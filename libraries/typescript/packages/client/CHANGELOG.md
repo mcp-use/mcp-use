@@ -1,5 +1,17 @@
 # @mcp-use/client
 
+## 2.3.3-canary.1
+
+### Patch Changes
+
+- 6e6f391: Keep MCP App iframe backgrounds transparent when embedded in dark hosts by matching the iframe color scheme to the sandbox document.
+
+## 2.3.3-canary.0
+
+### Patch Changes
+
+- b906d63: Prevent sibling inline MCP View widgets from clobbering global document fullscreen and pip attributes.
+
 ## 2.3.2
 
 ### Patch Changes

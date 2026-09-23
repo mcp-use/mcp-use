@@ -1,6 +1,125 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 import { getTestMatrix } from "./test-matrix";
+
+/** Inspector tab ids (see src/client/components/layout/layoutTabs.ts). */
+export type InspectorTabId =
+  | "server-metadata"
+  | "chat"
+  | "tools"
+  | "prompts"
+  | "resources"
+  | "skills"
+  | "sampling"
+  | "elicitation"
+  | "notifications"
+  | "connection-settings";
+
+/**
+ * The visible tab control for a tab id.
+ *
+ * On desktop the tabs are plain buttons in the left sidebar; the header tab
+ * bar with role="tab" only renders below the lg breakpoint. Both carry
+ * data-testid="tab-<id>", so select by test id and keep only the visible one.
+ */
+export function tabLocator(page: Page, id: InspectorTabId): Locator {
+  return page.locator(`[data-testid="tab-${id}"]:visible`);
+}
+
+/** Click a tab and wait for its content heading. */
+export async function openTab(
+  page: Page,
+  id: InspectorTabId,
+  heading?: string | RegExp
+): Promise<void> {
+  await tabLocator(page, id).click();
+  if (heading) {
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  }
+}
+
+/**
+ * The pending-count badge next to a sidebar tab (SidebarNavCountBadge). It is
+ * rendered in the <li> beside the tab button, not inside it.
+ */
+export function tabCountBadge(page: Page, id: InspectorTabId): Locator {
+  return page.locator("li", { has: tabLocator(page, id) }).getByText(/^\d+$/);
+}
+
+/** Turn the sidebar RPC panel on if it is not already open. */
+export async function openRpcPanel(page: Page): Promise<void> {
+  const toggle = page.getByRole("switch", { name: "RPC Panel" }).first();
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-checked")) !== "true") {
+    await toggle.click();
+  }
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+}
+
+/**
+ * Number of JSON-RPC messages represented by the given RPC panel rows.
+ *
+ * The panel coalesces consecutive notifications with the same method into one
+ * row labelled "×N", so counting rows undercounts. Sum the repeat suffixes.
+ */
+export async function countRpcMessages(rows: Locator): Promise<number> {
+  const texts = await rows.allTextContents();
+  return texts.reduce((total, text) => {
+    const match = text.match(/×(\d+)/);
+    return total + (match ? Number(match[1]) : 1);
+  }, 0);
+}
+
+const JSON_RPC_META = {
+  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+  "io.modelcontextprotocol/clientInfo": {
+    name: "inspector-e2e",
+    version: "1.0.0",
+  },
+  // Stateless modern requests must carry the client capabilities; the server
+  // answers 400 without them.
+  "io.modelcontextprotocol/clientCapabilities": {
+    extensions: {
+      "io.modelcontextprotocol/ui": {
+        mimeTypes: ["text/html;profile=mcp-app"],
+      },
+    },
+  },
+};
+
+/**
+ * Issue a raw JSON-RPC request to the server under test from the Node side.
+ *
+ * Uses Playwright's request context rather than page.evaluate(fetch) so the
+ * call is not subject to the browser's CORS preflight, which the v2 server
+ * does not answer by default.
+ */
+export async function mcpJsonRpc<T>(
+  page: Page,
+  method: string,
+  params: Record<string, unknown> = {}
+): Promise<T> {
+  const { serverUrl } = getTestMatrix();
+  const response = await page.request.post(serverUrl, {
+    headers: {
+      accept: "application/json, text/event-stream",
+      "content-type": "application/json",
+      "mcp-method": method,
+      "mcp-protocol-version": "2026-07-28",
+    },
+    data: {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method,
+      params: { ...params, _meta: JSON_RPC_META },
+    },
+  });
+  expect(response.ok(), `${method} returned HTTP ${response.status()}`).toBe(
+    true
+  );
+  const body = (await response.json()) as { result: T };
+  return body.result;
+}
 
 // CI environments (Docker/xvfb) need longer timeouts due to slower rendering
 const CI_MULTIPLIER = process.env.CI ? 3 : 1;
@@ -217,19 +336,34 @@ export async function configureLLMAPI(page: Page): Promise<void> {
   const apiKey = process.env.OPENAI_API_KEY || "";
 
   // Navigate to Chat tab
-  await page.getByRole("tab", { name: /Chat/ }).first().click();
-  await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible();
+  await openTab(page, "chat", "Chat");
 
-  // Click Configure API Key button
-  await page.getByTestId("chat-configure-api-key-button").click();
-  await expect(page.getByTestId("chat-config-dialog")).toBeVisible();
+  // Open the LLM configuration dialog. Without any LLM the landing shows a
+  // Configure button; when the managed Manufact cloud model is active (the
+  // default), the composer's model badge opens the same dialog.
+  const configureButton = page.getByTestId("chat-configure-api-key-button");
+  const modelBadge = page.getByTestId("chat-model-badge").first();
+  await expect(configureButton.or(modelBadge)).toBeVisible();
+  if (await configureButton.isVisible()) {
+    await configureButton.click();
+  } else {
+    await modelBadge.click();
+  }
+  const dialog = page.getByTestId("chat-config-dialog");
+  await expect(dialog).toBeVisible();
+
+  // The managed-cloud layout adds a "Manufact cloud | API key" switch.
+  const apiKeyTab = dialog.getByRole("tab", { name: "API key" });
+  if (await apiKeyTab.isVisible()) {
+    await apiKeyTab.click();
+  }
 
   // Enter API key
-  await page.getByTestId("chat-config-api-key-input").fill(apiKey);
+  await dialog.getByTestId("chat-config-api-key-input").fill(apiKey);
   await page.waitForTimeout(1000);
 
   // Select model
-  await page.getByTestId("chat-config-model-select").click();
+  await dialog.getByTestId("chat-config-model-select").click();
   const modelSearch = page.getByPlaceholder("Search models...");
   await expect(modelSearch).toBeVisible();
   await modelSearch.fill("gpt-5-nano");
@@ -239,6 +373,6 @@ export async function configureLLMAPI(page: Page): Promise<void> {
     .click();
 
   // Save configuration
-  await page.getByTestId("chat-config-save-button").click();
-  await expect(page.getByTestId("chat-config-dialog")).not.toBeVisible();
+  await dialog.getByTestId("chat-config-save-button").click();
+  await expect(dialog).not.toBeVisible();
 }

@@ -1,5 +1,28 @@
 # @mcp-use/cli
 
+## 4.1.15-canary.2
+
+### Patch Changes
+
+- 3e8a1d6: Resolve the organization in `mcp-use whoami` the same way `org current` and every `servers`/`deployments` command already do, by falling back to the account default when the local config has no explicit selection. Authenticating with `MCP_USE_API_KEY` without running `mcp-use login` previously made `whoami` report `organization: null` while the rest of the CLI read and mutated that organization's resources.
+- 01dedad: Trim `skills.directory` before resolving it. The blank check already tested the trimmed value, but the untrimmed string was passed to `resolve`, so `skills: { directory: " skills" }` resolved to a sibling directory with a leading space and no skills were discovered.
+
+## 4.1.15-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.15-canary.0
+
+### Patch Changes
+
+- 02196f8: Add `mcp-use/vite`, `mcp-use/tanstack-start` and `mcp-use/tanstack-start/vite` for mounting MCP servers in TanStack React Start. A dedicated MCP Vite environment reloads server code and skill/view registrations, while views share the application's browser environment for React Fast Refresh and CSS HMR. Successful server updates interrupt old requests; invalid edits retain the previous handler.
+
+  Production builds compile views in a separate environment and embed assets and skills into the deployable server output. The route adapter uses `createTanStackStartHandler()` without importing the authored server. Configure React, CSS and aliases in the main Vite config; the previous `viewsConfig` option is no longer supported. Include a Node/Nitro example and browser checks for development HMR and source-free production deployments.
+
+  Validate the compiled MCP server with the host's production Vite configuration, preserving custom defines, build plugins, aliases and mode-specific environment values.
+
 ## 4.1.14
 
 ### Patch Changes

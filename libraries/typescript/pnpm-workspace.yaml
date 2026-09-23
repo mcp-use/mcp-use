@@ -59,6 +59,10 @@ overrides:
   qs: ">=6.15.2"
   preact: ">=10.28.2"
   zod: 4.4.3
+  # A2UI's renderer and schema conversion currently require the Zod 3 API.
+  "mcp-use-example-a2ui>zod": 3.25.76
+  "@a2ui/react>zod": 3.25.76
+  "@a2ui/web_core>zod": 3.25.76
   jsondiffpatch: ">=0.7.2"
   esbuild: 0.27.1
   vite: "8.0.16"
@@ -86,6 +90,9 @@ overrides:
   lodash-es: ">=4.17.24"
   joi: ">=18.2.1"
   "@babel/core": ">=7.29.1"
+  # Start's compiler imports Babel 7's default export; Babel 8 removed it.
+  "@tanstack/start-plugin-core>@babel/core": "^7.29.1"
+  "@tanstack/router-plugin>@babel/core": "^7.29.1"
   path-to-regexp: ">=8.4.0"
   yaml: ">=2.8.3"
   "@eslint/plugin-kit": ">=0.3.4"
@@ -109,6 +116,8 @@ overrides:
 allowBuilds:
   "@tailwindcss/oxide": true
   esbuild: true
+  # protobufjs only checks dependency version conventions during postinstall.
+  protobufjs: false
   # The Next.js route example does not use image optimization, so its optional
   # sharp dependency must not run a native build in CI.
   sharp: false

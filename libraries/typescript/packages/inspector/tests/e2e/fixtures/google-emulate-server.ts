@@ -11,9 +11,17 @@ import { oauthCustomProvider } from "mcp-use/oauth";
 const GOOGLE_EMULATOR_PORT = 4101;
 const MCP_SERVER_PORT = 4201;
 const MCP_SERVER_OAUTH_CALLBACK = `http://localhost:${MCP_SERVER_PORT}/oauth/callback`;
+// The inspector is the OAuth client: both Auto (direct) and Proxy modes return
+// to its own callback route, so the emulator must accept that redirect URI.
+const INSPECTOR_OAUTH_CALLBACK =
+  "http://localhost:3000/inspector/oauth/callback";
 
-const STATIC_CLIENT_ID = "mcp-emulate-test-client.apps.googleusercontent.com";
-const STATIC_CLIENT_SECRET = "GOCSPX-mcp-emulate-test-secret";
+export const STATIC_CLIENT_ID =
+  "mcp-emulate-test-client.apps.googleusercontent.com";
+// The inspector is a public OAuth client (browser + PKCE) and never sends a
+// client_secret, by design. The emulator compares secrets byte-for-byte, so a
+// client seeded with an empty secret accepts token requests that carry none.
+const PUBLIC_CLIENT_SECRET = "";
 
 export const GOOGLE_MOCK_USER = {
   email: "testuser@example.com",
@@ -46,8 +54,11 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
         oauth_clients: [
           {
             client_id: STATIC_CLIENT_ID,
-            client_secret: STATIC_CLIENT_SECRET,
-            redirect_uris: [MCP_SERVER_OAUTH_CALLBACK],
+            client_secret: PUBLIC_CLIENT_SECRET,
+            redirect_uris: [
+              MCP_SERVER_OAUTH_CALLBACK,
+              INSPECTOR_OAUTH_CALLBACK,
+            ],
           },
         ],
       },
@@ -72,9 +83,12 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
           token_endpoint: `${emulatorUrl}/oauth2/token`,
           response_types_supported: ["code"],
           grant_types_supported: ["authorization_code", "refresh_token"],
-          token_endpoint_auth_methods_supported: ["client_secret_post"],
+          // Public client: no client authentication at the token endpoint.
+          token_endpoint_auth_methods_supported: ["none"],
         },
-        createTokenVerifier: () => ({
+        // The verifier is bound to the canonical MCP resource; v2 rejects
+        // verified tokens that do not echo it back.
+        createTokenVerifier: (protectedResource) => ({
           async verifyAccessToken(token: string) {
             const res = await fetch(`${emulatorUrl}/oauth2/v2/userinfo`, {
               headers: { Authorization: `Bearer ${token}` },
@@ -90,6 +104,7 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
               clientId: STATIC_CLIENT_ID,
               scopes: ["openid", "email", "profile"],
               expiresAt: Math.floor(Date.now() / 1000) + 3600,
+              resource: protectedResource,
               extra: { payload },
             };
           },

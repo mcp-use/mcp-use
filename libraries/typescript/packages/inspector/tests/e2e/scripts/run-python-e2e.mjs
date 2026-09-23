@@ -3,8 +3,10 @@
 /**
  * E2E tests for the Python MCP server.
  *
- * 1. Build the inspector (dist/web).
- * 2. Serve dist/web with npx http-server (mimics CDN); Python server fetches inspector from this URL.
+ * 1. Build the inspector (dist/app: inspector.js.gz + inspector.css.gz).
+ * 2. Assemble a legacy CDN layout (index.html + assets/*) in dist/e2e-cdn and serve it with
+ *    npx http-server. The Python loader fetches `${INSPECTOR_CDN_BASE_URL}/index.html` and
+ *    rewrites `/inspector/assets/` references to the CDN, so the shell must use those paths.
  * 3. Start the Python server (examples/server/server_example.py) with INSPECTOR_CDN_BASE_URL set.
  * 4. Run Playwright tests against the Python server's inspector at http://localhost:8000/inspector.
  *
@@ -14,7 +16,16 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { gunzipSync } from "node:zlib";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import waitOn from "wait-on";
@@ -25,14 +36,13 @@ const __dirname = dirname(__filename);
 const inspectorDir = resolve(__dirname, "../../..");
 const repoRoot = resolve(inspectorDir, "../../../..");
 const pythonDir = resolve(repoRoot, "libraries/python");
-const inspectorDistWeb = join(inspectorDir, "dist", "web");
 
 const CDN_SERVER_PORT = 2967;
 const PYTHON_SERVER_PORT = 8000;
 
 const childProcesses = [];
 
-function cleanup() {
+function cleanup(exitCode = 0) {
   console.log("\n🧹 Cleaning up processes...");
   childProcesses.forEach((proc) => {
     try {
@@ -41,11 +51,11 @@ function cleanup() {
       // ignore
     }
   });
-  process.exit(0);
+  process.exit(exitCode);
 }
 
-process.on("SIGINT", cleanup);
-process.on("SIGTERM", cleanup);
+process.on("SIGINT", () => cleanup(130));
+process.on("SIGTERM", () => cleanup(143));
 
 function runCommand(command, args, cwd, description) {
   return new Promise((resolve, reject) => {
@@ -126,6 +136,81 @@ async function waitForUrl(url, description, options = {}) {
   }
 }
 
+/**
+ * Build a legacy-layout CDN directory from the v2 inspector build.
+ *
+ * v2 emits dist/app/{inspector.js.gz,inspector.css.gz,favicons...} and the
+ * server renders its own HTML shell. The Python package still loads the
+ * inspector the v1 way: fetch `<cdn>/index.html` and rewrite
+ * `/inspector/assets/` paths to `<cdn>/assets/`. Recreate that shape here.
+ */
+function buildLegacyCdnLayout() {
+  const appDir = join(inspectorDir, "dist", "app");
+  const cdnDir = join(inspectorDir, "dist", "e2e-cdn");
+  const assetsDir = join(cdnDir, "assets");
+  rmSync(cdnDir, { recursive: true, force: true });
+  mkdirSync(assetsDir, { recursive: true });
+
+  for (const entry of readdirSync(appDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const source = join(appDir, entry.name);
+    if (entry.name.endsWith(".gz")) {
+      writeFileSync(
+        join(assetsDir, entry.name.slice(0, -3)),
+        gunzipSync(readFileSync(source))
+      );
+    } else {
+      copyFileSync(source, join(assetsDir, entry.name));
+    }
+  }
+
+  const missing = ["inspector.js", "inspector.css"].filter(
+    (name) => !existsSync(join(assetsDir, name))
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Inspector build is missing ${missing.join(", ")} in dist/app; run "pnpm build" first`
+    );
+  }
+
+  // Mirrors the runtime shell in src/server/inspector-shell.ts. The Python
+  // server is same-origin with the inspector, so no proxy is configured.
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/inspector/assets/inspector.css" />
+    <title>Inspector | mcp-use</title>
+    <script>window.__MCP_BASE_PATH__ = "";</script>
+    <script>window.__MCP_PROXY_URL__ = null;</script>
+    <script>window.__MCP_INSPECTOR_MODE__ = "embedded";</script>
+    <script>window.__MCP_USE_ANONYMIZED_TELEMETRY__ = false;try{localStorage.setItem("MCP_USE_ANONYMIZED_TELEMETRY","false");}catch(e){}</script>
+  </head>
+  <body>
+    <script>
+      if (typeof window !== "undefined" && typeof window.process === "undefined") {
+        window.process = {
+          env: {},
+          platform: "browser",
+          browser: true,
+          version: "v18.0.0",
+          versions: { node: "18.0.0" },
+          cwd: () => "/",
+          nextTick: (fn, ...args) => queueMicrotask(() => fn(...args)),
+        };
+      }
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/inspector/assets/inspector.js"></script>
+  </body>
+</html>
+`;
+  writeFileSync(join(cdnDir, "index.html"), html);
+  console.log(`📁 Legacy CDN layout assembled at ${cdnDir}\n`);
+  return cdnDir;
+}
+
 async function main() {
   const additionalArgs = process.argv.slice(2);
 
@@ -135,10 +220,11 @@ async function main() {
     // 1. Build inspector
     await runCommand("pnpm", ["build"], inspectorDir, "Building inspector");
 
-    // 2. Serve dist/web like a CDN (Python server will fetch from this URL)
+    // 2. Serve a legacy CDN layout built from dist/app (Python server will fetch from this URL)
+    const cdnDir = buildLegacyCdnLayout();
     await startBackgroundProcess(
       "npx",
-      ["http-server", "dist/web", "-p", String(CDN_SERVER_PORT), "--cors"],
+      ["http-server", cdnDir, "-p", String(CDN_SERVER_PORT), "--cors"],
       inspectorDir,
       "Starting http-server (inspector dist as CDN)"
     );
@@ -219,13 +305,12 @@ async function main() {
       } else {
         console.log(`\n❌ Tests failed with code ${code}\n`);
       }
-      cleanup();
-      process.exit(code ?? 0);
+      // cleanup() exits the process; pass the Playwright exit code through.
+      cleanup(code ?? 1);
     });
   } catch (err) {
     console.error("\n❌ Error:", err.message, "\n");
-    cleanup();
-    process.exit(1);
+    cleanup(1);
   }
 }
 

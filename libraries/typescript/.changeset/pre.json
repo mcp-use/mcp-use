@@ -1,0 +1,28 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.17",
+    "@mcp-use/cli": "4.1.14",
+    "@mcp-use/client": "2.3.2",
+    "create-mcp-use-app": "2.0.6",
+    "@mcp-use/inspector": "20.3.10",
+    "mcp-use": "2.5.2",
+    "@mcp-use/tunnel": "0.2.1"
+  },
+  "changesets": [
+    "brave-otters-report",
+    "daytona-example",
+    "fix-multi-widget-display-mode-chrome",
+    "fix-view-iframe-color-scheme",
+    "linear-vite-base-path",
+    "plain-moons-wander",
+    "propagated-470891b325c45906",
+    "propagated-dcb14d47f4d03962",
+    "propagated-de767204ec5bb2a7",
+    "quiet-chat-button",
+    "tanstack-start-server",
+    "template-node-types",
+    "upstash-example"
+  ]
+}

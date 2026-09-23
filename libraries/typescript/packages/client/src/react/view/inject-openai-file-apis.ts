@@ -154,12 +154,29 @@ const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
   api.requestDisplayMode = api.requestDisplayMode || function (request) {
     return sendRequest("ui/request-display-mode", { mode: request.mode });
   };
+  function modelContextParams(modelContent) {
+    if (typeof modelContent === "string") {
+      return modelContent ? { content: [{ type: "text", text: modelContent }] } : undefined;
+    }
+    if (modelContent && typeof modelContent === "object" && !Array.isArray(modelContent)) {
+      return { structuredContent: modelContent };
+    }
+    return undefined;
+  }
   api.setWidgetState = api.setWidgetState || function (state) {
     dispatchGlobals({ widgetState: state });
     // The Apps SDK setter is promise-based. Keep the local state update
     // synchronous, but return a promise so legacy useWidget() code can safely
     // await or chain .catch() on the compatibility API.
-    return Promise.resolve();
+    // Only modelContent is model-visible in ChatGPT; privateContent and
+    // imageIds stay in the view. Surfaces without model context reject the
+    // request, which must not reject the setter.
+    var params = modelContextParams(state && state.modelContent);
+    if (!params) return Promise.resolve();
+    return sendRequest("ui/update-model-context", params).then(
+      function () {},
+      function () {}
+    );
   };
   api.notifyIntrinsicHeight = api.notifyIntrinsicHeight || function (height) {
     sendNotification("ui/notifications/size-changed", { height: height });

@@ -2,9 +2,74 @@
  * Authentication Test Helpers
  *
  * Helper functions for testing authentication flows in the inspector.
+ *
+ * Two surfaces edit custom headers:
+ * - The dashboard connect form opens a "Custom Headers" dialog
+ *   (connection-form-headers-button) that closes via its own Save button.
+ * - The Connection Settings tab renders the headers editor inline and saves
+ *   through the tab header's Save button (connection-form-save-button).
  */
 
 import { expect, type Page } from "@playwright/test";
+
+const INSPECTOR_URL = "http://localhost:3000/inspector";
+
+/**
+ * Add a custom header through the dashboard connect form's headers dialog.
+ * Leaves the dialog closed and the header staged for the next Connect.
+ */
+export async function addCustomHeaderInConnectForm(
+  page: Page,
+  name: string,
+  value: string
+): Promise<void> {
+  await page.getByTestId("connection-form-headers-button").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByTestId("custom-headers-add-button").click();
+  const index =
+    (await dialog.getByTestId(/^custom-header-row-\d+$/).count()) - 1;
+  await dialog.getByTestId(`custom-header-name-${index}`).fill(name);
+  await dialog.getByTestId(`custom-header-value-${index}`).fill(value);
+  await dialog.getByTestId("custom-headers-save-button").click();
+  await expect(dialog).not.toBeVisible();
+}
+
+/**
+ * Add a custom header on the Connection Settings tab (inline editor) and save
+ * the connection options. Assumes the tab is already open.
+ */
+export async function addCustomHeaderInSettingsTab(
+  page: Page,
+  name: string,
+  value: string
+): Promise<void> {
+  await page.getByTestId("custom-headers-add-button").click();
+  const index = (await page.getByTestId(/^custom-header-row-\d+$/).count()) - 1;
+  await page.getByTestId(`custom-header-name-${index}`).fill(name);
+  await page.getByTestId(`custom-header-value-${index}`).fill(value);
+  await page.getByTestId("connection-form-save-button").click();
+  await expect(
+    page.getByText("Connection settings updated").first()
+  ).toBeVisible({ timeout: 5000 });
+}
+
+/**
+ * Return to the dashboard with client-side navigation and wait for the server
+ * to become ready.
+ *
+ * Saving connection options remounts the connection with the new settings,
+ * but the "Connection settings updated" toast fires before the update is
+ * awaited and persisted. A full page load at that moment restores the stale
+ * stored config (without the new headers), so navigate in-app instead.
+ */
+export async function returnToDashboardAndWaitReady(
+  page: Page,
+  serverName: string
+): Promise<void> {
+  await page.getByRole("link", { name: /mcp-use.*Inspector/ }).click();
+  await waitForServerState(page, serverName, "ready", 20000);
+}
 
 /**
  * Connect to API Key server with or without authentication
@@ -19,24 +84,15 @@ export async function connectToApiKeyServer(
   const { withAuth = false, apiKey = "test-api-key-12345" } = options;
   const serverUrl = "http://localhost:3003/mcp";
 
-  // If withAuth, add the API key header before connecting
   if (withAuth) {
-    await page.goto("http://localhost:3000/inspector");
-
-    // Add custom header
-    await page.getByTestId("connection-form-advanced-toggle").click();
-    await page.getByTestId("custom-headers-add-button").click();
-
-    // Fill in header name and value
-    await page.getByTestId("custom-header-name-0").fill("Authorization");
-    await page.getByTestId("custom-header-value-0").fill(`Bearer ${apiKey}`);
+    await addCustomHeaderInConnectForm(
+      page,
+      "Authorization",
+      `Bearer ${apiKey}`
+    );
   }
 
-  // Fill in the URL
-  await page.getByTestId("connection-form-url-input").click();
   await page.getByTestId("connection-form-url-input").fill(serverUrl);
-
-  // Click connect
   await page.getByTestId("connection-form-connect-button").click();
 }
 
@@ -58,81 +114,70 @@ export async function connectToCustomHeaderServer(
   } = options;
   const serverUrl = "http://localhost:3004/mcp";
 
-  // If withAuth, add the custom header before connecting
   if (withAuth) {
-    await page.goto("http://localhost:3000/inspector");
-
-    // Add custom header
-    await page.getByTestId("connection-form-advanced-toggle").click();
-    await page.getByTestId("custom-headers-add-button").click();
-
-    // Fill in header name and value
-    await page.getByTestId("custom-header-name-0").fill(headerName);
-    await page.getByTestId("custom-header-value-0").fill(headerValue);
+    await addCustomHeaderInConnectForm(page, headerName, headerValue);
   }
 
-  // Fill in the URL
-  await page.getByTestId("connection-form-url-input").click();
   await page.getByTestId("connection-form-url-input").fill(serverUrl);
-
-  // Click connect
   await page.getByTestId("connection-form-connect-button").click();
 }
 
 /**
- * Connect to OAuth server
+ * Pre-register OAuth client credentials in the connect form's Authentication
+ * dialog. Servers whose authorization server does not offer dynamic client
+ * registration (Google, most mocks) need this before Connect, otherwise the
+ * client fails with "does not support dynamic client registration".
+ */
+export async function fillOAuthClientCredentials(
+  page: Page,
+  options: { clientId: string; clientSecret?: string; scope?: string }
+): Promise<void> {
+  await page.getByTestId("connection-form-auth-button").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByTestId("auth-dialog-client-id-input")
+    .fill(options.clientId);
+  if (options.clientSecret !== undefined) {
+    await dialog
+      .getByTestId("auth-dialog-client-secret-input")
+      .fill(options.clientSecret);
+  }
+  if (options.scope !== undefined) {
+    await dialog.getByTestId("auth-dialog-scope-input").fill(options.scope);
+  }
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).not.toBeVisible();
+}
+
+/**
+ * Connect to an OAuth server. Static client credentials are registered first
+ * when provided.
  */
 export async function connectToOAuthServer(
   page: Page,
-  provider: string,
-  port: number
+  _provider: string,
+  port: number,
+  options: { clientId?: string; clientSecret?: string } = {}
 ) {
   const serverUrl = `http://localhost:${port}/mcp`;
 
-  // Navigate to inspector
-  await page.goto("http://localhost:3000/inspector");
+  if (options.clientId) {
+    await fillOAuthClientCredentials(page, {
+      clientId: options.clientId,
+      clientSecret: options.clientSecret,
+    });
+  }
 
-  // Fill in the URL
-  await page.getByTestId("connection-form-url-input").click();
   await page.getByTestId("connection-form-url-input").fill(serverUrl);
-
-  // Click connect
   await page.getByTestId("connection-form-connect-button").click();
 }
 
 /**
- * Add a custom header via the connection form
- */
-export async function addCustomHeader(
-  page: Page,
-  name: string,
-  value: string,
-  index: number = 0
-) {
-  // Expand advanced settings if not already expanded
-  const advancedToggle = page.getByTestId("connection-form-advanced-toggle");
-  if (await advancedToggle.isVisible()) {
-    await advancedToggle.click();
-  }
-
-  // Add header button if this is the first one
-  if (index === 0) {
-    const addButton = page.getByTestId("custom-headers-add-button");
-    if (await addButton.isVisible()) {
-      await addButton.click();
-    }
-  }
-
-  // Fill in header
-  await page.getByTestId(`custom-header-name-${index}`).fill(name);
-  await page.getByTestId(`custom-header-value-${index}`).fill(value);
-}
-
-/**
- * Open connection settings for a server
+ * Open the Connection Settings tab for a server from its dashboard tile.
  */
 export async function openConnectionSettings(page: Page, serverUrl: string) {
-  await page.goto("http://localhost:3000/inspector");
+  await page.goto(INSPECTOR_URL);
   await page.getByTestId("server-tile-settings").click();
   await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
   await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
@@ -158,48 +203,12 @@ export async function waitForServerState(
 }
 
 /**
- * Click the authenticate button for a server
+ * Locate the authenticate button for a server
  */
 export async function clickAuthenticateButton(page: Page) {
   const authenticateButton = page.getByTestId("server-tile-authenticate");
   await expect(authenticateButton).toBeVisible({ timeout: 5000 });
   return authenticateButton;
-}
-
-/**
- * Complete OAuth flow by clicking authenticate and handling the popup
- * For mock OAuth, we can intercept the redirect and complete it programmatically
- */
-export async function completeOAuthFlow(page: Page, oauthHelper: any) {
-  // Get the authenticate button
-  const authenticateButton = await clickAuthenticateButton(page);
-
-  // Get the authUrl from the button's href
-  const authUrl = await authenticateButton.getAttribute("href");
-  expect(authUrl).toBeTruthy();
-
-  // For testing, we can generate a token and simulate the OAuth callback
-  const token = await oauthHelper.generateToken();
-
-  // Navigate to the OAuth callback URL with the token
-  // The format depends on how the inspector handles OAuth callbacks
-  // This is a simplified version - adjust based on actual implementation
-  const _callbackUrl = `http://localhost:3000/inspector/oauth/callback?access_token=${token}&token_type=Bearer`;
-
-  // Open auth URL in a new context to simulate popup
-  const context = page.context();
-  const authPage = await context.newPage();
-  await authPage.goto(authUrl!);
-
-  // The mock OAuth server should auto-approve and redirect
-  // Wait for redirect to callback URL
-  await authPage.waitForURL(/callback/, { timeout: 5000 });
-
-  // Close the auth page
-  await authPage.close();
-
-  // Wait for the main page to update with the token
-  await page.waitForTimeout(1000);
 }
 
 /**
@@ -210,21 +219,13 @@ export async function executeToolAndVerifyAuth(
   toolName: string,
   expectedMessage?: string
 ) {
-  // Click on the tool
   await page.getByTestId(`tool-item-${toolName}`).click();
-
-  // Wait for execute button
   await expect(page.getByTestId("tool-execution-execute-button")).toBeVisible();
-
-  // Execute the tool
   await page.getByTestId("tool-execution-execute-button").click();
-
-  // Wait for results
   await expect(
     page.getByTestId("tool-execution-results-text-content")
   ).toBeVisible({ timeout: 10000 });
 
-  // If expected message provided, verify it
   if (expectedMessage) {
     await expect(
       page.getByTestId("tool-execution-results-text-content")
@@ -237,19 +238,16 @@ export async function executeToolAndVerifyAuth(
  */
 export async function navigateToServerTools(page: Page, serverUrl: string) {
   await page.getByTestId(`server-tile-${serverUrl}`).click();
+  // The inspector restores the last active tab (e.g. Connection Settings
+  // after editing auth); select Tools explicitly.
+  await page.locator('[data-testid="tab-tools"]:visible').click();
   await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 }
 
 /**
- * Reconnect to a server after adding authentication
+ * Reconnect to a server from its dashboard tile
  */
-export async function reconnectServer(page: Page, serverUrl: string) {
-  // Go back to home
-  await page.goto("http://localhost:3000/inspector");
-
-  // Find the server and click reconnect/retry
-  await page.getByTestId(`server-tile-retry-${serverUrl}`).click();
-
-  // Wait a moment for reconnection
-  await page.waitForTimeout(1000);
+export async function reconnectServer(page: Page, _serverUrl: string) {
+  await page.goto(INSPECTOR_URL);
+  await page.getByTestId("server-tile-reconnect").click();
 }

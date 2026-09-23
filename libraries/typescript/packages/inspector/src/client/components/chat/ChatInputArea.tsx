@@ -132,6 +132,7 @@ export function ChatInputArea({
               managedModel={managedModel}
               mode={modelBadgeMode}
               className="shrink-0"
+              data-testid="chat-model-badge"
               onClick={() => onConfigDialogOpenChange(true)}
             />
           }

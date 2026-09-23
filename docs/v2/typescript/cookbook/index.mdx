@@ -1,0 +1,70 @@
+---
+title: "Cookbook"
+description: "Extend your MCP server with practical integration examples."
+sidebarTitle: "Overview"
+icon: "layout-grid"
+---
+
+Start with a working app or MCP server and add an integration. Each recipe includes the code you need and a quick way to try it.
+
+## Recipes
+
+<CardGroup cols={2}>
+  {/* Daytona glyph from https://www.daytona.io/brand, cropped to its artwork bounds. */}
+  <Card
+    title="Daytona"
+    icon={
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="192 123 70 73" width="24" height="24" fill="currentColor" aria-hidden="true">
+        <path d="M195.994 172.235h24.929v8.547h-24.929zm33.477-29.915h28.491v8.547h-28.491zm-14.958 2.634 21.153-21.153 6.044 6.044-21.153 21.153z" />
+        <path d="m214.644 166.322-16.246-16.246-6.043 6.044 16.245 16.246zm21.368 11.957-17.124 17.124-6.044-6.044 17.124-17.124zm-.131-21.368 19.139 19.139 6.043-6.044-19.138-19.139zm-21.368-21.002v20.656h-8.547v-20.656z" />
+        <path d="M244.428 165.825v25.642h-8.547v-25.642z" />
+      </svg>
+    }
+    href="/v2/typescript/cookbook/daytona"
+  >
+    Run Python, TypeScript, or JavaScript in an isolated sandbox. Add a `run_code` tool to your MCP server.
+  </Card>
+  <Card
+    title="Next.js"
+    icon={
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+        <path d="M18.665 21.978C16.758 23.255 14.465 24 12 24 5.377 24 0 18.623 0 12S5.377 0 12 0s12 5.377 12 12c0 3.583-1.574 6.801-4.067 9.001L9.219 7.2H7.2v9.596h1.615V9.251l9.85 12.727Zm-3.332-8.533 1.6 2.061V7.2h-1.6v6.245Z" />
+      </svg>
+    }
+    href="/v2/typescript/cookbook/nextjs"
+  >
+    Add an MCP endpoint to your existing Next.js app. Define a tool and mount it with the Next.js adapter.
+  </Card>
+  <Card
+    title="TanStack Start"
+    icon="/v2/typescript/cookbook/tanstack-start.svg"
+    href="/v2/typescript/cookbook/tanstack-start"
+  >
+    Add an MCP endpoint to your existing TanStack Start app. Define a tool and mount it with the Vite plugin and a server route.
+  </Card>
+  <Card
+    title="Upstash"
+    icon={
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 355 472" width="24" height="24" fill="currentColor" aria-hidden="true">
+        <path d="M0.421875 412.975C78.5269 491.079 205.16 491.079 283.265 412.975C361.369 334.87 361.369 208.237 283.265 130.132L247.909 165.487C306.488 224.066 306.488 319.041 247.909 377.619C189.331 436.198 94.3559 436.198 35.7769 377.619L0.421875 412.975Z" />
+        <path d="M71.1328 342.264C110.185 381.316 173.501 381.316 212.554 342.264C251.606 303.212 251.606 239.895 212.554 200.843L177.199 236.198C196.725 255.724 196.725 287.382 177.199 306.909C157.672 326.435 126.014 326.435 106.488 306.909L71.1328 342.264Z" />
+        <path d="M353.974 59.421C275.869 -18.6835 149.236 -18.6835 71.1315 59.421C-6.97352 137.526 -6.97352 264.159 71.1315 342.264L106.486 306.909C47.9085 248.33 47.9085 153.355 106.486 94.777C165.065 36.198 260.04 36.198 318.618 94.777L353.974 59.421Z" />
+        <path d="M283.264 130.132C244.212 91.08 180.894 91.08 141.842 130.132C102.789 169.185 102.789 232.501 141.842 271.553L177.197 236.198C157.671 216.672 157.671 185.014 177.197 165.487C196.723 145.961 228.381 145.961 247.908 165.487L283.264 130.132Z" />
+      </svg>
+    }
+    href="/v2/typescript/cookbook/upstash"
+  >
+    Rate-limit MCP tool calls with Upstash Redis. Share a quota across server instances before running a tool.
+  </Card>
+  <Card
+    title="Sentry"
+    icon={
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+        <path d="M13.91 2.505c-.873-1.448-2.972-1.448-3.844 0L6.904 7.92a15.478 15.478 0 0 1 8.53 12.811h-2.221A13.301 13.301 0 0 0 5.784 9.814l-2.926 5.06a7.65 7.65 0 0 1 4.435 5.848H2.194a.365.365 0 0 1-.298-.534l1.413-2.402a5.16 5.16 0 0 0-1.614-.913L.296 19.275a2.182 2.182 0 0 0 .812 2.999 2.24 2.24 0 0 0 1.086.288h6.983a9.322 9.322 0 0 0-3.845-8.318l1.11-1.922a11.47 11.47 0 0 1 4.95 10.24h5.915a17.242 17.242 0 0 0-7.885-15.28l2.244-3.845a.37.37 0 0 1 .504-.13c.255.14 9.75 16.708 9.928 16.9a.365.365 0 0 1-.327.543h-2.287c.029.612.029 1.223 0 1.831h2.297a2.206 2.206 0 0 0 1.922-3.31z" />
+      </svg>
+    }
+    href="/v2/typescript/cookbook/sentry"
+  >
+    Trace MCP tool calls and report failures in Sentry. Monitor successful calls, tool errors, and exceptions.
+  </Card>
+</CardGroup>

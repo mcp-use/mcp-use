@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/cli",
   "type": "module",
-  "version": "4.1.14",
+  "version": "4.1.15-canary.2",
   "description": "Prebuilt CLI, development server, and build pipeline for mcp-use",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -33,6 +33,10 @@
     },
     "./vite-client": {
       "types": "./types/vite-client.d.ts"
+    },
+    "./internal/vite": {
+      "types": "./types/internal/vite.d.ts",
+      "import": "./dist/internal/vite.js"
     }
   },
   "files": [
@@ -56,8 +60,8 @@
     "vite": "8.0.16"
   },
   "peerDependencies": {
-    "@mcp-use/client": "^2.0.1 || ^2.1.0 || ^2.1.1 || ^2.1.2 || ^2.1.3 || ^2.1.4 || ^2.1.5 || ^2.2.0 || ^2.2.1 || ^2.2.2 || ^2.2.3 || ^2.2.4 || ^2.2.5 || ^2.3.0 || ^2.3.1 || ^2.3.2",
-    "@mcp-use/inspector": "^20.3.8 || ^20.3.9 || ^20.3.10"
+    "@mcp-use/client": "^2.0.1 || ^2.1.0 || ^2.1.1 || ^2.1.2 || ^2.1.3 || ^2.1.4 || ^2.1.5 || ^2.2.0 || ^2.2.1 || ^2.2.2 || ^2.2.3 || ^2.2.4 || ^2.2.5 || ^2.3.0 || ^2.3.1 || ^2.3.2 || ^2.3.3-canary.0",
+    "@mcp-use/inspector": "^20.3.8 || ^20.3.9 || ^20.3.10 || ^20.3.11-canary.0"
   },
   "peerDependenciesMeta": {
     "@mcp-use/client": {

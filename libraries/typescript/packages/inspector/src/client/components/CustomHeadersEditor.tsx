@@ -146,15 +146,17 @@ export function CustomHeadersEditor({
             </div>
           </div>
         ) : (
-          headers.map((header) => (
+          headers.map((header, index) => (
             <div
               key={header.id}
               className="grid grid-cols-[1fr_1fr] gap-4 items-center"
+              data-testid={`custom-header-row-${index}`}
             >
               <Input
                 ref={(el) => {
                   inputRefs.current[header.id] = el;
                 }}
+                data-testid={`custom-header-name-${index}`}
                 placeholder="Authorization"
                 value={header.name}
                 onChange={(e) =>
@@ -165,6 +167,7 @@ export function CustomHeadersEditor({
               />
               <div className="flex items-center gap-2">
                 <Input
+                  data-testid={`custom-header-value-${index}`}
                   placeholder=""
                   value={header.value}
                   onChange={(e) =>
@@ -193,6 +196,8 @@ export function CustomHeadersEditor({
                   size="icon-sm"
                   onClick={() => removeHeader(header.id)}
                   className="h-8 w-8 p-0"
+                  data-testid={`custom-header-remove-${index}`}
+                  aria-label="Remove header"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -210,6 +215,7 @@ export function CustomHeadersEditor({
             onClick={addHeader}
             disabled={headers.length >= maxHeaders}
             className="flex items-center gap-2"
+            data-testid="custom-headers-add-button"
           >
             <Plus className="h-4 w-4" />
             Add
@@ -224,6 +230,7 @@ export function CustomHeadersEditor({
             type="button"
             onClick={onSave}
             className="bg-black text-white hover:bg-gray-800"
+            data-testid="custom-headers-save-button"
           >
             Save
           </Button>

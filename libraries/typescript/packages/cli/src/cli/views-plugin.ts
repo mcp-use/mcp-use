@@ -48,6 +48,10 @@ export const VIEW_REACT_OPTIMIZE_DEPS = {
 interface McpUseViewsPluginOptions {
   /** Static list or live getter (dev rediscovery). */
   getViews: () => DiscoveredView[];
+  /** Include the CLI-managed Tailwind stylesheet; framework hosts supply their own CSS. */
+  tailwind?: boolean;
+  /** Environment names that compile view modules. Defaults to the client environment. */
+  environments?: string[];
   /**
    * Dev-mode entry shape. When present, every virtual entry self-accepts HMR
    * updates (`import.meta.hot.accept()`) so an update that propagates past the
@@ -71,7 +75,8 @@ interface McpUseViewsPluginOptions {
 /**
  * Vite plugin that resolves `virtual:mcp-use/views/<name>` to bootstrap code.
  *
- * Applies only to the **client** environment.
+ * Applies to the client environment by default; adapters can select additional
+ * browser build environments.
  *
  * @internal
  */
@@ -89,7 +94,7 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
       };
     },
     applyToEnvironment(environment) {
-      return environment.name === "client";
+      return (options.environments ?? ["client"]).includes(environment.name);
     },
     resolveId(id) {
       if (id === VIRTUAL_CSP_RUNTIME_ID) {
@@ -141,7 +146,8 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         // below) or any refresh-wrapped view module evaluates.
         lines.push(`import "@vitejs/plugin-react/preamble";`);
       }
-      lines.push(`import ${JSON.stringify(VIRTUAL_TAILWIND_ID)};`);
+      if (options.tailwind !== false)
+        lines.push(`import ${JSON.stringify(VIRTUAL_TAILWIND_ID)};`);
       lines.push(
         `import { bootstrapView } from "mcp-use/react";`,
         `import * as viewModule from ${JSON.stringify(view.entryPath)};`,

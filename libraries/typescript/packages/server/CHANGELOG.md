@@ -1,5 +1,59 @@
 # mcp-use
 
+## 2.6.0-canary.5
+
+### Patch Changes
+
+- f143d66: Validate Vite integration base paths without a slow trailing-slash regular expression on long paths.
+
+## 2.6.0-canary.4
+
+### Patch Changes
+
+- 257e44a: Keep the public chat button hidden when public chat is unavailable.
+
+## 2.6.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3e8a1d6]
+- Updated dependencies [01dedad]
+  - @mcp-use/cli@4.1.15-canary.2
+
+## 2.6.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.11-canary.2
+  - @mcp-use/cli@4.1.15-canary.1
+
+## 2.6.0-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.1.15-canary.1
+  - @mcp-use/inspector@20.3.11-canary.1
+
+## 2.6.0-canary.0
+
+### Minor Changes
+
+- 02196f8: Add `mcp-use/vite`, `mcp-use/tanstack-start` and `mcp-use/tanstack-start/vite` for mounting MCP servers in TanStack React Start. A dedicated MCP Vite environment reloads server code and skill/view registrations, while views share the application's browser environment for React Fast Refresh and CSS HMR. Successful server updates interrupt old requests; invalid edits retain the previous handler.
+
+  Production builds compile views in a separate environment and embed assets and skills into the deployable server output. The route adapter uses `createTanStackStartHandler()` without importing the authored server. Configure React, CSS and aliases in the main Vite config; the previous `viewsConfig` option is no longer supported. Include a Node/Nitro example and browser checks for development HMR and source-free production deployments.
+
+  Validate the compiled MCP server with the host's production Vite configuration, preserving custom defines, build plugins, aliases and mode-specific environment values.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [02196f8]
+  - @mcp-use/inspector@20.3.11-canary.0
+  - @mcp-use/cli@4.1.15-canary.0
+
 ## 2.5.2
 
 ### Patch Changes
