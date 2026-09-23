@@ -82,7 +82,27 @@ describe("listAllTools pagination", () => {
     );
   });
 
-  it("returns no tools when the server does not implement tools/list", async () => {
+  it("stops when nextCursor is null, not just undefined", async () => {
+    const connector = new TestConnector() as MutableConnector;
+
+    // Servers may signal "no more pages" with an explicit null cursor.
+    let call = 0;
+    connector.client = {
+      async listTools() {
+        call += 1;
+        return { tools: makeTools(0, 2), nextCursor: null };
+      },
+    };
+
+    const tools = await connector.listAllTools();
+
+    // A `!== undefined` check would treat null as "another page" and either
+    // make a bogus second call or throw a repeated-cursor error.
+    expect(tools).toHaveLength(2);
+    expect(call).toBe(1);
+  });
+
+  it("propagates -32601 so callers decide (initialize -> [], refresh keeps cache)", async () => {
     const connector = new TestConnector() as MutableConnector;
 
     connector.client = {
@@ -91,7 +111,9 @@ describe("listAllTools pagination", () => {
       },
     };
 
-    await expect(connector.listAllTools()).resolves.toEqual([]);
+    // Unlike prompts, tools/list not-implemented is not swallowed here; the
+    // single-page listTools() also throws, and callers handle it.
+    await expect(connector.listAllTools()).rejects.toThrow("Method not found");
   });
 });
 
@@ -149,6 +171,21 @@ describe("listAllPrompts pagination", () => {
 
     expect(prompts).toEqual([]);
     expect(called).toBe(false);
+  });
+
+  it("returns no prompts when a capable server still answers -32601", async () => {
+    const connector = new TestConnector() as MutableConnector;
+    connector.capabilitiesCache = { prompts: {} };
+
+    connector.client = {
+      async listPrompts() {
+        throw Object.assign(new Error("Method not found"), { code: -32601 });
+      },
+    };
+
+    // Mirrors single-page listPrompts(): a -32601 is treated as "no prompts",
+    // not an error, and the shape stays { prompts: [] }.
+    await expect(connector.listAllPrompts()).resolves.toEqual({ prompts: [] });
   });
 });
 

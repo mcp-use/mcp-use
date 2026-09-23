@@ -715,6 +715,43 @@ export abstract class BaseConnector {
   }
 
   /**
+   * Follow an MCP list method's pagination to completion.
+   *
+   * Cursor rules per the MCP spec: cursors are opaque; iteration ends only when
+   * `nextCursor` is `null` or absent (an empty-string cursor is a valid
+   * "there is another page" signal, not the end); and a repeated cursor is
+   * treated as a server fault and rejected rather than looped on forever.
+   *
+   * @param label - Method name used in the repeated-cursor error message.
+   * @param fetchPage - Fetches one page for the given cursor (`undefined` = first page).
+   * @returns Every item accumulated across all pages.
+   */
+  private async paginateAll<TItem>(
+    label: string,
+    fetchPage: (
+      cursor: string | undefined
+    ) => Promise<{ items: TItem[]; nextCursor?: string | null }>
+  ): Promise<TItem[]> {
+    const all: TItem[] = [];
+    const seenCursors = new Set<string>();
+    let cursor: string | undefined = undefined;
+    for (;;) {
+      const page = await fetchPage(cursor);
+      all.push(...page.items);
+      const next = page.nextCursor;
+      // `!= null` ends iteration on both `null` and `undefined`, while still
+      // continuing on an empty-string cursor (a spec-legal "next page").
+      if (next == null) break;
+      if (seenCursors.has(next)) {
+        throw new Error(`${label} returned a repeated pagination cursor`);
+      }
+      seenCursors.add(next);
+      cursor = next;
+    }
+    return all;
+  }
+
+  /**
    * List all available tools from the MCP server.
    * This method fetches fresh tools from the server, unlike the `tools` getter which returns cached tools.
    *
@@ -760,41 +797,26 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
 
-    try {
-      logger.debug("[listAllTools] Fetching all tools (auto-pagination)...");
-      return await this.executeRequest(async () => {
-        const allTools: Tool[] = [];
-        const seenCursors = new Set<string>();
-        let cursor: string | undefined = undefined;
-
-        do {
-          const result: { tools?: Tool[]; nextCursor?: string } =
-            await client.listTools({ cursor }, options);
-          allTools.push(...((result.tools ?? []) as Tool[]));
-          cursor = result.nextCursor;
-          if (cursor !== undefined) {
-            if (seenCursors.has(cursor)) {
-              throw new Error(
-                "tools/list returned a repeated pagination cursor"
-              );
-            }
-            seenCursors.add(cursor);
-          }
-        } while (cursor !== undefined);
-
-        logger.debug(`[listAllTools] Returned ${allTools.length} tools`);
-        return allTools;
-      });
-    } catch (err: unknown) {
-      const error = err as Error & { code?: number };
-      // Match listTools()/initialize(): a server without tools/list has no
-      // tools rather than being an error.
-      if (error.code === -32601) {
-        logger.debug("Server does not implement tools/list, assuming no tools");
-        return [];
-      }
-      throw err;
-    }
+    logger.debug("[listAllTools] Fetching all tools (auto-pagination)...");
+    // A -32601 ("tools/list not implemented") is intentionally NOT swallowed
+    // here, matching single-page listTools(): the caller decides what an absent
+    // method means. initialize() treats it as "no tools" ([]), while
+    // refreshToolsCache() keeps the previously discovered tools rather than
+    // wiping them when a refresh transiently fails.
+    const tools = await this.executeRequest(() =>
+      this.paginateAll<Tool>("tools/list", async (cursor) => {
+        const result = (await client.listTools({ cursor }, options)) as {
+          tools?: Tool[];
+          nextCursor?: string | null;
+        };
+        return {
+          items: (result.tools ?? []) as Tool[],
+          nextCursor: result.nextCursor,
+        };
+      })
+    );
+    logger.debug(`[listAllTools] Returned ${tools.length} tools`);
+    return tools;
   }
 
   /**
@@ -1017,31 +1039,20 @@ export abstract class BaseConnector {
 
     try {
       logger.debug("Listing all prompts (with auto-pagination)");
-      return await this.executeRequest(async () => {
-        const allPrompts: any[] = [];
-        const seenCursors = new Set<string>();
-        let cursor: string | undefined = undefined;
-
-        do {
-          const result: { prompts?: any[]; nextCursor?: string } =
-            await client.listPrompts({ cursor }, options);
-          allPrompts.push(...(result.prompts ?? []));
-          cursor = result.nextCursor;
-          if (cursor !== undefined) {
-            if (seenCursors.has(cursor)) {
-              throw new Error(
-                "prompts/list returned a repeated pagination cursor"
-              );
-            }
-            seenCursors.add(cursor);
-          }
-        } while (cursor !== undefined);
-
-        return { prompts: allPrompts };
-      });
+      const prompts = await this.executeRequest(() =>
+        this.paginateAll<any>("prompts/list", async (cursor) => {
+          const result = (await client.listPrompts({ cursor }, options)) as {
+            prompts?: any[];
+            nextCursor?: string | null;
+          };
+          return { items: result.prompts ?? [], nextCursor: result.nextCursor };
+        })
+      );
+      return { prompts };
     } catch (err: unknown) {
       const error = err as Error & { code?: number };
-      // Gracefully handle if server advertises but doesn't actually support it
+      // Match listPrompts(): a server that advertises prompts but answers
+      // -32601 is treated as having no prompts rather than as an error.
       if (error.code === -32601) {
         logger.debug("Server advertised prompts but method not found");
         return { prompts: [] };
