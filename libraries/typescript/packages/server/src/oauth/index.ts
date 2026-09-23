@@ -32,5 +32,6 @@ export {
   type CustomOAuthProviderOptions,
   type OAuthExtra,
   type OAuthProvider,
+  type OAuthProviderHost,
   type OAuthResourceOptions,
 } from "./provider.js";

@@ -4,6 +4,31 @@ import type {
   OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
 
+import type { DefinitionSecuritySchemes, ToolOAuthMode } from "../context.js";
+import type {
+  McpMiddlewareFnFor,
+  McpMiddlewarePattern,
+} from "../middleware/mcp-middleware.js";
+import type {
+  InferPromptInput,
+  PromptCallback,
+  PromptDefinition,
+} from "../prompts.js";
+import type {
+  InferTemplateParams,
+  ResourceCallback,
+  ResourceDefinition,
+  ResourceTemplateCallback,
+  ResourceTemplateDefinition,
+} from "../resources.js";
+import type {
+  InferToolInput,
+  InferToolName,
+  InferToolOutput,
+  ToolCallback,
+  ToolDefinition,
+  ToolRef,
+} from "../tools.js";
 import { assertSecureHttpUrl, parseAbsoluteUrl } from "./internal.js";
 
 /** Additional verified identity information exposed by mcp-use callbacks. */
@@ -30,6 +55,107 @@ export interface OAuthResourceOptions {
   serviceDocumentationUrl?: URL;
 }
 
+/**
+ * Server surface handed to a provider's {@link CustomOAuthProviderOptions.setup}
+ * hook while the server mounts.
+ *
+ * The hook runs once, after the canonical resource is resolved and before the
+ * first request is served, so everything registered here participates in the
+ * same per-request registry replay as user registrations. Provider-owned
+ * tools, resources, resource templates, and prompts go through the same
+ * OAuth gate as application items,
+ * including a tool's `securitySchemes` on a `mixedAuth` server, and their
+ * callbacks receive `ctx.auth` with the provider's user type. The host is
+ * only usable while the hook runs.
+ *
+ * @typeParam TUser - The provider's user type, exposed as `ctx.auth.user`.
+ */
+export interface OAuthProviderHost<TUser> {
+  /** Resolved canonical MCP resource URL (the RFC 8707 `resource`). */
+  readonly resourceUrl: URL;
+  /** MCP endpoint base path, for example `/mcp`. */
+  readonly basePath: string;
+  /**
+   * Whether the server was constructed with `mixedAuth: true`, so signed-out
+   * clients can connect, list, and call `noauth` tools. A provider that
+   * needs anonymous discovery can throw from `setup` when this is `false`.
+   */
+  readonly mixedAuth: boolean;
+  /**
+   * Registers MCP middleware using the same `mcp:` patterns accepted by
+   * `server.use()`.
+   */
+  use<P extends McpMiddlewarePattern>(
+    pattern: P,
+    handler: McpMiddlewareFnFor<P>
+  ): void;
+  /**
+   * Registers a provider-owned tool, like `server.tool()`: `ctx.auth` is
+   * required in the callback unless `definition.securitySchemes` includes
+   * `noauth`.
+   *
+   * @throws If a tool with the same name is already registered, or when
+   * `definition.securitySchemes` is invalid for this server.
+   */
+  tool<const T extends ToolDefinition>(
+    definition: T,
+    callback: ToolCallback<
+      InferToolInput<T>,
+      InferToolOutput<T>,
+      TUser,
+      ToolOAuthMode<TUser, DefinitionSecuritySchemes<T>>
+    >
+  ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>>;
+  /**
+   * Registers a provider-owned static resource, like `server.resource()`.
+   * Resources always require sign-in, including on a `mixedAuth` server.
+   *
+   * @throws If a resource with the same name is already registered.
+   */
+  resource<T extends ResourceDefinition>(
+    definition: T,
+    callback: ResourceCallback<TUser, true>
+  ): void;
+  /**
+   * Registers a provider-owned parameterized resource, like
+   * `server.resourceTemplate()`. Resource templates always require sign-in,
+   * including on a `mixedAuth` server.
+   *
+   * @throws If a resource template with the same name is already registered.
+   */
+  resourceTemplate<const TUriTemplate extends string>(
+    definition: ResourceTemplateDefinition<TUriTemplate>,
+    callback: ResourceTemplateCallback<
+      InferTemplateParams<{ uriTemplate: TUriTemplate }>,
+      TUser,
+      true
+    >
+  ): void;
+  /**
+   * Registers a provider-owned prompt, like `server.prompt()`. Prompts always
+   * require sign-in, including on a `mixedAuth` server.
+   *
+   * @throws If a prompt with the same name is already registered.
+   */
+  prompt<T extends PromptDefinition>(
+    definition: T,
+    callback: PromptCallback<InferPromptInput<T>, TUser, true>
+  ): void;
+  /**
+   * Every tool registered so far, application and provider-owned, in
+   * registration order. Providers use it to validate the application's
+   * tools, for example to refuse a destructive tool that lacks a required
+   * `_meta` tag, or one whose `securitySchemes` accepts `noauth`.
+   */
+  listTools(): readonly Readonly<ToolDefinition>[];
+  /**
+   * Rewrites the instructions text advertised to clients. The transform
+   * receives the current text, including earlier transforms, and returns
+   * the text to advertise instead. The caller's config is not mutated.
+   */
+  instructions(transform: (current: string | undefined) => string): void;
+}
+
 /** Options for {@link oauthCustomProvider}. */
 export interface CustomOAuthProviderOptions<
   TUser,
@@ -40,6 +166,16 @@ export interface CustomOAuthProviderOptions<
   oauthMetadata: OAuthMetadata;
   /** Maps verified SDK auth information into mcp-use callback identity data. */
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
+  /**
+   * Optional hook invoked once while the server mounts. Providers use it to
+   * install MCP middleware, provider-owned tools, resources, and prompts, or
+   * instructions text that the authorization model requires. See
+   * {@link OAuthProviderHost}.
+   *
+   * The hook must be synchronous. If it throws or returns a promise, the
+   * server never mounts: every request and `listen()` rethrows that error.
+   */
+  setup?: (host: OAuthProviderHost<TUser>) => void;
 }
 
 /** OAuth resource-server provider accepted by the mcp-use server constructor. */
@@ -82,6 +218,10 @@ export function oauthCustomProvider<TUser>(
     );
   }
 
+  if (options.setup !== undefined && typeof options.setup !== "function") {
+    throw new TypeError("setup must be a function when provided");
+  }
+
   assertOAuthMetadata(options.oauthMetadata);
   if (options.resource !== undefined) {
     assertResourceUrl(options.resource);
@@ -109,6 +249,7 @@ export function oauthCustomProvider<TUser>(
     createTokenVerifier: options.createTokenVerifier,
     oauthMetadata: options.oauthMetadata,
     mapAuthInfo: options.mapAuthInfo,
+    ...(options.setup !== undefined && { setup: options.setup }),
     ...(options.resource !== undefined && { resource: options.resource }),
     ...(options.requiredScopes !== undefined && {
       requiredScopes: [...options.requiredScopes],

@@ -98,6 +98,63 @@ Write the verifier by hand when the provider does not issue JWTs, for example wh
 
 The server exposes those values as `ctx.auth.user`, `ctx.auth.payload`, and `ctx.auth.permissions`. `ctx.auth.scopes` remains the verifier's verified `authInfo.scopes`.
 
+## Extend the server from the provider
+
+Some authorization models need more than token verification: a consent step exposed as a tool, or a policy check before every tool call. Pass an optional `setup(host)` hook and the server invokes it once while mounting, before the first request is served.
+
+```typescript
+import { oauthCustomProvider, type OAuthProviderHost } from "mcp-use/oauth";
+
+const oauth = oauthCustomProvider<AppUser>({
+  createTokenVerifier,
+  oauthMetadata,
+  mapAuthInfo,
+  setup(host: OAuthProviderHost<AppUser>) {
+    for (const tool of host.listTools()) {
+      if (tool.annotations?.destructiveHint && !tool._meta?.["shop/tags"]) {
+        throw new Error(`Destructive tool "${tool.name}" needs shop/tags`);
+      }
+    }
+
+    host.use("mcp:tools/call", async (ctx, next) => {
+      // Let the consent tool through, or consent could never be recorded.
+      if (ctx.params.name === "grant_consent") return next();
+      if (!(await isAllowed(ctx.auth, ctx.params.name))) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Complete consent first." }],
+        };
+      }
+      return next();
+    });
+
+    host.tool(
+      { name: "grant_consent", description: "Record consent." },
+      async (_params, ctx) => recordConsent(ctx.auth.user),
+    );
+
+    host.instructions((current) =>
+      `${current ?? ""}\n\nCall grant_consent before other tools.`.trim(),
+    );
+  },
+});
+```
+
+The host exposes:
+
+| Member                                           | Purpose                                                                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `resourceUrl`, `basePath`                        | The resolved canonical resource URL and the MCP endpoint path.                                                                 |
+| `mixedAuth`                                      | Whether the server accepts signed-out clients. Throw from `setup` if your model needs anonymous discovery and this is `false`. |
+| `use(pattern, handler)`                          | Registers `mcp:` middleware, like `server.use()`.                                                                              |
+| `tool`, `resource`, `resourceTemplate`, `prompt` | Register provider-owned items, like the `server` methods of the same name.                                                     |
+| `listTools()`                                    | Returns every tool registered so far, so the provider can validate the application's tools.                                    |
+| `instructions(transform)`                        | Rewrites the instructions text advertised to clients. Each call receives the result of the previous one.                       |
+
+Provider-owned items go through the same OAuth gate as application items, and `ctx.auth` carries the provider's user type. On a [mixed authentication](/v2/typescript/server/authentication/mixed-auth) server, a provider tool can declare `securitySchemes` exactly like an application tool: with `noauth`, signed-out clients can call it and `ctx.auth` is optional. Resources, resource templates, and prompts always require sign-in. `mcp:` middleware also runs on signed-out calls to `noauth` tools, so check `ctx.auth` before relying on it. Registering a name that the application already uses throws, so reserved names never silently replace application items.
+
+`setup` must be synchronous, and the host only works while it runs; calling it later throws. If `setup` throws or returns a promise, the server does not start, and every later request fails with the same error.
+
 ## Verify the integration
 
 Test that:

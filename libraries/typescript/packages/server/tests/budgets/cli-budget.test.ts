@@ -107,7 +107,7 @@ describe("published CLI boundaries", () => {
     }
   });
 
-  it("keeps the edge entry under one hundred thousand bytes and its static graph under one hundred thirty KiB", async () => {
+  it("keeps the edge entry under one hundred thousand bytes and its static graph under one hundred thirty-two KiB", async () => {
     const entry = new URL("index.js", DIST);
     const graph = await buildStaticGraph(entry);
     const graphBytes = await sumFileBytes(graph.files.keys());
@@ -115,8 +115,9 @@ describe("published CLI boundaries", () => {
     expect((await stat(entry)).size).toBeLessThanOrEqual(100_000);
     // Raised from 124 KiB when mixed auth's securitySchemes resolver joined
     // the static graph (about 5 KiB). The OAuth gate and its challenge
-    // builder stay in a lazy chunk.
-    expect(graphBytes).toBeLessThanOrEqual(130 * 1024);
+    // builder stay in a lazy chunk. Raised again from 130 KiB for the OAuth
+    // provider setup hook, which runs synchronously at mount.
+    expect(graphBytes).toBeLessThanOrEqual(132 * 1024);
   });
 
   it("keeps the unpacked framework artifact below five MiB", async () => {
