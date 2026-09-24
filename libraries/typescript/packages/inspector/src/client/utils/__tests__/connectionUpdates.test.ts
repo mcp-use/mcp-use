@@ -320,6 +320,26 @@ describe("InspectorConnectionStorageProvider v2 recovery", () => {
     });
   });
 
+  it("keeps tool timeout settings when the client updates a connection", () => {
+    const url = "https://example.com/mcp";
+    saveStoredConnectionConfig(url, {
+      url,
+      transportType: "http",
+      requestTimeout: 50,
+      maxTotalTimeout: 200,
+      resetTimeoutOnProgress: false,
+    });
+
+    const provider = new InspectorConnectionStorageProvider();
+    provider.setServer(url, { url, displayName: "Example" });
+
+    expect(provider.getServers()[url]).toMatchObject({
+      requestTimeout: 50,
+      maxTotalTimeout: 200,
+      resetTimeoutOnProgress: false,
+    });
+  });
+
   it("recovers a localhost connection URL before its client wrapper mounts", () => {
     const localUrl = "http://localhost:3001/mcp";
     localStorage.setItem(

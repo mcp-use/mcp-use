@@ -473,6 +473,7 @@ export function Layout({ children }: LayoutProps) {
       if (config.url !== selectedServerId) {
         removeConnection(selectedServerId);
         addServer(config.url, toMcpServerConfig(config));
+        saveStoredConnectionConfig(config.url, config);
       } else if (
         currentConnection &&
         isAliasOnlyConnectionUpdate(currentConnection, config)

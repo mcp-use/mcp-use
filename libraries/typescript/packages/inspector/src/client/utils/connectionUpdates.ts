@@ -633,8 +633,7 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
         }),
       ])
     ) as Record<string, PersistedInspectorConnectionConfig>;
-    super.setServers(merged);
-    this.markStorageVersion();
+    this.writeRecoveredStorage(merged);
   }
 
   setServer(id: string, config: PersistedMcpServerConfig): void {
