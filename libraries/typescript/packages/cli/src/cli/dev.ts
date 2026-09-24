@@ -22,10 +22,11 @@ import { existsSync } from "node:fs";
 import { createServer as createNodeServer } from "node:http";
 import { createRequire } from "node:module";
 import { networkInterfaces } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import type { ComponentType } from "react";
 import { createServer, createServerModuleRunner, normalizePath } from "vite";
 // Bundled into the lazy dev chunk; keeping this build input in devDependencies
 // prevents the standalone CLI from installing the full SDK dependency tree.
@@ -53,6 +54,7 @@ import {
 } from "./next-compat.js";
 import { resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
+import { DEV_LANDING_ENTRY, mcpUseLandingPlugin } from "./landing-client.js";
 import { createDevApiHandler } from "./dev-api.js";
 import {
   loadProjectInspector,
@@ -86,6 +88,34 @@ import {
 
 /** Canonical Web handler exposed by `MCPServer.fetch`. */
 type WebHandler = (request: Request) => Promise<Response>;
+
+/** Keep an open HMR connection on the default page for landing.tsx creation. */
+function devLandingHandler(
+  server: ServerLike,
+  basePath: string,
+  hasLanding: boolean
+): WebHandler {
+  return async (request) => {
+    const response = await server.fetch(request);
+    if (
+      hasLanding ||
+      request.method !== "GET" ||
+      new URL(request.url).pathname !== basePath ||
+      response.status !== 200 ||
+      !response.headers.get("content-type")?.startsWith("text/html")
+    ) {
+      return response;
+    }
+    const html = await response.text();
+    return new Response(
+      html.replace(
+        "</body>",
+        '<script type="module" src="/@vite/client"></script></body>'
+      ),
+      { status: response.status, headers: response.headers }
+    );
+  };
+}
 
 /** Coalesce one editor save burst before reconciling a project generation. */
 const RELOAD_SETTLE_MS = 50;
@@ -123,6 +153,14 @@ interface ServerLike {
   ): void;
   __primeSkills(snapshot: SkillsSnapshot | undefined): void;
   __skillsConfig(): boolean | SkillsOptions | undefined;
+  __primeLandingPage?(options: {
+    render: (props: unknown) => string | Promise<string>;
+    entry: string;
+    css?: readonly string[];
+    scripts?: readonly string[];
+    dev?: boolean;
+    projectRoot?: string;
+  }): void;
 }
 
 /**
@@ -394,6 +432,10 @@ export async function runDev(options: DevOptions): Promise<void> {
     options.mcpDir === undefined
       ? options.cwd
       : resolve(options.cwd, options.mcpDir);
+  const landingSourcePath = join(sourceRoot, "landing.tsx");
+  let currentLandingPath = existsSync(landingSourcePath)
+    ? landingSourcePath
+    : undefined;
   const entry =
     options.entry === undefined
       ? discoverEntry(sourceRoot)
@@ -429,7 +471,9 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const vite = await createServer({
     root: options.cwd,
-    configFile: viewsAtStartup ? userViteConfig : false,
+    // A landing.tsx can appear after startup; its imports must still resolve
+    // with the project's aliases and CSS plugins from the initial Vite config.
+    configFile: userViteConfig,
     envDir: false,
     logLevel: "warn",
     cacheDir: paths.cache,
@@ -448,19 +492,30 @@ export async function runDev(options: DevOptions): Promise<void> {
     // Tool-only projects do not load a browser view graph. Avoid starting a
     // dependency optimizer for them: on Windows its background cache commit
     // can otherwise outlive Vite shutdown and race fixture/project cleanup.
-    ...(viewsAtStartup && { optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS }),
+    ...(viewsAtStartup
+      ? { optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS }
+      : currentLandingPath !== undefined
+        ? { optimizeDeps: { include: ["react", "react-dom/client"] } }
+        : {}),
     oxc: { jsx: { runtime: "automatic" } },
-    plugins: viewsAtStartup
-      ? [
-          nextStandaloneCompatPlugin(options.cwd),
-          tailwindcss(),
-          mcpUseViewsPlugin({
-            getViews: () => currentViews,
-            dev: { reactRefresh: true },
-          }),
-          react(),
-        ]
-      : [nextStandaloneCompatPlugin(options.cwd)],
+    plugins: [
+      nextStandaloneCompatPlugin(options.cwd),
+      tailwindcss(),
+      ...(viewsAtStartup
+        ? [
+            mcpUseViewsPlugin({
+              getViews: () => currentViews,
+              dev: { reactRefresh: true },
+            }),
+          ]
+        : []),
+      mcpUseLandingPlugin({
+        getLandingPath: () =>
+          existsSync(landingSourcePath) ? landingSourcePath : undefined,
+        dev: true,
+      }),
+      react(),
+    ],
     server: {
       middlewareMode: true,
       watch: {
@@ -487,12 +542,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       // View HMR rides the one HTTP listener: Vite attaches its websocket
       // upgrade handler to our server, so no dedicated HMR port exists to
       // collide when several dev processes run side by side.
-      hmr: viewsAtStartup
-        ? { server: httpServer, ...devClientEndpoint.hmr }
-        : false,
-      // Vite 8's Environment API keeps its WebSocket transport enabled when
-      // only `hmr: false` is set. Zero-view servers need no socket at all.
-      ...(!viewsAtStartup && { ws: false }),
+      hmr: { server: httpServer, ...devClientEndpoint.hmr },
     },
     ssr: {
       ...nextStandaloneSsrOptions(options.cwd),
@@ -504,9 +554,11 @@ export async function runDev(options: DevOptions): Promise<void> {
     hmr: false,
     sourcemapInterceptor: "node",
   });
+  const projectRequire = createRequire(join(options.cwd, "package.json"));
 
   const importServer = async (
-    viewsSnapshot: DiscoveredView[]
+    viewsSnapshot: DiscoveredView[],
+    landingSnapshot: string | undefined
   ): Promise<{
     server: ServerLike;
     skillsDirectory: string | undefined;
@@ -549,6 +601,50 @@ export async function runDev(options: DevOptions): Promise<void> {
         dev: true,
         projectRoot: options.cwd,
       });
+      if (landingSnapshot !== undefined) {
+        if (typeof server.__primeLandingPage !== "function") {
+          throw new Error(
+            "Loaded MCPServer instance does not support __primeLandingPage."
+          );
+        }
+        const react = projectRequire("react") as typeof import("react");
+        const { renderToString } = projectRequire(
+          "react-dom/server"
+        ) as typeof import("react-dom/server");
+        let lastWorkingComponent: ComponentType<unknown> | undefined;
+        server.__primeLandingPage({
+          render: async (props) => {
+            try {
+              const moduleExports = (await runner.import(landingSnapshot)) as {
+                default?: unknown;
+              };
+              if (typeof moduleExports.default !== "function") {
+                throw new Error(
+                  "landing.tsx must default-export a React component"
+                );
+              }
+              lastWorkingComponent =
+                moduleExports.default as ComponentType<unknown>;
+            } catch (error) {
+              if (lastWorkingComponent === undefined) throw error;
+              console.error(
+                "[mcp-use] landing update failed; serving last working page",
+                error
+              );
+            }
+            return renderToString(
+              react.createElement(
+                lastWorkingComponent!,
+                props as Record<string, unknown>
+              )
+            );
+          },
+          entry: DEV_LANDING_ENTRY,
+          scripts: ["/@vite/client"],
+          dev: true,
+          projectRoot: options.cwd,
+        });
+      }
 
       return { server, skillsDirectory };
     };
@@ -605,7 +701,10 @@ export async function runDev(options: DevOptions): Promise<void> {
   let basePath: string;
   let currentSkillsDirectory: string | undefined;
   try {
-    const { server, skillsDirectory } = await importServer(currentViews);
+    const { server, skillsDirectory } = await importServer(
+      currentViews,
+      currentLandingPath
+    );
     server.__setEventBus(eventBus);
     basePath = server.basePath ?? "/mcp";
     if (options.inspector !== false) {
@@ -619,7 +718,11 @@ export async function runDev(options: DevOptions): Promise<void> {
       inspectorHandler === undefined ? undefined : "[server]"
     );
     server.__mount();
-    currentHandler = async (request) => server.fetch(request);
+    currentHandler = devLandingHandler(
+      server,
+      basePath,
+      currentLandingPath !== undefined
+    );
     currentSkillsDirectory = skillsDirectory;
   } catch (error) {
     await runner.close();
@@ -646,9 +749,15 @@ export async function runDev(options: DevOptions): Promise<void> {
       while (!isAborted()) {
         const revision = desiredRevision;
         const viewsSnapshot = discoverViews(options.cwd, viewsDirectory);
+        const landingSnapshot = existsSync(landingSourcePath)
+          ? landingSourcePath
+          : undefined;
         try {
           runner.evaluatedModules.clear();
-          const { server, skillsDirectory } = await importServer(viewsSnapshot);
+          const { server, skillsDirectory } = await importServer(
+            viewsSnapshot,
+            landingSnapshot
+          );
           server.__setEventBus(eventBus);
           server.__setRequestLogPrefix(
             inspectorHandler === undefined ? undefined : "[server]"
@@ -658,11 +767,16 @@ export async function runDev(options: DevOptions): Promise<void> {
           if (isAborted()) return;
           if (revision !== desiredRevision) continue;
 
-          const nextHandler: WebHandler = async (request) =>
-            server.fetch(request);
           const nextBasePath = server.basePath ?? "/mcp";
+          const nextHandler = devLandingHandler(
+            server,
+            nextBasePath,
+            landingSnapshot !== undefined
+          );
           mountDevInspector(nextBasePath);
           currentViews = [...viewsSnapshot];
+          const landingChanged = currentLandingPath !== landingSnapshot;
+          currentLandingPath = landingSnapshot;
           currentHandler = nextHandler;
           basePath = nextBasePath;
           currentSkillsDirectory = skillsDirectory;
@@ -672,6 +786,9 @@ export async function runDev(options: DevOptions): Promise<void> {
           eventBus.publish({ kind: "tools_list_changed" });
           eventBus.publish({ kind: "prompts_list_changed" });
           eventBus.publish({ kind: "resources_list_changed" });
+          if (landingChanged) {
+            vite.ws.send({ type: "full-reload" });
+          }
           console.log("[mcp-use] reloaded server entry");
           return;
         } catch (error) {
@@ -715,6 +832,12 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const onSsrFileEvent = (file: string): void => {
     const normalizedFile = file.replaceAll("\\", "/");
+    if (resolve(file) === landingSourcePath) {
+      // The browser's React boundary owns the edit. Re-import the component
+      // on the next HTML request without replacing the MCP server generation.
+      runner.evaluatedModules.clear();
+      return;
+    }
     // Skills may intentionally live under the views root. Give that configured
     // data directory precedence before view files take the HMR-only path.
     if (
@@ -767,6 +890,10 @@ export async function runDev(options: DevOptions): Promise<void> {
   };
 
   const onFileAddOrUnlink = (file: string): void => {
+    if (resolve(file) === landingSourcePath) {
+      scheduleReconcile();
+      return;
+    }
     onViewFilesystemEvent(file);
     onSsrFileEvent(file);
   };
@@ -777,6 +904,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   vite.watcher.on("change", onSsrFileEvent);
   vite.watcher.on("add", onFileAddOrUnlink);
   vite.watcher.on("unlink", onFileAddOrUnlink);
+  vite.watcher.add(landingSourcePath);
   // Skill files are data, not server-module imports, so Vite does not
   // necessarily watch their directory until we opt it in explicitly.
   // Watching the configured root also covers a conventional skills/ folder
@@ -896,7 +1024,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
   );
 
-  const projectRequire = createRequire(join(options.cwd, "package.json"));
   let nodeBridgeEntry: string;
   try {
     nodeBridgeEntry = projectRequire.resolve("mcp-use/node");
@@ -937,9 +1064,26 @@ export async function runDev(options: DevOptions): Promise<void> {
       res.end("Not Found");
       return;
     }
-    // Routing to Vite requires both the client environment (configured only
-    // when views existed at startup) and a currently non-empty registry.
+    // Keep the client environment available for a landing.tsx created after
+    // startup. Only routes in the browser module graph reach Vite.
     const viewsEnabled = viewsAtStartup && currentViews.length > 0;
+    const landingEnabled = currentLandingPath !== undefined;
+    const landingRelativePath = relative(options.cwd, landingSourcePath)
+      .split("\\")
+      .join("/");
+    const landingUrlPath = landingRelativePath.startsWith("../")
+      ? undefined
+      : `/${landingRelativePath}`;
+    const knownLandingModule =
+      landingEnabled &&
+      !pathname.startsWith(`${basePath}/_mcp-use/`) &&
+      !isInspectorPath(pathname, basePath) &&
+      pathname !== basePath &&
+      (pathname === landingUrlPath ||
+        (pathname.startsWith("/") &&
+          (vite.environments.client.moduleGraph.getModulesByFile(
+            normalizePath(resolve(options.cwd, pathname.slice(1)))
+          )?.size ?? 0) > 0));
     // Vite sees module-graph URLs (/@vite/client, /@id/virtual:…,
     // /.mcp-use/cache/deps/…, view files under /views/…) plus standard
     // node_modules pre-bundles; everything else — the MCP endpoint included —
@@ -949,9 +1093,14 @@ export async function runDev(options: DevOptions): Promise<void> {
       (pathname.startsWith("/@") ||
         pathname.startsWith("/node_modules/") ||
         pathname.startsWith("/.mcp-use/") ||
-        (viewsEnabled && pathname.startsWith("/views/")));
+        (viewsEnabled && pathname.startsWith("/views/")) ||
+        knownLandingModule);
+    const isViteBootstrap =
+      pathname.startsWith("/@vite/") ||
+      (pathname.startsWith("/@fs/") &&
+        pathname.endsWith("/vite/dist/client/env.mjs"));
 
-    if (viewsEnabled && isViteRequest) {
+    if ((viewsEnabled || landingEnabled || isViteBootstrap) && isViteRequest) {
       // CORS for Vite module URLs: tunnel → `*`; else localhost bind with a
       // validated loopback Origin → reflect that origin (+ Vary). Foreign /
       // opaque / missing Origin stay without ACAO so the source module graph
