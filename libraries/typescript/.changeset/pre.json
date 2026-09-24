@@ -10,5 +10,8 @@
     "mcp-use": "2.7.0",
     "@mcp-use/tunnel": "0.2.1"
   },
-  "changesets": []
+  "changesets": [
+    "propagated-7d8cf4efec69fb9c",
+    "view-tool-cancelled"
+  ]
 }
