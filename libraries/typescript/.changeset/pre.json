@@ -12,8 +12,10 @@
   },
   "changesets": [
     "browser-client-options-parity",
+    "jwt-base64url-token-expiry",
     "propagated-7d8cf4efec69fb9c",
     "propagated-842b1116857be76c",
+    "propagated-8dd494f02f91d752",
     "propagated-a01f1c0d8146aaa1",
     "run-options-messages-native-only",
     "view-tool-cancelled"
