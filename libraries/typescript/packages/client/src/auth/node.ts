@@ -6,7 +6,7 @@ import type {
   OAuthDiscoveryState,
   OAuthTokens,
 } from "@modelcontextprotocol/client";
-import { createServer as createNetServer } from "node:net";
+import { createServer as createNetServer, type Socket } from "node:net";
 import { createServer as createHttpServer, type Server } from "node:http";
 import { FileKVStore } from "./storage-file.js";
 import type { KVStore } from "./storage.js";
@@ -153,6 +153,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
   private shouldPersistSelectedPort: boolean;
 
   private server: Server | null = null;
+  private readonly sockets: Set<Socket> = new Set();
   /** Provider authorization URL, exposed only through the local redirect route. */
   private authorizationUrl: string | null = null;
   /** Currently in-flight deferred — used to prevent overlapping flows. */
@@ -492,6 +493,12 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     const server = createHttpServer((req, res) => {
       this.handleCallback(req.url ?? "/", res);
     });
+    server.on("connection", (socket: Socket) => {
+      this.sockets.add(socket);
+      socket.once("close", () => {
+        this.sockets.delete(socket);
+      });
+    });
     // Track the server during binding so dispose() can find it.
     this.server = server;
     try {
@@ -507,34 +514,97 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
         this.server = null;
       }
       server.close();
+      if (typeof server.closeAllConnections === "function") {
+        server.closeAllConnections();
+      }
+      for (const socket of this.sockets) {
+        socket.destroy();
+      }
+      this.sockets.clear();
       throw err;
     }
   }
 
-  private stopLoopback(): void {
+  private stopLoopback(activeSocket?: import("node:net").Socket): void {
     if (this.pendingTimer) {
       clearTimeout(this.pendingTimer);
       this.pendingTimer = null;
     }
     if (this.server) {
-      this.server.close();
+      const server = this.server;
       this.server = null;
+      server.close();
+
+      for (const socket of this.sockets) {
+        if (socket !== activeSocket) {
+          socket.destroy();
+        }
+      }
+      this.sockets.clear();
+
+      if (activeSocket && !activeSocket.destroyed) {
+        // Active response socket has already received the response headers & body;
+        // let it finish closing cleanly via Connection: close, or destroy after fallback.
+        const timer = setTimeout(() => {
+          activeSocket.destroy();
+        }, 1_000);
+        timer.unref?.();
+        activeSocket.once("close", () => clearTimeout(timer));
+      } else if (
+        !activeSocket &&
+        typeof server.closeAllConnections === "function"
+      ) {
+        server.closeAllConnections();
+      }
     }
     this.authorizationUrl = null;
   }
 
-  private resolvePending(response: NodeOAuthAuthorizationResponse): void {
+  private resolvePending(
+    response: NodeOAuthAuthorizationResponse,
+    activeSocket?: import("node:net").Socket
+  ): void {
     const p = this.pending;
     this.pending = null;
-    this.stopLoopback();
+    this.stopLoopback(activeSocket);
     p?.resolve(response);
   }
 
-  private rejectPending(err: Error): void {
+  private rejectPending(
+    err: Error,
+    activeSocket?: import("node:net").Socket
+  ): void {
     const p = this.pending;
     this.pending = null;
-    this.stopLoopback();
+    this.stopLoopback(activeSocket);
     p?.reject(err);
+  }
+
+  private deferUntilResponseFinished(
+    res: import("node:http").ServerResponse,
+    callback: () => void
+  ): void {
+    if (res.writableFinished) {
+      callback();
+      return;
+    }
+
+    let settled = false;
+    const onDone = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(safetyTimer);
+        res.removeListener("finish", onDone);
+        res.removeListener("close", onDone);
+        callback();
+      }
+    };
+
+    const safetyTimer = setTimeout(onDone, 1_000);
+    safetyTimer.unref?.();
+
+    res.once("finish", onDone);
+    res.once("close", onDone);
   }
 
   private handleCallback(
@@ -546,6 +616,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     if (url.pathname === "/authorize") {
       if (this.authorizationUrl === null || this.pending === null) {
         res.statusCode = 410;
+        res.setHeader("connection", "close");
         res.end("Authorization flow is not active");
         return;
       }
@@ -553,12 +624,14 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       res.setHeader("location", this.authorizationUrl);
       res.setHeader("cache-control", "no-store");
       res.setHeader("referrer-policy", "no-referrer");
+      res.setHeader("connection", "close");
       res.end();
       return;
     }
 
     if (url.pathname !== "/callback") {
       res.statusCode = 404;
+      res.setHeader("connection", "close");
       res.end("Not Found");
       return;
     }
@@ -572,13 +645,19 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     if (err) {
       res.statusCode = 400;
       res.setHeader("content-type", "text/html; charset=utf-8");
+      res.setHeader("connection", "close");
       res.end(FAILURE_HTML(err, errDesc));
-      this.rejectPending(new OAuthFlowError(err, errDesc));
+
+      const activeSocket = res.socket ?? undefined;
+      this.deferUntilResponseFinished(res, () => {
+        this.rejectPending(new OAuthFlowError(err, errDesc), activeSocket);
+      });
       return;
     }
 
     if (!code || !state) {
       res.statusCode = 400;
+      res.setHeader("connection", "close");
       res.end("Missing code or state");
       // Don't reject — the user might retry; let timeout do the cleanup.
       return;
@@ -586,8 +665,16 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
 
     res.statusCode = 200;
     res.setHeader("content-type", "text/html; charset=utf-8");
+    res.setHeader("connection", "close");
     res.end(SUCCESS_HTML);
-    this.resolvePending({ code, ...(iss !== undefined ? { iss } : {}) });
+
+    const activeSocket = res.socket ?? undefined;
+    this.deferUntilResponseFinished(res, () => {
+      this.resolvePending(
+        { code, ...(iss !== undefined ? { iss } : {}) },
+        activeSocket
+      );
+    });
   }
 }
 
