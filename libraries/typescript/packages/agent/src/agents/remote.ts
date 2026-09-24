@@ -344,14 +344,17 @@ export class RemoteAgent {
       // Check for error responses (even with 200 status)
       if (typeof result === "object" && result !== null) {
         // Check for actual error conditions (not just presence of error field)
-        if (result.status === "error" || result.error !== null) {
-          const errorMsg = result.error ?? String(result);
+        if (result.status === "error" || result.error != null) {
+          const errorMsg =
+            typeof result.error === "string"
+              ? result.error
+              : JSON.stringify(result.error ?? result);
           logger.error(`❌ Remote agent execution failed: ${errorMsg}`);
           throw new Error(`Remote agent execution failed: ${errorMsg}`);
         }
 
         // Check if the response indicates agent initialization failure
-        if (String(result).includes("failed to initialize")) {
+        if (JSON.stringify(result).includes("failed to initialize")) {
           logger.error(`❌ Agent initialization failed: ${result}`);
           throw new Error(
             "Agent initialization failed on remote server. " +
