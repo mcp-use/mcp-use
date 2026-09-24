@@ -218,12 +218,20 @@ run_test "Flag-PNPM" npm mcp-server "--pnpm" ""
 echo ""
 run_test "Flag-Bun" npm mcp-server "--bun" ""
 echo ""
-run_test "Removed-Flag-Falls-Back-To-NPM" npm mcp-server "--yarn" ""
-if grep -qi "yarn" /tmp/test-output.log; then
-    echo -e "${RED}❌ FAILED: Removed --yarn option appeared in output${NC}"
+echo -e "${BLUE}🧪 Test: Removed-Flag-Is-Rejected${NC}"
+rm -rf test-app-removed-flag
+if npx --yes --package="$PACKAGE_FULL_PATH" create-mcp-use-app test-app-removed-flag --template mcp-server --yarn --no-skills > /tmp/test-output.log 2>&1; then
+    echo -e "${RED}❌ FAILED: Removed --yarn option was accepted${NC}"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+elif ! grep -q "Unknown option '--yarn'" /tmp/test-output.log; then
+    echo -e "${RED}❌ FAILED: Expected an unknown-option error for --yarn${NC}"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+elif [ -d test-app-removed-flag ]; then
+    echo -e "${RED}❌ FAILED: Project directory was created for --yarn${NC}"
     TESTS_FAILED=$((TESTS_FAILED + 1))
 else
-    echo -e "${GREEN}✅ Removed --yarn option falls back without Yarn instructions${NC}"
+    echo -e "${GREEN}✅ Removed --yarn option was rejected before scaffolding${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
 fi
 echo ""
 
