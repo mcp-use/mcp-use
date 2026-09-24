@@ -72,9 +72,38 @@ export class ToolError extends Error {
 }
 
 /**
- * Error that can appear in the `"error"` branch of {@link ToolContextHandle}.
+ * The host cancelled the tool call that rendered this View before it produced
+ * a result (`ui/notifications/tool-cancelled`) — for example, the user stopped
+ * the turn or the request failed.
+ *
+ * `message` includes the host's `reason` when one was sent, or is
+ * `"Tool call was cancelled."` otherwise.
  */
-export type ToolContextError = ToolError;
+export class ToolCancelledError extends Error {
+  /** Host-provided reason for the cancellation, when present. */
+  readonly reason: string | undefined;
+
+  /**
+   * @param reason - Optional host-provided cancellation reason.
+   */
+  constructor(reason?: string) {
+    const trimmed = reason?.trim();
+    super(
+      trimmed
+        ? `Tool call was cancelled: ${trimmed}`
+        : "Tool call was cancelled."
+    );
+    this.name = "ToolCancelledError";
+    this.reason = reason;
+  }
+}
+
+/**
+ * Error that can appear in the `"error"` branch of {@link ToolContextHandle}:
+ * a {@link ToolError} when the tool answered with `isError: true`, or a
+ * {@link ToolCancelledError} when the host cancelled the call.
+ */
+export type ToolContextError = ToolError | ToolCancelledError;
 
 /**
  * Successful non-error tool result returned by {@link useCallTool}.
