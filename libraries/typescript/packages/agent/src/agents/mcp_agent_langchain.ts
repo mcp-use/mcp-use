@@ -1843,12 +1843,6 @@ export class MCPAgent {
             : String(query);
       logger.debug(`💬 Received query for streamEvents: '${display_query}'`);
 
-      // Add user message to history if memory enabled
-      if (this.memoryEnabled) {
-        logger.debug(`🔄 Adding user message to history: ${display_query}`);
-        this.addToHistory(new HumanMessage({ content: query }));
-      }
-
       // Prepare history
       const historyToUse = history ?? this.conversationHistory;
       const langchainHistory: BaseMessage[] = [];
@@ -1871,6 +1865,12 @@ export class MCPAgent {
         ...langchainHistory,
         new HumanMessage(query),
       ];
+
+      // Add user message to history if memory enabled
+      if (this.memoryEnabled) {
+        logger.debug(`🔄 Adding user message to history: ${display_query}`);
+        this.addToHistory(new HumanMessage({ content: query }));
+      }
 
       logger.debug("callbacks", this.callbacks);
 
