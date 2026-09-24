@@ -111,12 +111,20 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
 
     /** Consume the flag's value: inline (`=`) or the next argv token. */
     const takeValue = (): string => {
-      if (inline !== undefined) return inline;
-      const next = argv[++i];
-      if (next === undefined || next.startsWith("-")) {
+      // An empty value is an absent value, not a value. Without this guard
+      // `--host=` reaches resolveHost as "" and Node binds every interface
+      // instead of loopback, and `--port=` becomes Number("") === 0, an
+      // ephemeral port. `resolveListenPort` already treats a blank `PORT` as
+      // absent; this keeps the flag path consistent with the env path.
+      const value = inline !== undefined ? inline : argv[++i];
+      if (
+        value === undefined ||
+        value.trim() === "" ||
+        (inline === undefined && value.startsWith("-"))
+      ) {
         throw new Error(`Missing value for ${flag}`);
       }
-      return next;
+      return value;
     };
 
     switch (flag) {
