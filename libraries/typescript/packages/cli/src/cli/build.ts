@@ -21,6 +21,7 @@ import react from "@vitejs/plugin-react";
 import { build } from "vite";
 
 import { discoverEntry } from "./entry.js";
+import { mcpUseLandingPlugin, VIRTUAL_LANDING_ID } from "./landing-client.js";
 import {
   loadProjectEnv,
   nextStandaloneAliases,
@@ -54,6 +55,12 @@ const WRAPPER_BASENAME = "entry-wrapper.ts";
 
 /** Inline imported assets as data URLs up to this byte size (effectively all). */
 const ASSETS_INLINE_LIMIT = 100 * 1024 * 1024;
+
+interface BuiltLanding {
+  source: string;
+  entry: string;
+  css: string[];
+}
 
 async function copyPublicAssets(cwd: string, outputDir: string): Promise<void> {
   const publicSrc = join(cwd, "public");
@@ -101,7 +108,8 @@ async function writeWrapperEntry(
   cacheDir: string,
   userEntry: string,
   viewsManifest: ViewsManifest,
-  skillsSnapshot: SkillsSnapshot | undefined
+  skillsSnapshot: SkillsSnapshot | undefined,
+  landing?: BuiltLanding
 ): Promise<string> {
   const wrapperPath = join(cacheDir, WRAPPER_BASENAME);
   await mkdir(cacheDir, { recursive: true });
@@ -112,13 +120,110 @@ async function writeWrapperEntry(
     [
       `import server from ${JSON.stringify(userEntry)};`,
       `import { registerSkills, registerViews } from "mcp-use";`,
+      ...(landing === undefined
+        ? []
+        : [
+            `import LandingPage from ${JSON.stringify(landing.source)};`,
+            `import { createElement } from "react";`,
+            `import { renderToString } from "react-dom/server";`,
+            `import { fileURLToPath } from "node:url";`,
+          ]),
       `server[registerViews](${manifestJson});`,
       `server[registerSkills](${skillsJson});`,
+      ...(landing === undefined
+        ? []
+        : [
+            `server.__primeLandingPage({`,
+            `  render: (props) => renderToString(createElement(LandingPage, props)),`,
+            `  entry: ${JSON.stringify(landing.entry)},`,
+            `  css: ${JSON.stringify(landing.css)},`,
+            `  projectRoot: fileURLToPath(new URL("../../", import.meta.url)),`,
+            `});`,
+          ]),
       `export default server;`,
       "",
     ].join("\n")
   );
   return wrapperPath;
+}
+
+/** Compile the discovered component and its imported styles for hydration. */
+async function buildLanding(
+  source: string,
+  options: {
+    cwd: string;
+    cacheDir: string;
+    buildDir: string;
+    userViteConfig: string | false;
+    sourceMaps: boolean;
+  }
+): Promise<BuiltLanding> {
+  const clientResult = await build({
+    root: options.cwd,
+    configFile: options.userViteConfig,
+    envDir: false,
+    publicDir: false,
+    logLevel: "warn",
+    cacheDir: options.cacheDir,
+    resolve: {
+      tsconfigPaths: true,
+      alias: { tailwindcss: resolveTailwindCss() },
+      dedupe: ["react", "react-dom"],
+    },
+    oxc: { jsx: { runtime: "automatic" } },
+    plugins: [
+      tailwindcss(),
+      react(),
+      mcpUseLandingPlugin({ getLandingPath: () => source }),
+    ],
+    build: {
+      outDir: join(options.buildDir, "landing"),
+      emptyOutDir: true,
+      target: "es2022",
+      sourcemap: options.sourceMaps,
+      minify: true,
+      cssCodeSplit: false,
+      chunkSizeWarningLimit: 1000,
+      assetsInlineLimit: ASSETS_INLINE_LIMIT,
+      rollupOptions: {
+        input: { landing: VIRTUAL_LANDING_ID },
+        output: {
+          format: "es",
+          entryFileNames: "assets/[name]-[hash].js",
+          chunkFileNames: "assets/[name]-[hash].js",
+          assetFileNames: "assets/[name]-[hash][extname]",
+        },
+      },
+    },
+    base: "./",
+  });
+
+  const result = Array.isArray(clientResult) ? clientResult[0] : clientResult;
+  if (result === undefined || !("output" in result)) {
+    throw new Error("Landing client build produced no output.");
+  }
+  const rawOutput = result.output;
+  const items = Array.isArray(rawOutput) ? rawOutput : Object.values(rawOutput);
+  let entryName: string | undefined;
+  const css: string[] = [];
+  for (const item of items) {
+    if (typeof item !== "object" || item === null) continue;
+    const output = item as {
+      type?: string;
+      isEntry?: boolean;
+      fileName?: unknown;
+    };
+    if (typeof output.fileName !== "string") continue;
+    if (output.type === "chunk" && output.isEntry === true) {
+      entryName = output.fileName;
+    } else if (output.type === "asset" && output.fileName.endsWith(".css")) {
+      css.push(output.fileName);
+    }
+  }
+  if (entryName === undefined) {
+    throw new Error("Landing client build produced no entry chunk.");
+  }
+  return { source, entry: entryName, css };
 }
 
 function readBuildAssetsBase(): string | undefined {
@@ -329,6 +434,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     options.mcpDir === undefined
       ? options.cwd
       : resolve(options.cwd, options.mcpDir);
+  const landingSource = join(sourceRoot, "landing.tsx");
+  const hasLanding = existsSync(landingSource);
   const entry =
     options.entry === undefined
       ? discoverEntry(sourceRoot)
@@ -370,11 +477,23 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         options.cwd,
         conventionalSkillsDirectory
       );
+      let landing: BuiltLanding | undefined;
+      if (hasLanding) {
+        await rm(paths.build, { recursive: true, force: true });
+        landing = await buildLanding(landingSource, {
+          cwd: options.cwd,
+          cacheDir: paths.cache,
+          buildDir: paths.build,
+          userViteConfig,
+          sourceMaps,
+        });
+      }
       const wrapperEntry = await writeWrapperEntry(
         paths.cache,
         entry,
         {},
-        skillsSnapshot
+        skillsSnapshot,
+        landing
       );
       await build({
         root: options.cwd,
@@ -391,7 +510,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         build: {
           ssr: wrapperEntry,
           outDir: paths.build,
-          emptyOutDir: true,
+          emptyOutDir: !hasLanding,
           target: "node22",
           sourcemap: sourceMaps,
           minify: false,
@@ -451,6 +570,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const viewsManifest: ViewsManifest = {};
   let skillsSnapshot: SkillsSnapshot | undefined;
   const buildAssetsBase = readBuildAssetsBase();
+  let landing: BuiltLanding | undefined;
   try {
     buildBasePath = await resolveBuildBasePath(
       bindingServer.environments.ssr,
@@ -475,6 +595,16 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         );
       }
       viewsManifest[view.name] = manifestEntry;
+    }
+
+    if (hasLanding) {
+      landing = await buildLanding(landingSource, {
+        cwd: options.cwd,
+        cacheDir: paths.cache,
+        buildDir: paths.build,
+        userViteConfig,
+        sourceMaps,
+      });
     }
 
     if (buildAssetsBase !== undefined && !inline) {
@@ -510,7 +640,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     paths.cache,
     entry,
     viewsManifest,
-    skillsSnapshot
+    skillsSnapshot,
+    landing
   );
 
   await build({

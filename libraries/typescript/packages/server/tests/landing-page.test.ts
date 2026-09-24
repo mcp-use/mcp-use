@@ -1,13 +1,22 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { MCPServer } from "../src/index.js";
 import { generateLandingPage } from "../src/landing.js";
 import { oauthCustomProvider, type OAuthMetadata } from "../src/oauth/index.js";
 
 const servers: MCPServer<unknown>[] = [];
+const directories: string[] = [];
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
+  await Promise.all(
+    directories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true }))
+  );
 });
 
 function track<TUser>(server: MCPServer<TUser>): MCPServer<TUser> {
@@ -145,6 +154,137 @@ describe("generateLandingPage", () => {
 });
 
 describe("MCPServer landing page routing", () => {
+  it("renders a custom shell with serialized props and caches by URL and asset base", async () => {
+    const originalAssetsUrl = process.env["MCP_ASSETS_URL"];
+    const server = track(
+      new MCPServer({
+        name: "custom-landing",
+        title: "Custom <Landing>",
+        version: "2.0.0",
+        websiteUrl: "https://example.test",
+      })
+    );
+    server.tool({ name: "weather", title: "Weather" }, async () => ({
+      content: [],
+    }));
+    const renders: string[] = [];
+    server.__primeLandingPage({
+      render: (props) => {
+        renders.push(props.url);
+        expect(props).toMatchObject({
+          name: "custom-landing",
+          title: "Custom <Landing>",
+          websiteUrl: "https://example.test",
+          tools: [{ name: "weather", title: "Weather" }],
+          prompts: [],
+          resources: [],
+        });
+        return `<main>${props.name}</main>`;
+      },
+      entry: "assets/entry.js",
+      css: ["assets/entry.css"],
+    });
+    const request = htmlRequest("https://server.example.test/mcp");
+    try {
+      process.env["MCP_ASSETS_URL"] = "https://cdn-one.example.test/prefix";
+      const first = await server.fetch(request);
+      expect(first.headers.get("cache-control")).toBe("no-store");
+      expect(first.headers.get("content-type")).toBe(
+        "text/html; charset=utf-8"
+      );
+      expect(first.headers.get("x-content-type-options")).toBe("nosniff");
+      const html = await first.text();
+      expect(html).toContain(
+        '<div id="mcp-use-landing-root"><main>custom-landing</main></div>'
+      );
+      expect(html).toContain(
+        "https://cdn-one.example.test/prefix/mcp/_mcp-use/landing/assets/entry.js"
+      );
+      expect(html).toContain(
+        "https://cdn-one.example.test/prefix/mcp/_mcp-use/landing/assets/entry.css"
+      );
+      expect(html).toContain("Custom &lt;Landing&gt;");
+      const json = html.match(
+        /<script id="mcp-use-landing-props" type="application\/json">(.*?)<\/script>/s
+      )?.[1];
+      expect(json).toBeDefined();
+      expect(JSON.parse(json!)).toMatchObject({
+        url: "https://server.example.test/mcp",
+        title: "Custom <Landing>",
+        publicBaseUrl:
+          "https://cdn-one.example.test/prefix/mcp/_mcp-use/public/",
+      });
+      expect(JSON.parse(json!).tools).toEqual([
+        { name: "weather", title: "Weather" },
+      ]);
+
+      await server.fetch(request);
+      expect(renders).toHaveLength(1);
+
+      process.env["MCP_ASSETS_URL"] = "https://cdn-two.example.test/prefix";
+      const second = await server.fetch(request);
+      expect(await second.text()).toContain(
+        "https://cdn-two.example.test/prefix/mcp/_mcp-use/landing/assets/entry.js"
+      );
+      expect(renders).toHaveLength(2);
+
+      const head = await server.fetch(
+        htmlRequest("https://server.example.test/mcp", { method: "HEAD" })
+      );
+      expect(head.status).toBe(200);
+      expect(await head.text()).toBe("");
+      expect(renders).toHaveLength(2);
+    } finally {
+      if (originalAssetsUrl === undefined) delete process.env["MCP_ASSETS_URL"];
+      else process.env["MCP_ASSETS_URL"] = originalAssetsUrl;
+    }
+  });
+
+  it("serves landing bundles and project public files on a custom base path", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "mcp-landing-"));
+    directories.push(projectRoot);
+    const bundleDir = join(projectRoot, ".mcp-use/build/landing/assets");
+    const publicDir = join(projectRoot, ".mcp-use/build/views/public");
+    await mkdir(bundleDir, { recursive: true });
+    await mkdir(publicDir, { recursive: true });
+    await writeFile(join(bundleDir, "entry.js"), "export const ready = true;");
+    await writeFile(join(publicDir, "logo.svg"), "<svg></svg>");
+    const server = track(
+      new MCPServer({
+        name: "asset-landing",
+        version: "1.0.0",
+        basePath: "/api/mcp",
+      })
+    );
+    server.__primeLandingPage({
+      render: () => "<main>Assets</main>",
+      entry: "assets/entry.js",
+      projectRoot,
+    });
+    const bundleUrl =
+      "https://server.example.test/api/mcp/_mcp-use/landing/assets/entry.js";
+    const asset = await server.fetch(new Request(bundleUrl));
+    expect(asset.status).toBe(200);
+    expect(asset.headers.get("content-type")).toBe("application/javascript");
+    expect(await asset.text()).toBe("export const ready = true;");
+    const head = await server.fetch(new Request(bundleUrl, { method: "HEAD" }));
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe("");
+    const publicAsset = await server.fetch(
+      new Request(
+        "https://server.example.test/api/mcp/_mcp-use/public/logo.svg"
+      )
+    );
+    expect(publicAsset.status).toBe(200);
+    expect(await publicAsset.text()).toBe("<svg></svg>");
+    const traversal = await server.fetch(
+      new Request(
+        "https://server.example.test/api/mcp/_mcp-use/landing/%2e%2e/entry.js"
+      )
+    );
+    expect(traversal.status).toBe(404);
+  });
+
   it("serves GET/HEAD HTML at a custom base path and preserves protocol probes", async () => {
     const server = track(
       new MCPServer({
@@ -262,6 +402,40 @@ describe("publicLandingPage OAuth behavior", () => {
       })
     );
   }
+
+  it("applies the existing OAuth gate to custom HTML without exposing MCP requests", async () => {
+    const protectedServer = oauthServer();
+    protectedServer.__primeLandingPage({
+      render: () => "<main>Custom OAuth</main>",
+      entry: "assets/entry.js",
+    });
+    const protectedHandler = protectedServer.fetch;
+    expect(
+      (await protectedHandler(htmlRequest("https://api.example.test/mcp")))
+        .status
+    ).toBe(401);
+    const authorized = await protectedHandler(
+      htmlRequest("https://api.example.test/mcp", { token: "valid" })
+    );
+    expect(await authorized.text()).toContain("Custom OAuth");
+
+    const publicServer = oauthServer(true);
+    publicServer.__primeLandingPage({
+      render: () => "<main>Public Custom</main>",
+      entry: "assets/entry.js",
+    });
+    const publicHandler = publicServer.fetch;
+    const publicHtml = await publicHandler(
+      htmlRequest("https://api.example.test/mcp")
+    );
+    expect(await publicHtml.text()).toContain("Public Custom");
+    const protocol = await publicHandler(
+      new Request("https://api.example.test/mcp", {
+        headers: { accept: "application/json, text/event-stream" },
+      })
+    );
+    expect(protocol.status).toBe(401);
+  });
 
   it("requires OAuth by default but renders HTML after authentication", async () => {
     const handler = oauthServer().fetch;

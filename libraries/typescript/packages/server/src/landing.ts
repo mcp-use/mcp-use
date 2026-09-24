@@ -347,6 +347,38 @@ export interface LandingPageOptions {
   iconType?: string;
 }
 
+/** Props passed to a CLI-discovered `landing.tsx` component. */
+export interface LandingPageProps extends LandingPageOptions {
+  /** Absolute prefix for project `public/` files, including a configured CDN. */
+  publicBaseUrl: string;
+  /** The server's configured website, when present. */
+  websiteUrl?: string;
+  /** Registered tools, including their protocol names and display metadata. */
+  tools: readonly LandingPageTool[];
+  /** Registered prompts, including their protocol names and display metadata. */
+  prompts: readonly LandingPagePrompt[];
+  /** Registered static resources. */
+  resources: readonly LandingPageResource[];
+}
+
+/** Built or development rendering supplied by the CLI. @internal */
+export interface LandingPageRegistration {
+  /** Server-render the body component with request-resolved props. */
+  render: (props: LandingPageProps) => string | Promise<string>;
+  /** Browser hydration module: full URL, root path, or landing-relative path. */
+  entry: string;
+  /** Browser stylesheet URLs, with the same path rules as `entry`. */
+  css?: readonly string[];
+  /** Scripts loaded before `entry`, such as Vite's development client. */
+  scripts?: readonly string[];
+  /** Disable HTML caching and use Vite middleware for module assets. */
+  dev?: boolean;
+  /** Project directory containing `.mcp-use/build/landing` and `public`. */
+  projectRoot?: string;
+  /** Optional embedded files, keyed by paths relative to the landing root. */
+  assets?: Readonly<Record<string, { body: string; contentType: string }>>;
+}
+
 /**
  * Generates an HTML landing page with connection instructions
  * for Claude Code, Cursor, VS Code, ChatGPT, and Manufact Inspector.
