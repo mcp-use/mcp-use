@@ -306,13 +306,13 @@ export function InspectorDashboard() {
         ? { headers: headersObject }
         : {}),
       ...(oauthConfig ? { oauth: oauthConfig } : {}),
-      ...(Number.isFinite(parsedRequestTimeout)
-        ? { requestTimeout: parsedRequestTimeout }
-        : {}),
+      requestTimeout: Number.isFinite(parsedRequestTimeout)
+        ? parsedRequestTimeout
+        : undefined,
       resetTimeoutOnProgress: resetTimeoutOnProgress === "True",
-      ...(Number.isFinite(parsedMaxTotalTimeout)
-        ? { maxTotalTimeout: parsedMaxTotalTimeout }
-        : {}),
+      maxTotalTimeout: Number.isFinite(parsedMaxTotalTimeout)
+        ? parsedMaxTotalTimeout
+        : undefined,
     };
 
     // Add server directly - useMcp handles proxy fallback automatically via autoProxyFallback
