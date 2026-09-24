@@ -11,7 +11,11 @@ import type {
 
 import type { DisplayMode } from "../types/host-types.js";
 import type { FileMetadata } from "../types/file-types.js";
-import { ToolError, type ToolContextError } from "../types/result-types.js";
+import {
+  ToolCancelledError,
+  ToolError,
+  type ToolContextError,
+} from "../types/result-types.js";
 import { ModelContextStore } from "./model-context-store.js";
 import type { NormalizedViewConfig } from "./view-config.js";
 
@@ -24,13 +28,16 @@ type Listener = () => void;
  * Tool-channel snapshot for the invocation that rendered this View.
  *
  * Input notifications replace `toolInput` while the invocation is pending.
- * The first structured result or tool error latches a terminal state; all
- * later ambient lifecycle notifications are ignored.
+ * The first structured result, tool error, or host cancellation latches a
+ * terminal state; all later ambient lifecycle notifications are ignored.
  *
  * @internal
  */
 export interface ToolSnapshot {
-  /** Pending until the first structured result or tool error, then terminal. */
+  /**
+   * Pending until the first structured result, tool error, or host
+   * cancellation, then terminal.
+   */
   status: "pending" | "ready" | "error";
   /** Model-visible tool output from the last ready result's `structuredContent`. */
   toolOutput: unknown;
@@ -44,7 +51,7 @@ export interface ToolSnapshot {
   /** View-only result `_meta` channel. */
   meta: Record<string, unknown> | undefined;
   /**
-   * Tool error for the rendering invocation.
+   * Tool error or host cancellation for the rendering invocation.
    */
   error: ToolContextError | undefined;
 }
@@ -530,9 +537,19 @@ export function createMcpAppRuntime(
       });
     };
 
-    // Cancellation cannot be correlated either and has no public bound-state
-    // branch. A cancelled rendering invocation therefore remains pending.
-    app.ontoolcancelled = () => {};
+    // Like results, cancellation carries no correlation metadata. Hosts send
+    // it for the invocation that rendered this View, so while pending it
+    // latches the error branch; after a result it is ambient and ignored.
+    app.ontoolcancelled = (params) => {
+      if (disposed || toolSnapshot.status !== "pending") return;
+      patchTool({
+        status: "error",
+        error: new ToolCancelledError(params.reason),
+        toolOutput: undefined,
+        content: undefined,
+        meta: undefined,
+      });
+    };
 
     app.onhostcontextchanged = (params) => {
       if (disposed) return;

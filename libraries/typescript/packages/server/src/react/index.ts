@@ -55,6 +55,7 @@ export type {
   SafeAreaInsets,
 } from "./types/host-types.js";
 export {
+  ToolCancelledError,
   ToolError,
   toolResultText,
   type CallToolResult,

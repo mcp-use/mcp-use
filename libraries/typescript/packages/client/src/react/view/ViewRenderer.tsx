@@ -558,17 +558,12 @@ function ViewRendererBase({
             const conn = connectionRef.current;
             if (!conn) throw new Error("Server connection not available");
             assertAppCanCallTool(conn.tools, name);
-            try {
-              return await conn.callTool(name, args || {}, {
-                timeout: toolCallTimeout,
-                resetTimeoutOnProgress: true,
-              });
-            } catch (error) {
-              bridge?.sendToolCancelled({
-                reason: error instanceof Error ? error.message : String(error),
-              });
-              throw error;
-            }
+            // A failure rejects this request back to the View. It must not
+            // send tool-cancelled, which refers to the rendering invocation.
+            return await conn.callTool(name, args || {}, {
+              timeout: toolCallTimeout,
+              resetTimeoutOnProgress: true,
+            });
           }) as typeof bridge.oncalltool;
         }
 

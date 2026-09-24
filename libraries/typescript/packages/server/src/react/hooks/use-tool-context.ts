@@ -13,7 +13,7 @@ type ToolOutput<Name extends keyof RegisteredTools> =
 type ToolInput<Name extends keyof RegisteredTools> =
   Name extends keyof RegisteredTools ? RegisteredTools[Name]["input"] : unknown;
 
-/** No structured result has been latched yet. */
+/** No structured result, tool error, or cancellation has been latched yet. */
 interface PendingToolContext<Name extends keyof RegisteredTools> {
   status: "pending";
   /** Latest complete or partial arguments; each notification replaces it. */
@@ -37,14 +37,23 @@ interface ReadyToolContext<Name extends keyof RegisteredTools> {
   error?: undefined;
 }
 
-/** First tool result carrying `isError: true`. */
+/**
+ * First tool result carrying `isError: true`, or a host cancellation of the
+ * rendering invocation before any result arrived.
+ */
 interface ErrorToolContext<Name extends keyof RegisteredTools> {
   status: "error";
   /** Latest arguments delivered before the error, when available. */
   toolInput: ToolInput<Name> | undefined;
   toolOutput: undefined;
+  /** Error result content; `undefined` for a cancellation. */
   content: ContentBlock[] | undefined;
+  /** Error result `_meta`; `undefined` for a cancellation. */
   meta: Record<string, unknown> | undefined;
+  /**
+   * {@link ToolError} for an `isError: true` result, or
+   * {@link ToolCancelledError} when the host cancelled the call.
+   */
   error: ToolContextError;
 }
 
@@ -53,9 +62,9 @@ interface ErrorToolContext<Name extends keyof RegisteredTools> {
  *
  * Partial and complete input notifications replace the same `toolInput`
  * snapshot while pending. Because the MCP Apps notification has no tool name
- * or request id, the first structured result or tool error is assumed to
- * belong to the rendering invocation and becomes terminal. Content-only
- * successes are valid ambient activity and are ignored.
+ * or request id, the first structured result, tool error, or cancellation is
+ * assumed to belong to the rendering invocation and becomes terminal.
+ * Content-only successes are valid ambient activity and are ignored.
  */
 export type ToolContextHandle<Name extends keyof RegisteredTools = never> =
   | PendingToolContext<Name>
@@ -67,7 +76,9 @@ export type ToolContextHandle<Name extends keyof RegisteredTools = never> =
  *
  * The hook starts pending with an optional progressive `toolInput`, then
  * latches the first structured success or tool error for the View's lifetime.
- * Later lifecycle notifications cannot overwrite that terminal context.
+ * If the host cancels the call first, the hook latches `status: "error"` with
+ * a {@link ToolCancelledError}. Later lifecycle notifications cannot overwrite
+ * that terminal context.
  *
  * @example
  * ```tsx
