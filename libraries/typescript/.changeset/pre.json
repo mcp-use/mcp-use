@@ -11,7 +11,9 @@
     "@mcp-use/tunnel": "0.2.1"
   },
   "changesets": [
+    "browser-client-options-parity",
     "propagated-7d8cf4efec69fb9c",
+    "propagated-842b1116857be76c",
     "view-tool-cancelled"
   ]
 }

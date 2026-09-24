@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.3.4-canary.1
+
+### Patch Changes
+
+- a294830: `BrowserMCPClient` now expands the `capabilities.views` shorthand into the `io.modelcontextprotocol/ui` extension and forwards `roots` and `defaultRequestOptions` to the connector, matching the Node client.
+
 ## 2.3.4-canary.0
 
 ### Patch Changes
