@@ -520,6 +520,110 @@ Map v1 CORS `allowMethods` and `allowHeaders` to v2 `methods` and
 Use `basePath` for the MCP route. Set `MCP_URL` for the externally visible
 server origin.
 
+### Keep existing OAuth connections working
+
+v2 binds every access token to the MCP endpoint instead of the server origin.
+Clients that authorized against a v1 server can hold tokens that v2 rejects.
+Plan this migration before you deploy v2 to an existing production URL.
+
+| OAuth behavior                        | v1                                       | v2                                                    |
+| ------------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
+| Protected resource identifier         | Server origin: `https://mcp.example.com` | Origin plus `basePath`: `https://mcp.example.com/mcp` |
+| 401 challenge `resource_metadata` URL | `/.well-known/oauth-protected-resource`  | `/.well-known/oauth-protected-resource/mcp`           |
+| Access token `aud` claim              | Not checked                              | Must include the v2 identifier exactly                |
+
+A token whose `aud` is only the v1 identifier fails with `Token audience does
+not include the protected resource`, and the client receives HTTP 401. The v2
+identifier always ends with `basePath`, so you cannot configure v2 to advertise
+the bare origin.
+
+Which clients are affected depends on where the client gets its resource
+identifier:
+
+- **Clients that read protected-resource metadata** follow the 401 challenge
+  and request tokens for the v2 identifier when they next authorize.
+- **Clients with a saved resource setting** keep requesting the v1 identifier.
+  A published ChatGPT or Codex app uses the Resource value from its approved app
+  submission. Reconnecting does not help, because every new token has the v1
+  audience. OpenAI tool scans that use the same saved value fail with the same
+  error.
+- **Clients that refresh tokens** get whichever audience your authorization
+  server issues for the `resource` they send on refresh. A client that keeps
+  sending the v1 identifier can keep getting v1-audience tokens indefinitely
+  when refresh tokens rotate.
+
+<Steps>
+  <Step title="Find the identifier your v1 clients use">
+    Check the `resource` value in your v1 protected-resource metadata, or the
+    `aud` claim of a current access token. It is usually your `MCP_URL` origin.
+  </Step>
+  <Step title="Accept both identifiers during the migration">
+    Pass both identifiers to `createJwtVerifier` through `audience`. The server
+    still advertises only the v2 identifier, and still verifies the signature,
+    issuer, and expiry.
+  </Step>
+  <Step title="Update clients that save a resource setting">
+    Submit a new version of each published app with the v2 identifier as its
+    Resource. Keep accepting the v1 identifier until that version is approved
+    and live. Submitting it is not enough.
+  </Step>
+  <Step title="Allow the v2 identifier on the authorization server">
+    Confirm that the authorization server issues tokens with the v2 identifier
+    as their audience. For the Better Auth OAuth provider plugin, include it in
+    `validAudiences`.
+  </Step>
+  <Step title="Remove the v1 identifier after the last v1 token expires">
+    Log when an accepted token's `aud` does not include the v2 identifier. The
+    verified claims are available in `authInfo.extra.payload`. Remove the v1
+    identifier only after no v1-audience tokens appear for at least your longest
+    access-token lifetime.
+  </Step>
+</Steps>
+
+This example accepts both identifiers with the Better Auth provider:
+
+```ts server.ts
+import { MCPServer } from "mcp-use";
+import { createJwtVerifier } from "mcp-use/oauth";
+import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
+
+const authURL = "https://auth.example.com/api/auth";
+// The resource identifier that v1 clients requested tokens for.
+const v1Resource = "https://mcp.example.com";
+
+const provider = oauthBetterAuthProvider({ authURL });
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "2.0.0",
+  oauth: {
+    ...provider,
+    createTokenVerifier: (resource) =>
+      createJwtVerifier({
+        issuer: authURL,
+        jwksUrl: new URL(`${authURL}/jwks`),
+        resource,
+        audience: [resource.href, v1Resource],
+      }),
+  },
+});
+
+export default server;
+```
+
+The `audience` option checks the `aud` claim only. If your authorization server
+also sets a `resource` claim to the v1 identifier, v2 still rejects the token.
+Verify the migration with a real token that a v1 client holds.
+
+<Warning>
+  Removing the v1 identifier before every client has moved breaks those
+  connections immediately. Published apps show a reconnect prompt that cannot
+  succeed, because each reconnect issues another v1-audience token.
+</Warning>
+
+The resource identifier is part of your public contract. Changing `MCP_URL` or
+`basePath` later changes it again and requires the same migration.
+
 ## Review current beta limitations
 
 The following v1 capabilities do not currently have direct v2 equivalents.
@@ -586,8 +690,9 @@ explicit domain handle. Do not key business state to an MCP transport session.
     display mode; sizing; CSP; and public assets in a capable host.
   </Step>
   <Step title="Test security and authentication">
-    Check a valid token, missing or invalid scopes, mapped user data, Host
-    rejection, Origin rejection, and browser CORS behavior.
+    Check a valid token, a token issued before the migration, missing or invalid
+    scopes, mapped user data, Host rejection, Origin rejection, and browser CORS
+    behavior.
   </Step>
   <Step title="Preserve behavioral coverage">
     Keep existing runtime assertions as runtime assertions. If v2 does not
