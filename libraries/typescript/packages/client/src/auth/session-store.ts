@@ -348,14 +348,11 @@ export class OAuthSessionStore {
       kind: "client_info" | "tokens"
     ): Promise<void> => {
       const base = this.getKey(kind);
-      const matches = (key: string, name: string) =>
-        key === name || key.startsWith(`${name}_`);
+      // FileKVStore lists file-safe names ("mcp:auth" is "mcp_auth" on disk).
+      // Other stores list the keys as set, where "mcp_auth" is another prefix.
+      const name = this.store.listsFileSafeKeys ? fileSafeKey(base) : base;
       for (const key of await this.store.keys()) {
-        // FileKVStore lists file-safe names ("mcp:auth" is "mcp_auth" on disk).
-        if (
-          matches(key, base) ||
-          (key === fileSafeKey(key) && matches(key, fileSafeKey(base)))
-        ) {
+        if (key === name || key.startsWith(`${name}_`)) {
           await this.store.remove(key);
         }
       }

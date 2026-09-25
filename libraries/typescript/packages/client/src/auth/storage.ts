@@ -10,6 +10,13 @@ export interface KVStore {
   set(key: string, value: string): Promise<void> | void;
   remove(key: string): Promise<void> | void;
   keys(): Promise<string[]> | string[];
+  /**
+   * True when `keys()` lists `fileSafeKey` names rather than the keys that
+   * were set, as `FileKVStore` does.
+   *
+   * @internal
+   */
+  readonly listsFileSafeKeys?: boolean;
 }
 
 /**

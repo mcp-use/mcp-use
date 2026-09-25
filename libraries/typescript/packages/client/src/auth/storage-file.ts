@@ -21,6 +21,7 @@ const isWindows = process.platform === "win32";
  */
 export class FileKVStore implements KVStore {
   readonly dir: string;
+  readonly listsFileSafeKeys = true;
 
   constructor(serverUrlHash: string, baseDir?: string) {
     const root = baseDir ?? join(homedir(), ".mcp-use", "oauth");
