@@ -148,6 +148,7 @@ export class OpenAIResponsesDriver implements LlmDriver {
       }
 
       for (const tc of turn.toolCalls) {
+        if (params.signal?.aborted) break;
         let result: unknown;
         let isError = false;
         try {
