@@ -539,7 +539,13 @@ server.use(server.basePath, async (c, next) => {
   await next();
 
   const text = await c.res.text();
-  c.res = new Response(text.replaceAll(JSON.stringify(viewUri), JSON.stringify(legacyUri)), c.res);
+  const resHeaders = new Headers(c.res.headers);
+  resHeaders.delete("content-length");
+  resHeaders.delete("content-encoding");
+  c.res = new Response(
+    text.replaceAll(JSON.stringify(viewUri), JSON.stringify(legacyUri)),
+    { status: c.res.status, statusText: c.res.statusText, headers: resHeaders },
+  );
 });
 ```
 
