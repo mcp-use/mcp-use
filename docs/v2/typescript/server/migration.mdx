@@ -525,8 +525,11 @@ server.use('/mcp', async (c, next) => {
   if (!viewUri) return next();
 
   console.log('legacy view uri rewrite:', legacyUri, '->', viewUri);
+  const reqHeaders = new Headers(c.req.raw.headers);
+  reqHeaders.delete("content-length");
   c.req.raw = new Request(c.req.raw, {
     body: JSON.stringify({ ...body, params: { ...body.params, uri: viewUri } }),
+    headers: reqHeaders,
   });
   await next();
 
