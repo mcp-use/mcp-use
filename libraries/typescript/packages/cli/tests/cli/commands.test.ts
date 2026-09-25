@@ -19,6 +19,17 @@ describe("greenfield CLI command helpers", () => {
     });
   });
 
+  it("keeps := inside a plain key=value string", () => {
+    // The key ends at the first separator, so these are plain strings.
+    expect(
+      parseMcpArguments(["code=x := 1", "query=a:=b", "limit:=5"])
+    ).toEqual({
+      code: "x := 1",
+      query: "a:=b",
+      limit: 5,
+    });
+  });
+
   it("accepts a complete JSON argument object", () => {
     expect(parseMcpArguments(['{"city":"Paris","days":2}'])).toEqual({
       city: "Paris",
