@@ -516,7 +516,7 @@ function rewriteLegacyViewUri(legacyUri: string): string | undefined {
   return `${CURRENT_VIEW_PREFIX}${name}.html`;
 }
 
-server.use('/mcp', async (c, next) => {
+server.use(server.basePath, async (c, next) => {
   if (c.req.method !== 'POST') return next();
 
   const body = await c.req.raw.clone().json().catch(() => undefined);
