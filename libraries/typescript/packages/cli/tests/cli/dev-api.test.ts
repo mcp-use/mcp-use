@@ -113,6 +113,27 @@ describe("createDevApiHandler", () => {
     });
   });
 
+  it("returns 500 when stop-tunnel fails", async () => {
+    const tunnel = fakeTunnel("https://happy-cat.local.mcp-use.run");
+    tunnel.stop.mockRejectedValueOnce(
+      new Error("relay connection already closed")
+    );
+    const handler = createDevApiHandler(
+      { getBasePath: () => basePath, port, tunnel: tunnel.manager },
+      async () => new Response("fallback")
+    );
+
+    const res = await handler(
+      new Request(`${origin}${basePath}/inspector/api/dev/stop-tunnel`, {
+        method: "POST",
+      })
+    );
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({
+      error: "relay connection already closed",
+    });
+  });
+
   it("stops the tunnel via POST stop-tunnel", async () => {
     const tunnel = fakeTunnel("https://happy-cat.local.mcp-use.run");
     const handler = createDevApiHandler(

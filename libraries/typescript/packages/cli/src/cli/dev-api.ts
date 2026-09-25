@@ -90,8 +90,14 @@ export function createDevApiHandler(
     }
 
     if (request.method === "POST" && pathname === stopPath) {
-      await options.tunnel.stop();
-      return Response.json({ ok: true });
+      try {
+        await options.tunnel.stop();
+        return Response.json({ ok: true });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to stop tunnel";
+        return Response.json({ error: message }, { status: 500 });
+      }
     }
 
     return fallback(request);
