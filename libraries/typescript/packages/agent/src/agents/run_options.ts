@@ -21,7 +21,12 @@ export interface RunOptions<T = string> {
    * stored memory.
    */
   externalHistory?: BaseMessage[];
-  /** Provider-neutral messages appended before `prompt`. */
+  /**
+   * Provider-neutral messages appended before `prompt`.
+   *
+   * Supported by the native local agent only. The LangChain entry point
+   * ignores this option; pass prior messages via `externalHistory` instead.
+   */
   messages?: ProviderMessage[];
   /**
    * Zod schema for a typed result.

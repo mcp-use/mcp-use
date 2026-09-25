@@ -1,0 +1,23 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.18",
+    "@mcp-use/cli": "4.1.16",
+    "@mcp-use/client": "2.3.3",
+    "create-mcp-use-app": "2.0.7",
+    "@mcp-use/inspector": "20.3.12",
+    "mcp-use": "2.7.0",
+    "@mcp-use/tunnel": "0.2.1"
+  },
+  "changesets": [
+    "browser-client-options-parity",
+    "jwt-base64url-token-expiry",
+    "propagated-7d8cf4efec69fb9c",
+    "propagated-842b1116857be76c",
+    "propagated-8dd494f02f91d752",
+    "propagated-a01f1c0d8146aaa1",
+    "run-options-messages-native-only",
+    "view-tool-cancelled"
+  ]
+}
