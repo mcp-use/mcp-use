@@ -15,6 +15,7 @@
   },
   "include": [
     "index.ts",
+    "landing.tsx",
     "mcp-env.d.ts",
     "src/**/*",
     "views/**/*",
