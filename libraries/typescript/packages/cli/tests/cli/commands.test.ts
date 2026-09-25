@@ -20,7 +20,8 @@ describe("greenfield CLI command helpers", () => {
   });
 
   it("keeps := inside a plain key=value string", () => {
-    // The key ends at the first separator, so these are plain strings.
+    // The key ends at the first separator. Only ":=" right after the key
+    // marks a typed value, so the first two stay strings and limit is 5.
     expect(
       parseMcpArguments(["code=x := 1", "query=a:=b", "limit:=5"])
     ).toEqual({
