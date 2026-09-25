@@ -297,9 +297,14 @@ describe("parseArgs", () => {
 
   it("rejects a flag with a missing value", () => {
     expect(() => parseArgs(["start", "--port"])).toThrow(/missing value/i);
+
     expect(() => parseArgs(["dev", "--entry", "--host"])).toThrow(
       /missing value/i
     );
+
+    expect(() => parseArgs(["dev", "--host="])).toThrow(/missing value/i);
+
+    expect(() => parseArgs(["dev", "--port="])).toThrow(/missing value/i);
   });
 
   it("rejects unknown options and extra positionals", () => {
