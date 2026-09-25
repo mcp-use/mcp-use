@@ -44,6 +44,7 @@ import {
   resolveHost,
   resolvePort as resolvePreferredPort,
 } from "../bin/args.js";
+import { pathUnderBase } from "../base-path.js";
 import { discoverEntry } from "./entry.js";
 import { resolveDevClientEndpoint } from "./dev-client-endpoint.js";
 import {
@@ -992,7 +993,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   console.log(`  ➜ MCP endpoint:  ${devClientEndpoint.origin}${basePath}`);
   if (inspectorHandler !== undefined) {
     console.log(
-      `  ➜ Inspector:     ${devClientEndpoint.origin}${basePath}/inspector`
+      `  ➜ Inspector:     ${devClientEndpoint.origin}${pathUnderBase(basePath, "inspector")}`
     );
   } else if (options.inspector !== false) {
     console.warn(
@@ -1031,7 +1032,9 @@ export async function runDev(options: DevOptions): Promise<void> {
     options.open !== false &&
     process.stdout.isTTY === true
   ) {
-    openInBrowser(`${devClientEndpoint.origin}${basePath}/inspector`);
+    openInBrowser(
+      `${devClientEndpoint.origin}${pathUnderBase(basePath, "inspector")}`
+    );
   }
 
   // --- Graceful shutdown (SIGINT/SIGTERM or options.signal). ---------------

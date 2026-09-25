@@ -188,7 +188,7 @@ mcp-use start [options]
 | `--path <path>`    | Project root containing `.mcp-use/build/`.               | Current directory                     |
 | `--port <port>`    | Server port.                                             | `PORT`, server config, or `3000`      |
 | `--host <host>`    | Bind address. Use `0.0.0.0` to listen on all interfaces. | `HOST`, server config, or `127.0.0.1` |
-| `--with-inspector` | Mount the bundled Inspector at `${basePath}/inspector`.  | Disabled                              |
+| `--with-inspector` | Mount the bundled Inspector under `basePath`, so `/inspector` when `basePath` is `/`. | Disabled                              |
 | `--tunnel`         | Create a public tunnel for the production server.        | Disabled                              |
 
 **Examples:**
