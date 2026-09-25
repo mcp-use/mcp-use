@@ -682,7 +682,10 @@ async function connectTunnel(
       const state = requests.get(message.requestId);
       if (message.type === "request-end") {
         state?.request.end();
-      } else if (message.type === "cancel" && state !== undefined) {
+      } else if (message.type === "cancel") {
+        // A cancel can cross our response-end or response-error; the request
+        // is already gone, so there is nothing left to stop.
+        if (state === undefined) return;
         requests.delete(message.requestId);
         state.request.destroy();
         state.response?.destroy();

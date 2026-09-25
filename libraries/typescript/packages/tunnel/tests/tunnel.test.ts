@@ -224,4 +224,23 @@ describe("createTunnelManager", () => {
     expect(unsupportedSocket?.closeCode).toBe(1003);
     await third.stop();
   });
+
+  it("keeps the relay connection when a cancel arrives after the request finished", async () => {
+    const tunnel = createTunnelManager(stateFilePath);
+    await tunnel.start(3000);
+    const socket = MockWebSocket.instances[0];
+
+    // The relay cancels when the public client disconnects. That can cross
+    // the tunnel's response-end, so the request is already gone locally.
+    socket?.receive(
+      JSON.stringify({
+        type: "cancel",
+        requestId: "123e4567-e89b-42d3-a456-426614174000",
+      })
+    );
+
+    expect(socket?.closeCode).toBeUndefined();
+    expect(MockWebSocket.instances).toHaveLength(1);
+    await tunnel.stop();
+  });
 });
