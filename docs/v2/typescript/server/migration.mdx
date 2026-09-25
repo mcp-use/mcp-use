@@ -487,6 +487,72 @@ Native View documents are generated MCP resources. Do not register
 
 Move existing widget CSP domains to `view.csp`.
 
+### Handle View URIs cached by ChatGPT
+
+v1 served widgets at `ui://widget/<name>.html`, and sometimes
+`ui://widget/<name>.<buildId>.html`; v2 serves Views at exactly
+`ui://views/<name>.html`. A published ChatGPT app caches the resource URI from
+the v1 tool metadata and keeps requesting the old URI after you deploy v2, so
+its Views fail to load until the app is resubmitted and re-approved with the
+new metadata.
+
+As a temporary bridge, add middleware that rewrites the legacy URI before the
+request reaches the MCP handler and restores the requested URI in the
+response:
+
+```ts
+// TEMPORARY: mcp-use v1 served views at ui://widget/<name>.html, v2 at ui://views/<name>.html.
+// Clients that cached the v1 tool metadata still read the old URI, so rewrite
+// resources/read to the v2 URI before it reaches the SDK, then restore the
+// requested URI in the response. Remove once all clients have refreshed.
+const LEGACY_VIEW_PREFIX = "ui://widget/";
+const CURRENT_VIEW_PREFIX = "ui://views/";
+
+function rewriteLegacyViewUri(legacyUri: string): string | undefined {
+  if (!legacyUri.startsWith(LEGACY_VIEW_PREFIX) || !legacyUri.endsWith(".html")) {
+    return undefined;
+  }
+  const suffix = legacyUri.slice(LEGACY_VIEW_PREFIX.length, -".html".length);
+  if (!suffix) return undefined;
+  // v1 could emit ui://widget/<view>.<buildId>.html, but v2 view URIs never
+  // include a build id, so strip the trailing build id segment.
+  const dotIndex = suffix.lastIndexOf(".");
+  const name = dotIndex > 0 ? suffix.slice(0, dotIndex) : suffix;
+  return `${CURRENT_VIEW_PREFIX}${name}.html`;
+}
+
+server.use(server.basePath, async (c, next) => {
+  if (c.req.method !== 'POST') return next();
+
+  const body = await c.req.raw.clone().json().catch(() => undefined);
+  const legacyUri = body?.method === 'resources/read' ? body.params?.uri : undefined;
+  const viewUri = typeof legacyUri === 'string' ? rewriteLegacyViewUri(legacyUri) : undefined;
+  if (!viewUri) return next();
+
+  console.log('legacy view uri rewrite:', legacyUri, '->', viewUri);
+  const reqHeaders = new Headers(c.req.raw.headers);
+  reqHeaders.delete("content-length");
+  c.req.raw = new Request(c.req.raw, {
+    body: JSON.stringify({ ...body, params: { ...body.params, uri: viewUri } }),
+    headers: reqHeaders,
+  });
+  await next();
+
+  const text = await c.res.text();
+  const resHeaders = new Headers(c.res.headers);
+  resHeaders.delete("content-length");
+  resHeaders.delete("content-encoding");
+  c.res = new Response(
+    text.replaceAll(JSON.stringify(viewUri), JSON.stringify(legacyUri)),
+    { status: c.res.status, statusText: c.res.statusText, headers: resHeaders },
+  );
+});
+```
+
+This shim is temporary. Submit a new version of the published app so ChatGPT
+picks up the v2 tool metadata and starts requesting `ui://views/<name>.html`
+directly. Once the new submission is approved and live, remove the middleware.
+
 ## Update authentication, proxies, and security
 
 Native v2 acts as an OAuth resource server backed by an external authorization
