@@ -489,7 +489,8 @@ Move existing widget CSP domains to `view.csp`.
 
 ### Handle View URIs cached by ChatGPT
 
-v1 served widgets at `ui://widget/<name>.html`; v2 serves Views at
+v1 served widgets at `ui://widget/<name>.html`, and sometimes
+`ui://widget/<name>.<buildId>.html`; v2 serves Views at exactly
 `ui://views/<name>.html`. A published ChatGPT app caches the resource URI from
 the v1 tool metadata and keeps requesting the old URI after you deploy v2, so
 its Views fail to load until the app is resubmitted and re-approved with the
@@ -511,8 +512,12 @@ function rewriteLegacyViewUri(legacyUri: string): string | undefined {
   if (!legacyUri.startsWith(LEGACY_VIEW_PREFIX) || !legacyUri.endsWith(".html")) {
     return undefined;
   }
-  const name = legacyUri.slice(LEGACY_VIEW_PREFIX.length, -".html".length);
-  if (!name) return undefined;
+  const suffix = legacyUri.slice(LEGACY_VIEW_PREFIX.length, -".html".length);
+  if (!suffix) return undefined;
+  // v1 could emit ui://widget/<view>.<buildId>.html, but v2 view URIs never
+  // include a build id, so strip the trailing build id segment.
+  const dotIndex = suffix.lastIndexOf(".");
+  const name = dotIndex > 0 ? suffix.slice(0, dotIndex) : suffix;
   return `${CURRENT_VIEW_PREFIX}${name}.html`;
 }
 
