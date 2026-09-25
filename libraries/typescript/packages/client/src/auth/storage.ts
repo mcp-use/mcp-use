@@ -12,6 +12,16 @@ export interface KVStore {
   keys(): Promise<string[]> | string[];
 }
 
+/**
+ * File name `FileKVStore` uses for `key`. Its `keys()` lists these names, so
+ * callers that match listed keys by prefix must compare this form too.
+ *
+ * @internal
+ */
+export function fileSafeKey(key: string): string {
+  return key.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 type EncryptedEnvelope = {
   v: 1;
   alg: "A256GCM";

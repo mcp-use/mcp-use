@@ -7,7 +7,7 @@ import type {
 } from "@modelcontextprotocol/client";
 import { validateClientMetadataUrl } from "@modelcontextprotocol/client";
 import { sanitizeUrl } from "./url.js";
-import type { KVStore } from "./storage.js";
+import { fileSafeKey, type KVStore } from "./storage.js";
 
 /**
  * Internal type for storing OAuth state during the OAuth flow.
@@ -347,9 +347,15 @@ export class OAuthSessionStore {
     const removeCredentialKeys = async (
       kind: "client_info" | "tokens"
     ): Promise<void> => {
-      const prefix = `${this.getKey(kind)}_`;
+      const base = this.getKey(kind);
+      const matches = (key: string, name: string) =>
+        key === name || key.startsWith(`${name}_`);
       for (const key of await this.store.keys()) {
-        if (key === this.getKey(kind) || key.startsWith(prefix)) {
+        // FileKVStore lists file-safe names ("mcp:auth" is "mcp_auth" on disk).
+        if (
+          matches(key, base) ||
+          (key === fileSafeKey(key) && matches(key, fileSafeKey(base)))
+        ) {
           await this.store.remove(key);
         }
       }

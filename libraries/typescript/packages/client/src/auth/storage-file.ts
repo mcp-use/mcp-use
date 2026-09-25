@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { KVStore } from "./storage.js";
+import { fileSafeKey, type KVStore } from "./storage.js";
 
 const isWindows = process.platform === "win32";
 
@@ -42,12 +42,8 @@ export class FileKVStore implements KVStore {
     }
   }
 
-  private sanitize(key: string): string {
-    return key.replace(/[^a-zA-Z0-9._-]/g, "_");
-  }
-
   private pathFor(key: string): string {
-    return join(this.dir, this.sanitize(key));
+    return join(this.dir, fileSafeKey(key));
   }
 
   get(key: string): string | null {
