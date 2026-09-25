@@ -111,12 +111,17 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
 
     /** Consume the flag's value: inline (`=`) or the next argv token. */
     const takeValue = (): string => {
-      if (inline !== undefined) return inline;
-      const next = argv[++i];
-      if (next === undefined || next.startsWith("-")) {
+      const value = inline !== undefined ? inline : argv[++i];
+
+      if (
+        value === undefined ||
+        value.trim() === "" ||
+        (inline === undefined && value.startsWith("-"))
+      ) {
         throw new Error(`Missing value for ${flag}`);
       }
-      return next;
+
+      return value;
     };
 
     switch (flag) {
