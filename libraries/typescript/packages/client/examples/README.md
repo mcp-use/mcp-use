@@ -43,6 +43,8 @@ Run the complete matrix:
   MCP Apps tool metadata, and structured content in both eras.
 - `node/auth/oauth-flow.ts` — self-contained OAuth discovery, DCR, PKCE loopback,
   code exchange, and token persistence.
+- `node/chainlove-discovery.ts` — Chain.Love infrastructure discovery with bounded
+  metadata queries.
 - `browser/basic-http.ts` — browser entry smoke under `tsx`.
 - `browser/react/` — `useMcp`, four-server `McpClientProvider`, OAuth callback,
   notification queues, sampling, and elicitation UI.
@@ -52,3 +54,19 @@ Run the complete matrix:
 
 Individual examples use ports 3103/3104 by default and accept
 `MCP_SERVER_URL` / `MCP_SERVER_V2_URL` overrides.
+
+## Chain.Love infrastructure discovery
+
+The `node/chainlove-discovery.ts` example uses the public Chain.Love MCP gateway to discover supported networks and categories, then requests at most three matching infrastructure service records. It defaults to `filecoin` and `apis`, and accepts optional network/category slugs as positional arguments.
+
+See [Chain.Love](https://chain.love/) and its [MCP gateway](https://app.chain.love/mcp) for the discovery infrastructure.
+
+Node.js 22.22.2+ is required.
+
+From `packages/client`:
+
+```bash
+pnpm --filter @mcp-use/client build
+node --experimental-strip-types examples/node/chainlove-discovery.ts
+node --experimental-strip-types examples/node/chainlove-discovery.ts filecoin storages
+```
