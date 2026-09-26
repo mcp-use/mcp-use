@@ -214,9 +214,16 @@ export class OAuthSessionStore {
     tokens: StoredOAuthTokens,
     ctx?: OAuthClientInformationContext
   ): Promise<void> {
+    // `expires_in` is relative to token receipt. Preserve that origin with the
+    // token so readers projecting an absolute expiry don't restart its lifetime.
+    const receivedAt = Date.now();
+    const tokensWithReceiptTime = {
+      ...tokens,
+      _mcp_use_received_at: receivedAt,
+    };
     // Persist tokens BEFORE clearing the verifier / last_auth_url so a failed
     // write can't strand the auth flow with no way to recover.
-    const serialized = JSON.stringify(tokens);
+    const serialized = JSON.stringify(tokensWithReceiptTime);
     await this.store.set(this.credentialKey("tokens", ctx), serialized);
     // The no-context SDK read is the transport's latest bearer token lookup.
     if (ctx) await this.store.set(this.credentialKey("tokens"), serialized);
