@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   extractFunctionCalls,
   responsesReasoningFields,
   seedInputFromMessages,
 } from "../providers/openai-responses";
+import { OpenAIResponsesDriver } from "../providers/openai-responses-driver";
 import { toolResultToContent } from "../toolResultParts";
 import type { ProviderMessage } from "../types";
 
@@ -156,5 +157,78 @@ describe("Responses SSE event mapping", () => {
     const args = JSON.parse(payload.arguments);
     expect(args).toEqual({ city: "Paris" });
     expect(payload.call_id).toBe("call_abc");
+  });
+});
+
+describe("OpenAIResponsesDriver.runToolLoopNonStreaming", () => {
+  it("stops dispatching remaining tool calls in a turn when signal is aborted", async () => {
+    const controller = new AbortController();
+    const callTool = vi.fn(async (name: string) => {
+      if (name === "tool1") {
+        controller.abort();
+      }
+      return { ok: true };
+    });
+
+    const driver = new OpenAIResponsesDriver({ apiKey: "test-key" });
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: "completed",
+          output: [
+            {
+              type: "function_call",
+              call_id: "1",
+              name: "tool1",
+              arguments: "{}",
+            },
+            {
+              type: "function_call",
+              call_id: "2",
+              name: "tool2",
+              arguments: "{}",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    const result = await driver.runToolLoopNonStreaming({
+      driver,
+      messages: [{ role: "user", content: "hi" }],
+      tools: [],
+      callTool,
+      signal: controller.signal,
+    });
+
+    expect(callTool).toHaveBeenCalledTimes(1);
+    expect(callTool).toHaveBeenCalledWith("tool1", {});
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls[0].toolName).toBe("tool1");
+    fetchSpy.mockRestore();
+  });
+
+  it("does not dispatch tool calls when signal is pre-aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const callTool = vi.fn(async () => ({ ok: true }));
+    const driver = new OpenAIResponsesDriver({ apiKey: "test-key" });
+
+    const result = await driver.runToolLoopNonStreaming({
+      driver,
+      messages: [{ role: "user", content: "hi" }],
+      tools: [],
+      callTool,
+      signal: controller.signal,
+    });
+
+    expect(callTool).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.toolCalls).toHaveLength(0);
+    fetchSpy.mockRestore();
   });
 });
