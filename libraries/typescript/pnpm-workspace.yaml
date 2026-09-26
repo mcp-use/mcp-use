@@ -3,6 +3,7 @@ packages:
   # examples
   - packages/client/examples/browser/react
   - packages/client/examples/conformance
+  - packages/client/examples/node/ai-sdk-openai
   - packages/server/examples/*
   - packages/server/examples/schema-libraries/*
   - packages/server/examples/views/*
