@@ -4,6 +4,10 @@ import {
   captureInspectorEvent,
 } from "@/client/telemetry";
 import { copyToClipboard } from "@/client/utils/browser";
+import {
+  getStoredConnectionConfig,
+  type EditableConnectionConfig,
+} from "@/client/utils/connectionUpdates";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ToolResult } from "./ToolResultDisplay";
 import {
@@ -50,6 +54,7 @@ export function useToolExecution({
     args: Record<string, unknown>,
     options?: {
       timeout?: number;
+      maxTotalTimeout?: number;
       resetTimeoutOnProgress?: boolean;
       signal?: AbortSignal;
     }
@@ -110,9 +115,12 @@ export function useToolExecution({
           ]);
         }
 
+        const settings =
+          getStoredConnectionConfig<EditableConnectionConfig>(serverId);
         const result = await callTool(request.toolName, request.args, {
-          timeout: 600000,
-          resetTimeoutOnProgress: true,
+          timeout: settings?.requestTimeout ?? 600000,
+          maxTotalTimeout: settings?.maxTotalTimeout,
+          resetTimeoutOnProgress: settings?.resetTimeoutOnProgress ?? true,
           signal: controller.signal,
         });
         const duration = Date.now() - startTime;

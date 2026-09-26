@@ -38,11 +38,7 @@ import {
   Terminal,
   Trash2,
 } from "lucide-react";
-import {
-  useMcpClient,
-  type McpServer,
-  type McpServerConfig,
-} from "@mcp-use/client/react";
+import { useMcpClient, type McpServer } from "@mcp-use/client/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/browser";
 import {
@@ -50,7 +46,9 @@ import {
   getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
   protocolNegotiationForMode,
+  saveStoredConnectionConfig,
   toEditableConnectionConfig,
+  toMcpServerConfig,
   type ConnectionMode,
   type EditableConnectionConfig,
   type InspectorProtocolMode,
@@ -294,10 +292,12 @@ export function InspectorDashboard() {
 
     const oauthConfig = buildOAuthStaticConfig(clientId, clientSecret, scope);
 
-    // Build server configuration with proper typing
-    const serverConfig: McpServerConfig = {
+    const parsedRequestTimeout = Number.parseInt(requestTimeout, 10);
+    const parsedMaxTotalTimeout = Number.parseInt(maxTotalTimeout, 10);
+    const editableConfig: EditableConnectionConfig = {
       url: normalizedUrl,
-      displayName: alias.trim() || normalizedUrl,
+      name: alias.trim() || normalizedUrl,
+      transportType: "http",
       connectionMode,
       protocolNegotiation: protocolNegotiationForMode(protocolMode),
       autoProxyFallback,
@@ -306,10 +306,18 @@ export function InspectorDashboard() {
         ? { headers: headersObject }
         : {}),
       ...(oauthConfig ? { oauth: oauthConfig } : {}),
+      requestTimeout: Number.isFinite(parsedRequestTimeout)
+        ? parsedRequestTimeout
+        : undefined,
+      resetTimeoutOnProgress: resetTimeoutOnProgress === "True",
+      maxTotalTimeout: Number.isFinite(parsedMaxTotalTimeout)
+        ? parsedMaxTotalTimeout
+        : undefined,
     };
 
     // Add server directly - useMcp handles proxy fallback automatically via autoProxyFallback
-    addServer(normalizedUrl, serverConfig);
+    addServer(normalizedUrl, toMcpServerConfig(editableConfig));
+    saveStoredConnectionConfig(normalizedUrl, editableConfig);
 
     // Track server added
     captureInspectorEvent(
@@ -344,6 +352,9 @@ export function InspectorDashboard() {
     clientId,
     clientSecret,
     scope,
+    requestTimeout,
+    resetTimeoutOnProgress,
+    maxTotalTimeout,
     addServer,
   ]);
 
