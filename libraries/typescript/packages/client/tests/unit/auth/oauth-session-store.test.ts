@@ -293,6 +293,20 @@ describe("OAuthSessionStore", () => {
       expect(kv.get(session.getKey("last_auth_url"))).toBe("auth");
     });
 
+    it("'tokens' leaves another provider's mcp_auth prefix alone", async () => {
+      const { session, kv } = createStore();
+      const other = new OAuthSessionStore(
+        SERVER_URL,
+        { ...DEFAULT_OPTS, storageKeyPrefix: "mcp_auth" },
+        kv
+      );
+      kv.set(session.getKey("tokens"), "tokens");
+      kv.set(other.getKey("tokens"), "other-tokens");
+      await session.invalidateCredentials("tokens");
+      expect(kv.get(session.getKey("tokens"))).toBeNull();
+      expect(kv.get(other.getKey("tokens"))).toBe("other-tokens");
+    });
+
     it("'verifier' removes only code_verifier", async () => {
       const { session, kv } = createStore();
       seed(session, kv);
