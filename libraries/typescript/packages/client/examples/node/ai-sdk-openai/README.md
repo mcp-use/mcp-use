@@ -14,7 +14,7 @@ peer dependencies, optional dependencies, or development dependencies of
 From this directory:
 
 ```bash
-pnpm install --ignore-workspace --frozen-lockfile
+pnpm install --ignore-workspace
 OPENAI_API_KEY=... pnpm start
 ```
 
