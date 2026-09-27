@@ -23,4 +23,22 @@ describe("getOAuthTokenExpiry", () => {
     ).toBe(Date.now() + 60_000);
     vi.useRealTimers();
   });
+
+  it("calculates expires_in from the token receipt time", () => {
+    const receivedAt = Date.parse("2026-01-01T21:12:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T21:42:00Z"));
+    try {
+      const expiry = getOAuthTokenExpiry({
+        access_token: "opaque",
+        expires_in: 3600,
+        _mcp_use_received_at: receivedAt,
+      });
+
+      expect(expiry).toBe(Date.parse("2026-01-01T22:12:00Z"));
+      expect(expiry).not.toBe(Date.now() + 3_600_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

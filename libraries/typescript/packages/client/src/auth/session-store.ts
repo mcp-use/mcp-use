@@ -216,10 +216,13 @@ export class OAuthSessionStore {
   ): Promise<void> {
     // `expires_in` is relative to token receipt. Preserve that origin with the
     // token so readers projecting an absolute expiry don't restart its lifetime.
-    const receivedAt = Date.now();
+    const receivedAt = (
+      tokens as StoredOAuthTokens & { _mcp_use_received_at?: unknown }
+    )._mcp_use_received_at;
     const tokensWithReceiptTime = {
       ...tokens,
-      _mcp_use_received_at: receivedAt,
+      _mcp_use_received_at:
+        typeof receivedAt === "number" ? receivedAt : Date.now(),
     };
     // Persist tokens BEFORE clearing the verifier / last_auth_url so a failed
     // write can't strand the auth flow with no way to recover.
