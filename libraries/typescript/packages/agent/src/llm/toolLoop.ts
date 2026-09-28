@@ -174,6 +174,7 @@ export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
       toolCalls,
     });
     for (const tc of toolCalls) {
+      if (signal?.aborted) break;
       let result: unknown;
       let isError = false;
       try {
