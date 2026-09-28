@@ -72,11 +72,15 @@ function messageText(content: unknown): string {
   return JSON.stringify(content ?? "");
 }
 
-/** Whether every entry looks like a content block with a string `type`. */
+/**
+ * Whether every entry looks like a content block with a string `type`.
+ *
+ * An empty array qualifies, so empty tool content stays an empty string rather
+ * than being stringified to `"[]"`.
+ */
 function isContentBlockArray(value: unknown): value is Array<{ type: string }> {
   return (
     Array.isArray(value) &&
-    value.length > 0 &&
     value.every(
       (item) =>
         item !== null &&
@@ -99,9 +103,12 @@ function normalizeToolBlock(block: { type: string }): unknown {
       : ((raw as { url?: unknown } | undefined)?.url as string | undefined);
   if (typeof url !== "string") return block;
   const parsed = parseDataUrl(url);
-  return parsed === null
-    ? block
-    : { type: "image", data: parsed.data, mimeType: parsed.mimeType };
+  if (parsed === null) {
+    // A remote URL carries no bytes to embed, so keep the reference visible
+    // instead of letting it fall through to an "unsupported block" marker.
+    return { type: "text", text: `[image: ${url}]` };
+  }
+  return { type: "image", data: parsed.data, mimeType: parsed.mimeType };
 }
 
 /**

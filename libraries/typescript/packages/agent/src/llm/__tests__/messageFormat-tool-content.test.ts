@@ -66,6 +66,30 @@ describe("convertExternalHistoryToProvider tool content", () => {
     expect(message!.content).toBe("first\nsecond");
   });
 
+  it("keeps empty array content as an empty string", () => {
+    const [message] = convertExternalHistoryToProvider([
+      new ToolMessage({ content: [], tool_call_id: "call_6" }) as never,
+    ]);
+
+    expect(message!.content).toBe("");
+  });
+
+  it("keeps a remote image_url reference visible", () => {
+    const [message] = convertExternalHistoryToProvider([
+      new ToolMessage({
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: "https://example.com/shot.png" },
+          },
+        ],
+        tool_call_id: "call_7",
+      }) as never,
+    ]);
+
+    expect(message!.content).toBe("[image: https://example.com/shot.png]");
+  });
+
   it("leaves plain string content and error replay unchanged", () => {
     expect(
       convertExternalHistoryToProvider([
