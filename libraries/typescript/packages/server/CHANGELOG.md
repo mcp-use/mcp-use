@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.7.2-canary.2
+
+### Patch Changes
+
+- 03bb362: Forward downstream cancellation signals to proxied prompt requests.
+
 ## 2.7.2-canary.1
 
 ### Patch Changes
