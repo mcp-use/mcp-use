@@ -82,6 +82,9 @@ export abstract class BaseMCPClient {
     Map<string, number>
   >();
 
+  /** Blocks new creations until every removal for that server has settled. */
+  private readonly serverRemovals = new Map<string, number>();
+
   /**
    * List of server names that have active sessions.
    * This array is kept in sync with the sessions map and can be used
@@ -213,9 +216,16 @@ export abstract class BaseMCPClient {
     epochs.set(name, (epochs.get(name) ?? 0) + 1);
     this.serverRemovalEpochs.set(serverConfig, epochs);
 
-    await this.closeSession(name);
-    delete this.config.mcpServers?.[name];
-    trackClientRemoveServer(name);
+    this.serverRemovals.set(name, (this.serverRemovals.get(name) ?? 0) + 1);
+    try {
+      await this.closeSession(name);
+      delete this.config.mcpServers?.[name];
+      trackClientRemoveServer(name);
+    } finally {
+      const remaining = this.serverRemovals.get(name)! - 1;
+      if (remaining === 0) this.serverRemovals.delete(name);
+      else this.serverRemovals.set(name, remaining);
+    }
   }
 
   /**
@@ -342,6 +352,10 @@ export abstract class BaseMCPClient {
     autoInitialize = true
   ): Promise<MCPSession> {
     const servers = this.config.mcpServers ?? {};
+
+    if (this.serverRemovals.has(serverName)) {
+      throw new Error(`Server '${serverName}' is being removed`);
+    }
 
     if (Object.keys(servers).length === 0) {
       logger.warn("No MCP servers defined in config");

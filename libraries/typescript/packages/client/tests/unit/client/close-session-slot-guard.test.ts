@@ -42,14 +42,16 @@ class TestMCPClient extends BaseMCPClient {
 }
 
 class InitializingMCPClient extends BaseMCPClient {
-  constructor(private readonly connector: BaseConnector) {
+  constructor(private readonly connectors: BaseConnector[]) {
     super({
       mcpServers: { server: { url: "https://example.com/mcp", oauth: false } },
     });
   }
 
   protected createConnectorFromConfig(): BaseConnector {
-    return this.connector;
+    const connector = this.connectors.shift();
+    if (!connector) throw new Error("No test connector available");
+    return connector;
   }
 
   protected async createDefaultOAuthProvider(): Promise<never> {
@@ -146,7 +148,7 @@ describe("BaseMCPClient.closeSession slot guard", () => {
       }),
       disconnect: vi.fn(async () => {}),
     } as unknown as BaseConnector;
-    const client = new InitializingMCPClient(connector);
+    const client = new InitializingMCPClient([connector]);
 
     const creating = client.createSession("server");
     await initializing.promise;
@@ -166,7 +168,7 @@ describe("BaseMCPClient.closeSession slot guard", () => {
     const connector = {
       disconnect: vi.fn(async () => {}),
     } as unknown as BaseConnector;
-    const client = new InitializingMCPClient(connector);
+    const client = new InitializingMCPClient([connector]);
     const config = client.getServerConfig("server");
     expect(config).toBeDefined();
 
@@ -176,5 +178,62 @@ describe("BaseMCPClient.closeSession slot guard", () => {
     const session = await client.createSession("server", false);
     expect(client.getSession("server")).toBe(session);
     expect(client.activeSessions).toContain("server");
+  });
+
+  it("does not leave a session active when creation starts during removal", async () => {
+    const oldDisconnecting = makeDeferred();
+    const releaseOldDisconnect = makeDeferred();
+    const oldConnector = {
+      disconnect: vi.fn(() => {
+        oldDisconnecting.resolve();
+        return releaseOldDisconnect.promise;
+      }),
+    } as unknown as BaseConnector;
+    const newConnector = {
+      disconnect: vi.fn(async () => {}),
+    } as unknown as BaseConnector;
+    const client = new InitializingMCPClient([oldConnector, newConnector]);
+
+    await client.createSession("server", false);
+    const removing = client.removeServer("server");
+    await oldDisconnecting.promise;
+
+    // Creation starts while removeServer awaits the old disconnect. Its
+    // replacement teardown also awaits that disconnect, so settle both after
+    // releasing the barrier and assert only through the public client API.
+    const creationOutcome = client.createSession("server", false).then(
+      () => "fulfilled",
+      () => "rejected"
+    );
+    releaseOldDisconnect.resolve();
+    const outcome = await creationOutcome;
+    await removing;
+
+    expect(client.getServerNames()).not.toContain("server");
+    expect(client.getSession("server")).toBeNull();
+    expect(client.activeSessions).not.toContain("server");
+    expect(outcome).toBe("rejected");
+  });
+
+  it("allows re-adding the server after its disconnect fails during removal", async () => {
+    const oldConnector = {
+      disconnect: vi.fn(async () => {
+        throw new Error("disconnect failed");
+      }),
+    } as unknown as BaseConnector;
+    const newConnector = {
+      disconnect: vi.fn(async () => {}),
+    } as unknown as BaseConnector;
+    const client = new InitializingMCPClient([oldConnector, newConnector]);
+    const config = client.getServerConfig("server");
+    expect(config).toBeDefined();
+
+    await client.createSession("server", false);
+    await client.removeServer("server");
+    expect(client.getSession("server")).toBeNull();
+
+    client.addServer("server", config!);
+    const session = await client.createSession("server", false);
+    expect(client.getSession("server")).toBe(session);
   });
 });
