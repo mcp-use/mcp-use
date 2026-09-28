@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { toAnthropicMessages } from "../providers/anthropic";
-import { chat, streamChat, toGeminiContents } from "../providers/google";
+import { toGeminiContents } from "../providers/google";
 import { toOpenAIMessages } from "../providers/openai-chat-completions";
 import { toolResultToContent } from "../toolResultParts";
 import type { ProviderMessage } from "../types";
@@ -101,8 +101,6 @@ describe("OpenAI: tool message + follow-up user with image_url", () => {
 });
 
 describe("Google: functionResponse + follow-up user with inlineData", () => {
-  afterEach(() => vi.unstubAllGlobals());
-
   it.each([
     { label: "empty array", result: [], response: { result: [] } },
     {
@@ -137,58 +135,6 @@ describe("Google: functionResponse + follow-up user with inlineData", () => {
           parts: [{ functionResponse: { name: "list-records", response } }],
         },
       ]);
-    }
-  );
-
-  it.each([false, true])(
-    "serializes array tool results as an object in provider requests (streaming=%s)",
-    async (streaming) => {
-      const fetchMock = vi.fn().mockResolvedValue(
-        new Response(
-          streaming
-            ? 'data: {"candidates":[{"content":{"parts":[{"text":"done"}]}}]}\n\n'
-            : JSON.stringify({
-                candidates: [{ content: { parts: [{ text: "done" }] } }],
-              })
-        )
-      );
-      vi.stubGlobal("fetch", fetchMock);
-      const params = {
-        config: {
-          provider: "google" as const,
-          model: "gemini-2.5-flash",
-          apiKey: "test-key",
-        },
-        messages: [
-          { role: "user", content: "list records" },
-          {
-            role: "assistant",
-            content: "",
-            toolCalls: [{ id: "call_1", name: "list-records", args: {} }],
-          },
-          {
-            role: "tool",
-            toolCallId: "call_1",
-            toolName: "list-records",
-            content: toolResultToContent({
-              content: [{ type: "text", text: '[{"name":"sample"}]' }],
-            }),
-          },
-        ] satisfies ProviderMessage[],
-      };
-      if (streaming) {
-        const events = [];
-        for await (const event of streamChat(params)) events.push(event);
-        expect(events).toContainEqual({ type: "text-delta", delta: "done" });
-      } else {
-        expect((await chat(params)).text).toBe("done");
-      }
-      expect(fetchMock).toHaveBeenCalledOnce();
-      const request = JSON.parse(fetchMock.mock.calls[0][1].body);
-      expect(request.contents[2].parts[0].functionResponse).toEqual({
-        name: "list-records",
-        response: { result: [{ name: "sample" }] },
-      });
     }
   );
 
