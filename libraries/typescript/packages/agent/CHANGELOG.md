@@ -1,5 +1,11 @@
 # @mcp-use/agent
 
+## 2.0.20-canary.2
+
+### Patch Changes
+
+- 0d19df7: Wrap array-valued Gemini tool results in an object so function responses satisfy the provider's request schema in streaming and non-streaming calls.
+
 ## 2.0.20-canary.1
 
 ### Patch Changes
