@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.2.0-canary.3
+
+### Minor Changes
+
+- cc3ec31: Reject an inline value on boolean CLI switches instead of silently discarding it. `mcp-use dev --tunnel=false` previously parsed as `--tunnel` and opened a public tunnel; it now fails with `--tunnel does not take a value`. The same applies to `--no-open`, `--no-inspector`, `--with-inspector`, `--source-maps`, `--inline`, `--help`, and `--version`. Flags that take a value continue to accept both `--flag value` and `--flag=value`.
+
 ## 4.1.18-canary.2
 
 ### Patch Changes

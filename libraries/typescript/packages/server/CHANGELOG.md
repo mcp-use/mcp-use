@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.7.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [cc3ec31]
+  - @mcp-use/cli@4.2.0-canary.3
+
 ## 2.7.2-canary.3
 
 ### Patch Changes
