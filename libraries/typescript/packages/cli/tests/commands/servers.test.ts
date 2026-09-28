@@ -350,3 +350,82 @@ describe("server trigger configuration", () => {
     expect(api.request).not.toHaveBeenCalled();
   });
 });
+
+describe("server command help routing", () => {
+  const cases: Array<{
+    name: string;
+    argv: string[];
+    contains: string;
+    notContains?: string;
+  }> = [
+    {
+      name: "servers --help",
+      argv: ["--help"],
+      contains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers -h",
+      argv: ["-h"],
+      contains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers list --help",
+      argv: ["list", "--help"],
+      contains: "Usage: mcp-use servers list [options]",
+    },
+    {
+      name: "servers env --help",
+      argv: ["env", "--help"],
+      contains: "Usage: mcp-use servers env <list|set|unset> [options]",
+      notContains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers env -h",
+      argv: ["env", "-h"],
+      contains: "Usage: mcp-use servers env <list|set|unset> [options]",
+      notContains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers --help env",
+      argv: ["--help", "env"],
+      contains: "Usage: mcp-use servers env <list|set|unset> [options]",
+      notContains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers env --json --help",
+      argv: ["env", "--json", "--help"],
+      contains: "Usage: mcp-use servers env <list|set|unset> [options]",
+      notContains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers env list --help",
+      argv: ["env", "list", "--help"],
+      contains: "Usage: mcp-use servers env list <server> [options]",
+    },
+    {
+      name: "servers env set --help",
+      argv: ["env", "set", "--help"],
+      contains: "Usage: mcp-use servers env set <server> <KEY=VALUE> [options]",
+    },
+    {
+      name: "servers env unset --help",
+      argv: ["env", "unset", "--help"],
+      contains: "Usage: mcp-use servers env unset <server> <key> [options]",
+    },
+  ];
+
+  for (const { name, argv, contains, notContains } of cases) {
+    it(`routes ${name} correctly`, async () => {
+      const stdout = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation(() => true);
+
+      await expect(runServers(argv)).resolves.toBe(0);
+      const output = stdout.mock.calls.flat().join("");
+      expect(output).toContain(contains);
+      if (notContains) {
+        expect(output).not.toContain(notContains);
+      }
+    });
+  }
+});

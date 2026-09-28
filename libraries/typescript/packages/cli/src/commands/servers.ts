@@ -59,10 +59,13 @@ const COMMAND_HELP: Record<string, string> = {
 /** Run the `mcp-use servers` command family. */
 export async function runServers(argv: readonly string[]): Promise<number> {
   if (argv.some((token) => token === "--help" || token === "-h")) {
+    const sub = argv.filter(
+      (token) => token !== "--help" && token !== "-h" && token !== "--json"
+    );
     const key =
-      argv[0] === "env" && argv[1] !== undefined
-        ? `env ${argv[1]}`
-        : (argv[0] ?? "");
+      sub[0] === "env" && sub[1] !== undefined
+        ? `env ${sub[1]}`
+        : (sub[0] ?? "");
     process.stdout.write(`${COMMAND_HELP[key] ?? HELP}\n`);
     return 0;
   }
