@@ -9,6 +9,8 @@
 export type {
   UseMcpOptions,
   UseMcpResult,
+  McpUserInfoClaims,
+  McpUserInfoState,
   ReconnectionOptions,
   McpServer,
   McpServerConfig,

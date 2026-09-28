@@ -321,6 +321,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           "token_endpoint",
           "revocation_endpoint",
           "introspection_endpoint",
+          "userinfo_endpoint",
         ]) {
           if (typeof metadata?.[key] === "string") {
             discoveredEndpoints.add(metadata[key]);
@@ -383,6 +384,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
             "token_endpoint",
             "revocation_endpoint",
             "introspection_endpoint",
+            "userinfo_endpoint",
           ]) {
             if (typeof metadata[key] === "string") {
               discoveredEndpoints.add(metadata[key]);

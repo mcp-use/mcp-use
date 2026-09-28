@@ -6,7 +6,7 @@
  * The browser identifies the logical MCP server and the exact OAuth request it
  * wants to make. The BFF independently binds protected-resource metadata to
  * that server, authorization-server metadata to the advertised issuers, and
- * POST requests to endpoints advertised by that metadata.
+ * requests to endpoints advertised by that metadata.
  */
 
 import { lookup } from "node:dns/promises";
@@ -24,7 +24,8 @@ type OAuthEndpointKind =
   | "registration"
   | "token"
   | "revocation"
-  | "introspection";
+  | "introspection"
+  | "userinfo";
 
 type Binding = {
   authorizationServers: Set<string>;
@@ -103,6 +104,7 @@ const ENDPOINT_FIELDS: ReadonlyArray<readonly [string, OAuthEndpointKind]> = [
   ["token_endpoint", "token"],
   ["revocation_endpoint", "revocation"],
   ["introspection_endpoint", "introspection"],
+  ["userinfo_endpoint", "userinfo"],
 ];
 const BINDING_TTL_MS = 10 * 60 * 1000;
 const MAX_BINDINGS = 100;
@@ -298,10 +300,6 @@ export function mountOAuthProxy(
       return c.json({ error: targetResult.error }, 400);
     }
     const target = targetResult.url;
-    if (request.method !== undefined && request.method !== "POST") {
-      return c.json({ error: "Only OAuth endpoint POST is allowed" }, 405);
-    }
-
     const bindingKey = canonicalUrl(serverUrl);
     const binding = getBinding(bindings, bindingKey);
     if (binding.endpoints.size === 0) {
@@ -326,10 +324,17 @@ export function mountOAuthProxy(
         403
       );
     }
+    const expectedMethod = endpointKind === "userinfo" ? "GET" : "POST";
+    if ((request.method ?? "POST") !== expectedMethod) {
+      return c.json({ error: "OAuth endpoint method not allowed" }, 405);
+    }
 
     try {
       const headers = filterRequestHeaders(request.headers);
-      let body = serializeBody(request.body, headers);
+      let body =
+        endpointKind === "userinfo"
+          ? undefined
+          : serializeBody(request.body, headers);
       if (endpointKind === "registration") {
         const publicOrigin = normalizeOrigin(
           c.req.header("Origin") ?? new URL(c.req.url).origin
@@ -339,7 +344,7 @@ export function mountOAuthProxy(
           headers,
           new URL(callbackPath, publicOrigin).toString()
         );
-      } else {
+      } else if (endpointKind !== "userinfo") {
         body = applyConfidentialClientAuthentication({
           body,
           headers,
@@ -353,9 +358,13 @@ export function mountOAuthProxy(
         return c.json({ error: "OAuth request body too large" }, 413);
       }
 
-      log(enableLogging, logPrefix, `POST ${endpointKind} ${target}`);
+      log(
+        enableLogging,
+        logPrefix,
+        `${expectedMethod} ${endpointKind} ${target}`
+      );
       const upstream = await safeFetch(target, {
-        method: "POST",
+        method: expectedMethod,
         headers,
         body,
         redirect: "manual",

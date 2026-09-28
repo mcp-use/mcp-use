@@ -51,6 +51,27 @@ export type ReconnectionOptions = {
   maxRetries?: number;
 };
 
+/** Claims returned by an OAuth authorization server's UserInfo endpoint. */
+export type McpUserInfoClaims = {
+  sub: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  [claim: string]: unknown;
+};
+
+/** UserInfo is supplemental to the MCP connection and resolves independently. */
+export type McpUserInfoState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "available"; issuer?: string; claims: McpUserInfoClaims }
+  | {
+      status: "unavailable";
+      reason: "not_authenticated" | "no_userinfo_endpoint" | "session_changed";
+    }
+  | { status: "error"; error: string };
+
 /** Configures the {@link useMcp} hook and its browser connection lifecycle. */
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
@@ -341,6 +362,8 @@ export type UseMcpOptions = {
     clientMetadataUrl?: string;
     /** OAuth scope string included in the authorize request. */
     scope?: string;
+    /** Resolve UserInfo after authentication without delaying MCP readiness. */
+    fetchUserInfo?: boolean;
   };
 };
 
@@ -398,6 +421,8 @@ export type PersistedMcpServerConfig = Pick<
     clientMetadataUrl?: string;
     /** Space-delimited OAuth scopes. */
     scope?: string;
+    /** Resolve UserInfo after authentication. */
+    fetchUserInfo?: boolean;
   };
 };
 
@@ -547,6 +572,8 @@ export type UseMcpResult = {
   };
   /** OAuth availability discovered for an anonymously connected server. */
   authorization?: MCPAuthorizationInfo;
+  /** Reactive UserInfo result for the current OAuth session. */
+  userInfo: McpUserInfoState;
   /** Array of internal log messages (useful for debugging) */
   log: {
     /** Log severity. */
@@ -703,6 +730,8 @@ export type UseMcpResult = {
    *          or undefined if auth cannot be started.
    */
   authenticate: () => Promise<void>;
+  /** Fetch UserInfo for the current OAuth session and update `userInfo`. */
+  getUserInfo: () => Promise<McpUserInfoState>;
   /** Clears all stored authentication data (tokens, client info, etc.) for this server URL from localStorage. */
   clearStorage: () => void;
   /**
@@ -848,6 +877,9 @@ export function pickPersistedServerConfig(
     }
     if (source.oauth.scope !== undefined) {
       oauth.scope = source.oauth.scope;
+    }
+    if (source.oauth.fetchUserInfo !== undefined) {
+      oauth.fetchUserInfo = source.oauth.fetchUserInfo;
     }
     if (Object.keys(oauth).length > 0) {
       out.oauth = oauth;
