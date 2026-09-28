@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.1.18-canary.2
+
+### Patch Changes
+
+- edf4bb4: Route `mcp-use servers env --help` and related flags to the `servers env` command help instead of the root servers help.
+
 ## 4.1.18-canary.1
 
 ### Patch Changes
