@@ -15,8 +15,10 @@
     "cli-servers-env-help",
     "inspector-express-release-stream-on-disconnect",
     "propagated-13281a2df4db7191",
+    "propagated-ceb70cd2af77306c",
     "propagated-f67b20113aa39173",
     "quiet-lamps-refuse",
-    "quiet-proxies-wait"
+    "quiet-proxies-wait",
+    "tool-loop-abort-signal"
   ]
 }

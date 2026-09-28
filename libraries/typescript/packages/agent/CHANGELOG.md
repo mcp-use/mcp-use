@@ -1,5 +1,11 @@
 # @mcp-use/agent
 
+## 2.0.20-canary.1
+
+### Patch Changes
+
+- b24607b: `runToolLoopNonStreaming` now stops dispatching remaining tool calls in a turn when the `signal` is aborted, matching the cancellation behavior of `runToolLoop`.
+
 ## 2.0.20-canary.0
 
 ### Patch Changes
