@@ -198,6 +198,20 @@ describe("parseArgs", () => {
     expect(parseArgs(["start", "--port=8080"]).port).toBe(8080);
   });
 
+  it("rejects an empty value instead of binding every interface", () => {
+    // `--host=` used to resolve to "", which Node binds as :: rather than the
+    // documented 127.0.0.1 default; `--port=` used to become port 0.
+    expect(() => parseArgs(["dev", "--host="])).toThrow(
+      "Missing value for --host"
+    );
+    expect(() => parseArgs(["start", "--port="])).toThrow(
+      "Missing value for --port"
+    );
+    expect(() => parseArgs(["start", "--port", ""])).toThrow(
+      "Missing value for --port"
+    );
+  });
+
   it("accepts the package-manager forwarding separator for dev flags", () => {
     const args = parseArgs(["dev", "--", "--port", "3050", "--no-open"]);
     expect(args.port).toBe(3050);
