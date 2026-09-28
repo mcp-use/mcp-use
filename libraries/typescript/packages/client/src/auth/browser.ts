@@ -297,7 +297,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       } catch {
         return await base(input, init);
       }
-      const isMetadata = pathname.includes("/.well-known/");
+      const looksLikeMetadata = pathname.includes("/.well-known/");
 
       // Metadata responses can carry Origin-specific CORS headers. Never let
       // the browser reuse or revalidate a response cached for another origin.
@@ -305,10 +305,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       // their caller-provided cache behavior.
       if (!oauthProxyUrl) {
         const response = await base(
-          isMetadata ? url : input,
-          isMetadata ? { ...init, cache: "no-store" } : init
+          looksLikeMetadata ? url : input,
+          looksLikeMetadata ? { ...init, cache: "no-store" } : init
         );
-        if (!isMetadata) this.rememberResourceMetadataChallenge(response);
+        if (!looksLikeMetadata)
+          this.rememberResourceMetadataChallenge(response);
         return response;
       }
 
@@ -328,6 +329,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           }
         }
       }
+      const isMetadata = looksLikeMetadata && !discoveredEndpoints.has(url);
       const isProxiedEndpoint =
         discoveredEndpoints.has(url) ||
         /\/(?:register|registration|token|revoke|revocation|introspect|introspection)\/?$/.test(

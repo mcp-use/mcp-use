@@ -429,8 +429,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const connectEpochRef = useRef(0);
   const userInfoRequestRef = useRef(0);
   const userInfoTokenRef = useRef<string | undefined>(undefined);
+  const userInfoAutoRetryRef = useRef(false);
   const userInfoBaseFetchRef = useRef(customFetch);
-  userInfoBaseFetchRef.current = customFetch;
   const authTimeoutRef = useRef<number | null>(null);
   const retryScheduledRef = useRef<boolean>(false);
   /**
@@ -452,6 +452,10 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const failConnectionRef = useRef<
     ((message: string, error?: Error) => void) | null
   >(null);
+
+  useEffect(() => {
+    userInfoBaseFetchRef.current = customFetch;
+  }, [customFetch]);
 
   // Reverse-request / notification callbacks must stay fresh without putting
   // their React identities into connect()'s dependency list (which would
@@ -1932,6 +1936,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         baseFetch ??
         globalThis.fetch.bind(globalThis);
       const response = await scopedFetch(endpoint, {
+        method: "GET",
         headers: {
           Accept: "application/json",
           Authorization: `${tokens.token_type || "Bearer"} ${tokens.access_token}`,
@@ -1993,15 +1998,37 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   }, [url, addLog, disconnect]);
 
   useEffect(() => {
-    if (userInfoTokenRef.current !== authTokens?.access_token) {
-      userInfoTokenRef.current = authTokens?.access_token;
+    const token = authTokens?.access_token;
+    const tokenChanged = userInfoTokenRef.current !== token;
+    if (tokenChanged) {
+      userInfoTokenRef.current = token;
       userInfoRequestRef.current += 1;
+      userInfoAutoRetryRef.current = false;
       setUserInfo({ status: "idle" });
     }
-    if (autoFetchUserInfo && state === "ready" && authTokens?.access_token) {
+    if (!autoFetchUserInfo || state !== "ready" || !token) return;
+    if (tokenChanged || userInfo.status === "idle") {
+      userInfoAutoRetryRef.current = false;
       void getUserInfo();
+    } else if (userInfo.status === "error" && !userInfoAutoRetryRef.current) {
+      userInfoAutoRetryRef.current = true;
+      let fired = false;
+      const timeout = setTimeout(() => {
+        fired = true;
+        void getUserInfo();
+      }, 1000);
+      return () => {
+        clearTimeout(timeout);
+        if (!fired) userInfoAutoRetryRef.current = false;
+      };
     }
-  }, [autoFetchUserInfo, state, authTokens?.access_token, getUserInfo]);
+  }, [
+    autoFetchUserInfo,
+    state,
+    authTokens?.access_token,
+    userInfo.status,
+    getUserInfo,
+  ]);
 
   // ===== Effects =====
 

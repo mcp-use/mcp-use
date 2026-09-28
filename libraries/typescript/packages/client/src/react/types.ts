@@ -53,24 +53,50 @@ export type ReconnectionOptions = {
 
 /** Claims returned by an OAuth authorization server's UserInfo endpoint. */
 export type McpUserInfoClaims = {
+  /** Subject identifier assigned by the authorization server. */
   sub: string;
+  /** Account email, when released by the authorization server. */
   email?: string;
+  /** Whether the authorization server verified the email. */
   email_verified?: boolean;
+  /** Display name, when available. */
   name?: string;
+  /** Profile image URL, when available. */
   picture?: string;
+  /** Additional provider-specific UserInfo claims. */
   [claim: string]: unknown;
 };
 
 /** UserInfo is supplemental to the MCP connection and resolves independently. */
 export type McpUserInfoState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "available"; issuer?: string; claims: McpUserInfoClaims }
   | {
+      /** No UserInfo request is in progress. */
+      status: "idle";
+    }
+  | {
+      /** A UserInfo request is in progress. */
+      status: "loading";
+    }
+  | {
+      /** UserInfo claims were returned. */
+      status: "available";
+      /** Authorization server issuer from discovered metadata. */
+      issuer?: string;
+      /** Claims returned by the UserInfo endpoint. */
+      claims: McpUserInfoClaims;
+    }
+  | {
+      /** UserInfo cannot be fetched for this session. */
       status: "unavailable";
+      /** Why UserInfo is unavailable. */
       reason: "not_authenticated" | "no_userinfo_endpoint" | "session_changed";
     }
-  | { status: "error"; error: string };
+  | {
+      /** The UserInfo request failed. */
+      status: "error";
+      /** Failure message; call `getUserInfo()` to retry. */
+      error: string;
+    };
 
 /** Configures the {@link useMcp} hook and its browser connection lifecycle. */
 export type UseMcpOptions = {

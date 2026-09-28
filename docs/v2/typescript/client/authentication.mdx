@@ -116,6 +116,19 @@ On your callback route, import `onMcpAuthorization` from
 `@mcp-use/client/react`. See
 [React integration](/v2/typescript/client/usemcp#oauth-callback).
 
+To show the authorized account, set `oauth.fetchUserInfo: true` and read
+`mcp.userInfo`. Its status is `idle`, `loading`, `available`, `unavailable`, or
+`error`; claims such as `email` are present only when released by the
+authorization server. You can also fetch explicitly:
+
+```tsx
+const result = await mcp.getUserInfo();
+if (result.status === "available") console.log(result.claims.email);
+```
+
+See [OAuth UserInfo](/v2/typescript/client/usemcp#oauth-userinfo) for the
+options, state details, and a React example.
+
 ## Pre-registered clients
 
 The `MCPClient` configuration uses
