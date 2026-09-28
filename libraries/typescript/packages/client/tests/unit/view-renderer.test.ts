@@ -95,6 +95,24 @@ describe("buildViewSandboxUrl", () => {
 });
 
 describe("resolveViewResource", () => {
+  it("decodes UTF-8 HTML from a base64 blob", () => {
+    const html = "<html><body>你好 🌍</body></html>";
+    const resolved = resolveViewResource({
+      resourceResult: {
+        contents: [
+          {
+            mimeType: "text/html;profile=mcp-app",
+            blob: Buffer.from(html, "utf8").toString("base64"),
+          },
+        ],
+      },
+      cspMode: "widget-declared",
+    });
+
+    expect(resolved.html).toBe(html);
+    expect(resolved.mimeTypeValid).toBe(true);
+  });
+
   it("accepts valid MCP App MIME type and extracts HTML", () => {
     const resolved = resolveViewResource({
       resourceResult: {
