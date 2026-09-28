@@ -7,9 +7,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
-import type { ProxyConnection } from "../src/index.js";
+import type { MetaObject, ProxyConnection } from "../src/index.js";
 import { mountProxyConnection } from "../src/mcp-proxy.js";
 import type { ProxyMountHost } from "../src/mcp-proxy.js";
+import { buildToolUiMeta } from "../src/views/wire.js";
 
 async function connectClient(url: string): Promise<Client> {
   const client = new Client(
@@ -504,6 +505,75 @@ describe("MCPServer.proxy", () => {
     releaseFirstProgress?.();
     await call;
     expect(forwarded).toEqual([1, 2]);
+  });
+
+  it("preserves upstream tool annotations and _meta", async () => {
+    let mounted: Record<string, unknown> | undefined;
+    const host: ProxyMountHost = {
+      isStarted: () => false,
+      hasTool: () => false,
+      hasResource: () => false,
+      hasPrompt: () => false,
+      registerTool: (definition) => {
+        mounted = definition as unknown as Record<string, unknown>;
+      },
+      registerResource: () => {
+        throw new Error("unexpected resource registration");
+      },
+      registerPrompt: () => {
+        throw new Error("unexpected prompt registration");
+      },
+      trackOwner: () => {},
+    };
+    const connection: ProxyConnection = {
+      info: { server: { name: "docs" } },
+      supports: (capability) => capability === "tools",
+      async listTools() {
+        return [
+          {
+            name: "search",
+            annotations: { readOnlyHint: true },
+            _meta: {
+              "example.com/category": "reference",
+              ui: {
+                resourceUri: "ui://views/upstream.html",
+                customField: { preserved: true },
+              },
+              "ui/resourceUri": "ui://views/upstream.html",
+            },
+          },
+        ];
+      },
+      async callTool() {
+        return { content: [] };
+      },
+      async listResources() {
+        return { resources: [] };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return { prompts: [] };
+      },
+      async getPrompt() {
+        return { messages: [] };
+      },
+    };
+
+    await mountProxyConnection(host, connection);
+
+    expect(mounted).toMatchObject({
+      annotations: { readOnlyHint: true },
+      _meta: { "example.com/category": "reference" },
+    });
+
+    expect(
+      buildToolUiMeta(undefined, undefined, mounted?.["_meta"] as MetaObject)
+    ).toEqual({
+      "example.com/category": "reference",
+      ui: { customField: { preserved: true } },
+    });
   });
 
   it("preserves upstream resource annotations and _meta", async () => {
