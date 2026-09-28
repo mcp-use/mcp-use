@@ -5,8 +5,10 @@ This module provides a high-level client that manages MCP servers, connectors,
 and sessions from configuration.
 """
 
+import asyncio
 import json
 import warnings
+import weakref
 from typing import TYPE_CHECKING, Any
 
 from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
@@ -67,6 +69,9 @@ class MCPClient:
         self.sandbox_options = sandbox_options
         self.sessions: dict[str, MCPSession] = {}
         self.active_sessions: list[str] = []
+        self._session_disconnects: weakref.WeakKeyDictionary[MCPSession, asyncio.Task[None]] = (
+            weakref.WeakKeyDictionary()
+        )
         self.sampling_callback = sampling_callback
         self.elicitation_callback = elicitation_callback
         self.message_handler = message_handler
@@ -277,6 +282,14 @@ class MCPClient:
         with open(filepath, "w") as f:
             json.dump(self.config, f, indent=2)
 
+    async def _disconnect_session(self, session: MCPSession) -> None:
+        """Disconnect a session while sharing any in-progress teardown."""
+        disconnect_task = self._session_disconnects.get(session)
+        if disconnect_task is None:
+            disconnect_task = asyncio.create_task(session.disconnect())
+            self._session_disconnects[session] = disconnect_task
+        await disconnect_task
+
     @telemetry("client_create_session")
     async def create_session(self, server_name: str, auto_initialize: bool = True) -> MCPSession | None:
         """Create a session for the specified server.
@@ -286,7 +299,9 @@ class MCPClient:
             auto_initialize: Whether to automatically initialize the session.
 
         Returns:
-            The created MCPSession.
+            The created MCPSession. If a session already exists for this server,
+            it is replaced and disconnected; previously returned references to it
+            become unusable.
 
         Raises:
             ValueError: If the specified server doesn't exist.
@@ -323,11 +338,23 @@ class MCPClient:
         connector._record_telemetry = False
         if auto_initialize:
             await session.initialize()
+        previous = self.sessions.get(server_name)
         self.sessions[server_name] = session
 
         # Add to active sessions
         if server_name not in self.active_sessions:
             self.active_sessions.append(server_name)
+
+        # Replacing the map entry makes the old session unreachable from
+        # close_session()/close_all_sessions(), so clean it up after the new
+        # session is installed. Keep the new session usable even if teardown
+        # of the replaced session fails.
+        if previous is not None and previous is not session:
+            try:
+                logger.debug(f"Disconnecting replaced session for server '{server_name}'")
+                await self._disconnect_session(previous)
+            except Exception as e:
+                logger.error(f"Error disconnecting replaced session for server '{server_name}': {e}")
 
         return session
 
@@ -425,16 +452,18 @@ class MCPClient:
         try:
             # Disconnect from the session
             logger.debug(f"Closing session for server '{server_name}'")
-            await session.disconnect()
+            await self._disconnect_session(session)
         except Exception as e:
             logger.error(f"Error closing session for server '{server_name}': {e}")
         finally:
-            # Remove the session regardless of whether disconnect succeeded
-            del self.sessions[server_name]
+            # A concurrent create_session() may have installed a replacement
+            # while the captured session was disconnecting. Only remove the
+            # slot if it still points at the session we actually closed.
+            if self.sessions.get(server_name) is session:
+                del self.sessions[server_name]
 
-            # Remove from active_sessions
-            if server_name in self.active_sessions:
-                self.active_sessions.remove(server_name)
+                if server_name in self.active_sessions:
+                    self.active_sessions.remove(server_name)
 
     async def close_all_sessions(self) -> None:
         """Close all active sessions.

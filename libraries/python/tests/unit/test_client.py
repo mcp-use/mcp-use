@@ -2,6 +2,7 @@
 Unit tests for the MCPClient class.
 """
 
+import asyncio
 import json
 import os
 import tempfile
@@ -301,6 +302,103 @@ class TestMCPClientSessionManagement:
         # Verify state changes
         assert client.sessions["server1"] == mock_session
         assert "server1" in client.active_sessions
+
+    @pytest.mark.asyncio
+    @patch("mcp_use.client.client.create_connector_from_config")
+    @patch("mcp_use.client.client.MCPSession")
+    async def test_create_session_disconnects_replaced_session(self, mock_session_class, mock_create_connector):
+        """Creating the same server session again disconnects the replaced session."""
+        config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
+        client = MCPClient(config=config)
+
+        first_connector = MagicMock()
+        second_connector = MagicMock()
+        mock_create_connector.side_effect = [first_connector, second_connector]
+
+        first_session = MagicMock(spec=MCPSession)
+        first_session.disconnect = AsyncMock()
+        second_session = MagicMock(spec=MCPSession)
+        second_session.disconnect = AsyncMock()
+        mock_session_class.side_effect = [first_session, second_session]
+
+        await client.create_session("server1", auto_initialize=False)
+        replacement = await client.create_session("server1", auto_initialize=False)
+
+        first_session.disconnect.assert_awaited_once_with()
+        second_session.disconnect.assert_not_awaited()
+        assert replacement is second_session
+        assert client.sessions["server1"] is second_session
+        assert client.active_sessions == ["server1"]
+
+    @pytest.mark.asyncio
+    @patch("mcp_use.client.client.create_connector_from_config")
+    @patch("mcp_use.client.client.MCPSession")
+    async def test_create_session_keeps_replacement_when_disconnect_fails(
+        self, mock_session_class, mock_create_connector
+    ):
+        """A replaced session failing to disconnect does not discard the new session."""
+        config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
+        client = MCPClient(config=config)
+
+        mock_create_connector.side_effect = [MagicMock(), MagicMock()]
+
+        first_session = MagicMock(spec=MCPSession)
+        first_session.disconnect = AsyncMock(side_effect=RuntimeError("boom"))
+        second_session = MagicMock(spec=MCPSession)
+        second_session.disconnect = AsyncMock()
+        mock_session_class.side_effect = [first_session, second_session]
+
+        await client.create_session("server1", auto_initialize=False)
+        replacement = await client.create_session("server1", auto_initialize=False)
+
+        first_session.disconnect.assert_awaited_once_with()
+        assert replacement is second_session
+        assert client.sessions["server1"] is second_session
+        assert client.active_sessions == ["server1"]
+
+    @pytest.mark.asyncio
+    @patch("mcp_use.client.client.create_connector_from_config")
+    @patch("mcp_use.client.client.MCPSession")
+    async def test_replacement_during_close_keeps_new_session(self, mock_session_class, mock_create_connector):
+        """A close already in progress must not remove or double-close a replacement session."""
+        config = {"mcpServers": {"server1": {"url": "http://server1.com"}}}
+        client = MCPClient(config=config)
+
+        disconnect_started = asyncio.Event()
+        allow_disconnect = asyncio.Event()
+
+        async def blocking_disconnect():
+            disconnect_started.set()
+            await allow_disconnect.wait()
+
+        old_session = MagicMock(spec=MCPSession)
+        old_session.disconnect = AsyncMock(side_effect=blocking_disconnect)
+        client.sessions["server1"] = old_session
+        client.active_sessions = ["server1"]
+
+        new_session = MagicMock(spec=MCPSession)
+        new_session.disconnect = AsyncMock()
+        mock_session_class.return_value = new_session
+        mock_create_connector.return_value = MagicMock()
+
+        close_task = asyncio.create_task(client.close_session("server1"))
+        await disconnect_started.wait()
+
+        replacement_task = asyncio.create_task(client.create_session("server1", auto_initialize=False))
+        await asyncio.sleep(0)
+
+        assert client.sessions["server1"] is new_session
+        old_session.disconnect.assert_awaited_once_with()
+
+        allow_disconnect.set()
+        replacement = await replacement_task
+        await close_task
+
+        assert replacement is new_session
+        assert client.sessions["server1"] is new_session
+        assert client.active_sessions == ["server1"]
+        old_session.disconnect.assert_awaited_once_with()
+        new_session.disconnect.assert_not_awaited()
 
     def test_get_session(self):
         """Test getting an existing session."""
