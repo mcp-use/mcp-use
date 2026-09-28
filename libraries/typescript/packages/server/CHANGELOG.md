@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.7.2-canary.6
+
+### Patch Changes
+
+- 77802c8: Updated dependency `vitest` to `4.1.11`.
+
 ## 2.7.2-canary.5
 
 ### Patch Changes
