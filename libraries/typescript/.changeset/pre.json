@@ -10,5 +10,8 @@
     "mcp-use": "2.7.1",
     "@mcp-use/tunnel": "0.2.1"
   },
-  "changesets": []
+  "changesets": [
+    "inspector-express-release-stream-on-disconnect",
+    "propagated-f67b20113aa39173"
+  ]
 }
