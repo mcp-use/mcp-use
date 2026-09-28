@@ -6,6 +6,19 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.7.1" description="September 2026">
+  ## View cancellation & client fixes
+  Patch release surfacing host tool cancellation in views, plus browser client and OAuth token expiry fixes.
+
+- **Fix** (server): views no longer stay pending when the host cancels the tool call that rendered them. `useToolContext()` switches to `status: "error"` with a new `ToolCancelledError` (exported from `mcp-use/react`) carrying the host's `reason`; a cancellation after a result is still ignored. `ToolContextError` is now `ToolError | ToolCancelledError`, so narrow with `instanceof ToolError` before reading `error.result` (`#2646`)
+- **Fix** (@mcp-use/client): `ViewRenderer` no longer sends `tool-cancelled` when a tool call made by the view fails; that failure already rejects the view's call (`#2646`)
+- **Fix** (@mcp-use/client): `BrowserMCPClient` expands the `capabilities.views` shorthand into the `io.modelcontextprotocol/ui` extension and forwards `roots` and `defaultRequestOptions` to the connector, matching the Node client (`#2476`)
+- **Fix** (@mcp-use/client): `getOAuthTokenExpiry` reads the JWT `exp` claim from Base64URL payloads containing `-` or `_`, which previously fell back to `expires_in`; the `authTokens.expires_at` docs now say milliseconds (`#2660`)
+- **Documentation** (@mcp-use/agent): `RunOptions.messages` is documented as native-agent only; the LangChain agent ignores it, so pass prior messages through `externalHistory` (`#2658`)
+- **Update**: Updated @mcp-use/inspector to v20.3.13; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.1.17
+</Update>
+
 <Update label="v2.7.0" description="September 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.7.0&title=Mixed%20authentication&date=2026-09&lang=typescript" alt="Release 2.7.0" />

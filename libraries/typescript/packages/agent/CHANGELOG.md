@@ -1,5 +1,32 @@
 # @mcp-use/agent
 
+## 2.0.19-canary.3
+
+### Patch Changes
+
+- Updated dependencies [1a5dbe5]
+  - @mcp-use/client@2.3.4-canary.2
+
+## 2.0.19-canary.2
+
+### Patch Changes
+
+- aa20eef: The `RunOptions.messages` docs now state that only the native local agent supports it. The LangChain agent (`@mcp-use/agent/langchain`) ignores `messages`; pass prior messages through `externalHistory` instead.
+
+## 2.0.19-canary.1
+
+### Patch Changes
+
+- Updated dependencies [a294830]
+  - @mcp-use/client@2.3.4-canary.1
+
+## 2.0.19-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a7f5b34]
+  - @mcp-use/client@2.3.4-canary.0
+
 ## 2.0.18
 
 ### Patch Changes

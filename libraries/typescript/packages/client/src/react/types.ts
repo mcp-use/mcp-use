@@ -523,7 +523,7 @@ export type UseMcpResult = {
     access_token: string;
     /** OAuth token type, commonly `"Bearer"`. */
     token_type: string;
-    /** Unix timestamp in seconds when the access token expires. */
+    /** Unix timestamp in milliseconds when the access token expires. */
     expires_at?: number;
     /** OAuth refresh token, when issued. */
     refresh_token?: string;

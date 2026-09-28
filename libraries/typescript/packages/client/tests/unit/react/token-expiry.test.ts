@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { getOAuthTokenExpiry } from "../../../src/react/token-expiry.js";
 
-function jwt(exp: number): string {
+function jwt(claims: number | Record<string, unknown>): string {
   const encode = (value: Record<string, unknown>) =>
     Buffer.from(JSON.stringify(value)).toString("base64url");
-  return `${encode({ alg: "none" })}.${encode({ exp })}.sig`;
+  const payload = typeof claims === "number" ? { exp: claims } : claims;
+  return `${encode({ alg: "none" })}.${encode(payload)}.sig`;
 }
 
 describe("getOAuthTokenExpiry", () => {
@@ -13,6 +14,27 @@ describe("getOAuthTokenExpiry", () => {
     expect(
       getOAuthTokenExpiry({ access_token: jwt(exp), expires_in: 60 })
     ).toBe(exp * 1000);
+  });
+
+  it.each([
+    ["-", { exp: 1_800_000_000, pad: "¾" }],
+    [
+      "_",
+      {
+        exp: 1_800_000_000,
+        sub: "auth0|65f8a9d0_123-abc",
+        scope: "read:mcp write:mcp",
+        pad: "ǿ",
+      },
+    ],
+  ])("reads exp from Base64URL payloads containing %s", (char, claims) => {
+    const token = jwt(claims);
+    // Whether the encoding contains the character depends on byte alignment,
+    // so guard the fixture instead of letting it silently stop covering it.
+    expect(token.split(".")[1]).toContain(char);
+    expect(getOAuthTokenExpiry({ access_token: token })).toBe(
+      claims.exp * 1000
+    );
   });
 
   it("uses expires_in for opaque tokens", () => {
