@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.3.5-canary.0
+
+### Patch Changes
+
+- 19a3d94: Decode base64 MCP App HTML resources as UTF-8 so non-ASCII text renders correctly in React views.
+
 ## 2.3.4
 
 ### Patch Changes

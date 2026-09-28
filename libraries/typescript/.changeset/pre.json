@@ -11,7 +11,9 @@
     "@mcp-use/tunnel": "0.2.1"
   },
   "changesets": [
+    "bright-mcp-view-utf8",
     "inspector-express-release-stream-on-disconnect",
+    "propagated-13281a2df4db7191",
     "propagated-f67b20113aa39173"
   ]
 }
