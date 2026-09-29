@@ -244,13 +244,27 @@ export async function toWebRequest(
       // from, it also serves custom routes, whose uploads and other non-JSON
       // bodies would be corrupted by decoding them as UTF-8 text.
       const chunks: Uint8Array[] = [];
-      let length = 0;
+      let text = "";
       for await (const chunk of req) {
-        const bytes =
-          typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
-        chunks.push(bytes);
-        length += bytes.byteLength;
+        if (typeof chunk === "string") {
+          // Encode consecutive string chunks together, so a surrogate pair
+          // split between two of them stays one character.
+          text += chunk;
+          continue;
+        }
+        if (text !== "") {
+          chunks.push(new TextEncoder().encode(text));
+          text = "";
+        }
+        chunks.push(chunk);
       }
+      if (text !== "") {
+        chunks.push(new TextEncoder().encode(text));
+      }
+      const length = chunks.reduce(
+        (total, bytes) => total + bytes.byteLength,
+        0
+      );
       if (length > 0) {
         const collected = new Uint8Array(length);
         let offset = 0;

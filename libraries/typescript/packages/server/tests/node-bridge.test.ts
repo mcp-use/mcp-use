@@ -139,13 +139,15 @@ describe("Node request bridge", () => {
       url: "/",
       headers: { host: "localhost" },
       async *[Symbol.asyncIterator]() {
-        // "é" is split across the first two chunks.
+        // "é" is split across the first two chunks, and the surrogate pair
+        // of "😀" across the two string chunks.
         yield Uint8Array.from([0x63, 0x61, 0x66, 0xc3]);
         yield Uint8Array.from([0xa9]);
-        yield "!";
+        yield "\ud83d";
+        yield "\ude00!";
       },
     });
 
-    await expect(request.text()).resolves.toBe("café!");
+    await expect(request.text()).resolves.toBe("café😀!");
   });
 });
