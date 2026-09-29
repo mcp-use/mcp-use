@@ -506,6 +506,67 @@ describe("MCPServer.proxy", () => {
     expect(forwarded).toEqual([1, 2]);
   });
 
+  it("forwards the downstream prompt abort signal to the upstream", async () => {
+    let mountedPrompt:
+      | ((params: Record<string, unknown>, ctx: unknown) => Promise<unknown>)
+      | undefined;
+    const host: ProxyMountHost = {
+      isStarted: () => false,
+      hasTool: () => false,
+      hasResource: () => false,
+      hasPrompt: () => false,
+      registerTool: () => {
+        throw new Error("unexpected tool registration");
+      },
+      registerResource: () => {
+        throw new Error("unexpected resource registration");
+      },
+      registerPrompt: (_definition, callback) => {
+        mountedPrompt = callback as unknown as typeof mountedPrompt;
+      },
+      trackOwner: () => {},
+    };
+    const controller = new AbortController();
+    let forwardedSignal: AbortSignal | undefined;
+    const connection: ProxyConnection = {
+      info: { server: { name: "prompt" } },
+      supports: (capability) => capability === "prompts",
+      async listTools() {
+        return [];
+      },
+      async callTool() {
+        return { content: [] };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return { prompts: [{ name: "slow" }] };
+      },
+      async getPrompt(_name, _args, options) {
+        forwardedSignal = options?.signal;
+        return new Promise((_, reject) => {
+          if (options?.signal?.aborted) {
+            reject(options.signal.reason);
+            return;
+          }
+          options?.signal?.addEventListener(
+            "abort",
+            () => reject(options.signal?.reason),
+            { once: true }
+          );
+        });
+      },
+    };
+
+    await mountProxyConnection(host, connection);
+    expect(mountedPrompt).toBeDefined();
+    const request = mountedPrompt!({}, { signal: controller.signal });
+    expect(forwardedSignal).toBe(controller.signal);
+    controller.abort(new Error("downstream cancelled"));
+    await expect(request).rejects.toThrow("downstream cancelled");
+  });
+
   it("preserves upstream resource annotations and _meta", async () => {
     let mounted: Record<string, unknown> | undefined;
     const host: ProxyMountHost = {
