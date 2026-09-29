@@ -2,6 +2,7 @@
 // Extracted to allow testing without heavy UI/CLI dependencies (index.tsx
 // runs commander on import, so its inner functions can't be imported in tests).
 
+import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
@@ -122,4 +123,44 @@ export function updateIndexTs(projectPath: string, projectName: string) {
   let content = readFileSync(indexPath, "utf-8");
   content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
   writeFileSync(indexPath, content);
+}
+
+export function runPackageManager(
+  packageManager: string,
+  args: string[],
+  cwd: string
+): Promise<{ stderr: string }> {
+  return new Promise((resolve, reject) => {
+    // npm and pnpm are .cmd shims on Windows, which Node only runs through a
+    // shell. Pass them as one command string: Node warns (DEP0190) when an
+    // args array is combined with `shell: true`. Callers pass fixed package
+    // manager names and arguments, never user input.
+    const isWindows = process.platform === "win32";
+    const child = spawn(
+      isWindows ? [packageManager, ...args].join(" ") : packageManager,
+      isWindows ? [] : args,
+      {
+        cwd,
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: isWindows,
+      }
+    );
+
+    let stderr = "";
+    child.stderr?.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve({ stderr });
+      } else {
+        reject(new Error(`${packageManager} install failed:\n${stderr}`));
+      }
+    });
+
+    child.on("error", (err) => {
+      reject(err);
+    });
+  });
 }
