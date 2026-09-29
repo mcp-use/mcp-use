@@ -27,6 +27,7 @@ import {
 import {
   deriveProjectInfo,
   findUnsafeEntries,
+  getDeployCommand,
   updateIndexTs,
   updatePackageJson,
 } from "./utils.js";
@@ -1117,11 +1118,7 @@ async function main(): Promise<void> {
   console.log(ansi.cyan(`   ${getDevCommand(usedPackageManager)}`));
   console.log("");
   console.log(ansi.bold("📤 To deploy:"));
-  console.log(
-    ansi.cyan(
-      `   ${usedPackageManager === "pnpm" ? "pnpm" : usedPackageManager === "bun" ? "bun run" : "npm run"} deploy`
-    )
-  );
+  console.log(ansi.cyan(`   ${getDeployCommand(usedPackageManager)}`));
   console.log("");
   if (options.dev) {
     console.log(
