@@ -68,6 +68,9 @@ export interface ToNodeHandlerOptions {
 /**
  * Adapt a web-standard `fetch` handler to Node `(req, res, parsedBody?)`.
  *
+ * Unless a `parsedBody` is passed, the handler receives the request body as
+ * the bytes that were sent.
+ *
  * @param handler - Handler whose `fetch` receives converted `Request` objects.
  * @param opts - Optional adapter error observer.
  * @returns A Node-compatible asynchronous request handler.
@@ -198,6 +201,9 @@ export interface ToWebRequestOptions {
 
 /**
  * Convert a duck-typed Node request to a web-standard `Request`.
+ *
+ * Without `parsedBody`, the body is read from `req` and kept as the bytes that
+ * were received. It is not decoded or normalized as text.
  *
  * @param req - Node `IncomingMessage` (or Express `req`).
  * @param parsedBody - Optional pre-parsed JSON body.
