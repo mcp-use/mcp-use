@@ -237,19 +237,27 @@ export async function toWebRequest(
     }
   }
 
-  let body: string | undefined;
+  let body: BodyInit | undefined;
   if (method !== "GET" && method !== "HEAD") {
     if (parsedBody === undefined) {
-      const decoder = new TextDecoder();
-      let collected = "";
+      // Keep the bytes as received. Unlike the SDK bridge this was vendored
+      // from, it also serves custom routes, whose uploads and other non-JSON
+      // bodies would be corrupted by decoding them as UTF-8 text.
+      const chunks: Uint8Array[] = [];
+      let length = 0;
       for await (const chunk of req) {
-        collected +=
-          typeof chunk === "string"
-            ? chunk
-            : decoder.decode(chunk as Uint8Array, { stream: true });
+        const bytes =
+          typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
+        chunks.push(bytes);
+        length += bytes.byteLength;
       }
-      collected += decoder.decode();
-      if (collected.length > 0) {
+      if (length > 0) {
+        const collected = new Uint8Array(length);
+        let offset = 0;
+        for (const bytes of chunks) {
+          collected.set(bytes, offset);
+          offset += bytes.byteLength;
+        }
         body = collected;
       }
     } else {

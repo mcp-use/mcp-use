@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { markBufferedResponse } from "../src/buffered-response.js";
+import { toWebRequest } from "../src/node-bridge.js";
 import { listenFetch, type ListenFetchResult } from "./helpers/listen-fetch.js";
 
 describe("Node response bridge", () => {
@@ -107,5 +108,44 @@ describe("Node response bridge", () => {
       "session_token=token; Path=/; HttpOnly",
       "session_data=data; Path=/; HttpOnly",
     ]);
+  });
+});
+
+describe("Node request bridge", () => {
+  let listener: ListenFetchResult | undefined;
+
+  afterEach(async () => {
+    await listener?.close();
+    listener = undefined;
+  });
+
+  it("passes binary request bodies to the handler unchanged", async () => {
+    listener = await listenFetch(
+      async (request) => new Response(await request.arrayBuffer())
+    );
+    // The PNG file signature; 0x89 is not valid UTF-8 on its own.
+    const sent = Uint8Array.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+
+    const response = await fetch(listener.url, { method: "POST", body: sent });
+
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(sent);
+  });
+
+  it("joins a body split across chunks, including string chunks", async () => {
+    const request = await toWebRequest({
+      method: "POST",
+      url: "/",
+      headers: { host: "localhost" },
+      async *[Symbol.asyncIterator]() {
+        // "é" is split across the first two chunks.
+        yield Uint8Array.from([0x63, 0x61, 0x66, 0xc3]);
+        yield Uint8Array.from([0xa9]);
+        yield "!";
+      },
+    });
+
+    await expect(request.text()).resolves.toBe("café!");
   });
 });
