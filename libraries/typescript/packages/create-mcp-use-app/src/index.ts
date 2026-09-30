@@ -17,6 +17,7 @@ import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import * as ansi from "./ansi.js";
+import { getTemplateCloneArgs } from "./github-template.js";
 import {
   isInteractive,
   promptConfirm,
@@ -464,57 +465,27 @@ async function cloneGitHubRepo(
   }
 
   const repoUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
-  const branch = repoInfo.branch || "main";
   const s = spinner();
   s.start("Cloning repository from GitHub...");
 
-  const cloneWithBranch = (
-    branchName: string
-  ): { success: boolean; error?: Error } => {
-    const result = spawnSync(
-      "git",
-      ["clone", "--depth", "1", "--branch", branchName, repoUrl, tempDir],
-      {
-        stdio: "pipe",
-        shell: false,
-      }
-    );
-
-    if (result.status !== 0) {
-      const errorMessage =
-        result.stderr?.toString() ||
-        result.stdout?.toString() ||
-        "Unknown error";
-      return {
-        success: false,
-        error: new Error(errorMessage),
-      };
+  const result = spawnSync(
+    "git",
+    getTemplateCloneArgs(repoUrl, tempDir, repoInfo.branch),
+    {
+      stdio: "pipe",
+      shell: false,
     }
-
-    return { success: true };
-  };
-
-  const cloneResult = cloneWithBranch(branch);
-  if (cloneResult.success) {
+  );
+  if (result.status === 0 && !result.error) {
     s.stop("Repository cloned successfully");
     return tempDir;
   }
 
-  if (!repoInfo.branch) {
-    s.message(`Branch "${branch}" not found, trying "main"...`);
-    const mainResult = cloneWithBranch("main");
-    if (mainResult.success) {
-      s.stop("Repository cloned successfully (using main branch)");
-      return tempDir;
-    }
-
-    s.message('Branch "main" not found, trying "master"...');
-    const masterResult = cloneWithBranch("master");
-    if (masterResult.success) {
-      s.stop("Repository cloned successfully (using master branch)");
-      return tempDir;
-    }
-  }
+  const cloneError =
+    result.error ||
+    new Error(
+      result.stderr?.toString() || result.stdout?.toString() || "Unknown error"
+    );
 
   s.error("Failed to clone repository");
   console.error(ansi.red(`❌ Error cloning repository: ${repoUrl}`));
@@ -522,14 +493,14 @@ async function cloneGitHubRepo(
     console.error(ansi.yellow(`   Branch "${repoInfo.branch}" may not exist`));
   }
 
-  const errorMessage = cloneResult.error?.message || "Unknown error";
+  const errorMessage = cloneError.message || "Unknown error";
   if (errorMessage.includes("not found")) {
     console.error(ansi.yellow("   Repository may not exist or is private"));
   } else {
     console.error(ansi.yellow(`   ${errorMessage}`));
   }
 
-  throw cloneResult.error || new Error("Failed to clone repository");
+  throw cloneError;
 }
 
 function validateTemplateName(template: string): string {
