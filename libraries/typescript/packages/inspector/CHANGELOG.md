@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.14-canary.4
+
+### Patch Changes
+
+- 604b130: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
 ## 20.3.14-canary.3
 
 ### Patch Changes
