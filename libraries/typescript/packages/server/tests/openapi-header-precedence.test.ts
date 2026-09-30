@@ -102,12 +102,16 @@ describe("OpenAPI header precedence", () => {
       { name: "headers-test", version: "1.0.0" },
       { versionNegotiation: { mode: { pin: "2026-07-28" } } }
     );
+    let testFailed = false;
     try {
       await client.connect(
         new StreamableHTTPClientTransport(new URL(started.url))
       );
       await client.callTool({ name: "check", arguments: args });
       expect(outgoing).toBe(expected);
+    } catch (error) {
+      testFailed = true;
+      throw error;
     } finally {
       const results = await Promise.allSettled([
         client.close(),
@@ -116,11 +120,15 @@ describe("OpenAPI header precedence", () => {
           upstream.close((error) => (error ? reject(error) : resolve()))
         ),
       ]);
-      expect(results.map((result) => result.status)).toEqual([
-        "fulfilled",
-        "fulfilled",
-        "fulfilled",
-      ]);
+      // Only assert cleanup when the test body passed, so a teardown failure
+      // cannot replace the original assertion or call error.
+      if (!testFailed) {
+        expect(results.map((result) => result.status)).toEqual([
+          "fulfilled",
+          "fulfilled",
+          "fulfilled",
+        ]);
+      }
     }
   });
 });
