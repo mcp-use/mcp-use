@@ -128,7 +128,7 @@ type MiddlewareContextCommon<TEnv extends Env = Env> = Omit<
   req?: HonoRequest;
   /** Session info when the underlying transport provides a session ID. */
   session?: { sessionId: string };
-  /** OAuth info extracted from the validated access token. */
+  /** Same projected OAuth auth shape exposed to tool/resource/prompt callbacks. */
   auth?: OAuthAuth<unknown>;
   /** Shared state for middleware participating in this request. */
   state: Map<string, unknown>;
