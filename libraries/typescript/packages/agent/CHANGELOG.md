@@ -1,5 +1,16 @@
 # @mcp-use/agent
 
+## 2.0.20
+
+### Patch Changes
+
+- cdf2cc6: Wrap array-valued Gemini tool results in an object so function responses satisfy the provider's request schema in streaming and non-streaming calls.
+- cdf2cc6: `runToolLoopNonStreaming` now stops dispatching remaining tool calls in a turn when the `signal` is aborted, matching the cancellation behavior of `runToolLoop`.
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+  - @mcp-use/client@2.4.0
+
 ## 2.0.20-canary.4
 
 ### Patch Changes

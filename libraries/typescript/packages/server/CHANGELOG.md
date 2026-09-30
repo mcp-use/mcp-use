@@ -1,5 +1,25 @@
 # mcp-use
 
+## 2.7.2
+
+### Patch Changes
+
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Forward downstream cancellation signals to proxied prompt requests.
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+  - @mcp-use/cli@4.2.0
+  - @mcp-use/inspector@20.3.14
+
 ## 2.7.2-canary.9
 
 ### Patch Changes

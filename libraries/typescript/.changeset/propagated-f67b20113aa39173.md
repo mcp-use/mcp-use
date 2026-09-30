@@ -1,5 +1,0 @@
----
-"@mcp-use/cli": patch
----
-
-Rebuild bundled workspace code and synchronize published internal package metadata.
