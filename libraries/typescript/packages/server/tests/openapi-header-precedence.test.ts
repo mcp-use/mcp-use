@@ -109,11 +109,16 @@ describe("OpenAPI header precedence", () => {
       await client.callTool({ name: "check", arguments: args });
       expect(outgoing).toBe(expected);
     } finally {
-      await client.close();
-      await server.close();
-      await new Promise<void>((resolve, reject) =>
-        upstream.close((error) => (error ? reject(error) : resolve()))
-      );
+      const results = await Promise.allSettled([
+        client.close(),
+        server.close(),
+        new Promise<void>((resolve, reject) =>
+          upstream.close((error) => (error ? reject(error) : resolve()))
+        ),
+      ]);
+      for (const result of results) {
+        if (result.status === "rejected") throw result.reason;
+      }
     }
   });
 });
