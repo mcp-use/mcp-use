@@ -1,6 +1,6 @@
 ---
 title: "Migrate to v2"
-description: "Migrate mcp-use 1.x servers, widgets, and runtime behavior to the v2 beta."
+description: "Migrate mcp-use 1.x servers, widgets, and runtime behavior to mcp-use v2."
 icon: "arrow-right-left"
 ---
 
@@ -29,7 +29,7 @@ changes. Widgets require a complete rewrite as MCP App Views.
     Replace the widget file layout, tool binding, result helper, provider,
     generated helpers, hooks, state model, and asset paths.
   </Step>
-  <Step title="Review beta limitations and verify">
+  <Step title="Review v2 limitations and verify">
     Check whether a missing v1 capability affects the server, then typecheck,
     build, run, and exercise the migrated project.
   </Step>
@@ -37,7 +37,7 @@ changes. Widgets require a complete rewrite as MCP App Views.
 
 ## Update the runtime and entry point
 
-The current v2 beta requires Node.js `>=22.22.2` and ESM.
+mcp-use v2 requires Node.js `>=22.22.2` and ESM.
 
 ```bash
 npm install mcp-use
@@ -57,6 +57,17 @@ export default server;
 ```
 
 Default-export the server from `index.ts`.
+
+v1 `getHandler()` remains only as a deprecated alias for `server.fetch`. Pass
+`server.fetch` to edge and Fetch-based runtimes directly. To serve from a custom
+Node.js `http` server, wrap the server with `toNodeHandler()`:
+
+```typescript
+import { createServer } from "node:http";
+import { toNodeHandler } from "mcp-use/node";
+
+createServer(toNodeHandler(server)).listen(3000);
+```
 
 ## Export every static tool
 
@@ -131,8 +142,8 @@ export const weather = server.tool(
 );
 ```
 
-`schema` remains an alias for `inputSchema` in the current beta, but
-`inputSchema` matches the MCP wire field and is the migration target.
+`schema` remains an alias for `inputSchema`, but `inputSchema` matches the MCP
+wire field and is the migration target.
 
 Follow these result rules:
 
@@ -230,16 +241,16 @@ v2 request context exists only for the current request. Remove session
 assumptions from client metadata, logging, progress, notifications, and
 elicitation.
 
-| v1                          | v2                                            |
-| --------------------------- | --------------------------------------------- |
-| `ctx.req`                   | `ctx.request`                                 |
-| Node/Web request access     | `ctx.request.raw` for the Web `Request`       |
-| `ctx.log(...)`              | `ctx.sendLog(...)`                            |
-| `ctx.client.supportsApps()` | `ctx.client.supportsViews()`                  |
-| `ctx.user`                  | provider-specific `ctx.auth.user`             |
-| session metadata            | current request's `ctx.client` snapshot       |
-| blocking `ctx.elicit(...)`  | keyed input-required round trip               |
-| `ctx.sample(...)`           | no server-side equivalent in the current beta |
+| v1                          | v2                                      |
+| --------------------------- | --------------------------------------- |
+| `ctx.req`                   | `ctx.request`                           |
+| Node/Web request access     | `ctx.request.raw` for the Web `Request` |
+| `ctx.log(...)`              | `ctx.sendLog(...)`                      |
+| `ctx.client.supportsApps()` | `ctx.client.supportsViews()`            |
+| `ctx.user`                  | provider-specific `ctx.auth.user`       |
+| session metadata            | current request's `ctx.client` snapshot |
+| blocking `ctx.elicit(...)`  | keyed input-required round trip         |
+| `ctx.sample(...)`           | no server-side equivalent               |
 
 `ctx.client.info()`, `capabilities()`, `can()`, `extension()`, and `user()`
 return client-declared request hints. Never use them for authorization. Use
@@ -425,6 +436,11 @@ export default function ResultsView() {
 }
 ```
 
+The `error` status also covers a host that cancels the tool call before a result
+arrives. `view.error` is then a `ToolCancelledError`; check
+`view.error instanceof ToolError` before reading `view.error.result`. Import both
+classes from `mcp-use/react`.
+
 Use the focused v2 surface:
 
 | v1                                 | v2                                                            |
@@ -466,9 +482,12 @@ snapshot across the mounted View. The state is model-visible.
 ChatGPT can restore View state across View lifetimes. Other MCP Apps hosts keep
 the state only for the current iframe lifetime.
 
-Use `ModelContext` or `modelContext` for model-visible natural-language context.
-Use `useSendFollowUp()` to trigger a new model turn. Keep presentation-only
-state in ordinary React state.
+Use the declarative `<ModelContext>` component for model-visible
+natural-language context. v2 removes the imperative `modelContext.set()`,
+`modelContext.remove()`, and `modelContext.clear()` helpers; render
+`<ModelContext>` where the annotation applies so it follows React state and
+component lifecycle. Use `useSendFollowUp()` to trigger a new model turn. Keep
+presentation-only state in ordinary React state.
 
 `useFiles()` keeps the upload/download capability check, but it no longer
 accepts the v1 `modelVisible` option or mutates widget state automatically.
@@ -562,6 +581,13 @@ locator options, and use the provider-specific `ctx.auth.user` type.
 Replace generic `userId` assumptions with the provider's mapped field, commonly
 `id`. Replace `getAuth`, `hasScope`, and `requireScope` with verified
 `ctx.auth`, scopes, permissions, and application authorization checks.
+
+To serve public, optional, and sign-in tools from one OAuth-enabled endpoint,
+set `mixedAuth: true` on the server and declare `securitySchemes` on each tool.
+Without `mixedAuth`, every request to the MCP endpoint needs a valid token. If a
+v1 tool sets `_meta.securitySchemes` by hand, v2 passes it through unchanged but
+does not enforce it; declare `securitySchemes` on the tool instead. See
+[Mixed authentication](/v2/typescript/server/authentication/mixed-auth).
 
 OAuth proxy or authorization-server mode has no native v2 migration. Do not
 translate `oauthProxy`, `jwksVerifier`, or `mountOAuthProxy` as resource-server
@@ -690,7 +716,7 @@ Verify the migration with a real token that a v1 client holds.
 The resource identifier is part of your public contract. Changing `MCP_URL` or
 `basePath` later changes it again and requires the same migration.
 
-## Review current beta limitations
+## Review v2 limitations
 
 The following v1 capabilities do not currently have direct v2 equivalents.
 Update the application design where one of these limitations affects your
@@ -705,18 +731,19 @@ server.
   available.
 - Server-to-client sampling through `ctx.sample()` is not available.
 - The v1 roots-changed callback surface is not available.
-- Express and Connect adapters are not available. Use Hono or `server.fetch`.
+- Express and Connect adapters are not available. Use Hono, `server.fetch`, or
+  `toNodeHandler()` from `mcp-use/node`.
 - Stdio serving and stdio child-process proxy configuration do not have a
   native migration path.
 - CommonJS and unsupported Node.js versions are intentional compatibility
-  breaks, not beta bugs.
+  breaks.
 
 Move durable state to application storage keyed by verified user, tenant, or an
 explicit domain handle. Do not key business state to an MCP transport session.
 
 ### OAuth, proxy, and OpenAPI
 
-- OAuth proxy and authorization-server mode are deferred. Direct
+- OAuth proxy and authorization-server mode are not provided. Direct
   resource-server authentication is implemented.
 - Unsigned token bypasses such as `verifyJwt: false` are not supported.
 - Verify proxy requirements for upstream OAuth, templates, completions,
