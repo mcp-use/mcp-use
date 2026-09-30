@@ -116,9 +116,11 @@ describe("OpenAPI header precedence", () => {
           upstream.close((error) => (error ? reject(error) : resolve()))
         ),
       ]);
-      for (const result of results) {
-        if (result.status === "rejected") throw result.reason;
-      }
+      expect(results.map((result) => result.status)).toEqual([
+        "fulfilled",
+        "fulfilled",
+        "fulfilled",
+      ]);
     }
   });
 });
