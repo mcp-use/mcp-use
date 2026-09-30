@@ -137,6 +137,8 @@ authenticatedServer.use("mcp:tools/call", async (ctx, next) => {
 Use [server authentication](/v2/typescript/server/authentication/index) to
 verify bearer tokens before relying on `ctx.auth`.
 
+The middleware auth object is the same shape callbacks receive. Use `ctx.auth.accessToken` for the verified bearer token, `ctx.auth.payload` for verified claims/introspection data, and `ctx.auth.user` / `ctx.auth.permissions` for provider-mapped identity. Code written against the older raw SDK middleware shape should replace `ctx.auth.token` with `ctx.auth.accessToken` and `ctx.auth.extra.*` with the corresponding projected fields.
+
 ## Rate-limit expensive operations
 
 Use middleware when the limit applies to a class of operations instead of one
