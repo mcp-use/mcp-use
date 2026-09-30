@@ -3,6 +3,7 @@ import type {
   ProviderConfig,
   ProviderMessage,
   ProviderTool,
+  ProviderToolCall,
 } from "../types.js";
 import * as anthropic from "./anthropic.js";
 import * as google from "./google.js";
@@ -18,7 +19,7 @@ interface ChatParams {
 
 interface ChatResult {
   text: string;
-  toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
+  toolCalls: ProviderToolCall[];
 }
 
 /** Applies OpenRouter's base URL and attribution headers. */
