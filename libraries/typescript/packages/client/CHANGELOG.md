@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.4.0-canary.2
+
+### Patch Changes
+
+- 63b923e: Document that `proxyOAuthRequests` also routes UserInfo requests through the OAuth proxy.
+
 ## 2.4.0-canary.1
 
 ### Minor Changes
