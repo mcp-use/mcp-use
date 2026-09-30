@@ -403,6 +403,58 @@ describe("MCPServer.fromOpenAPI", () => {
     }
   });
 
+  it.each([
+    ["getReport", "getReport", "getReport_2"],
+    ["getReport_2", "getReport", "getReport"],
+    ["a".repeat(64), "a".repeat(64), `${"a".repeat(62)}_2`],
+  ])("keeps suffix collisions distinct: %j", async (...operationIds) => {
+    const connection = await connect(
+      MCPServer.fromOpenAPI({
+        baseUrl: upstreamBaseUrl,
+        spec: {
+          openapi: "3.1.0",
+          info: { title: "Collisions", version: "1" },
+          paths: {
+            "/first": {
+              get: {
+                operationId: operationIds[0]!,
+                responses: { "200": { description: "ok" } },
+              },
+            },
+            "/second": {
+              get: {
+                operationId: operationIds[1]!,
+                responses: { "200": { description: "ok" } },
+              },
+            },
+            "/third": {
+              get: {
+                operationId: operationIds[2]!,
+                responses: { "200": { description: "ok" } },
+              },
+            },
+          },
+        },
+      })
+    );
+    try {
+      const { tools } = await connection.client.listTools();
+      expect(tools).toHaveLength(3);
+      for (const tool of tools) {
+        const result = await connection.client.callTool({
+          name: tool.name,
+          arguments: {},
+        });
+        expect(result.isError).not.toBe(true);
+      }
+      expect(
+        new Set(captured.slice(-3).map((request) => request.url)).size
+      ).toBe(3);
+    } finally {
+      await connection.close();
+    }
+  });
+
   it("disambiguates same-name parameters and a body parameter", async () => {
     captured.length = 0;
     const spec: OpenAPIDocument = {

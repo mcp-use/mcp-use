@@ -193,7 +193,7 @@ function matchesPattern(pattern: string | RegExp, value: string): boolean {
 }
 
 function createToolNames(operations: CollectedOpenAPIOperation[]): string[] {
-  const seen = new Map<string, number>();
+  const used = new Set<string>();
   return operations.map((operation) => {
     const baseName = slugifyToolName(
       operation.operation.operationId ??
@@ -201,12 +201,15 @@ function createToolNames(operations: CollectedOpenAPIOperation[]): string[] {
           .replace(/[{}]/g, "")
           .replace(/\//g, "_")}`
     );
-    const count = seen.get(baseName) ?? 0;
-    seen.set(baseName, count + 1);
-    if (count === 0) return baseName;
-
-    const suffix = `_${count + 1}`;
-    return `${baseName.slice(0, 64 - suffix.length)}${suffix}`;
+    let name = baseName;
+    let count = 1;
+    while (used.has(name)) {
+      count += 1;
+      const suffix = `_${count}`;
+      name = `${baseName.slice(0, 64 - suffix.length)}${suffix}`;
+    }
+    used.add(name);
+    return name;
   });
 }
 
