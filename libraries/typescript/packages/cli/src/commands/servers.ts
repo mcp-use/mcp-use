@@ -60,8 +60,10 @@ const COMMAND_HELP: Record<string, string> = {
 export async function runServers(argv: readonly string[]): Promise<number> {
   if (argv.some((token) => token === "--help" || token === "-h")) {
     const key =
-      argv[0] === "env" && argv[1] !== undefined
-        ? `env ${argv[1]}`
+      argv[0] === "env"
+        ? argv[1] !== undefined && argv[1] !== "--help" && argv[1] !== "-h"
+          ? `env ${argv[1]}`
+          : "env"
         : (argv[0] ?? "");
     process.stdout.write(`${COMMAND_HELP[key] ?? HELP}\n`);
     return 0;
