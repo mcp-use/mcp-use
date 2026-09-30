@@ -8,12 +8,13 @@ import {
 } from "@modelcontextprotocol/core";
 import { isInputRequiredResult } from "@modelcontextprotocol/server";
 import type {
-  AuthInfo,
   HandlerResultTypeMap,
   RequestTypeMap,
   ResultTypeMap,
 } from "@modelcontextprotocol/server";
 import type { Context, Env, HonoRequest } from "hono";
+
+import type { OAuthAuth } from "../context.js";
 
 const MCP_MIDDLEWARE_METHODS = [
   "tools/call",
@@ -128,7 +129,7 @@ type MiddlewareContextCommon<TEnv extends Env = Env> = Omit<
   /** Session info when the underlying transport provides a session ID. */
   session?: { sessionId: string };
   /** OAuth info extracted from the validated access token. */
-  auth?: AuthInfo;
+  auth?: OAuthAuth<unknown>;
   /** Shared state for middleware participating in this request. */
   state: Map<string, unknown>;
 };
@@ -335,7 +336,7 @@ export type ReadonlyMiddlewareContext<
         /** @deprecated Use `request` instead. */
         readonly req?: HonoRequest;
         readonly session?: Readonly<{ sessionId: string }>;
-        readonly auth?: Readonly<AuthInfo>;
+        readonly auth?: Readonly<OAuthAuth<unknown>>;
         readonly state: ReadonlyMap<string, unknown>;
       }
     : never
