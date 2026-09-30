@@ -15,7 +15,12 @@ afterEach(() => {
 });
 
 function git(args: string[], cwd?: string) {
-  return spawnSync("git", args, { cwd, encoding: "utf8", shell: false });
+  return spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    shell: false,
+    env: { ...process.env, LC_ALL: "C" },
+  });
 }
 
 function createRepository(defaultBranch: string) {
