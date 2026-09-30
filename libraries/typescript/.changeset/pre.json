@@ -10,5 +10,8 @@
     "mcp-use": "2.7.2",
     "@mcp-use/tunnel": "0.2.1"
   },
-  "changesets": []
+  "changesets": [
+    "cli-plain-value-colon-equals",
+    "propagated-bdf148f1180e69ea"
+  ]
 }

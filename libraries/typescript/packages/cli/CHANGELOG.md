@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.2.1-canary.0
+
+### Patch Changes
+
+- 0e240fc: fix(cli): keep `:=` inside a plain `key=value` tool or prompt argument instead of splitting the key there, so `code="x := 1"` is sent as a string
+
 ## 4.2.0
 
 ### Minor Changes
