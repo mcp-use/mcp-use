@@ -12,6 +12,7 @@
   },
   "changesets": [
     "cli-plain-value-colon-equals",
+    "create-app-pnpm-run-deploy",
     "propagated-bdf148f1180e69ea"
   ]
 }
