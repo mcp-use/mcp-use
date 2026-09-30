@@ -17,6 +17,8 @@ import {
   type OpenAPIDocument,
 } from "../src/index.js";
 
+import { registerOpenAPITools } from "../src/openapi/index.js";
+
 interface CapturedRequest {
   method: string;
   url: string;
@@ -454,6 +456,46 @@ describe("MCPServer.fromOpenAPI", () => {
       await connection.close();
     }
   });
+
+  it.each(["report", "a".repeat(80)])(
+    "advances repeated suffixes without rescanning: %s",
+    (operationId) => {
+      const count = 1000;
+      const paths = Object.fromEntries(
+        Array.from({ length: count }, (_, index) => [
+          `/reports/${index}`,
+          { get: { operationId, responses: { "200": { description: "ok" } } } },
+        ])
+      );
+      const names: string[] = [];
+      let probes = 0;
+      const originalHas = Set.prototype.has;
+      Set.prototype.has = function (value) {
+        probes += 1;
+        return originalHas.call(this, value);
+      };
+      try {
+        registerOpenAPITools(
+          {
+            tool: (definition: { name: string }) => names.push(definition.name),
+          } as unknown as Pick<MCPServer, "tool">,
+          {
+            baseUrl: upstreamBaseUrl,
+            spec: {
+              openapi: "3.1.0",
+              info: { title: "Many tools", version: "1" },
+              paths,
+            },
+          }
+        );
+      } finally {
+        Set.prototype.has = originalHas;
+      }
+      expect(new Set(names).size).toBe(count);
+      expect(names.every((name) => name.length <= 64)).toBe(true);
+      expect(probes).toBeLessThan(count * 8);
+    }
+  );
 
   it("disambiguates same-name parameters and a body parameter", async () => {
     captured.length = 0;
