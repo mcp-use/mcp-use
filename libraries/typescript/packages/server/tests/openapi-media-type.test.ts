@@ -120,3 +120,37 @@ describe("OpenAPI request media types", () => {
     expect(response.body).toBeUndefined();
   });
 });
+
+it.each([
+  { "application/*+json": {}, "application/vnd.api+json": { schema } },
+  { "application/*+json": { schema }, "application/vnd.api+json": { schema } },
+  { "application/json": {}, "application/vnd.api+json": { schema } },
+])(
+  "skips schema-less entries and prefers concrete vendor media types: %j",
+  async (content) => {
+    const response = await requestWith(content, "application/vnd.api+json");
+    expect(response.headers.get("content-type")).toBe(
+      "application/vnd.api+json"
+    );
+    expect(response.body).toBe(JSON.stringify({ title: "Test" }));
+    expect(response.result).not.toMatchObject({ isError: true });
+  }
+);
+
+it.each(["Application/Vnd.API+JSON", "Application/JSON"])(
+  "recognizes case-insensitive media types: %s",
+  async (mediaType) => {
+    const response = await requestWith({ [mediaType]: { schema } }, mediaType);
+    expect(response.headers.get("content-type")).toBe(mediaType);
+    expect(response.body).toBe(JSON.stringify({ title: "Test" }));
+  }
+);
+
+it("does not treat a +json substring as a structured JSON suffix", async () => {
+  const response = await requestWith(
+    { "application/not+json-extra": { schema } },
+    "application/json"
+  );
+  expect(response.headers.has("content-type")).toBe(false);
+  expect(response.body).toBeUndefined();
+});

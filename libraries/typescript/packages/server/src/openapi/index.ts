@@ -407,19 +407,28 @@ function getJsonRequestBodyMediaType(
   | undefined {
   const content = requestBody?.content;
   if (content === undefined) return undefined;
-  const jsonSchema = content["application/json"]?.schema;
-  if (jsonSchema !== undefined) {
-    return { mediaType: "application/json", schema: jsonSchema };
-  }
-  const wildcardSchema = content["application/*+json"]?.schema;
-  if (wildcardSchema !== undefined) {
-    return { mediaType: "application/json", schema: wildcardSchema };
-  }
-  const entry = Object.entries(content).find(([mediaType]) =>
-    mediaType.includes("+json")
+  const entries = Object.entries(content).filter(
+    ([, media]) => media.schema !== undefined
   );
+  const normalize = (mediaType: string) =>
+    mediaType.split(";", 1)[0]!.trim().toLowerCase();
+  const json = entries.find(
+    ([mediaType]) => normalize(mediaType) === "application/json"
+  );
+  const concrete = entries.find(([mediaType]) =>
+    /^[a-z0-9!#$%&'`|~^_.+-]+\/[a-z0-9!#$%&'`|~^_.+-]+\+json$/.test(
+      normalize(mediaType)
+    )
+  );
+  const wildcard = entries.find(
+    ([mediaType]) => normalize(mediaType) === "application/*+json"
+  );
+  const entry = json ?? concrete ?? wildcard;
   if (entry?.[1].schema === undefined) return undefined;
-  return { mediaType: entry[0], schema: entry[1].schema };
+  return {
+    mediaType: entry === wildcard ? "application/json" : entry[0],
+    schema: entry[1].schema,
+  };
 }
 
 async function callOpenAPIOperation(
