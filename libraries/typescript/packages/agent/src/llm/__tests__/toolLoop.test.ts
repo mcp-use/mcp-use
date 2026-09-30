@@ -1,7 +1,40 @@
 import { describe, expect, it, vi } from "vitest";
 import { LlmRequestError } from "../providers/openai-chat-completions.js";
-import { runToolLoop } from "../toolLoop.js";
+import { runToolLoop, runToolLoopNonStreaming } from "../toolLoop.js";
 import type { LlmDriver } from "../driver.js";
+
+describe("runToolLoopNonStreaming", () => {
+  it("stops dispatching remaining tool calls in a turn after abort", async () => {
+    const controller = new AbortController();
+    const callTool = vi.fn(async (name: string) => {
+      if (name === "tool1") controller.abort();
+      return { ok: true };
+    });
+    const driver: LlmDriver = {
+      stream: vi.fn(),
+      complete: vi.fn(async () => ({
+        text: "",
+        toolCalls: [
+          { id: "1", name: "tool1", args: {} },
+          { id: "2", name: "tool2", args: {} },
+        ],
+      })),
+    };
+
+    const result = await runToolLoopNonStreaming({
+      driver,
+      messages: [{ role: "user", content: "run tools" }],
+      tools: [],
+      callTool,
+      signal: controller.signal,
+    });
+
+    expect(callTool).toHaveBeenCalledTimes(1);
+    expect(callTool).toHaveBeenCalledWith("tool1", {});
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls[0]?.toolName).toBe("tool1");
+  });
+});
 
 describe("runToolLoop", () => {
   it("re-throws LlmRequestError so callers can read status/body", async () => {
