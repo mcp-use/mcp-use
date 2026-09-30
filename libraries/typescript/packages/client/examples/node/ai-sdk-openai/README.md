@@ -15,7 +15,7 @@ Requires Node.js 22.22.2 or newer (the same as `@mcp-use/client`), which runs `i
 
 From this directory:
 ```bash
-pnpm install --ignore-workspace
+pnpm install --ignore-workspace --frozen-lockfile
 OPENAI_API_KEY=... pnpm start
 ```
 
