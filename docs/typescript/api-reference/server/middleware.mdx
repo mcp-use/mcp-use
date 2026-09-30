@@ -106,6 +106,8 @@ server.use("mcp:tools/list", async (_ctx, next) => {
 
 Hook points: `tools/call`, `resources/read`, `prompts/get`, and `tools/list` / `resources/list` / `prompts/list`.
 
+When OAuth is configured, MCP middleware receives the same projected `ctx.auth` shape as tool, resource, and prompt callbacks: `user`, `payload`, `accessToken`, `scopes`, `permissions`, and the optional client/resource fields. Middleware that previously read the SDK-shaped `ctx.auth.token` or `ctx.auth.extra` should migrate to `ctx.auth.accessToken` and the projected `ctx.auth.payload` / `ctx.auth.user` / `ctx.auth.permissions` fields.
+
 ## Observer events
 
 Read-only telemetry — cannot block or mutate params. Append `:complete` for after-handler:
