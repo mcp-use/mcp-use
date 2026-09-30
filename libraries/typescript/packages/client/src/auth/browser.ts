@@ -55,7 +55,7 @@ export interface BrowserOAuthOptions {
   clientMetadataUrl?: string;
   /**
    * When true (default), OAuth requests (.well-known metadata, token,
-   * registration, revocation, and introspection) are routed through
+   * registration, revocation, introspection, and UserInfo) are routed through
    * `oauthProxyUrl` to bypass CORS.
    * The routing is applied only to the scoped fetch returned by
    * {@link BrowserOAuthClientProvider.getProxyFetch}; it never mutates the
