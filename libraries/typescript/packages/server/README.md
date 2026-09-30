@@ -172,7 +172,7 @@ export default server;
 [Explore MCP server tools →](https://mcp-use.com/docs/typescript/server/tools)
 
 
-### `tools/list` serialization contract
+## `tools/list` serialization contract
 
 `MCPServer.tool()` registrations are converted to MCP tool descriptors by the
 underlying MCP SDK. Treat the descriptor returned by `tools/list` as the wire
