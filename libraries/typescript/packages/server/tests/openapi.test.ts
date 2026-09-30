@@ -9,7 +9,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   MCPServer,
@@ -470,10 +470,12 @@ describe("MCPServer.fromOpenAPI", () => {
       const names: string[] = [];
       let probes = 0;
       const originalHas = Set.prototype.has;
-      Set.prototype.has = function (value) {
-        probes += 1;
-        return originalHas.call(this, value);
-      };
+      const hasSpy = vi
+        .spyOn(Set.prototype, "has")
+        .mockImplementation(function (this: Set<unknown>, value) {
+          probes += 1;
+          return originalHas.call(this, value);
+        });
       try {
         registerOpenAPITools(
           {
@@ -489,7 +491,7 @@ describe("MCPServer.fromOpenAPI", () => {
           }
         );
       } finally {
-        Set.prototype.has = originalHas;
+        hasSpy.mockRestore();
       }
       expect(new Set(names).size).toBe(count);
       expect(names.every((name) => name.length <= 64)).toBe(true);
