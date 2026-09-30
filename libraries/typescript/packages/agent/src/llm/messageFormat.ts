@@ -206,8 +206,11 @@ export function convertMessagesToProvider(
     }
 
     const text = extractText(m);
+    // Ids stay short and name-free: OpenAI caps tool call ids at 40
+    // characters and Anthropic only accepts [a-zA-Z0-9_-].
+    const toolCallId = (i: number) => `call_${mi}_${i}`;
     const toolCalls = toolParts.map((p, i) => ({
-      id: `call_${mi}_${i}_${p.toolInvocation!.toolName}`,
+      id: toolCallId(i),
       name: p.toolInvocation!.toolName,
       args: p.toolInvocation!.args,
     }));
@@ -221,7 +224,7 @@ export function convertMessagesToProvider(
       out.push({
         role: "tool",
         content: toolResultToContent(result),
-        toolCallId: `call_${mi}_${i}_${p.toolInvocation!.toolName}`,
+        toolCallId: toolCallId(i),
         toolName: p.toolInvocation!.toolName,
         toolResult: result,
         toolIsError: isToolResultError(result),
