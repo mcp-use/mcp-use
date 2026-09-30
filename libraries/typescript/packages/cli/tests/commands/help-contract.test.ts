@@ -51,6 +51,21 @@ describe("offline help contract", () => {
     expect(stderr).not.toHaveBeenCalled();
   });
 
+  it("servers env help is command-specific", async () => {
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["env", "--help"])).resolves.toBe(0);
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(output).toContain("Usage: mcp-use servers env");
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
   it.each(["dev", "build", "typecheck", "start"])(
     "%s has command-specific help",
     async (command) => {
