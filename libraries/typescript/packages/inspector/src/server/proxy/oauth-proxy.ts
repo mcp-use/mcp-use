@@ -6,7 +6,7 @@
  * The browser identifies the logical MCP server and the exact OAuth request it
  * wants to make. The BFF independently binds protected-resource metadata to
  * that server, authorization-server metadata to the advertised issuers, and
- * POST requests to endpoints advertised by that metadata.
+ * requests to endpoints advertised by that metadata.
  */
 
 import { lookup } from "node:dns/promises";
@@ -29,6 +29,7 @@ type OAuthEndpointKind =
 type Binding = {
   authorizationServers: Set<string>;
   endpoints: Map<string, OAuthEndpointKind>;
+  userInfoEndpoints: Set<string>;
   tokenEndpointAuthMethods: Set<string>;
   updatedAt: number;
 };
@@ -298,13 +299,13 @@ export function mountOAuthProxy(
       return c.json({ error: targetResult.error }, 400);
     }
     const target = targetResult.url;
-    if (request.method !== undefined && request.method !== "POST") {
-      return c.json({ error: "Only OAuth endpoint POST is allowed" }, 405);
+    const method = request.method ?? "POST";
+    if (method !== "GET" && method !== "POST") {
+      return c.json({ error: "OAuth endpoint method not allowed" }, 405);
     }
-
     const bindingKey = canonicalUrl(serverUrl);
     const binding = getBinding(bindings, bindingKey);
-    if (binding.endpoints.size === 0) {
+    if (binding.endpoints.size === 0 && binding.userInfoEndpoints.size === 0) {
       try {
         await hydrateBinding(
           serverUrl,
@@ -319,17 +320,28 @@ export function mountOAuthProxy(
         return proxyError(c, error, enableLogging, logPrefix);
       }
     }
-    const endpointKind = binding.endpoints.get(canonicalUrl(target));
-    if (!endpointKind) {
+    const endpointKey = canonicalUrl(target);
+    const postEndpointKind = binding.endpoints.get(endpointKey);
+    const isUserInfoEndpoint = binding.userInfoEndpoints.has(endpointKey);
+    if (!postEndpointKind && !isUserInfoEndpoint) {
       return c.json(
         { error: "OAuth endpoint is not bound to this MCP server" },
         403
       );
     }
+    const endpointKind =
+      method === "GET" && isUserInfoEndpoint ? "userinfo" : postEndpointKind;
+    const expectedMethod = endpointKind === "userinfo" ? "GET" : "POST";
+    if (!endpointKind || method !== expectedMethod) {
+      return c.json({ error: "OAuth endpoint method not allowed" }, 405);
+    }
 
     try {
       const headers = filterRequestHeaders(request.headers);
-      let body = serializeBody(request.body, headers);
+      let body =
+        endpointKind === "userinfo"
+          ? undefined
+          : serializeBody(request.body, headers);
       if (endpointKind === "registration") {
         const publicOrigin = normalizeOrigin(
           c.req.header("Origin") ?? new URL(c.req.url).origin
@@ -339,7 +351,7 @@ export function mountOAuthProxy(
           headers,
           new URL(callbackPath, publicOrigin).toString()
         );
-      } else {
+      } else if (endpointKind !== "userinfo") {
         body = applyConfidentialClientAuthentication({
           body,
           headers,
@@ -353,9 +365,13 @@ export function mountOAuthProxy(
         return c.json({ error: "OAuth request body too large" }, 413);
       }
 
-      log(enableLogging, logPrefix, `POST ${endpointKind} ${target}`);
+      log(
+        enableLogging,
+        logPrefix,
+        `${expectedMethod} ${endpointKind} ${target}`
+      );
       const upstream = await safeFetch(target, {
-        method: "POST",
+        method: expectedMethod,
         headers,
         body,
         redirect: "manual",
@@ -566,6 +582,7 @@ async function bindProtectedResource(
   }
   binding.authorizationServers = issuers;
   binding.endpoints.clear();
+  binding.userInfoEndpoints.clear();
   binding.tokenEndpointAuthMethods.clear();
 }
 
@@ -636,6 +653,7 @@ async function bindAuthorizationServer(
     );
   }
   binding.endpoints.clear();
+  binding.userInfoEndpoints.clear();
   binding.tokenEndpointAuthMethods = new Set(
     Array.isArray(metadata.token_endpoint_auth_methods_supported)
       ? metadata.token_endpoint_auth_methods_supported.filter(
@@ -651,6 +669,15 @@ async function bindAuthorizationServer(
       throw new InvalidUpstreamError(`Unsafe ${field}: ${result.error}`);
     }
     binding.endpoints.set(canonicalUrl(result.url), kind);
+  }
+  if (metadata.userinfo_endpoint !== undefined) {
+    const result = await validateUrl(metadata.userinfo_endpoint, allowLoopback);
+    if ("error" in result) {
+      throw new InvalidUpstreamError(
+        `Unsafe userinfo_endpoint: ${result.error}`
+      );
+    }
+    binding.userInfoEndpoints.add(canonicalUrl(result.url));
   }
 }
 
@@ -717,7 +744,7 @@ async function hydrateBinding(
     }
     if (bound) break;
   }
-  if (binding.endpoints.size === 0) {
+  if (binding.endpoints.size === 0 && binding.userInfoEndpoints.size === 0) {
     throw new InvalidUpstreamError(
       "Authorization-server metadata could not be discovered"
     );
@@ -963,6 +990,7 @@ function getBinding(bindings: Map<string, Binding>, key: string): Binding {
   return {
     authorizationServers: new Set(),
     endpoints: new Map(),
+    userInfoEndpoints: new Set(),
     tokenEndpointAuthMethods: new Set(),
     updatedAt: Date.now(),
   };

@@ -35,7 +35,12 @@ import {
   startConnectionHealthMonitoring,
   USE_MCP_SERVER_NAME,
 } from "./useMcp-helpers.js";
-import type { UseMcpOptions, UseMcpResult } from "./types.js";
+import type {
+  McpUserInfoClaims,
+  McpUserInfoState,
+  UseMcpOptions,
+  UseMcpResult,
+} from "./types.js";
 import { loadServerIcon } from "./useMcp-helpers.js";
 import { useMcpOperations } from "./useMcp-operations.js";
 import { getOAuthTokenExpiry } from "./token-expiry.js";
@@ -198,6 +203,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const oauthClientMetadataUrl =
     oauthOptions?.clientMetadataUrl?.trim() || undefined;
   const oauthScope = oauthOptions?.scope?.trim() || undefined;
+  const autoFetchUserInfo = oauthOptions?.fetchUserInfo === true;
   const staticClientInfo = useMemo(
     () => (oauthClientId ? { client_id: oauthClientId } : undefined),
     [oauthClientId]
@@ -406,6 +412,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     useState<UseMcpResult["authTokens"]>(undefined);
   const [authorization, setAuthorization] =
     useState<UseMcpResult["authorization"]>(undefined);
+  const [userInfo, setUserInfo] = useState<McpUserInfoState>({
+    status: "idle",
+  });
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
   const connectionRef = useRef<MCPConnection | null>(null);
@@ -418,6 +427,10 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const connectAttemptRef = useRef<number>(0);
   /** Bumped at the start of each connect(); disconnect only clears clientRef if epoch unchanged. */
   const connectEpochRef = useRef(0);
+  const userInfoRequestRef = useRef(0);
+  const userInfoTokenRef = useRef<string | undefined>(undefined);
+  const userInfoAutoRetryRef = useRef(false);
+  const userInfoBaseFetchRef = useRef(customFetch);
   const authTimeoutRef = useRef<number | null>(null);
   const retryScheduledRef = useRef<boolean>(false);
   /**
@@ -439,6 +452,10 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const failConnectionRef = useRef<
     ((message: string, error?: Error) => void) | null
   >(null);
+
+  useEffect(() => {
+    userInfoBaseFetchRef.current = customFetch;
+  }, [customFetch]);
 
   // Reverse-request / notification callbacks must stay fresh without putting
   // their React identities into connect()'s dependency list (which would
@@ -587,6 +604,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const disconnect = useCallback(
     async (quiet = false) => {
       if (!quiet) addLog("info", "Disconnecting...");
+      userInfoRequestRef.current += 1;
+      if (!quiet && isMountedRef.current) setUserInfo({ status: "idle" });
       connectingRef.current = false;
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       authTimeoutRef.current = null;
@@ -800,6 +819,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
     connectingRef.current = true;
     connectEpochRef.current += 1;
+    userInfoRequestRef.current += 1;
+    setUserInfo({ status: "idle" });
     connectAttemptRef.current += 1;
     if (authorizationServerUrlRef.current !== url) {
       authorizationServerUrlRef.current = url;
@@ -1626,6 +1647,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         !authorizationRef.current.authenticated)
     ) {
       addLog("info", "Proceeding with authentication...");
+      userInfoRequestRef.current += 1;
+      setUserInfo({ status: "idle" });
 
       try {
         assert(
@@ -1859,6 +1882,100 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     providedAuthProvider,
   ]);
 
+  /** Fetch the current OAuth account's UserInfo and publish the result. */
+  const getUserInfo = useCallback(async (): Promise<McpUserInfoState> => {
+    const requestId = ++userInfoRequestRef.current;
+    const epoch = connectEpochRef.current;
+    const provider = authProviderRef.current;
+    const finish = (result: McpUserInfoState): McpUserInfoState => {
+      if (
+        !isMountedRef.current ||
+        userInfoRequestRef.current !== requestId ||
+        connectEpochRef.current !== epoch ||
+        authProviderRef.current !== provider
+      ) {
+        return { status: "unavailable", reason: "session_changed" };
+      }
+      setUserInfo(result);
+      return result;
+    };
+
+    if (!provider?.tokens) {
+      return finish({ status: "unavailable", reason: "not_authenticated" });
+    }
+    setUserInfo({ status: "loading" });
+    try {
+      const tokens = await provider.tokens();
+      if (!tokens?.access_token) {
+        return finish({ status: "unavailable", reason: "not_authenticated" });
+      }
+      const metadata = (await provider.discoveryState?.())
+        ?.authorizationServerMetadata as Record<string, unknown> | undefined;
+      const endpoint = metadata?.userinfo_endpoint;
+      if (typeof endpoint !== "string" || !endpoint) {
+        return finish({
+          status: "unavailable",
+          reason: "no_userinfo_endpoint",
+        });
+      }
+      const userInfoUrl = new URL(endpoint);
+      if (
+        userInfoUrl.username ||
+        userInfoUrl.password ||
+        (userInfoUrl.protocol !== "https:" &&
+          !(
+            userInfoUrl.protocol === "http:" &&
+            ["localhost", "127.0.0.1", "[::1]"].includes(userInfoUrl.hostname)
+          ))
+      ) {
+        throw new Error("Unsafe UserInfo endpoint");
+      }
+      const baseFetch = userInfoBaseFetchRef.current;
+      const scopedFetch =
+        provider.getProxyFetch?.(baseFetch) ??
+        baseFetch ??
+        globalThis.fetch.bind(globalThis);
+      const response = await scopedFetch(endpoint, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `${tokens.token_type || "Bearer"} ${tokens.access_token}`,
+        },
+        credentials: "omit",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`UserInfo request failed (${response.status})`);
+      }
+      const raw: unknown = await response.json();
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        throw new Error("Invalid UserInfo response");
+      }
+      const claims = { ...raw } as Record<string, unknown>;
+      if (typeof claims.sub !== "string" || !claims.sub) {
+        throw new Error("UserInfo response has no subject");
+      }
+      for (const key of ["email", "name", "picture"]) {
+        if (typeof claims[key] !== "string") delete claims[key];
+      }
+      if (typeof claims.email_verified !== "boolean") {
+        delete claims.email_verified;
+      }
+      return finish({
+        status: "available",
+        ...(typeof metadata?.issuer === "string"
+          ? { issuer: metadata.issuer }
+          : {}),
+        claims: claims as McpUserInfoClaims,
+      });
+    } catch (error) {
+      return finish({
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, []);
+
   /**
    * Clear OAuth tokens from localStorage and disconnect
    *
@@ -1879,6 +1996,39 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
       addLog("warn", "Auth provider not initialized, cannot clear storage.");
     }
   }, [url, addLog, disconnect]);
+
+  useEffect(() => {
+    const token = authTokens?.access_token;
+    const tokenChanged = userInfoTokenRef.current !== token;
+    if (tokenChanged) {
+      userInfoTokenRef.current = token;
+      userInfoRequestRef.current += 1;
+      userInfoAutoRetryRef.current = false;
+      setUserInfo({ status: "idle" });
+    }
+    if (!autoFetchUserInfo || state !== "ready" || !token) return;
+    if (tokenChanged || userInfo.status === "idle") {
+      userInfoAutoRetryRef.current = false;
+      void getUserInfo();
+    } else if (userInfo.status === "error" && !userInfoAutoRetryRef.current) {
+      userInfoAutoRetryRef.current = true;
+      let fired = false;
+      const timeout = setTimeout(() => {
+        fired = true;
+        void getUserInfo();
+      }, 1000);
+      return () => {
+        clearTimeout(timeout);
+        if (!fired) userInfoAutoRetryRef.current = false;
+      };
+    }
+  }, [
+    autoFetchUserInfo,
+    state,
+    authTokens?.access_token,
+    userInfo.status,
+    getUserInfo,
+  ]);
 
   // ===== Effects =====
 
@@ -2039,6 +2189,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
     // Skip connection if disabled or no URL provided
     if (!enabled || !url) {
+      userInfoRequestRef.current += 1;
+      setUserInfo({ status: "idle" });
       addLog(
         "debug",
         enabled
@@ -2219,11 +2371,13 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     authUrl,
     authTokens,
     authorization,
+    userInfo,
     client: clientRef.current,
     ...connectionOperations,
     retry,
     disconnect,
     authenticate,
+    getUserInfo,
     clearStorage,
     ensureIconLoaded,
   };
