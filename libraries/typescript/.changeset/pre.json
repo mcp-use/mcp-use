@@ -13,7 +13,6 @@
   "changesets": [
     "bright-mcp-view-utf8",
     "cli-servers-env-help",
-    "dependabot-84291ae8",
     "gemini-array-tool-results",
     "inspector-express-release-stream-on-disconnect",
     "propagated-13281a2df4db7191",

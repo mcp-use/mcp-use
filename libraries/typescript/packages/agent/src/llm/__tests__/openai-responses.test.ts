@@ -176,28 +176,30 @@ describe("OpenAIResponsesDriver.runToolLoopNonStreaming", () => {
 
     const driver = new OpenAIResponsesDriver({ apiKey: "test-key" });
 
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          status: "completed",
-          output: [
-            {
-              type: "function_call",
-              call_id: "1",
-              name: "tool1",
-              arguments: "{}",
-            },
-            {
-              type: "function_call",
-              call_id: "2",
-              name: "tool2",
-              arguments: "{}",
-            },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      )
-    );
+    vi.spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("unexpected fetch"))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: "completed",
+            output: [
+              {
+                type: "function_call",
+                call_id: "1",
+                name: "tool1",
+                arguments: "{}",
+              },
+              {
+                type: "function_call",
+                call_id: "2",
+                name: "tool2",
+                arguments: "{}",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
 
     const result = await driver.runToolLoopNonStreaming({
       driver,
@@ -217,7 +219,9 @@ describe("OpenAIResponsesDriver.runToolLoopNonStreaming", () => {
     const controller = new AbortController();
     controller.abort();
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("unexpected fetch"));
     const callTool = vi.fn(async () => ({ ok: true }));
     const driver = new OpenAIResponsesDriver({ apiKey: "test-key" });
 

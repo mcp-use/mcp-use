@@ -423,7 +423,7 @@ describe("mountInspector", () => {
         "cache-control": "no-cache",
       });
       res.write(": ping\n\n");
-      setTimeout(() => res.socket?.destroy(), 20);
+      setTimeout(() => res.destroy(), 250);
     });
     await new Promise<void>((resolve) => upstream.listen(0, resolve));
 
