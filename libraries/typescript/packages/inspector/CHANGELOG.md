@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 20.3.14
+
+### Patch Changes
+
+- cdf2cc6: Release the upstream stream when an Express client disconnects mid-response. The Express adapter's proxy loop had no abort wiring, so a client that went away during a long-lived SSE response left the loop writing to a dead socket and the upstream connection open until it ended on its own.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
 ## 20.3.14-canary.5
 
 ### Patch Changes
