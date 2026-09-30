@@ -172,6 +172,46 @@ return (
 );
 ```
 
+## OAuth UserInfo
+
+Set `oauth.fetchUserInfo: true` to fetch the authenticated account's UserInfo
+after the MCP connection becomes ready. The fetch runs independently of the
+connection; a UserInfo error does not change `mcp.state`. The authorization
+server must advertise a `userinfo_endpoint`, and the requested scopes must
+permit the claims you need (often `openid profile email`).
+
+```tsx
+function Account() {
+  const mcp = useMcp({
+    url: "https://example.com/mcp",
+    oauth: { scope: "openid profile email", fetchUserInfo: true },
+  });
+
+  return (
+    <div>
+      {mcp.userInfo.status === "available" &&
+        (mcp.userInfo.claims.email ?? mcp.userInfo.claims.sub)}
+      <button onClick={() => void mcp.getUserInfo()}>Refresh account</button>
+    </div>
+  );
+}
+```
+
+`mcp.userInfo` is reactive and has these states:
+
+| Status        | Meaning                                                                           |
+| ------------- | --------------------------------------------------------------------------------- |
+| `idle`        | No request is in progress.                                                        |
+| `loading`     | UserInfo is being fetched.                                                        |
+| `available`   | Read `claims` and optional `issuer`; claims such as `email` may be absent.        |
+| `unavailable` | Read `reason`: `not_authenticated`, `no_userinfo_endpoint`, or `session_changed`. |
+| `error`       | Read `error`; call `getUserInfo()` to retry.                                      |
+
+Automatic fetching is opt-in and retries an error once after a short delay.
+You can omit `fetchUserInfo` and call `await mcp.getUserInfo()` whenever you
+want to fetch the account explicitly; the method returns the same state it
+publishes to `mcp.userInfo`.
+
 ## Types
 
 - **`McpServerConfig`** — server options passed to `addServer` (replaces deprecated `McpServerOptions`).

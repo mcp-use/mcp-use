@@ -1,5 +1,41 @@
 # @mcp-use/inspector
 
+## 20.3.14-canary.5
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.4
+
+### Patch Changes
+
+- 604b130: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+## 20.3.14-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.0
+
+### Patch Changes
+
+- ee1c64b: Release the upstream stream when an Express client disconnects mid-response. The Express adapter's proxy loop had no abort wiring, so a client that went away during a long-lived SSE response left the loop writing to a dead socket and the upstream connection open until it ended on its own.
+
 ## 20.3.13
 
 ### Patch Changes

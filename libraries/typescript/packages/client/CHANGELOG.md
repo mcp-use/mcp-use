@@ -1,5 +1,23 @@
 # @mcp-use/client
 
+## 2.4.0-canary.2
+
+### Patch Changes
+
+- 63b923e: Document that `proxyOAuthRequests` also routes UserInfo requests through the OAuth proxy.
+
+## 2.4.0-canary.1
+
+### Minor Changes
+
+- 604b130: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+## 2.3.5-canary.0
+
+### Patch Changes
+
+- 19a3d94: Decode base64 MCP App HTML resources as UTF-8 so non-ASCII text renders correctly in React views.
+
 ## 2.3.4
 
 ### Patch Changes

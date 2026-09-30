@@ -1,5 +1,38 @@
 # @mcp-use/agent
 
+## 2.0.20-canary.4
+
+### Patch Changes
+
+- Updated dependencies [63b923e]
+  - @mcp-use/client@2.4.0-canary.2
+
+## 2.0.20-canary.3
+
+### Patch Changes
+
+- Updated dependencies [604b130]
+  - @mcp-use/client@2.4.0-canary.1
+
+## 2.0.20-canary.2
+
+### Patch Changes
+
+- 0d19df7: Wrap array-valued Gemini tool results in an object so function responses satisfy the provider's request schema in streaming and non-streaming calls.
+
+## 2.0.20-canary.1
+
+### Patch Changes
+
+- b24607b: `runToolLoopNonStreaming` now stops dispatching remaining tool calls in a turn when the `signal` is aborted, matching the cancellation behavior of `runToolLoop`.
+
+## 2.0.20-canary.0
+
+### Patch Changes
+
+- Updated dependencies [19a3d94]
+  - @mcp-use/client@2.3.5-canary.0
+
 ## 2.0.19
 
 ### Patch Changes

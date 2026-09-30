@@ -55,7 +55,7 @@ export interface BrowserOAuthOptions {
   clientMetadataUrl?: string;
   /**
    * When true (default), OAuth requests (.well-known metadata, token,
-   * registration, revocation, and introspection) are routed through
+   * registration, revocation, introspection, and UserInfo) are routed through
    * `oauthProxyUrl` to bypass CORS.
    * The routing is applied only to the scoped fetch returned by
    * {@link BrowserOAuthClientProvider.getProxyFetch}; it never mutates the
@@ -297,7 +297,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       } catch {
         return await base(input, init);
       }
-      const isMetadata = pathname.includes("/.well-known/");
+      const looksLikeMetadata = pathname.includes("/.well-known/");
 
       // Metadata responses can carry Origin-specific CORS headers. Never let
       // the browser reuse or revalidate a response cached for another origin.
@@ -305,10 +305,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       // their caller-provided cache behavior.
       if (!oauthProxyUrl) {
         const response = await base(
-          isMetadata ? url : input,
-          isMetadata ? { ...init, cache: "no-store" } : init
+          looksLikeMetadata ? url : input,
+          looksLikeMetadata ? { ...init, cache: "no-store" } : init
         );
-        if (!isMetadata) this.rememberResourceMetadataChallenge(response);
+        if (!looksLikeMetadata)
+          this.rememberResourceMetadataChallenge(response);
         return response;
       }
 
@@ -321,12 +322,14 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           "token_endpoint",
           "revocation_endpoint",
           "introspection_endpoint",
+          "userinfo_endpoint",
         ]) {
           if (typeof metadata?.[key] === "string") {
             discoveredEndpoints.add(metadata[key]);
           }
         }
       }
+      const isMetadata = looksLikeMetadata && !discoveredEndpoints.has(url);
       const isProxiedEndpoint =
         discoveredEndpoints.has(url) ||
         /\/(?:register|registration|token|revoke|revocation|introspect|introspection)\/?$/.test(
@@ -383,6 +386,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
             "token_endpoint",
             "revocation_endpoint",
             "introspection_endpoint",
+            "userinfo_endpoint",
           ]) {
             if (typeof metadata[key] === "string") {
               discoveredEndpoints.add(metadata[key]);

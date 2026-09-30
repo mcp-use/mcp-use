@@ -6,6 +6,24 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.7.2" description="September 2026">
+  ## OAuth UserInfo & stricter CLI flags
+  Patch release exposing optional OAuth UserInfo, plus a CLI minor that rejects inline values on boolean flags.
+
+- **New** (@mcp-use/client): `useMcp` and `useMcpServer` expose reactive OAuth UserInfo. Set `oauth.fetchUserInfo: true` to load the account after the connection is ready, or call `getUserInfo()`. `userInfo` is `idle`, `loading`, `available`, `unavailable`, or `error`; a UserInfo failure does not change `state`. See [OAuth UserInfo](/v2/typescript/client/usemcp#oauth-userinfo) (`#2688`)
+- **Fix** (@mcp-use/client): base64 MCP App HTML resources decode as UTF-8, so non-ASCII text renders correctly in React views (`#2632`)
+- **Fix** (@mcp-use/agent): array-valued Gemini tool results are wrapped in an object so function responses match the provider schema in streaming and non-streaming calls (`#2675`)
+- **Fix** (@mcp-use/agent): `runToolLoopNonStreaming` stops dispatching the rest of a turn's tool calls when `signal` is aborted, matching `runToolLoop` (`#2667`)
+- **Fix** (server): proxied prompt requests receive the downstream cancellation signal (`#2568`)
+- **Fix** (@mcp-use/cli): an inline value on a boolean flag is rejected instead of ignored. `mcp-use dev --tunnel=false` used to open a public tunnel; it now fails with `--tunnel does not take a value`. The same applies to `--no-open`, `--no-inspector`, `--with-inspector`, `--source-maps`, `--inline`, `--help`, and `--version`. Flags that take a value still accept `--flag value` and `--flag=value` (`#2521`)
+- **Fix** (@mcp-use/cli): `mcp-use servers env --help` prints `servers env` help instead of the root `servers` help (`#2690`)
+- **Fix** (@mcp-use/inspector): the Express adapter aborts the upstream stream when the client disconnects during a response (`#2394`)
+- **Enhancement** (@mcp-use/inspector): the OAuth proxy allows GET to UserInfo endpoints advertised in authorization-server metadata (`#2688`)
+- **Update**: Updated @mcp-use/inspector to v20.3.14; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.2.0
+- **Update**: Updated @mcp-use/client to v2.4.0
+</Update>
+
 <Update label="v2.7.1" description="September 2026">
   ## View cancellation & client fixes
   Patch release surfacing host tool cancellation in views, plus browser client and OAuth token expiry fixes.
@@ -15,6 +33,7 @@ rss: true
 - **Fix** (@mcp-use/client): `BrowserMCPClient` expands the `capabilities.views` shorthand into the `io.modelcontextprotocol/ui` extension and forwards `roots` and `defaultRequestOptions` to the connector, matching the Node client (`#2476`)
 - **Fix** (@mcp-use/client): `getOAuthTokenExpiry` reads the JWT `exp` claim from Base64URL payloads containing `-` or `_`, which previously fell back to `expires_in`; the `authTokens.expires_at` docs now say milliseconds (`#2660`)
 - **Documentation** (@mcp-use/agent): `RunOptions.messages` is documented as native-agent only; the LangChain agent ignores it, so pass prior messages through `externalHistory` (`#2658`)
+- **Documentation**: the v2 migration guide shows a temporary middleware rewrite so ChatGPT apps that cached v1 widget URIs (`ui://widget/…`) can still read Views served at `ui://views/…` until the app is resubmitted (`#2668`)
 - **Update**: Updated @mcp-use/inspector to v20.3.13; see the [Inspector changelog](/inspector/changelog)
 - **Update**: Updated @mcp-use/cli to v4.1.17
 </Update>

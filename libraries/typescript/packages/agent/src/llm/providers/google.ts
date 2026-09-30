@@ -87,7 +87,7 @@ function buildGeminiToolResponse(content: string | ContentPart[]): {
     } catch {
       parsed = { result: content };
     }
-    if (!parsed || typeof parsed !== "object") {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       parsed = { result: parsed };
     }
     return { response: parsed as Record<string, unknown>, imageParts: [] };

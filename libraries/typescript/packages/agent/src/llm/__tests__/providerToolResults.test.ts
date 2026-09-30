@@ -101,6 +101,43 @@ describe("OpenAI: tool message + follow-up user with image_url", () => {
 });
 
 describe("Google: functionResponse + follow-up user with inlineData", () => {
+  it.each([
+    { label: "empty array", result: [], response: { result: [] } },
+    {
+      label: "array of records",
+      result: [{ name: "sample" }],
+      response: { result: [{ name: "sample" }] },
+    },
+    {
+      label: "MCP text containing a JSON array",
+      result: { content: [{ type: "text", text: '["sample"]' }] },
+      response: { result: ["sample"] },
+    },
+    { label: "object", result: { count: 2 }, response: { count: 2 } },
+    { label: "null", result: null, response: { result: null } },
+    { label: "false", result: false, response: { result: false } },
+    { label: "zero", result: 0, response: { result: 0 } },
+    { label: "plain text", result: "sample", response: { result: "sample" } },
+  ])(
+    "uses an object response without losing $label",
+    ({ result, response }) => {
+      const contents = toGeminiContents([
+        {
+          role: "tool",
+          toolCallId: "call_1",
+          toolName: "list-records",
+          content: toolResultToContent(result),
+        },
+      ]);
+      expect(contents).toEqual([
+        {
+          role: "function",
+          parts: [{ functionResponse: { name: "list-records", response } }],
+        },
+      ]);
+    }
+  );
+
   it("keeps image bytes out of functionResponse.response and into a user inlineData part", () => {
     const out = toGeminiContents(buildImageToolMessages()) as any[];
     const fn = out.find((m) => m.role === "function");

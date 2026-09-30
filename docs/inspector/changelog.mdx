@@ -6,6 +6,15 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.14" description="September 2026">
+  ## Disconnect abort & UserInfo proxy
+  Patch release paired with `mcp-use` v2.7.2. The Express adapter stops holding upstream streams after the client leaves, and the OAuth proxy can fetch UserInfo.
+
+- **Fix**: disconnecting an Express client aborts the outbound fetch and the proxy read loop, so a long-lived SSE response no longer writes to a dead socket or leaves the upstream connection open (`#2394`)
+- **Enhancement**: the OAuth proxy allows GET to UserInfo endpoints listed on the authorization server's metadata, and rejects other methods and URLs that are not in that set (`#2688`)
+- **Update**: Updated mcp-use to v2.7.2
+</Update>
+
 <Update label="v20.3.13" description="September 2026">
   ## View cancellation release alignment
   Patch release paired with `mcp-use` v2.7.1; rebuilds the bundled Inspector with no Inspector-specific source changes.

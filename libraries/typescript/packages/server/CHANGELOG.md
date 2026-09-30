@@ -1,5 +1,81 @@
 # mcp-use
 
+## 2.7.2-canary.9
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.14-canary.5
+  - @mcp-use/cli@4.2.0-canary.4
+
+## 2.7.2-canary.8
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+- Updated dependencies [604b130]
+  - @mcp-use/cli@4.2.0-canary.4
+  - @mcp-use/inspector@20.3.14-canary.4
+
+## 2.7.2-canary.7
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.14-canary.3
+
+## 2.7.2-canary.6
+
+### Patch Changes
+
+- 77802c8: Updated dependency `vitest` to `4.1.11`.
+
+## 2.7.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.14-canary.2
+
+## 2.7.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [cc3ec31]
+  - @mcp-use/cli@4.2.0-canary.3
+
+## 2.7.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [edf4bb4]
+  - @mcp-use/cli@4.1.18-canary.2
+
+## 2.7.2-canary.2
+
+### Patch Changes
+
+- 03bb362: Forward downstream cancellation signals to proxied prompt requests.
+
+## 2.7.2-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.1.18-canary.1
+  - @mcp-use/inspector@20.3.14-canary.1
+
+## 2.7.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [ee1c64b]
+- Updated dependencies
+  - @mcp-use/inspector@20.3.14-canary.0
+  - @mcp-use/cli@4.1.18-canary.0
+
 ## 2.7.1
 
 ### Patch Changes
