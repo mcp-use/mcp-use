@@ -915,17 +915,10 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           url: url, // Use original URL, not transformed proxy URL
           timeout,
           clientInfo: mergedClientInfo,
-          // Pass a fetch that scopes OAuth-proxy routing to this server's
-          // transport/auth calls. getProxyFetch wraps `customFetch` (e.g. the
-          // OAuth retry fetch for scope step-up), bypasses the browser cache
-          // for OAuth metadata, and optionally routes OAuth through the BFF.
-          // It never mutates the global fetch.
-          ...(() => {
-            const scopedFetch =
-              authProviderRef.current?.getProxyFetch?.(customFetch) ??
-              customFetch;
-            return scopedFetch ? { fetch: scopedFetch } : {};
-          })(),
+          // BrowserMCPClient scopes the provider's OAuth proxy around this
+          // base fetch. Pass the raw fetch here so the provider is wrapped
+          // exactly once.
+          ...(customFetch ? { fetch: customFetch } : {}),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(effectiveClientOptions && {
             clientOptions: effectiveClientOptions,

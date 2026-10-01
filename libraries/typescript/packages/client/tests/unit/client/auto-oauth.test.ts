@@ -215,3 +215,33 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
     expect(flow.completeOAuthFlow).not.toHaveBeenCalled();
   });
 });
+
+describe("BrowserMCPClient OAuth fetch", () => {
+  it("uses the provider-scoped fetch for connector requests", async () => {
+    const { BrowserMCPClient } = await import("../../../src/core/browser.js");
+    class TestBrowserClient extends BrowserMCPClient {
+      connector(config: Record<string, unknown>): BaseConnector {
+        return this.createConnectorFromConfig(config);
+      }
+    }
+
+    const baseFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const scopedFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const getProxyFetch = vi.fn(() => scopedFetch);
+    const client = new TestBrowserClient({ mcpServers: {} });
+    const connector = client.connector({
+      url: "https://example.com/mcp",
+      fetch: baseFetch,
+      authProvider: { getProxyFetch },
+    });
+
+    expect(getProxyFetch).toHaveBeenCalledWith(baseFetch);
+    expect(
+      (connector as unknown as { customFetch?: typeof fetch }).customFetch
+    ).toBe(scopedFetch);
+  });
+});

@@ -16,6 +16,10 @@ import { Tel } from "../telemetry/telemetry-browser.js";
 import { getPackageVersion } from "../utils/version.js";
 import { BaseMCPClient } from "./base.js";
 
+type BrowserOAuthFetchProvider = OAuthClientProvider & {
+  getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
+};
+
 /**
  * Manages MCP server connections in browsers and other Web API runtimes.
  *
@@ -117,11 +121,16 @@ export class BrowserMCPClient extends BaseMCPClient {
     const clientInfo = normalizeClientInfo(
       serverConfig.clientInfo ?? this.config.clientInfo
     );
+    const baseFetch = configuredFetch ?? globalThis.fetch.bind(globalThis);
+    const connectorFetch =
+      (
+        authProvider as BrowserOAuthFetchProvider | null | undefined
+      )?.getProxyFetch?.(baseFetch) ?? baseFetch;
 
     // Prepare connector options
     const connectorOptions = {
       headers,
-      fetch: configuredFetch ?? globalThis.fetch.bind(globalThis),
+      fetch: connectorFetch,
       authToken,
       authProvider,
       detectMixedAuth,
