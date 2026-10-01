@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.15-canary.1
+
+### Patch Changes
+
+- f3d4ae7: Fix chat input text overlapping with the bottom toolbar when typing multi-line messages
+
 ## 20.3.15-canary.0
 
 ### Patch Changes

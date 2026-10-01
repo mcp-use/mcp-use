@@ -13,6 +13,7 @@
   "changesets": [
     "cli-plain-value-colon-equals",
     "create-app-pnpm-run-deploy",
+    "fix-chat-input-toolbar-overlap",
     "propagated-bdf148f1180e69ea"
   ]
 }
