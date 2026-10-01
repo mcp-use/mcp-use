@@ -35,6 +35,17 @@ function preambleThenAnswerDriver(): LlmDriver {
   };
 }
 
+// Drain a generator and resolve with its return value.
+async function returnValue<T>(
+  generator: AsyncGenerator<unknown, T, void>
+): Promise<T> {
+  let next = await generator.next();
+  while (!next.done) {
+    next = await generator.next();
+  }
+  return next.value;
+}
+
 describe("streamNativeAgentSteps", () => {
   it("pairs parallel tool results by toolCallId", async () => {
     const driver: LlmDriver = {
@@ -111,15 +122,27 @@ describe("streamNativeAgentSteps", () => {
       callTool: vi.fn().mockResolvedValue("a.ts"),
     };
 
-    const steps = streamNativeAgentSteps(preambleThenAnswerDriver(), options);
-    let next = await steps.next();
-    while (!next.done) {
-      next = await steps.next();
-    }
-
-    expect(next.value).toBe("The folder has a.ts.");
+    await expect(
+      returnValue(streamNativeAgentSteps(preambleThenAnswerDriver(), options))
+    ).resolves.toBe("The folder has a.ts.");
     await expect(
       runNativeAgent(preambleThenAnswerDriver(), options)
     ).resolves.toBe("The folder has a.ts.");
+  });
+
+  it("returns an empty string when maxSteps ends the run after tool results, like runNativeAgent", async () => {
+    const options = {
+      messages: [],
+      tools: [],
+      callTool: vi.fn().mockResolvedValue("a.ts"),
+      maxSteps: 1,
+    };
+
+    await expect(
+      returnValue(streamNativeAgentSteps(preambleThenAnswerDriver(), options))
+    ).resolves.toBe("");
+    await expect(
+      runNativeAgent(preambleThenAnswerDriver(), options)
+    ).resolves.toBe("");
   });
 });
