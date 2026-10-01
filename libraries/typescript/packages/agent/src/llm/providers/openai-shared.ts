@@ -57,8 +57,14 @@ export async function throwLlmRequestError(res: Response): Promise<never> {
 
 export function extractTextContent(content: string | ContentPart[]): string {
   if (typeof content === "string") return content;
-  return content
-    .filter((p): p is TextContentPart => p.type === "text")
-    .map((p) => p.text)
-    .join("\n");
+  if (content.length === 1 && content[0].type === "text")
+    return content[0].text;
+  let text = "";
+  for (let i = 0; i < content.length; i++) {
+    const part = content[i];
+    if (part.type === "text") {
+      text += (text.length > 0 ? "\n" : "") + part.text;
+    }
+  }
+  return text;
 }
