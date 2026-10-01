@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  browserCandidates,
   normalizeCaptureBounds,
   parseDimension,
   readyStateFailure,
@@ -92,5 +93,42 @@ describe("screenshot readiness gate", () => {
         error: "runtime_error",
       })
     ).toBeUndefined();
+  });
+});
+
+describe("screenshot browser discovery", () => {
+  const windowsEnv = {
+    PROGRAMFILES: "C:\\Program Files",
+    "PROGRAMFILES(X86)": "C:\\Program Files (x86)",
+    LOCALAPPDATA: "C:\\Users\\dev\\AppData\\Local",
+  };
+
+  it("falls back to the Edge that ships with Windows after Chrome", () => {
+    const candidates = browserCandidates("win32", windowsEnv);
+    const chrome = candidates.indexOf(
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    );
+    const edge = candidates.indexOf(
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    );
+
+    expect(chrome).toBe(0);
+    expect(edge).toBeGreaterThan(chrome);
+    expect(candidates).toContain(
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+    );
+  });
+
+  it("tries a configured executable first", () => {
+    expect(
+      browserCandidates("win32", {
+        ...windowsEnv,
+        MCP_USE_CHROME_PATH: "D:\\browsers\\chrome.exe",
+      })[0]
+    ).toBe("D:\\browsers\\chrome.exe");
+  });
+
+  it("skips Windows locations whose environment variable is unset", () => {
+    expect(browserCandidates("win32", {})).toEqual([]);
   });
 });
