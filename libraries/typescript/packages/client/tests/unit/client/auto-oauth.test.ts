@@ -169,12 +169,22 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
     expect(client.createDefaultOAuthProvider).not.toHaveBeenCalled();
   });
 
-  it("on 401 runs completeOAuthFlow and retries once", async () => {
+  it("on 401 uses the scoped fetch and retries once", async () => {
+    const baseFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const scopedFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const getProxyFetch = vi.fn(() => scopedFetch);
     const client = new TestClient({
-      mcpServers: { demo: { url: "https://example.com/mcp" } },
+      mcpServers: {
+        demo: { url: "https://example.com/mcp", fetch: baseFetch },
+      },
     });
     const provider = {
       getAuthorizationCode: vi.fn(async () => "code"),
+      getProxyFetch,
     } as unknown as OAuthClientProvider;
     client.createDefaultOAuthProvider.mockResolvedValue(provider);
 
@@ -191,9 +201,11 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
 
     await client.createSession("demo");
 
+    expect(getProxyFetch).toHaveBeenCalledWith(baseFetch);
     expect(flow.completeOAuthFlow).toHaveBeenCalledWith(
       provider,
-      "https://example.com/mcp"
+      "https://example.com/mcp",
+      { fetchFn: scopedFetch }
     );
     expect(attempts).toBe(2);
   });

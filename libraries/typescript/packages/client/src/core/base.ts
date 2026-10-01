@@ -398,7 +398,20 @@ export abstract class BaseMCPClient {
       logger.info(
         `[MCPClient] Unauthorized connecting to '${serverName}'; completing OAuth…`
       );
-      await completeOAuthFlow(oauthProvider, httpConfig.url);
+      const configuredFetch = httpConfig.fetch;
+      if (configuredFetch === undefined) {
+        await completeOAuthFlow(oauthProvider, httpConfig.url);
+      } else {
+        const fetchFn =
+          (
+            oauthProvider as OAuthClientProvider & {
+              getProxyFetch?: (
+                baseFetch?: typeof fetch
+              ) => typeof fetch | undefined;
+            }
+          ).getProxyFetch?.(configuredFetch) ?? configuredFetch;
+        await completeOAuthFlow(oauthProvider, httpConfig.url, { fetchFn });
+      }
       session = await openSession();
     }
 
