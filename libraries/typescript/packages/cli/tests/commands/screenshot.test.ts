@@ -103,20 +103,16 @@ describe("screenshot browser discovery", () => {
     LOCALAPPDATA: "C:\\Users\\dev\\AppData\\Local",
   };
 
-  it("falls back to the Edge that ships with Windows after Chrome", () => {
-    const candidates = browserCandidates("win32", windowsEnv);
-    const chrome = candidates.indexOf(
-      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-    );
-    const edge = candidates.indexOf(
-      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-    );
-
-    expect(chrome).toBe(0);
-    expect(edge).toBeGreaterThan(chrome);
-    expect(candidates).toContain(
-      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-    );
+  it("tries the original Chrome locations first, then Chrome (x86), Edge and Brave", () => {
+    expect(browserCandidates("win32", windowsEnv)).toEqual([
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Users\\dev\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+      "C:\\Users\\dev\\AppData\\Local\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+    ]);
   });
 
   it("tries a configured executable first", () => {
