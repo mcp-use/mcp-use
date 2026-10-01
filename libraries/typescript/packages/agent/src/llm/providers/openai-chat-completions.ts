@@ -11,7 +11,7 @@ import type {
   ProviderTool,
 } from "../types.js";
 import { tokenUsageFromRecord } from "../usage.js";
-import { throwLlmRequestError } from "./openai-shared.js";
+import { extractTextContent, throwLlmRequestError } from "./openai-shared.js";
 
 export { LlmRequestError } from "./openai-shared.js";
 
@@ -78,13 +78,15 @@ export function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
       }
       continue;
     }
+    if (m.role === "system") {
+      out.push({ role: "system", content: extractTextContent(m.content) });
+      continue;
+    }
     if (m.role === "assistant") {
+      const text = extractTextContent(m.content);
       const entry: Record<string, unknown> = {
         role: "assistant",
-        content:
-          typeof m.content === "string" && m.content.length > 0
-            ? m.content
-            : null,
+        content: m.toolCalls?.length ? (text.length > 0 ? text : null) : text,
       };
       if (m.toolCalls?.length) {
         entry.tool_calls = m.toolCalls.map((tc) => ({

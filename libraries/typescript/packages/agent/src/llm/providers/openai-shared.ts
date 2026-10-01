@@ -1,4 +1,4 @@
-import type { ProviderConfig } from "../types.js";
+import type { ContentPart, ProviderConfig, TextContentPart } from "../types.js";
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
@@ -53,4 +53,12 @@ export async function throwLlmRequestError(res: Response): Promise<never> {
     `OpenAI request failed (${res.status} ${res.statusText}): ${text}`,
     body
   );
+}
+
+export function extractTextContent(content: string | ContentPart[]): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((p): p is TextContentPart => p.type === "text")
+    .map((p) => p.text)
+    .join("\n");
 }

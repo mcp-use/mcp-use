@@ -87,6 +87,34 @@ describe("seedInputFromMessages", () => {
       true
     );
   });
+
+  it("preserves assistant message when content is an array of ContentParts", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Assistant response text" }],
+      },
+    ];
+    const { input } = seedInputFromMessages(messages);
+    expect(input).toEqual([
+      {
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: "Assistant response text" }],
+      },
+    ]);
+  });
+
+  it("extracts system instruction when content is an array of ContentParts", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "system",
+        content: [{ type: "text", text: "System prompt text" }],
+      },
+    ];
+    const { instructions } = seedInputFromMessages(messages);
+    expect(instructions).toBe("System prompt text");
+  });
 });
 
 describe("extractFunctionCalls", () => {
