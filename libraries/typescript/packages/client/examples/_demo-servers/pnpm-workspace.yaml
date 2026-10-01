@@ -1,0 +1,6 @@
+# Standalone install of the published mcp-use package. Overrides live here
+# because pnpm 11 ignores the package.json "pnpm" field.
+overrides:
+  hono: ">=4.13.5 <4.13.6"
+  qs: ">=6.16.0 <7"
+  nanoid@<3.3.18: 3.3.18
