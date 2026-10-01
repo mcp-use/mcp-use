@@ -131,6 +131,46 @@ describe("OAuthSessionStore", () => {
       });
     });
 
+    it("clamps future receipt times to now", async () => {
+      const { session } = createStore();
+      const now = Date.parse("2026-01-01T21:42:00Z");
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+      try {
+        await session.saveTokens({
+          access_token: "abc",
+          expires_in: 3600,
+          _mcp_use_received_at: now + 24 * 60 * 60 * 1000,
+        });
+
+        expect(await session.tokens()).toMatchObject({
+          _mcp_use_received_at: now,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("bounds stale receipt times so an expired token stays expired", async () => {
+      const { session } = createStore();
+      const now = Date.parse("2026-01-01T21:42:00Z");
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+      try {
+        await session.saveTokens({
+          access_token: "abc",
+          expires_in: 3600,
+          _mcp_use_received_at: now - 2 * 60 * 60 * 1000,
+        });
+
+        expect(await session.tokens()).toMatchObject({
+          _mcp_use_received_at: now - 3_600_000,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("persists the token receipt time and clears auth flow state", async () => {
       const { session, kv } = createStore();
       kv.set(session.getKey("code_verifier"), "verifier");
