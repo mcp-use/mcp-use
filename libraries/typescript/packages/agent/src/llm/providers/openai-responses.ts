@@ -40,6 +40,14 @@ function toResponsesUserContent(content: string | ContentPart[]): unknown {
   });
 }
 
+function toPlainText(content: string | ContentPart[]): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((part): part is Extract<ContentPart, { type: "text" }> => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
+}
+
 /** Seed Responses `input` from prior UI/history messages (once per tool-loop run). */
 export function seedInputFromMessages(
   messages: ProviderMessage[]
@@ -49,13 +57,7 @@ export function seedInputFromMessages(
 
   for (const m of messages) {
     if (m.role === "system") {
-      const text =
-        typeof m.content === "string"
-          ? m.content
-          : m.content
-              .filter((p) => p.type === "text")
-              .map((p) => (p as { text: string }).text)
-              .join("\n");
+      const text = toPlainText(m.content);
       if (text) systemParts.push(text);
       continue;
     }
@@ -67,11 +69,12 @@ export function seedInputFromMessages(
       continue;
     }
     if (m.role === "assistant") {
-      if (typeof m.content === "string" && m.content.length > 0) {
+      const text = toPlainText(m.content);
+      if (text.length > 0) {
         input.push({
           type: "message",
           role: "assistant",
-          content: [{ type: "output_text", text: m.content }],
+          content: [{ type: "output_text", text }],
         });
       }
       for (const tc of m.toolCalls ?? []) {
