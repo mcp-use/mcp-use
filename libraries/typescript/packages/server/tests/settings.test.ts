@@ -164,6 +164,9 @@ describe("native settings", () => {
       { missing: true },
       { units: "cm" },
       { scale: 1.5 },
+      { scale: 0 },
+      { scale: 11 },
+      { grid: "true" },
       { grid: undefined },
     ]) {
       const result = await request(server, "tools/call", {
@@ -172,6 +175,23 @@ describe("native settings", () => {
       });
       expect(result.error ?? result.result?.isError).toBeTruthy();
     }
+    for (const args of [
+      {},
+      { set: null },
+      { set: [] },
+      { set: { grid: false }, extra: true },
+    ]) {
+      const result = await request(server, "tools/call", {
+        name: "settings.update",
+        arguments: args,
+      });
+      expect(result.error ?? result.result?.isError).toBeTruthy();
+    }
+    const read = await request(server, "tools/call", {
+      name: "settings.read",
+      arguments: { extra: true },
+    });
+    expect(read.error ?? read.result?.isError).toBeTruthy();
     expect(update).not.toHaveBeenCalled();
     await server.close();
   });
@@ -180,21 +200,22 @@ describe("native settings", () => {
       { units: "mm" },
       { ...defaults, extra: true },
       { ...defaults, scale: 100 },
+      { ...defaults, grid: undefined },
+      { ...defaults, scale: Number.NaN },
     ]) {
       const server = new MCPServer({ name: "invalid", version: "1" });
       server.settings({
         fields,
         read: () => value as typeof defaults,
-        update: () => defaults,
+        update: () => value as typeof defaults,
       });
-      expect(
-        (
-          await request(server, "tools/call", {
-            name: "settings.read",
-            arguments: {},
-          })
-        ).result.isError
-      ).toBe(true);
+      for (const name of ["settings.read", "settings.update"]) {
+        const result = await request(server, "tools/call", {
+          name,
+          arguments: name === "settings.read" ? {} : { set: { grid: false } },
+        });
+        expect(result.result.isError).toBe(true);
+      }
       await server.close();
     }
     const server = new MCPServer({ name: "failure", version: "1" });
@@ -215,12 +236,11 @@ describe("native settings", () => {
     ).toBe(true);
     await server.close();
   });
-  it("rejects unsupported schemas, defaults and layout errors without partial registrations", async () => {
+  it("rejects unsupported wire schemas without partial registrations", async () => {
     for (const schema of [
       z.object({}),
       z.array(z.string()),
       z.string().nullable(),
-      z.boolean().default(true),
       z.string().transform((value) => value.length),
     ]) {
       const server = new MCPServer({ name: "invalid", version: "1" });
@@ -234,27 +254,47 @@ describe("native settings", () => {
       expect((await request(server, "tools/list")).result.tools).toEqual([]);
       await server.close();
     }
-    const server = new MCPServer({ name: "layout", version: "1" });
-    expect(() =>
-      server.settings({
-        fields,
-        layout: [
-          {
-            kind: "group",
-            title: "Display",
-            items: [
-              { kind: "property", property: "units" },
-              { kind: "property", property: "units" },
-            ],
-          },
-        ],
-        read: () => defaults,
-        update: () => defaults,
-      })
-    ).toThrow(/duplicate/);
   });
-  it("validates same-server layout actions at mount and allows optional/default arguments", async () => {
-    for (const mode of ["missing", "required", "valid"]) {
+  it("supports schema defaults while requiring complete effective callback values", async () => {
+    const server = new MCPServer({ name: "defaults", version: "1" });
+    const read = vi.fn(() => ({ grid: true }));
+    const update = vi.fn((set: Partial<{ grid: boolean }>) => ({
+      grid: set.grid ?? true,
+    }));
+    server.settings({
+      fields: {
+        grid: { schema: z.boolean().default(true), title: "Show grid" },
+      },
+      read,
+      update,
+    });
+    const result = await request(server, "tools/call", {
+      name: "settings.read",
+      arguments: {},
+    });
+    expect(result.result.structuredContent.values).toEqual({ grid: true });
+    expect(
+      result.result.structuredContent.schema.properties.grid
+    ).toMatchObject({ type: "boolean", title: "Show grid" });
+    expect(
+      result.result.structuredContent.schema.properties.grid
+    ).not.toHaveProperty("default");
+    const changed = await request(server, "tools/call", {
+      name: "settings.update",
+      arguments: { set: { grid: false } },
+    });
+    expect(update.mock.calls[0]?.[0]).toEqual({ grid: false });
+    expect(changed.result.structuredContent.values).toEqual({ grid: false });
+    read.mockReturnValue({} as { grid: boolean });
+    const missing = await request(server, "tools/call", {
+      name: "settings.read",
+      arguments: {},
+    });
+    expect(missing.result.isError).toBe(true);
+    await server.close();
+  });
+  it("checks same-server action existence without preflighting arguments", async () => {
+    for (const mode of ["missing", "required", "default"]) {
       const server = new MCPServer({ name: "actions", version: "1" });
       server.settings({
         fields,
@@ -268,6 +308,7 @@ describe("native settings", () => {
         read: () => defaults,
         update: () => defaults,
       });
+      const action = vi.fn((_args: { value: string }) => ({ content: [] }));
       if (mode !== "missing")
         server.tool(
           {
@@ -277,28 +318,42 @@ describe("native settings", () => {
                 ? z.object({ value: z.string() })
                 : z.object({ value: z.string().default("default") }),
           },
-          () => ({ content: [] })
+          action
         );
-      if (mode === "valid")
+      if (mode === "missing") {
+        await expect(request(server, "tools/list")).rejects.toThrow(
+          /not registered/
+        );
+      } else {
+        expect((await request(server, "server/discover")).result).toBeDefined();
         expect((await request(server, "tools/list")).result.tools).toHaveLength(
           3
         );
-      else
-        await expect(request(server, "tools/list")).rejects.toThrow(
-          /not registered|empty arguments/
-        );
+        expect(action).not.toHaveBeenCalled();
+        const result = await request(server, "tools/call", {
+          name: "action",
+          arguments: {},
+        });
+        if (mode === "required") {
+          expect(result.error ?? result.result?.isError).toBeTruthy();
+          expect(action).not.toHaveBeenCalled();
+        } else {
+          expect(result.result.isError).not.toBe(true);
+          expect(action.mock.calls[0]?.[0]).toEqual({ value: "default" });
+        }
+      }
       await server.close();
     }
   });
-  it("rejects action schemas whose actual empty-argument validation fails, including async schemas", async () => {
-    for (const schema of [
-      z.object({}).refine(() => false),
-      z.object({}).refine(async () => false),
-    ]) {
+  it("runs sync and async action validators only when the action is invoked", async () => {
+    for (const asyncValidation of [false, true]) {
+      const schema = z
+        .object({})
+        .refine(() => (asyncValidation ? Promise.resolve(false) : false));
+      const validate = vi.spyOn(schema["~standard"], "validate");
+      const action = vi.fn(() => ({ content: [] }));
       const server = new MCPServer({ name: "refined-actions", version: "1" });
-      server.tool({ name: "action", inputSchema: schema }, () => ({
-        content: [],
-      }));
+      server.tool({ name: "action", inputSchema: schema }, action);
       server.settings({
         fields,
         layout: [
@@ -311,9 +366,70 @@ describe("native settings", () => {
         read: () => defaults,
         update: () => defaults,
       });
-      expect((await request(server, "server/discover")).error).toBeDefined();
+      for (let i = 0; i < 2; i++) {
+        expect((await request(server, "server/discover")).result).toBeDefined();
+        expect((await request(server, "tools/list")).result.tools).toHaveLength(
+          3
+        );
+      }
+      expect(
+        (
+          await request(server, "tools/call", {
+            name: "settings.read",
+            arguments: {},
+          })
+        ).result.structuredContent.values
+      ).toEqual(defaults);
+      expect(validate).not.toHaveBeenCalled();
+      const invoked = await request(server, "tools/call", {
+        name: "action",
+        arguments: {},
+      });
+      expect(invoked.error ?? invoked.result?.isError).toBeTruthy();
+      expect(validate).toHaveBeenCalledTimes(1);
+      expect(action).not.toHaveBeenCalled();
       await server.close();
     }
+  });
+  it("validates each callback result once and retains async update constraints", async () => {
+    const schema = z.number().refine(async (value) => value <= 10);
+    const validate = vi.spyOn(schema["~standard"], "validate");
+    const server = new MCPServer({ name: "once", version: "1" });
+    const update = vi.fn((set: Partial<{ scale: number }>) => ({
+      scale: set.scale ?? 1,
+    }));
+    server.settings({
+      fields: {
+        scale: { schema, title: "Scale" },
+      },
+      read: () => ({ scale: 1 }),
+      update,
+    });
+    await request(server, "server/discover");
+    expect(validate).not.toHaveBeenCalled();
+    const read = await request(server, "tools/call", {
+      name: "settings.read",
+      arguments: {},
+    });
+    expect(read.result.structuredContent.values).toEqual({ scale: 1 });
+    expect(validate).toHaveBeenCalledTimes(1);
+    validate.mockClear();
+    const changed = await request(server, "tools/call", {
+      name: "settings.update",
+      arguments: { set: { scale: 2 } },
+    });
+    expect(changed.result.structuredContent.values).toEqual({ scale: 2 });
+    expect(validate).toHaveBeenCalledTimes(2); // One input check and one result check.
+    validate.mockClear();
+    update.mockClear();
+    const invalid = await request(server, "tools/call", {
+      name: "settings.update",
+      arguments: { set: { scale: 11 } },
+    });
+    expect(invalid.error ?? invalid.result?.isError).toBeTruthy();
+    expect(validate).toHaveBeenCalledTimes(1);
+    expect(update).not.toHaveBeenCalled();
+    await server.close();
   });
   it("captures schema references at registration", async () => {
     const server = new MCPServer({ name: "capture", version: "1" });

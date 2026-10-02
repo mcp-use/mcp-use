@@ -217,13 +217,15 @@ Override `readTool` and `updateTool` with distinct unused names if needed.
 Fields accept Standard Schema libraries with JSON Schema conversion. Native
 settings support boolean, string, string enum, number and integer, with their
 schema constraints. Give every field a title. Schema defaults such as Zod
-`.default()` are rejected; defaults belong in the effective read result. Optional
-fields still require an effective value in each complete result.
+`.default()` are supported; return each effective value from `read` and `update`.
+Default annotations are omitted from the wire schema. Optional fields still
+require an effective value in each complete result.
 
 Layout groups can include `{ kind: "tool", tool: "open_preferences", title: "More preferences" }`
 actions referencing a same-server tool accepting `{}`. Register that tool before
 starting the server. Unlisted fields appear in the host's Other settings group.
-Nested groups and duplicate property references are rejected.
+The host renders the declared layout. Action arguments are validated when the
+action is called, using the ordinary tool input schema.
 
 See the [OpenAI settings specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#structured-settings)
 for the wire contract. mcp-use retains the declaration and advertises the pair
