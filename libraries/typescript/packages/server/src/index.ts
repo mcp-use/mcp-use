@@ -228,3 +228,11 @@ export type {
   ProxyServerConfig,
   ProxyTool,
 } from "./mcp-proxy.js";
+
+export type {
+  SettingsField,
+  SettingsFields,
+  SettingsValues,
+  SettingsLayoutGroup,
+  SettingsRegistration,
+} from "./settings.js";
