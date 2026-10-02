@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { changelogs, checkReleaseNotes } from "./release-notes.mjs";
+import { fileURLToPath } from "node:url";
+import {
+  changelogs,
+  checkChangesets,
+  checkChangelogs,
+} from "./release-notes.mjs";
 
 const changeset = "libraries/typescript/.changeset/";
 const release = '---\n"mcp-use": patch\n---\n\nFix a bug.\n';
@@ -59,8 +64,10 @@ function fixture(t, { sdk = true, existingChangelogs = changelogs } = {}) {
       "export const changed = true;\n",
     );
   const check = (baseBranch = "canary", headBranch = "feature") =>
-    checkReleaseNotes({ cwd, base, head: commit(), baseBranch, headBranch });
-  return { write, check, git, commit, base, cwd };
+    checkChangesets({ cwd, base, head: commit(), baseBranch, headBranch });
+  const checkChangelog = (baseBranch = "main", headBranch = "canary") =>
+    checkChangelogs({ cwd, base, head: commit(), baseBranch, headBranch });
+  return { write, check, checkChangelog, git, commit, base, cwd };
 }
 
 test("existing, edited, and README changesets do not satisfy a canary PR", (t) => {
@@ -98,17 +105,17 @@ test("malformed changesets and release entries without summaries fail", (t) => {
 
 test("canary to main requires both MDX changelogs", (t) => {
   const f = fixture(t);
-  assert.equal(f.check("main", "canary").length, 2);
+  assert.equal(f.checkChangelog().length, 2);
   f.write(
     changelogs[0],
     '<Update label="v1.1.0">New feature</Update>\n' + entry,
   );
-  assert.equal(f.check("main", "canary").length, 1);
+  assert.equal(f.checkChangelog().length, 1);
   f.write(
     changelogs[1],
     '<Update label="v2.0.0">Inspector feature</Update>\n' + entry,
   );
-  assert.deepEqual(f.check("main", "canary"), []);
+  assert.deepEqual(f.checkChangelog(), []);
 });
 
 test("metadata, whitespace, empty entries, and generated changelogs do not count", (t) => {
@@ -120,7 +127,7 @@ test("metadata, whitespace, empty entries, and generated changelogs do not count
     );
   }
   f.write("libraries/typescript/packages/server/CHANGELOG.md", "New release");
-  assert.equal(f.check("main", "canary").length, 2);
+  assert.equal(f.checkChangelog().length, 2);
 });
 
 test("updating an existing release entry is allowed", (t) => {
@@ -130,7 +137,7 @@ test("updating an existing release entry is allowed", (t) => {
       path,
       entry.replace("Initial release", "Initial release with new fixes"),
     );
-  assert.deepEqual(f.check("main", "canary"), []);
+  assert.deepEqual(f.checkChangelog(), []);
 });
 
 test("SDK PRs require changesets for every target, including main", (t) => {
@@ -151,7 +158,7 @@ test("unrelated changes added to the base branch cannot satisfy the PR", (t) => 
   f.write(`${changeset}base-only.md`, release);
   const base = f.commit();
   assert.equal(
-    checkReleaseNotes({
+    checkChangesets({
       cwd: f.cwd,
       base,
       head,
@@ -218,7 +225,7 @@ test("runtime manifest edits count but version, scripts, and dev dependencies do
   f.write(path, JSON.stringify(original));
   const base = f.commit();
   const check = (headBranch = "feature") =>
-    checkReleaseNotes({
+    checkChangesets({
       cwd: f.cwd,
       base,
       head: f.commit(),
@@ -250,7 +257,7 @@ test("deleted SDK source files still require a changeset", (t) => {
   const base = f.commit();
   rmSync(join(f.cwd, "libraries/typescript/packages/server/src/index.ts"));
   assert.equal(
-    checkReleaseNotes({
+    checkChangesets({
       cwd: f.cwd,
       base,
       head: f.commit(),
@@ -287,7 +294,7 @@ test("comments and code examples cannot create changelog entries", (t) => {
   ]) {
     for (const path of changelogs)
       f.write(path, wrapper(hidden) + "\n" + entry);
-    assert.equal(f.check("main", "canary").length, 2);
+    assert.equal(f.checkChangelog().length, 2);
   }
 });
 
@@ -302,7 +309,7 @@ test("comment-only updates inside real entries do not count", (t) => {
       ),
     );
   }
-  assert.equal(f.check("main", "canary").length, 2);
+  assert.equal(f.checkChangelog().length, 2);
 });
 
 test("code examples inside real entries still count as release content", (t) => {
@@ -313,7 +320,7 @@ test("code examples inside real entries still count as release content", (t) => 
       '<Update label="v2.0.0">\n```tsx\n<Update>Example</Update>\n```\n</Update>',
     );
   }
-  assert.deepEqual(f.check("main", "canary"), []);
+  assert.deepEqual(f.checkChangelog(), []);
 });
 
 test("new changelog paths use an empty baseline", (t) => {
@@ -321,25 +328,25 @@ test("new changelog paths use an empty baseline", (t) => {
     const f = fixture(t, { existingChangelogs });
     for (const path of changelogs)
       f.write(path, entry.replace("Initial release", "New release"));
-    assert.deepEqual(f.check("main", "canary"), []);
+    assert.deepEqual(f.checkChangelog(), []);
   }
 });
 
 test("missing or deleted head changelogs report actionable failures", (t) => {
   const f = fixture(t);
   rmSync(join(f.cwd, changelogs[0]));
-  const errors = f.check("main", "canary");
+  const errors = f.checkChangelog();
   assert.equal(errors.length, 2);
   assert.ok(errors[0].includes(`entry in ${changelogs[0]}`));
   const missing = fixture(t, { existingChangelogs: [] });
-  assert.equal(missing.check("main", "canary").length, 2);
+  assert.equal(missing.checkChangelog().length, 2);
 });
 
 test("unexpected Git failures are not treated as missing changelogs", (t) => {
   const f = fixture(t);
   assert.throws(
     () =>
-      checkReleaseNotes({
+      checkChangelogs({
         cwd: f.cwd,
         base: "missing-ref",
         head: f.base,
@@ -378,7 +385,7 @@ test("manifest key order is ignored except for conditional resolution", (t) => {
   );
   const base = f.commit();
   const check = () =>
-    checkReleaseNotes({
+    checkChangesets({
       cwd: f.cwd,
       base,
       head: f.commit(),
@@ -403,4 +410,74 @@ test("manifest key order is ignored except for conditional resolution", (t) => {
     }),
   );
   assert.equal(check().length, 1);
+});
+
+test("changelog validation skips every PR except canary to main", (t) => {
+  const f = fixture(t, { existingChangelogs: [] });
+  for (const [baseBranch, headBranch] of [
+    ["canary", "feature"],
+    ["canary", "main"],
+    ["main", "feature"],
+    ["main", "release/exit-prerelease-1234"],
+    ["feature/another-base", "canary"],
+  ]) {
+    assert.deepEqual(f.checkChangelog(baseBranch, headBranch), []);
+  }
+  assert.equal(f.checkChangelog().length, 2);
+});
+
+test("a canary PR with a changeset passes without any changelogs", (t) => {
+  const f = fixture(t, { existingChangelogs: [] });
+  f.write(`${changeset}new.md`, release);
+  assert.deepEqual(f.check("canary", "feature"), []);
+  assert.deepEqual(f.checkChangelog("canary", "feature"), []);
+});
+
+test("promotion only checks changelogs and skips SDK package analysis", (t) => {
+  const f = fixture(t);
+  // The promotion check must not parse manifests or require fresh changesets.
+  f.write("libraries/typescript/packages/server/package.json", "invalid JSON");
+  assert.deepEqual(f.check("main", "canary"), []);
+  assert.equal(f.checkChangelog().length, 2);
+  for (const path of changelogs)
+    f.write(path, entry.replace("Initial release", "New release"));
+  assert.deepEqual(f.checkChangelog(), []);
+});
+
+test("changelogs cannot satisfy the changeset check", (t) => {
+  const f = fixture(t);
+  for (const path of changelogs)
+    f.write(path, entry.replace("Initial release", "New release"));
+  assert.equal(f.check("canary", "feature").length, 1);
+});
+
+test("workflow CLI modes report independent exit statuses", (t) => {
+  const f = fixture(t, { existingChangelogs: [] });
+  const run = (mode, baseBranch = "canary", headBranch = "feature") =>
+    spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("./release-notes.mjs", import.meta.url)), mode],
+      {
+        cwd: f.cwd,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          BASE_SHA: f.base,
+          HEAD_SHA: f.commit(),
+          BASE_BRANCH: baseBranch,
+          HEAD_BRANCH: headBranch,
+        },
+      },
+    );
+  assert.equal(run("changeset").status, 1);
+  assert.equal(run("changelog").status, 0);
+  f.write(`${changeset}new.md`, release);
+  assert.equal(run("changeset").status, 0);
+  assert.equal(run("changeset", "main", "canary").status, 0);
+  const promotion = run("changelog", "main", "canary");
+  assert.equal(promotion.status, 1);
+  assert.match(promotion.stderr, /release <Update> entry/);
+  for (const path of changelogs) f.write(path, entry);
+  assert.equal(run("changelog", "main", "canary").status, 0);
+  assert.equal(run("unknown").status, 1);
 });
