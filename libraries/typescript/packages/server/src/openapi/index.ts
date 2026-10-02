@@ -356,7 +356,29 @@ function transformSchemaNode(
   for (const [key, child] of Object.entries(object)) {
     if (key === "$ref") continue;
     if (key === "nullable" && typeof child === "boolean") continue;
-    siblings[key] = transformSchemaNode(spec, child, resolvingRefs);
+    if (["enum", "const", "default", "examples", "example"].includes(key)) {
+      siblings[key] = child;
+    } else if (
+      [
+        "properties",
+        "patternProperties",
+        "$defs",
+        "definitions",
+        "dependentSchemas",
+      ].includes(key) &&
+      readRecord(child) !== undefined
+    ) {
+      siblings[key] = Object.fromEntries(
+        Object.entries(child as Record<string, unknown>).map(
+          ([name, schema]) => [
+            name,
+            transformSchemaNode(spec, schema, resolvingRefs),
+          ]
+        )
+      );
+    } else {
+      siblings[key] = transformSchemaNode(spec, child, resolvingRefs);
+    }
   }
 
   let transformed: Record<string, unknown> = siblings;
