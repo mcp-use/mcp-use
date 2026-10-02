@@ -345,7 +345,9 @@ import { MCPAgent } from "@mcp-use/agent/langchain";
 import { ChatOpenAI } from "@langchain/openai";
 
 const client = new MCPClient({
-  url: "http://localhost:3000/mcp",
+  mcpServers: {
+    local: { url: "http://localhost:3000/mcp" },
+  },
 });
 
 const agent = new MCPAgent({

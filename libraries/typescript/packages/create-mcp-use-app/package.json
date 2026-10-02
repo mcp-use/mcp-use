@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "2.0.7",
+  "version": "2.0.8-canary.0",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
@@ -48,7 +48,7 @@
   "dependencies": {},
   "devDependencies": {
     "@clack/prompts": "^1.7.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.11"
   },
   "publishConfig": {
     "access": "public"

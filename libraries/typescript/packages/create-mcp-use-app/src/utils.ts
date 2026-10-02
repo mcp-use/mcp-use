@@ -92,6 +92,12 @@ export function deriveProjectInfo(rawName: string, cwd: string): ProjectInfo {
   };
 }
 
+// Deploy through `run`: `deploy` is also a built-in pnpm command, and pnpm 9
+// and 10 run it instead of the project's `deploy` script.
+export function getDeployCommand(packageManager: string): string {
+  return `${packageManager} run deploy`;
+}
+
 export function updatePackageJson(projectPath: string, projectName: string) {
   const packageJsonPath = join(projectPath, "package.json");
   const packageJsonContent = JSON.parse(readFileSync(packageJsonPath, "utf-8"));

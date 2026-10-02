@@ -122,7 +122,7 @@ export function ChatInput({
         className={cn(
           isFullscreen
             ? "field-sizing-fixed h-11 min-h-11 max-h-11 resize-none overflow-hidden py-2.5 pl-4 pr-12"
-            : "p-4 min-h-[150px] max-h-[300px]",
+            : "p-4 pb-14 min-h-[150px] max-h-[300px]",
           shape.container,
           !isFullscreen && hasAttachments && "pt-20",
           className

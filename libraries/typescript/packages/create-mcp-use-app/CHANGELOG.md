@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.8-canary.0
+
+### Patch Changes
+
+- b99caea: Print `pnpm run deploy` instead of `pnpm deploy` in the post-scaffold summary. `deploy` is also a built-in pnpm command, so on pnpm 9 and 10 `pnpm deploy` failed with `ERR_PNPM_CANNOT_DEPLOY` instead of running the project's `deploy` script.
+
 ## 2.0.7
 
 ### Patch Changes
