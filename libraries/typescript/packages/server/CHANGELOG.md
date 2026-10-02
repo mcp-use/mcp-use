@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.7.3-canary.3
+
+### Patch Changes
+
+- 2ab9dc5: Upgrade Hono to a patched release to address dependency security advisories.
+
 ## 2.7.3-canary.2
 
 ### Patch Changes
