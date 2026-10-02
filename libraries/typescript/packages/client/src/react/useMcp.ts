@@ -1,7 +1,6 @@
 // useMcp.ts
 import { auth } from "@modelcontextprotocol/client";
 import type {
-  OAuthClientProvider,
   Prompt,
   ProtocolEra,
   Resource,
@@ -21,7 +20,7 @@ import { resolveClientOptions } from "../core/config.js";
 import { Logger, type LogLevel } from "../utils/logging.js";
 import type { MCPConnection } from "../core/session.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
-import { isUnauthorized } from "../auth/flow.js";
+import { isUnauthorized, type OAuthFetchProvider } from "../auth/flow.js";
 import { assert } from "./useMcp-helpers.js";
 import type { ProxyConfig } from "./types.js";
 import { sanitizeUrl } from "../auth/url.js";
@@ -52,7 +51,7 @@ const DEFAULT_RETRY_DELAY = 5000;
 // Streamable HTTP is the only supported remote transport.
 type TransportType = "http";
 
-type UseMcpAuthProvider = OAuthClientProvider & {
+type UseMcpAuthProvider = OAuthFetchProvider & {
   tokens?: () => Promise<
     | {
         access_token?: string;
@@ -71,13 +70,6 @@ type UseMcpAuthProvider = OAuthClientProvider & {
     client_id: string;
     client_secret?: string;
   } | null>;
-  /**
-   * Returns a `fetch` scoped to this provider that routes OAuth requests
-   * through the configured OAuth proxy (bypassing CORS) while leaving the
-   * global `fetch` untouched. Passed to the SDK transport / `auth()` so proxy
-   * behavior is confined to this server's connection.
-   */
-  getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
   serverUrl?: string;
   /** localStorage key for a given suffix (e.g. "tokens"). */
   getKey?: (keySuffix: string) => string;
