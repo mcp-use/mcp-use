@@ -17,6 +17,7 @@
  * so library consumers and production startup never evaluate Vite.
  */
 
+import { readViewConfig } from "./view-config.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { createServer as createNodeServer } from "node:http";
@@ -410,6 +411,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   if (!existsSync(resolveViewsDir(options.cwd, viewsDirectory))) {
     console.log("[mcp-use] views directory not configured.");
   }
+  const frontendConfigs = new Map<string, string | undefined>();
   let currentViews: DiscoveredView[] = discoverViews(
     options.cwd,
     viewsDirectory
@@ -540,6 +542,12 @@ export async function runDev(options: DevOptions): Promise<void> {
         )
       );
       const viewsManifest = buildDevViewsManifest(viewsSnapshot);
+      for (const view of viewsSnapshot) {
+        frontendConfigs.set(
+          view.entryPath,
+          JSON.stringify(viewsManifest[view.name]?.viewConfig)
+        );
+      }
       if (typeof server.__primeViews !== "function") {
         throw new Error(
           "Loaded MCPServer instance does not support __primeViews."
@@ -728,6 +736,21 @@ export async function runDev(options: DevOptions): Promise<void> {
       return;
     }
     if (isViewPath(file, options.cwd, viewsDirectory)) {
+      const view = currentViews.find(
+        (entry) => normalizePath(entry.entryPath) === normalizePath(file)
+      );
+      if (view) {
+        try {
+          if (
+            JSON.stringify(readViewConfig(view.entryPath)) !==
+            frontendConfigs.get(view.entryPath)
+          )
+            scheduleReconcile();
+        } catch {
+          // Reconciliation reports invalid config and retains the previous handler.
+          scheduleReconcile();
+        }
+      }
       return;
     }
     const modules = ssrEnvironment.moduleGraph.getModulesByFile(

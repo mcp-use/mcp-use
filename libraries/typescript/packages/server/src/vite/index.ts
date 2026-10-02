@@ -16,6 +16,7 @@ import {
 } from "vite";
 import {
   buildDevViewsManifest,
+  readViewConfig,
   discoverViews,
   isViewEntryPath,
   mcpUseViewsPlugin,
@@ -107,6 +108,7 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
   let skillsDirectory: string | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let manifest: ViewsManifest = {};
+  const frontendConfigs = new Map<string, string | undefined>();
   let assets: EmbeddedViewAssets = {};
   let skills: SkillsSnapshot | undefined;
   const bridgePath = `/@mcp-use/${randomBytes(24).toString("hex")}`;
@@ -155,6 +157,11 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
       );
       server.__primeSkills(skills);
       const devManifest = buildDevViewsManifest(views);
+      for (const view of views)
+        frontendConfigs.set(
+          view.entryPath,
+          JSON.stringify(devManifest[view.name]?.viewConfig)
+        );
       const base = config.base;
       if (base !== "/")
         for (const view of Object.values(devManifest)) {
@@ -346,6 +353,20 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
           schedule();
       };
       const onChange = (file: string) => {
+        const view = views.find(
+          (entry) => normalizePath(entry.entryPath) === normalizePath(file)
+        );
+        if (view) {
+          try {
+            if (
+              JSON.stringify(readViewConfig(view.entryPath)) !==
+              frontendConfigs.get(view.entryPath)
+            )
+              schedule();
+          } catch {
+            schedule();
+          }
+        }
         if (skillsDirectory && within(file, skillsDirectory)) schedule();
       };
       server.watcher
@@ -476,6 +497,7 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
           if (output.type === "asset") visit(output.fileName);
         manifest[view.name] = {
           kind: "external",
+          viewConfig: readViewConfig(view.entryPath),
           entry: chunk.fileName,
           css: [...css],
         };
