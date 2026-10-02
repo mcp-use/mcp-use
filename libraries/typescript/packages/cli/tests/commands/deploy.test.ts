@@ -403,6 +403,94 @@ describe("deploy agent contract", () => {
     ).resolves.toBe(0);
   });
 
+  it.each([
+    "https://notgithub.com/example/lookalike.git",
+    "https://git.example.com/mirror/github.com/example/lookalike.git",
+    "git@notgithub.com:example/lookalike.git",
+    "git@github.com.evil.com:example/lookalike.git",
+    "https://github.com:8443/example/custom-port.git",
+    "https://github.com:443/example/explicit-default-port.git",
+    "ssh://git@github.com:22/example/ssh-port.git",
+    "git://github.com:9418/example/git-port.git",
+    "https://github.com/example/query.git?ref=main",
+    "https://github.com/example/hash.git#main",
+    "file://github.com/example/local-path.git",
+    "ftp://github.com/example/unsupported-protocol.git",
+    "custom://github.com/example/unsupported-protocol.git",
+    "https:/github.com/example/missing-slash.git",
+    "https:github.com/example/missing-authority.git",
+    String.raw`https:\github.com\example\backslash-path.git`,
+    "https://github.com/example/nested/../normalized-path.git",
+    "https://github.com/./dot-owner.git",
+    "https://github.com/example/..",
+    "git@github.com:../dot-owner.git",
+    "git@github.com:example/..",
+  ])("rejects an unsupported GitHub origin: %s", async (remote) => {
+    const directory = await project("lookalike-origin");
+    initializeRepository(directory, remote);
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
+
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
+      error: {
+        code: "unsupported_remote",
+        details: { remote },
+      },
+    });
+    expect(api.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "https://GitHub.com/example/case-insensitive.git",
+      "example/case-insensitive",
+    ],
+    ["git@github.com:example/scp-style.git", "example/scp-style"],
+    ["git@GITHUB.COM:example/upper-host.git", "example/upper-host"],
+    ["ssh://git@github.com/example/ssh-style.git", "example/ssh-style"],
+    ["http://github.com/example/http-style.git", "example/http-style"],
+    ["git://github.com/example/git-style.git", "example/git-style"],
+  ])(
+    "accepts supported GitHub remote syntax: %s",
+    async (remote, repository) => {
+      const directory = await project("supported-origin");
+      initializeRepository(directory, remote);
+      api.request.mockImplementation(
+        async (path: string, init?: { body?: string }) => {
+          if (path.startsWith("/github/installations?")) {
+            return {
+              installations: [
+                {
+                  id: "installation-row",
+                  installationId: "123",
+                  account: { login: "example", type: "Organization" },
+                },
+              ],
+            };
+          }
+          if (path.includes("/access")) return { hasAccess: true };
+          if (path === "/servers") {
+            expect(JSON.parse(init?.body ?? "{}")).toMatchObject({
+              type: "github",
+              repoFullName: repository,
+            });
+            return {
+              server: { id: "srv_supported", slug: "supported-origin" },
+              deploymentId: "dep_supported",
+            };
+          }
+          throw new Error(`Unexpected request: ${path}`);
+        }
+      );
+      vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+      await expect(runDeploy([directory, "--json"])).resolves.toBe(0);
+    }
+  );
+
   it("rejects an unsupported origin with recovery commands", async () => {
     const directory = await project("unsupported-origin");
     initializeRepository(
