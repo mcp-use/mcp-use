@@ -7,7 +7,7 @@ import type { ToolDefinition } from "./tools.js";
 export interface SettingsField<
   Schema extends StandardSchemaWithJSON = StandardSchemaWithJSON,
 > {
-  /** Primitive Standard Schema with JSON Schema conversion; defaults belong in read(). */
+  /** Primitive Standard Schema with JSON Schema conversion; read() returns effective values. */
   schema: Schema;
   /** Non-blank label displayed by the host. */
   title: string;
@@ -153,14 +153,12 @@ export function prepareSettings<Fields extends SettingsFields>(
         `Unsupported native setting ${name}: use boolean, string, string enum, number, or integer`
       );
     }
-    if ("default" in property)
-      throw new TypeError(
-        "Settings defaults must be returned by the read handler, not declared in the schema"
-      );
+    const wireProperty = structuredClone(property);
+    delete wireProperty["default"];
     Object.defineProperty(properties, name, {
       enumerable: true,
       value: {
-        ...structuredClone(property),
+        ...wireProperty,
         title: field.title,
         ...(field.description !== undefined && {
           description: field.description,
@@ -176,55 +174,6 @@ export function prepareSettings<Fields extends SettingsFields>(
   };
   const layout =
     options.layout === undefined ? undefined : structuredClone(options.layout);
-  const seen = new Set<string>();
-  const actionTools: string[] = [];
-  if (layout !== undefined) {
-    if (!Array.isArray(layout))
-      throw new TypeError("Settings layout must be an array");
-    for (const group of layout as readonly SettingsLayoutGroup[]) {
-      const record = object(group, "Settings group");
-      if (
-        group.kind !== "group" ||
-        Object.keys(record).some(
-          (key) => !["kind", "title", "items"].includes(key)
-        ) ||
-        !Array.isArray(group.items)
-      )
-        throw new TypeError("Invalid settings group");
-      nonBlank(group.title, "Settings group title");
-      for (const item of group.items as SettingsLayoutGroup["items"]) {
-        const entry = object(item, "Settings layout item");
-        if (item.kind === "property") {
-          if (
-            Object.keys(entry).some(
-              (key) => !["kind", "property"].includes(key)
-            ) ||
-            !Object.hasOwn(properties, item.property) ||
-            seen.has(item.property)
-          )
-            throw new TypeError(
-              `Unknown or duplicate settings key: ${item.property}`
-            );
-          seen.add(item.property);
-        } else if (item.kind === "tool") {
-          if (
-            Object.keys(entry).some(
-              (key) => !["kind", "tool", "title", "description"].includes(key)
-            )
-          )
-            throw new TypeError("Invalid settings action");
-          nonBlank(item.tool, "Settings action tool");
-          nonBlank(item.title, "Settings action title");
-          if (
-            item.description !== undefined &&
-            typeof item.description !== "string"
-          )
-            throw new TypeError("Settings action description must be a string");
-          actionTools.push(item.tool);
-        } else throw new TypeError("Invalid settings layout item");
-      }
-    }
-  }
   const validateValues = async (
     value: unknown,
     partial = false
@@ -259,7 +208,6 @@ export function prepareSettings<Fields extends SettingsFields>(
     }
     return result;
   };
-  const valuesSchema = standard(schema, validateValues);
   const emptySchema = standard(
     { type: "object", additionalProperties: false },
     (value) => {
@@ -319,9 +267,6 @@ export function prepareSettings<Fields extends SettingsFields>(
     capability: { readTool, updateTool },
     schema,
     layout,
-    actionTools,
-    validateValues,
-    valuesSchema,
     readDefinition: {
       name: readTool,
       inputSchema: emptySchema,
