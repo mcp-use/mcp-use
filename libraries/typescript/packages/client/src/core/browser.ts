@@ -118,10 +118,24 @@ export class BrowserMCPClient extends BaseMCPClient {
       serverConfig.clientInfo ?? this.config.clientInfo
     );
 
-    // Prepare connector options
+    // Prepare connector options. A browser OAuth provider may expose a
+    // provider-scoped fetch that routes only OAuth discovery/token requests
+    // through oauthProxyUrl while leaving MCP traffic on the configured fetch.
+    const baseFetch = configuredFetch ?? globalThis.fetch.bind(globalThis);
+    const oauthFetch =
+      authProvider &&
+      typeof (authProvider as { getProxyFetch?: unknown }).getProxyFetch ===
+        "function"
+        ? (
+            authProvider as {
+              getProxyFetch: (baseFetch?: typeof fetch) => typeof fetch | undefined;
+            }
+          ).getProxyFetch(baseFetch)
+        : undefined;
+
     const connectorOptions = {
       headers,
-      fetch: configuredFetch ?? globalThis.fetch.bind(globalThis),
+      fetch: oauthFetch ?? baseFetch,
       authToken,
       authProvider,
       detectMixedAuth,
