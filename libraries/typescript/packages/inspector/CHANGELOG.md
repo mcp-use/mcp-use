@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.3.15
+
+### Patch Changes
+
+- 8dc3750: Fix chat input text overlapping with the bottom toolbar when typing multi-line messages
+- 8dc3750: Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.15-canary.1
 
 ### Patch Changes

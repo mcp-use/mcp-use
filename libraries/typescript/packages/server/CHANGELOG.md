@@ -1,5 +1,17 @@
 # mcp-use
 
+## 2.7.3
+
+### Patch Changes
+
+- 8dc3750: Upgrade Hono to a patched release to address dependency security advisories.
+- Updated dependencies [8dc3750]
+- Updated dependencies [8dc3750]
+- Updated dependencies [8dc3750]
+- Updated dependencies [8dc3750]
+  - @mcp-use/cli@4.2.1
+  - @mcp-use/inspector@20.3.15
+
 ## 2.7.3-canary.3
 
 ### Patch Changes
