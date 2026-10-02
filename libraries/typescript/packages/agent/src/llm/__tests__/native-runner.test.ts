@@ -3,6 +3,53 @@ import type { LlmDriver } from "../driver.js";
 import { streamNativeAgentSteps } from "../native_runner.js";
 
 describe("streamNativeAgentSteps", () => {
+  it("returns only the final assistant turn after tool use", async () => {
+    const driver: LlmDriver = {
+      managesToolLoop: true,
+      async *stream() {},
+      async complete() {
+        return { text: "", toolCalls: [] };
+      },
+      async *streamToolLoop() {
+        yield { type: "text-delta", delta: "Let me check the files." };
+        yield {
+          type: "tool-call-ready",
+          index: 0,
+          toolCallId: "call_1",
+          toolName: "list_files",
+          args: {},
+        };
+        yield { type: "done" };
+        yield {
+          type: "tool-result",
+          toolCallId: "call_1",
+          toolName: "list_files",
+          result: ["a.ts"],
+          isError: false,
+        };
+        yield { type: "text-delta", delta: "The folder has " };
+        yield { type: "text-delta", delta: "a.ts." };
+        yield { type: "done" };
+      },
+    };
+
+    const generator = streamNativeAgentSteps(driver, {
+      messages: [],
+      tools: [],
+      callTool: vi.fn(),
+    });
+
+    const yielded = [];
+    let next = await generator.next();
+    while (!next.done) {
+      yielded.push(next.value);
+      next = await generator.next();
+    }
+
+    expect(next.value).toBe("The folder has a.ts.");
+    expect(yielded).toHaveLength(2);
+  });
+
   it("pairs parallel tool results by toolCallId", async () => {
     const driver: LlmDriver = {
       managesToolLoop: true,
