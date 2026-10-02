@@ -49,6 +49,26 @@ describe("seedInputFromMessages", () => {
     ]);
   });
 
+  it("preserves assistant ContentPart text in history", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "first" },
+          { type: "text", text: "second" },
+        ],
+      },
+    ];
+
+    expect(seedInputFromMessages(messages).input).toEqual([
+      {
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: "first\nsecond" }],
+      },
+    ]);
+  });
+
   it("adds follow-up user image turn for image tool results", () => {
     const result = {
       content: [{ type: "image", data: "AAAA", mimeType: "image/png" }],
