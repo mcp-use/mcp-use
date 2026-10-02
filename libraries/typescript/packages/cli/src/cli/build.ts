@@ -11,6 +11,7 @@
  * `mcp-use start` therefore never evaluate Vite.
  */
 
+import { readViewConfig } from "./view-config.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
@@ -279,6 +280,7 @@ async function buildView(
     }
     return {
       kind: "inline",
+      viewConfig: readViewConfig(view.entryPath),
       js: inlineJs,
       css: inlineCss.join("\n"),
     };
@@ -286,6 +288,7 @@ async function buildView(
 
   return {
     kind: "external",
+    viewConfig: readViewConfig(view.entryPath),
     entry: jsFileName.replace(/^\/+/, ""),
     css: cssFileName !== undefined ? [cssFileName.replace(/^\/+/, "")] : [],
   };

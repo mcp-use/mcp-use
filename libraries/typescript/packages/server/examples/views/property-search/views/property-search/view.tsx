@@ -47,6 +47,7 @@ import "./view.css";
 export const viewConfig: ViewConfig = {
   autoResize: true,
   displayModes: ["inline", "fullscreen"],
+  preferredDisplayMode: "fullscreen",
 };
 
 /* ------------------------------------------------------------------ */

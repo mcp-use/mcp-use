@@ -1158,6 +1158,13 @@ describe("runDev (views)", () => {
       .contents[0]!.text;
     expect(docHtml).toContain('id="root"');
     expect(docHtml).toContain("/@vite/client");
+    expect(
+      (readBody["result"] as { contents: { _meta: Record<string, unknown> }[] })
+        .contents[0]?._meta["openai/ui"]
+    ).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
+      preferredDisplayMode: "fullscreen",
+    });
     expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
 
     const virtualMatch =
@@ -1450,6 +1457,34 @@ describe("runDev (views)", () => {
     expect(
       dev.logs.filter((line) => line === "[mcp-use] reloaded server entry")
     ).toHaveLength(1);
+  }, 60_000);
+
+  it("refreshes resource display metadata when frontend config changes", async () => {
+    const cwd = copyFixture("dev-view-config", "views");
+    cleanups.push(() => removeDir(cwd));
+    const dev = await startDev(cwd, await getFreePort());
+    cleanups.push(dev.stop);
+    const uri = "ui://views/product-search-result.html";
+    const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
+    const before = await mcpRequest(dev.url, "resources/read", { uri });
+    expect(
+      (before["result"] as { contents: { _meta: Record<string, unknown> }[] })
+        .contents[0]?._meta["openai/ui"]
+    ).toMatchObject({ preferredDisplayMode: "fullscreen" });
+    writeFileSync(
+      viewPath,
+      readFileSync(viewPath, "utf8").replace(
+        'preferredDisplayMode: "fullscreen"',
+        'preferredDisplayMode: "inline"'
+      )
+    );
+    await waitFor(async () => {
+      const read = await mcpRequest(dev.url, "resources/read", { uri });
+      const meta = (
+        read["result"] as { contents: { _meta: Record<string, unknown> }[] }
+      ).contents[0]?._meta["openai/ui"] as { preferredDisplayMode?: string };
+      return meta.preferredDisplayMode === "inline" ? true : undefined;
+    });
   }, 60_000);
 
   it("hot-updates a view.tsx edit without a full document reload", async () => {
