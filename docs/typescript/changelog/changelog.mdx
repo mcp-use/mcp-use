@@ -6,6 +6,22 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.7.3" description="October 2026">
+  ## CLI argument & Windows screenshot fixes
+  Patch release fixing CLI argument parsing, Windows browser discovery, scaffold deploy guidance, and Inspector chat input spacing, with dependency security updates.
+
+- **Fix** (@mcp-use/cli): plain `key=value` tool and prompt arguments preserve `:=` inside the value, so `code="x := 1"` is sent as a string; `key:=<json>` still parses a typed JSON value (`#2665`)
+- **Fix** (@mcp-use/cli): on Windows, `mcp-use screenshot` also finds Chrome under `Program Files (x86)`, Microsoft Edge, and Brave instead of failing with `chrome_not_found` when neither original Chrome location exists (`#2725`)
+- **Fix** (create-mcp-use-app): scaffold completion prints `pnpm run deploy` so pnpm runs the project's deploy script instead of its built-in `deploy` command (`#2701`)
+- **Fix** (@mcp-use/inspector): multiline chat input stays clear of the bottom toolbar; see the [Inspector changelog](/inspector/changelog) (`#2735`)
+- **Update** (server): update Hono to `^4.13.7` and raise workspace dependency security floors (`#2746`)
+- **Documentation** (@mcp-use/client): the AI SDK OpenAI example installs from a fresh checkout with a frozen lockfile and runs TypeScript directly on Node.js 22.22.2 or newer (`#2672`)
+- **Documentation** (create-mcp-use-app): the Connect to AI example configures its MCP server through `MCPClient`'s `mcpServers` map (`#2727`)
+- **Update**: Updated @mcp-use/inspector to v20.3.15; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.2.1
+- **Update**: Updated create-mcp-use-app to v2.0.8
+</Update>
+
 <Update label="v2.7.2" description="September 2026">
   ## OAuth UserInfo & stricter CLI flags
   Patch release exposing optional OAuth UserInfo, plus a CLI minor that rejects inline values on boolean flags.
