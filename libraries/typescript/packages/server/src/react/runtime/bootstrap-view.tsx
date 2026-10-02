@@ -65,6 +65,7 @@ function configsEqual(
   b: NormalizedViewConfig
 ): boolean {
   if (a.autoResize !== b.autoResize) return false;
+  if (a.preferredDisplayMode !== b.preferredDisplayMode) return false;
   if (a.displayModes.length !== b.displayModes.length) return false;
   return a.displayModes.every((mode, index) => mode === b.displayModes[index]);
 }
@@ -132,7 +133,8 @@ interface BootstrapViewOptions {
  *   `viewConfig`).
  * @param options - Mount options.
  * @throws When `viewConfig.displayModes` is empty, duplicated, missing
- *   `"inline"`, or contains an unknown mode.
+ *   `"inline"`, or contains an unknown mode; also when the initial display
+ *   preference is unsupported or absent from the supported list.
  * @throws When a view is already mounted on a different `rootId` in this
  *   document.
  *
@@ -159,7 +161,7 @@ export function bootstrapView(
 
     if (!configsEqual(existing.config, normalized)) {
       console.warn(
-        "[mcp-use] viewConfig changed during HMR (autoResize / displayModes). " +
+        "[mcp-use] viewConfig changed during HMR (autoResize / displayModes / preferredDisplayMode). " +
           "A full iframe reload is required for configuration changes to take effect; " +
           "the mounted runtime keeps the original configuration."
       );

@@ -1,3 +1,4 @@
+import { normalizeViewConfig } from "./react/runtime/view-config.js";
 import {
   localhostAllowedHostnames,
   localhostAllowedOrigins,
@@ -712,6 +713,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       this.#viewsProjectRoot = options.projectRoot;
     }
     for (const [name, entry] of Object.entries(views)) {
+      normalizeViewConfig(entry.viewConfig);
       this.#views.set(name, entry);
     }
     this.#viewsPrimed = true;
@@ -2279,9 +2281,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     basePath: string
   ): void {
     const uri = viewResourceUri(viewName);
-    const authorFacts = this.#viewResourceFacts(
-      this.#viewBindings.get(viewName)?.config
-    );
+    const frontendConfig = normalizeViewConfig(entry.viewConfig);
+    const authorFacts = {
+      ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),
+      displayModes: frontendConfig.displayModes,
+      ...(frontendConfig.preferredDisplayMode !== undefined && {
+        preferredDisplayMode: frontendConfig.preferredDisplayMode,
+      }),
+    };
     const resourceConfig = viewResourceConfig(
       viewName,
       entry,
