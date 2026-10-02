@@ -116,11 +116,7 @@ import type {
   ToolViewConfig,
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
-import {
-  buildEntrypointMeta,
-  validateEntrypointInput,
-  validateEntrypoints,
-} from "./views/entrypoints.js";
+import { buildEntrypointMeta } from "./views/entrypoints.js";
 import { isUsageDisabled, recordUsage } from "./usage.js";
 import { registerSkillsRuntime } from "./skills/runtime.js";
 import {
@@ -605,7 +601,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>> {
     this.#assertNotStarted("tool", definition.name);
     const schemes = this.#resolveSecuritySchemes(definition);
-    validateEntrypoints(definition);
     this.#validateToolViewBinding(definition);
     this.#openApiTools.delete(definition.name);
     this.#proxiedTools.delete(definition.name);
@@ -2163,7 +2158,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           string,
           unknown
         >;
-        validateEntrypointInput(definition, effectiveArgs);
         const result = await callback(
           effectiveArgs,
           this.#toToolRequestContext(ctx, schemes)

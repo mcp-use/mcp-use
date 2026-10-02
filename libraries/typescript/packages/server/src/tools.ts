@@ -75,7 +75,7 @@ export interface ToolViewConfig {
    * Manual launch locations → tool `_meta["openai/ui"].entrypoints`.
    * Global/thread launchers must accept `{}`; file launchers require
    * {@link FileEntrypointInput}. Entrypoints open fullscreen in supporting
-   * hosts. Conflicting raw metadata declarations are rejected.
+   * hosts. Typed entrypoints take precedence over raw metadata declarations.
    */
   entrypoints?: readonly ToolViewEntrypoint[];
   /**
