@@ -72,6 +72,10 @@ function primeViews(server: MCPServer): void {
     "product-search-result": {
       kind: "inline",
       js: 'console.log("product-search-result");',
+      viewConfig: {
+        displayModes: ["inline", "fullscreen"],
+        preferredDisplayMode: "fullscreen",
+      },
       css: ".results { color: red; }",
     },
     "orphan-view": {
@@ -523,6 +527,26 @@ describe("views server core (e2e over HTTP)", () => {
       permissions: { clipboardWrite: {} },
       domain: "https://views.example.com",
       prefersBorder: true,
+    });
+  });
+
+  it("serves frontend display modes on HTML content before app initialization", async () => {
+    const read = await plainClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(read.contents[0]?._meta?.["openai/ui"]).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
+      preferredDisplayMode: "fullscreen",
+    });
+    expect(read.contents[0]?._meta?.["ui"]).toMatchObject({
+      permissions: { clipboardWrite: {} },
+      prefersBorder: true,
+    });
+    const orphan = await plainClient.readResource({
+      uri: "ui://views/orphan-view.html",
+    });
+    expect(orphan.contents[0]?._meta?.["openai/ui"]).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
     });
   });
 
