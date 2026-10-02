@@ -11,7 +11,7 @@ import type {
   ProviderTool,
 } from "../types.js";
 import { tokenUsageFromRecord } from "../usage.js";
-import { throwLlmRequestError } from "./openai-shared.js";
+import { throwLlmRequestError, toPlainText } from "./openai-shared.js";
 
 export { LlmRequestError } from "./openai-shared.js";
 
@@ -45,14 +45,6 @@ function toOpenAIContent(content: string | ContentPart[]): unknown {
     if (p.type === "text") return { type: "text", text: p.text };
     return { type: "image_url", image_url: { url: p.url } };
   });
-}
-
-function toPlainText(content: string | ContentPart[]): string {
-  if (typeof content === "string") return content;
-  return content
-    .filter((part): part is Extract<ContentPart, { type: "text" }> => part.type === "text")
-    .map((part) => part.text)
-    .join("\n");
 }
 
 export function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
