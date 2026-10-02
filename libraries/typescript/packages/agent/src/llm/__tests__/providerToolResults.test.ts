@@ -61,6 +61,46 @@ describe("Anthropic: tool_result content", () => {
   });
 });
 
+describe("OpenAI: system and assistant history normalization", () => {
+  it("normalizes system and assistant ContentPart arrays to plain text", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "system",
+        content: [
+          { type: "text", text: "first" },
+          { type: "text", text: "second" },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "prior answer" }],
+      },
+    ];
+    expect(toOpenAIMessages(messages)).toEqual([
+      { role: "system", content: "first\nsecond" },
+      { role: "assistant", content: "prior answer" },
+    ]);
+  });
+
+  it("keeps empty assistant content as a string when there are no tool calls", () => {
+    expect(
+      toOpenAIMessages([{ role: "assistant", content: "" }])
+    ).toEqual([{ role: "assistant", content: "" }]);
+  });
+
+  it("uses null only for empty assistant content that carries tool calls", () => {
+    const out = toOpenAIMessages([
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [{ id: "call_1", name: "lookup", args: {} }],
+      },
+    ]) as any[];
+    expect(out[0].content).toBeNull();
+    expect(out[0].tool_calls).toHaveLength(1);
+  });
+});
+
 describe("OpenAI: tool message + follow-up user with image_url", () => {
   it("emits a tool message and a user message with image_url for the bytes", () => {
     const out = toOpenAIMessages(buildImageToolMessages()) as any[];
