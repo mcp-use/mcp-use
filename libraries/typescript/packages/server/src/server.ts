@@ -368,7 +368,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   readonly #prompts = new Map<string, PromptEntry<TUser, TEnv>>();
   readonly #views = new Map<string, ViewManifestEntry>();
   #settings: ReturnType<typeof prepareSettings> | undefined;
-  #settingsActionValidation: Promise<void> | undefined;
   #skills: SkillsSnapshot | undefined;
   #skillsPrimed = false;
   #skillsDiscovery: Promise<void> | undefined;
@@ -645,7 +644,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * partial updates, and cross-field validation. The framework validates field
    * values and replays both tools and the capability on every request-scoped server.
    *
-   * @throws When already registered, started, schemas/layout are unsupported,
+   * @throws When already registered, started, field schemas are unsupported,
    * or either tool name collides with an existing registration.
    */
   settings<const Fields extends SettingsFields>(
@@ -669,19 +668,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       structuredContent: {
         schema: prepared.schema,
         ...(prepared.layout !== undefined && { layout: prepared.layout }),
-        values: await prepared.validateValues(
-          await read(ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>)
-        ),
+        values: await read(ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>),
       },
     }));
     this.tool(prepared.updateDefinition, async ({ set }, ctx) => ({
       content: [],
       structuredContent: {
-        values: await prepared.validateValues(
-          await update(
-            set as Partial<SettingsValues<Fields>>,
-            ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>
-          )
+        values: await update(
+          set as Partial<SettingsValues<Fields>>,
+          ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>
         ),
       },
     }));
@@ -1628,16 +1623,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         this.#runOAuthProviderSetup(resource, basePath);
       }
 
-      this.#validateSettingsAtMount();
+      for (const group of this.#settings?.layout ?? []) {
+        for (const item of group.items) {
+          if (item.kind === "tool" && !this.#tools.has(item.tool))
+            throw new Error(
+              `Settings action tool "${item.tool}" is not registered on this server`
+            );
+        }
+      }
       this.#validateViewBindingsAtMount();
 
       const { handler, fetch: mcpFetch } = createMcpMount(
-        (ctx) =>
-          this.#settings?.actionTools.length
-            ? this.#validateSettingsActionInputs().then(() =>
-                this.#buildSdkServer(ctx)
-              )
-            : this.#buildSdkServer(ctx),
+        (ctx) => this.#buildSdkServer(ctx),
         {
           path: basePath,
           ...((this.#config.legacy !== undefined ||
@@ -1829,60 +1826,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       toolName: definition.name,
       config: view,
     });
-  }
-
-  async #validateSettingsActionInputs(): Promise<void> {
-    this.#settingsActionValidation ??= (async () => {
-      for (const name of this.#settings?.actionTools ?? []) {
-        const definition = this.#tools.get(name)!.definition;
-        const schema = resolveToolInputSchema(definition);
-        if (schema === undefined) continue;
-        const result = await schema["~standard"].validate({});
-        if (result.issues !== undefined) {
-          throw new Error(
-            `Settings action tool "${name}" must accept empty arguments: ${result.issues.map((issue) => issue.message).join(", ")}`
-          );
-        }
-      }
-    })();
-    await this.#settingsActionValidation;
-  }
-
-  #validateSettingsAtMount(): void {
-    for (const name of this.#settings?.actionTools ?? []) {
-      const definition = this.#tools.get(name)?.definition;
-      if (definition === undefined)
-        throw new Error(
-          `Settings action tool "${name}" is not registered on this server`
-        );
-      const schema = resolveToolInputSchema(definition)?.[
-        "~standard"
-      ].jsonSchema.input({ target: "draft-2020-12" });
-      const properties = schema?.["properties"] as
-        | Record<string, Record<string, unknown>>
-        | undefined;
-      const required = schema?.["required"];
-      if (schema !== undefined && schema["type"] !== "object") {
-        throw new Error(
-          `Settings action tool "${name}" must accept empty object arguments`
-        );
-      }
-      if (
-        Array.isArray(required) &&
-        required.some(
-          (key) =>
-            !(
-              typeof key === "string" &&
-              properties?.[key] !== undefined &&
-              "default" in properties[key]!
-            )
-        )
-      ) {
-        throw new Error(
-          `Settings action tool "${name}" must accept empty arguments`
-        );
-      }
-    }
   }
 
   #validateViewBindingsAtMount(): void {
