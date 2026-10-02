@@ -390,6 +390,12 @@ export async function runDev(options: DevOptions): Promise<void> {
       ? `http://localhost:${port}`
       : undefined;
 
+  const tunnelManager = createTunnelManager(paths.tunnel);
+  // With --tunnel and no MCP_URL, the tunnel origin is the server's public
+  // URL. It is set before the first entry import (below), so module-scope
+  // OAuth configuration is built for the URL hosts will connect to.
+  let tunnelOrigin: string | undefined;
+
   const sourceRoot =
     options.mcpDir === undefined
       ? options.cwd
@@ -553,18 +559,19 @@ export async function runDev(options: DevOptions): Promise<void> {
       return { server, skillsDirectory };
     };
 
-    if (localFallbackMcpUrl === undefined) {
+    const entryMcpUrl = tunnelOrigin ?? localFallbackMcpUrl;
+    if (entryMcpUrl === undefined) {
       return load();
     }
 
     // This is safe only because this CLI selected and will bind this local
-    // listener. Never derive OAuth identity from an untrusted request Host.
-    // Scope it to entry evaluation: MCPServer freezes the trusted canonical
-    // resource during construction, while later runtime code must not inherit
-    // this CLI-owned synthetic environment value.
+    // listener, or reserved this tunnel. Never derive OAuth identity from an
+    // untrusted request Host. Scope it to entry evaluation: MCPServer freezes
+    // the trusted canonical resource during construction, while later runtime
+    // code must not inherit this CLI-owned synthetic environment value.
     const previousMcpUrl = process.env["MCP_URL"];
     try {
-      process.env["MCP_URL"] = localFallbackMcpUrl;
+      process.env["MCP_URL"] = entryMcpUrl;
       return await load();
     } finally {
       if (previousMcpUrl === undefined) {
@@ -605,6 +612,11 @@ export async function runDev(options: DevOptions): Promise<void> {
   let basePath: string;
   let currentSkillsDirectory: string | undefined;
   try {
+    // Tunnel traffic that arrives before the listener binds fails until it
+    // does. An explicit MCP_URL wins, so the tunnel then starts after binding.
+    if (options.tunnel === true && process.env["MCP_URL"] === undefined) {
+      tunnelOrigin = new URL((await tunnelManager.start(port)).url).origin;
+    }
     const { server, skillsDirectory } = await importServer(currentViews);
     server.__setEventBus(eventBus);
     basePath = server.basePath ?? "/mcp";
@@ -622,6 +634,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     currentHandler = async (request) => server.fetch(request);
     currentSkillsDirectory = skillsDirectory;
   } catch (error) {
+    await tunnelManager.stop();
     await runner.close();
     await vite.close();
     throw error;
@@ -786,8 +799,6 @@ export async function runDev(options: DevOptions): Promise<void> {
   }
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
-  const tunnelManager = createTunnelManager(paths.tunnel);
-
   // Vite owns the upgrade listener and validates Host before our HTTP request
   // guard runs. The public tunnel has already been validated by the proxy and
   // tunnel manager, so present only that active host as the local listener.
