@@ -95,64 +95,81 @@ jobs:
           echo "Generated deno.json with PR #$PR_NUMBER preview packages:"
           cat deno.json
 
-      - name: Wait for esm.sh to pick up the package
+      - name: Wait for esm.sh to build and warm the preview packages
+        id: warm-preview
         env:
           PR_NUMBER: ${{ needs.preview.outputs.pr-number }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          echo "Waiting for esm.sh to pick up the preview package..."
+          echo "Waiting for esm.sh to build the preview package..."
           SHORT_SHA="${COMMIT_SHA:0:7}"
-          
+
           MAX_RETRIES=10
           RETRY_DELAY=30
-          
-          PR_URL="https://esm.sh/pr/mcp-use/mcp-use@${PR_NUMBER}"
-          COMMIT_URL="https://esm.sh/pr/mcp-use/mcp-use@${SHORT_SHA}"
-          
-          echo "Checking URLs:"
-          echo "  PR URL: $PR_URL"
-          echo "  Commit URL: $COMMIT_URL"
-          
-          PR_READY=false
-          COMMIT_READY=false
-          RETRY_COUNT=0
 
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            # Check PR number URL
-            if [ "$PR_READY" = false ]; then
-              if curl -s -f -I "$PR_URL" > /dev/null 2>&1; then
-                echo "✅ PR URL is available"
-                PR_READY=true
-              fi
-            fi
-            
-            # Check commit SHA URL
-            if [ "$COMMIT_READY" = false ]; then
-              if curl -s -f -I "$COMMIT_URL" > /dev/null 2>&1; then
-                echo "✅ Commit URL is available"
-                COMMIT_READY=true
-              fi
-            fi
-            
-            # Both ready?
-            if [ "$PR_READY" = true ] && [ "$COMMIT_READY" = true ]; then
-              echo "✅ Both package URLs are available on esm.sh"
+          # Probe the exact URL deno.json imports. esm.sh keys its build cache
+          # on the query arguments, so the bare package URL is a different
+          # build: a warm bare URL says nothing about the artifact the tests
+          # import, and the imported variant can still be cold.
+          PR_URL="https://esm.sh/pr/mcp-use/mcp-use@${PR_NUMBER}?no-dts&external=zod"
+          COMMIT_URL="https://esm.sh/pr/mcp-use/mcp-use@${SHORT_SHA}"
+
+          echo "Checking URLs:"
+          echo "  imported by deno.json (gates the tests): $PR_URL"
+          echo "  imported by nothing (informational):      $COMMIT_URL"
+
+          # The check used to be a HEAD against the bare preview URL. A HEAD
+          # only proves metadata, not that the artifact is fetchable; and the
+          # bare URL is a different build from the one deno.json imports,
+          # because esm.sh keys its build cache on the query arguments. A
+          # ranged GET against the exact import-map URL forces resolution: it
+          # proves the artifact is fetchable and warms the build that
+          # `deno cache` and `deno test` hit immediately afterwards. The probe
+          # timeout is long enough for one cold build, so a slow build counts
+          # as "not yet" rather than as a failure.
+          is_warm() {
+            local url="$1"
+            local timeout="${2:-30}"
+            local code
+            code="$(curl -s -o /dev/null -w '%{http_code}' -r 0-0 --max-time "$timeout" "$url")" || return 1
+            [ "$code" = "200" ] || [ "$code" = "206" ]
+          }
+
+          READY=false
+          for attempt in $(seq 1 "$MAX_RETRIES"); do
+            if is_warm "$PR_URL"; then
+              READY=true
+              echo "OK the imported preview package is built and warm on esm.sh"
               break
             fi
-            
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-              echo "Waiting for packages... (attempt $RETRY_COUNT/$MAX_RETRIES, PR: $PR_READY, Commit: $COMMIT_READY)"
-              sleep $RETRY_DELAY
-            else
-              echo "⚠️ Packages didn't become fully available after ${MAX_RETRIES} attempts (5 minutes)"
-              echo "  PR URL ready: $PR_READY"
-              echo "  Commit URL ready: $COMMIT_READY"
-              echo "Proceeding with tests anyway..."
+
+            if [ "$attempt" -lt "$MAX_RETRIES" ]; then
+              echo "Waiting for the build... (attempt $attempt/$MAX_RETRIES)"
+              sleep "$RETRY_DELAY"
             fi
           done
 
+          # esm.sh resolves PR numbers to commit SHAs, so this is the same
+          # build as the import-map URL above. No import map references it,
+          # so one quick probe is diagnostic only.
+          if is_warm "$COMMIT_URL" 10; then
+            echo "INFO commit URL is available (not imported by the tests)"
+          else
+            echo "INFO commit URL unavailable (not imported by the tests)"
+          fi
+
+          if [ "$READY" != true ]; then
+            echo "WARN esm.sh never served the preview package after ${MAX_RETRIES} attempts."
+            echo "WARN skipping the Deno tests: this is CDN unavailability, not a test failure."
+          fi
+
+          # The cache and test steps read this from the job environment and
+          # skip instead of running commands that cannot succeed, so an
+          # unavailable preview package stays neutral rather than failing the PR.
+          echo "ready=$READY" >> "$GITHUB_ENV"
+
       - name: Cache Deno Dependencies
+        if: env.ready == 'true'
         working-directory: libraries/typescript/packages/server/tests/deno
         env:
           DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds
@@ -178,6 +195,7 @@ jobs:
           done
 
       - name: Run Deno Tests
+        if: env.ready == 'true'
         working-directory: libraries/typescript/packages/server/tests/deno
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
@@ -185,4 +203,23 @@ jobs:
           PR_NUMBER: ${{ needs.preview.outputs.pr-number }}
         run: |
           echo "Running Deno tests against PR #$PR_NUMBER preview packages..."
-          deno test --no-check --allow-read --allow-env --allow-net
+          MAX_TEST_ATTEMPTS=3
+          RETRY_DELAY=30
+
+          # esm.sh cold builds are the known flake source here, so a single
+          # failed attempt is retried before the job reports a real failure.
+          for attempt in $(seq 1 "$MAX_TEST_ATTEMPTS"); do
+            echo "Deno test attempt $attempt/$MAX_TEST_ATTEMPTS..."
+            if deno test --no-check --allow-read --allow-env --allow-net; then
+              echo "✅ Deno tests passed"
+              exit 0
+            fi
+
+            if [ "$attempt" -lt "$MAX_TEST_ATTEMPTS" ]; then
+              echo "⚠️ Attempt $attempt failed, retrying in ${RETRY_DELAY}s..."
+              sleep "$RETRY_DELAY"
+            fi
+          done
+
+          echo "❌ Deno tests failed after $MAX_TEST_ATTEMPTS attempts"
+          exit 1
