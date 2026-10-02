@@ -24,6 +24,7 @@ export {
   useDynamicTool,
   type CallToolHandle,
 } from "./hooks/use-call-tool.js";
+export { useDeepLink, type DeepLinkHandle } from "./hooks/use-deep-link.js";
 export { useDisplayMode } from "./hooks/use-display-mode.js";
 export { useFiles } from "./hooks/use-files.js";
 export {
