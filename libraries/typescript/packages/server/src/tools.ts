@@ -31,6 +31,34 @@ export type ToolSecurityScheme =
       readonly scopes: readonly string[];
     };
 
+/** Manual launch locations advertised by ChatGPT on a view-bound tool. */
+export type ToolViewEntrypoint =
+  | {
+      /** Opens the app from the global launcher. */
+      readonly type: "global";
+    }
+  | {
+      /** Opens the app within the current conversation. */
+      readonly type: "thread";
+    }
+  | {
+      /** Opens a matching file in the app. */
+      readonly type: "file";
+      /** HTML accept-style file extensions, each beginning with a dot. */
+      readonly extensions: readonly string[];
+    };
+
+/** Arguments supplied by the host when opening a file entrypoint. */
+export interface FileEntrypointInput {
+  /** Host-provided file identity and resource reference. */
+  file: {
+    /** File name including its extension, without a filesystem path. */
+    name: string;
+    /** Opaque host resource URI. */
+    resourceUri: string;
+  };
+}
+
 /**
  * Binds a tool to a view directory for MCP Apps rendering.
  *
@@ -43,6 +71,13 @@ export type ToolSecurityScheme =
 export interface ToolViewConfig {
   /** View directory / registry name, e.g. `"product-search-result"`. */
   name: string;
+  /**
+   * Manual launch locations → tool `_meta["openai/ui"].entrypoints`.
+   * Global/thread launchers must accept `{}`; file launchers require
+   * {@link FileEntrypointInput}. Entrypoints open fullscreen in supporting
+   * hosts. Typed entrypoints take precedence over raw metadata declarations.
+   */
+  entrypoints?: readonly ToolViewEntrypoint[];
   /**
    * Human-readable description of the view resource → the resource's
    * `description` on `resources/list` and `resources/read`.

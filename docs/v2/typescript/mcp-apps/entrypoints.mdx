@@ -1,0 +1,124 @@
+---
+title: "Add app launchers and file viewers"
+description: "Declare global, thread, and file entrypoints on a view-bound TypeScript tool."
+icon: "app-window"
+---
+
+Set `tool.view.entrypoints` to let supporting ChatGPT hosts launch your MCP App manually or open matching files in your view.
+
+| Type     | Host arguments                    | Launch location                              |
+| -------- | --------------------------------- | -------------------------------------------- |
+| `global` | `{}`                              | ChatGPT navigation                           |
+| `thread` | `{}`                              | A content tab in the current conversation    |
+| `file`   | `{ file: { name, resourceUri } }` | A custom viewer for matching file extensions |
+
+All entrypoints open fullscreen. The host controls launcher availability; the current file entrypoint specification supports desktop hosts.
+
+Start with a [view-bound MCP App](/v2/typescript/mcp-apps/quickstart). Each view binds to one tool and requires an `outputSchema`.
+
+## Add a global or thread launcher
+
+Declare one or both launcher kinds on a tool that accepts `{}`. Optional and defaulted input fields work with launchers.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "analytics", version: "1.0.0" });
+
+export const openAnalytics = server.tool(
+  {
+    name: "open_analytics",
+    title: "Analytics",
+    inputSchema: z.object({ screen: z.string().default("select-server") }),
+    outputSchema: z.object({ screen: z.string() }),
+    view: {
+      name: "analytics",
+      entrypoints: [{ type: "global" }, { type: "thread" }],
+    },
+  },
+  async ({ screen }) => ({ content: [], structuredContent: { screen } }),
+);
+```
+
+Create `views/analytics/view.tsx` and render the initial `structuredContent` with your existing view hooks. The host supplies the launch result, so your view can render without calling the opener again. Each thread receives its own app instance.
+
+Global and thread launchers must accept `{}`. Keep parameterized queries in separate tools. Tool arguments, including custom refinements, are validated by the MCP SDK against your input schema when called.
+
+## Add a file viewer
+
+Declare file extensions with a leading dot and require `file.name` and `file.resourceUri` as strings in your tool input schema.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "csv-viewer", version: "1.0.0" });
+const fileInput = z.object({
+  file: z.object({
+    name: z.string().min(1),
+    resourceUri: z.string().trim().min(1),
+  }),
+});
+
+export const openCsv = server.tool(
+  {
+    name: "open_csv",
+    title: "CSV viewer",
+    inputSchema: fileInput,
+    outputSchema: fileInput,
+    view: {
+      name: "csv",
+      entrypoints: [{ type: "file", extensions: [".csv"] }],
+    },
+  },
+  async ({ file }) => ({ content: [], structuredContent: { file } }),
+);
+```
+
+Create `views/csv/view.tsx` to display the file. The host supplies the same file arguments through `ui/notifications/tool-input`. `file.resourceUri` is an opaque host handle; use host resource APIs to read it. The view resource URI identifies your HTML view and remains separate from the opened file URI.
+
+Use a non-empty list of dot-prefixed file extensions such as `.csv`. File tools may have additional optional or defaulted fields, but must work without any other required arguments. Express any additional file-name or resource-URI constraints in your input schema.
+
+## Combine launch locations
+
+One tool can declare all three entrypoint kinds. Make the outer `file` field optional so global and thread launches can send `{}`. Keep `file.name` and `file.resourceUri` required whenever `file` is present.
+
+Use these fields in the file viewer tool definition above:
+
+```typescript
+inputSchema: fileInput.partial(),
+outputSchema: fileInput.partial(),
+view: {
+  name: "csv",
+  entrypoints: [
+    { type: "global" },
+    { type: "thread" },
+    { type: "file", extensions: [".csv"] },
+  ],
+},
+```
+
+Adapt the callback to return `{}` when no file is supplied, and let the view show an empty launch screen. Supplied files still require a non-empty name and non-blank resource URI. File-only tools require the outer `file` field.
+
+## Verify the advertised metadata
+
+Call `tools/list` and check the opener's descriptor:
+
+```json
+{
+  "name": "open_csv",
+  "_meta": {
+    "ui": { "resourceUri": "ui://views/csv.html" },
+    "openai/ui": {
+      "entrypoints": [{ "type": "file", "extensions": [".csv"] }]
+    }
+  }
+}
+```
+
+`view.entrypoints` compiles to tool `_meta["openai/ui"].entrypoints`. Other metadata, visibility, title, and annotations remain available. Entrypoint launches ignore the tool's visibility hint, as defined by the [OpenAI MCP Extensions specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#mcp-app-entrypoints).
+
+Prefer the typed field for new declarations. Typed entrypoints take precedence over raw `_meta["openai/ui"].entrypoints` values. Existing raw declarations continue to pass through when you omit `view.entrypoints`.
+
+A resource's preferred display mode controls host presentation after ordinary tool calls. Entrypoint metadata declares launchers; configure presentation separately.

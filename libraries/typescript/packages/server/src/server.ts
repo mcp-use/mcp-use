@@ -116,6 +116,7 @@ import type {
   ToolViewConfig,
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
+import { buildEntrypointMeta } from "./views/entrypoints.js";
 import { isUsageDisabled, recordUsage } from "./usage.js";
 import { registerSkillsRuntime } from "./skills/runtime.js";
 import {
@@ -2111,7 +2112,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const uiMeta = buildToolUiMeta(
       view?.name,
       definition.visibility,
-      definition._meta
+      buildEntrypointMeta(definition)
     );
     // Hand-written `_meta.securitySchemes` is already in `uiMeta`; only the
     // generated schemes are added here.
