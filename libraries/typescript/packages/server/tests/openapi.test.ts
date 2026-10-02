@@ -408,6 +408,7 @@ describe("MCPServer.fromOpenAPI", () => {
   it.each([
     ["getReport", "getReport", "getReport_2"],
     ["getReport_2", "getReport", "getReport"],
+    ["getReport", "getReport_2", "getReport"],
     ["a".repeat(64), "a".repeat(64), `${"a".repeat(62)}_2`],
   ])("keeps suffix collisions distinct: %j", async (...operationIds) => {
     const connection = await connect(
@@ -455,6 +456,57 @@ describe("MCPServer.fromOpenAPI", () => {
     } finally {
       await connection.close();
     }
+  });
+
+  it("keeps every declared operationId whatever the path order", async () => {
+    const operation = (operationId?: string) => ({
+      get: {
+        ...(operationId === undefined ? {} : { operationId }),
+        responses: { "200": { description: "ok" } },
+      },
+    });
+    const namesFor = async (paths: Record<string, unknown>) => {
+      const connection = await connect(
+        MCPServer.fromOpenAPI({
+          baseUrl: upstreamBaseUrl,
+          spec: {
+            openapi: "3.1.0",
+            info: { title: "Order", version: "1" },
+            paths,
+          } as FromOpenAPIOptions["spec"],
+        })
+      );
+      try {
+        const { tools } = await connection.client.listTools();
+        return tools.map((tool) => tool.name);
+      } finally {
+        await connection.close();
+      }
+    };
+    // The declared getReport_2 comes last, yet no generated suffix takes it.
+    expect(
+      await namesFor({
+        "/a": operation("getReport"),
+        "/b": operation("getReport"),
+        "/c": operation("getReport_2"),
+      })
+    ).toEqual(["getReport", "getReport_3", "getReport_2"]);
+    // Reordering the paths moves the names with them but never changes the set
+    // of declared ids that survive.
+    expect(
+      await namesFor({
+        "/c": operation("getReport_2"),
+        "/a": operation("getReport"),
+        "/b": operation("getReport"),
+      })
+    ).toEqual(["getReport_2", "getReport", "getReport_3"]);
+    // A name synthesized from method and path cannot take a declared id either.
+    expect(
+      await namesFor({
+        "/x": operation(),
+        "/y": operation("get_x"),
+      })
+    ).toEqual(["get_x_2", "get_x"]);
   });
 
   it.each(["report", "a".repeat(80)])(

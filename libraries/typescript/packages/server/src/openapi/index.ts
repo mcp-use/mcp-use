@@ -193,18 +193,34 @@ function matchesPattern(pattern: string | RegExp, value: string): boolean {
 }
 
 function createToolNames(operations: CollectedOpenAPIOperation[]): string[] {
-  const used = new Set<string>();
-  const nextSuffix = new Map<string, number>();
-  return operations.map((operation) => {
-    const baseName = slugifyToolName(
+  const baseNames = operations.map((operation) =>
+    slugifyToolName(
       operation.operation.operationId ??
         `${operation.method}_${operation.path
           .replace(/[{}]/g, "")
           .replace(/\//g, "_")}`
-    );
+    )
+  );
+  // Pass 1: every declared operationId is the only name a caller can know from
+  // the spec, so no generated suffix may take one, whatever the path order.
+  const declared = new Set(
+    operations.flatMap((operation, index) =>
+      operation.operation.operationId === undefined ? [] : [baseNames[index]!]
+    )
+  );
+  // Pass 2: hand out names in operation order. The collision check against
+  // already-assigned names stays here, because two operations can declare the
+  // same operationId.
+  const used = new Set<string>();
+  const nextSuffix = new Map<string, number>();
+  return baseNames.map((baseName, index) => {
+    const ownsBase = operations[index]!.operation.operationId !== undefined;
     let name = baseName;
     let count = nextSuffix.get(baseName) ?? 1;
-    while (used.has(name)) {
+    while (
+      used.has(name) ||
+      (declared.has(name) && !(ownsBase && name === baseName))
+    ) {
       count += 1;
       const suffix = `_${count}`;
       name = `${baseName.slice(0, 64 - suffix.length)}${suffix}`;
