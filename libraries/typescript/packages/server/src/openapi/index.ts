@@ -397,15 +397,38 @@ function rewriteSchemaRef(
 function getJsonRequestBodySchema(
   requestBody: OpenAPIRequestBodyObject | undefined
 ): OpenAPISchemaObject | OpenAPIReferenceObject | undefined {
+  return getJsonRequestBodyMediaType(requestBody)?.schema;
+}
+
+function getJsonRequestBodyMediaType(
+  requestBody: OpenAPIRequestBodyObject | undefined
+):
+  | { mediaType: string; schema: OpenAPISchemaObject | OpenAPIReferenceObject }
+  | undefined {
   const content = requestBody?.content;
   if (content === undefined) return undefined;
-  return (
-    content["application/json"]?.schema ??
-    content["application/*+json"]?.schema ??
-    Object.entries(content).find(([mediaType]) =>
-      mediaType.includes("+json")
-    )?.[1].schema
+  const entries = Object.entries(content).filter(
+    ([, media]) => media.schema !== undefined
   );
+  const normalize = (mediaType: string) =>
+    mediaType.split(";", 1)[0]!.trim().toLowerCase();
+  const json = entries.find(
+    ([mediaType]) => normalize(mediaType) === "application/json"
+  );
+  const concrete = entries.find(([mediaType]) =>
+    /^[a-z0-9!#$%&'`|~^_.+-]+\/[a-z0-9!#$%&'`|~^_.+-]+\+json$/.test(
+      normalize(mediaType)
+    )
+  );
+  const wildcard = entries.find(
+    ([mediaType]) => normalize(mediaType) === "application/*+json"
+  );
+  const entry = json ?? concrete ?? wildcard;
+  if (entry?.[1].schema === undefined) return undefined;
+  return {
+    mediaType: entry === wildcard ? "application/json" : entry[0],
+    schema: entry[1].schema,
+  };
 }
 
 async function callOpenAPIOperation(
@@ -425,7 +448,9 @@ async function callOpenAPIOperation(
       : JSON.stringify(params[bodyInputName]);
 
   if (body !== undefined && !hasHeader(headers, "content-type")) {
-    headers["content-type"] = "application/json";
+    headers["content-type"] =
+      getJsonRequestBodyMediaType(operation.requestBody)?.mediaType ??
+      "application/json";
   }
 
   const response = await fetchImpl(url, {
