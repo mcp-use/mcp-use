@@ -5,6 +5,7 @@
 export function getOAuthTokenExpiry(tokens: {
   access_token?: string;
   expires_in?: unknown;
+  _mcp_use_received_at?: unknown;
 }): number | undefined {
   try {
     // JWTs are Base64URL; atob only accepts the standard Base64 alphabet.
@@ -17,6 +18,9 @@ export function getOAuthTokenExpiry(tokens: {
     // Opaque tokens do not contain a JWT expiry claim.
   }
   return typeof tokens.expires_in === "number"
-    ? Date.now() + tokens.expires_in * 1000
+    ? (typeof tokens._mcp_use_received_at === "number"
+        ? tokens._mcp_use_received_at
+        : Date.now()) +
+        tokens.expires_in * 1000
     : undefined;
 }
