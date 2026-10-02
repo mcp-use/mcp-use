@@ -14,9 +14,9 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import * as ansi from "./ansi.js";
+import { parseCli } from "./cli-args.js";
 import {
   isInteractive,
   promptConfirm,
@@ -40,69 +40,6 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-type CliOptions = {
-  template?: string;
-  listTemplates?: boolean;
-  install?: boolean;
-  skills?: boolean;
-  dev?: boolean;
-  sdkVersion?: string;
-  npm?: boolean;
-  pnpm?: boolean;
-  bun?: boolean;
-};
-
-function parseCli(argv: string[]): {
-  projectName?: string;
-  options: CliOptions;
-} {
-  const { values, positionals } = parseArgs({
-    args: argv,
-    options: {
-      template: { type: "string", short: "t" },
-      "list-templates": { type: "boolean" },
-      install: { type: "boolean" },
-      skills: { type: "boolean" },
-      dev: { type: "boolean" },
-      "sdk-version": { type: "string" },
-      npm: { type: "boolean" },
-      pnpm: { type: "boolean" },
-      bun: { type: "boolean" },
-      help: { type: "boolean", short: "h" },
-      version: { type: "boolean", short: "V" },
-    },
-    allowPositionals: true,
-    strict: false,
-  });
-
-  const install = argv.includes("--install")
-    ? true
-    : argv.includes("--no-install")
-      ? false
-      : (values.install as boolean | undefined);
-
-  const skills = argv.includes("--skills")
-    ? true
-    : argv.includes("--no-skills")
-      ? false
-      : (values.skills as boolean | undefined);
-
-  return {
-    projectName: positionals[0],
-    options: {
-      template: values.template as string | undefined,
-      listTemplates: values["list-templates"] as boolean | undefined,
-      install,
-      skills,
-      dev: values.dev as boolean | undefined,
-      sdkVersion: values["sdk-version"] as string | undefined,
-      npm: values.npm as boolean | undefined,
-      pnpm: values.pnpm as boolean | undefined,
-      bun: values.bun as boolean | undefined,
-    },
-  };
-}
 
 function runPackageManager(
   packageManager: string,
