@@ -48,7 +48,7 @@
   "dependencies": {},
   "devDependencies": {
     "@clack/prompts": "^1.7.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.11"
   },
   "publishConfig": {
     "access": "public"

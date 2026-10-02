@@ -10,6 +10,10 @@ The MCP server only receives `authURL` and verifies the access tokens issued by
 the separate authorization server. The Hono app owns Better Auth, discovery,
 dynamic client registration, anonymous sign-in, consent, and token issuance.
 
+Clients with HTTP loopback callbacks must register with
+`application_type: "native"`. Better Auth 1.7 validates redirect URIs by client
+type and binds each registered client to this example's MCP resource.
+
 Better Auth is intentionally configured without a database. That enables its
 stateless cookie-session mode and uses its in-memory adapter for anonymous
 users, dynamically registered OAuth clients, authorization codes, and consent.

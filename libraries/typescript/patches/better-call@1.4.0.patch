@@ -1,0 +1,24 @@
+diff --git a/dist/openapi.d.cts b/dist/openapi.d.cts
+--- a/dist/openapi.d.cts
++++ b/dist/openapi.d.cts
+@@ -11,7 +11,7 @@ interface OpenAPIParameter {
+     format?: string | undefined;
+     items?: {
+       type: OpenAPISchemaType;
+-    };
++    } | undefined;
+     enum?: string[];
+     minLength?: number;
+     description?: string | undefined;
+diff --git a/dist/openapi.d.mts b/dist/openapi.d.mts
+--- a/dist/openapi.d.mts
++++ b/dist/openapi.d.mts
+@@ -11,7 +11,7 @@ interface OpenAPIParameter {
+     format?: string | undefined;
+     items?: {
+       type: OpenAPISchemaType;
+-    };
++    } | undefined;
+     enum?: string[];
+     minLength?: number;
+     description?: string | undefined;

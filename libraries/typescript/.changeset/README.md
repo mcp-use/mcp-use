@@ -49,17 +49,18 @@ shipped assets and count even when they contain documentation or examples.
 
 Before merging `canary` into `main`, add or update a release `<Update>` entry in
 both `docs/typescript/changelog/changelog.mdx` and `docs/inspector/changelog.mdx`.
-This promotion uses the changelog gate instead of requiring another changeset.
+The separate `release-changelog-check` runs only for `canary` → `main` PRs.
+This promotion does not require another changeset.
 Generated package `CHANGELOG.md` files, metadata-only edits, and whitespace-only
 edits do not satisfy the changelog gate. Automated `release/exit-prerelease-*`
 PRs into main may update package manifests without adding another changeset;
 source edits on those branches still require one.
 
-Repository administrators must require the `release-notes-check` status check in
-the branch protection rules or rulesets for **both `canary` and `main`** to block
-merges when it fails. The workflow reports success when no relevant SDK files
-changed, so required checks never remain pending on docs/Python/test-only PRs.
-It also reruns when a PR is retargeted.
+Repository administrators must replace the old `release-notes-check` required
+status with `release-changeset-check` for **both `canary` and `main`**, and require
+`release-changelog-check` for **main**. The changeset job reports success when no
+relevant SDK files changed; the changelog job is skipped outside promotions.
+Both checks rerun when a PR is retargeted.
 
 ```bash
 pnpm changeset
