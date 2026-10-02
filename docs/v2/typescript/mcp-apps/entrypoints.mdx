@@ -43,7 +43,7 @@ export const openAnalytics = server.tool(
 
 Create `views/analytics/view.tsx` and render the initial `structuredContent` with your existing view hooks. The host supplies the launch result, so your view can render without calling the opener again. Each thread receives its own app instance.
 
-Registration rejects schemas with required input fields for global and thread launchers. Keep parameterized queries in separate tools. Input JSON Schema determines registration checks; custom refinements still run through normal SDK validation during calls and must also allow `{}`.
+Global and thread launchers must accept `{}`. Keep parameterized queries in separate tools. Tool arguments, including custom refinements, are validated by the MCP SDK against your input schema when called.
 
 ## Add a file viewer
 
@@ -78,7 +78,7 @@ export const openCsv = server.tool(
 
 Create `views/csv/view.tsx` to display the file. The host supplies the same file arguments through `ui/notifications/tool-input`. `file.resourceUri` is an opaque host handle; use host resource APIs to read it. The view resource URI identifies your HTML view and remains separate from the opened file URI.
 
-Registration rejects missing file fields, incompatible types, empty extension lists, and extensions such as `csv` or `text/csv`. File tools may have additional optional or defaulted fields, but must work without any other required arguments. Calls reject an empty file name or a blank resource URI before your callback runs.
+Use a non-empty list of dot-prefixed file extensions such as `.csv`. File tools may have additional optional or defaulted fields, but must work without any other required arguments. Express any additional file-name or resource-URI constraints in your input schema.
 
 ## Combine launch locations
 
@@ -119,6 +119,6 @@ Call `tools/list` and check the opener's descriptor:
 
 `view.entrypoints` compiles to tool `_meta["openai/ui"].entrypoints`. Other metadata, visibility, title, and annotations remain available. Entrypoint launches ignore the tool's visibility hint, as defined by the [OpenAI MCP Extensions specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#mcp-app-entrypoints).
 
-Prefer the typed field for new declarations. Matching raw `_meta["openai/ui"].entrypoints` values are accepted; conflicting values throw a configuration error. Existing raw declarations continue to pass through when you omit `view.entrypoints`.
+Prefer the typed field for new declarations. Typed entrypoints take precedence over raw `_meta["openai/ui"].entrypoints` values. Existing raw declarations continue to pass through when you omit `view.entrypoints`.
 
 A resource's preferred display mode controls host presentation after ordinary tool calls. Entrypoint metadata declares launchers; configure presentation separately.
