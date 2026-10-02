@@ -14,23 +14,33 @@ import { gunzipSync } from "node:zlib";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { api, cloudApiForOrganization } = vi.hoisted(() => {
-  const api = {
-    request: vi.fn(),
-    multipartRequest: vi.fn(),
-  };
-  return {
-    api,
-    cloudApiForOrganization: vi.fn(async () => ({
+const { api, cloudApiForOrganization, cloudWebUrl, openBrowser } = vi.hoisted(
+  () => {
+    const api = {
+      request: vi.fn(),
+      multipartRequest: vi.fn(),
+    };
+    return {
       api,
-      organizationId: "org_1",
-    })),
-  };
-});
+      cloudWebUrl: vi.fn(() => "https://cloud.example.test"),
+      openBrowser: vi.fn(),
+      cloudApiForOrganization: vi.fn(async () => ({
+        api,
+        organizationId: "org_1",
+        organizationSlug: "primary-demo" as string | null,
+      })),
+    };
+  }
+);
 
 vi.mock("../../src/commands/cloud-api.js", () => ({
   cloudApiForOrganization,
-  cloudWebUrl: () => "https://cloud.example.test",
+  cloudWebUrl,
+}));
+
+vi.mock("../../src/commands/shared.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/commands/shared.js")>()),
+  openBrowser,
 }));
 
 import {
@@ -46,6 +56,8 @@ afterEach(async () => {
   api.request.mockReset();
   api.multipartRequest.mockReset();
   cloudApiForOrganization.mockClear();
+  cloudWebUrl.mockClear();
+  openBrowser.mockClear();
   await Promise.all(
     directories.splice(0).map((directory) =>
       // Retry transient filesystem errors while removing Git repositories.
@@ -306,6 +318,128 @@ describe("deploy agent contract", () => {
     expect(api.multipartRequest).not.toHaveBeenCalled();
   });
 
+  it("returns the canonical dashboard for the managed-upload regression", async () => {
+    const directory = await project("travel-agent-demo");
+    const serverId = "00000000-0000-4000-8000-000000000001";
+    cloudWebUrl.mockReturnValueOnce("https://manufact.com");
+    api.multipartRequest.mockResolvedValue({
+      server: {
+        id: serverId,
+        slug: "wild-cloud-example",
+        mcpUrl: "https://wild-cloud-example.run.mcp-use.com/mcp",
+      },
+      deploymentId: "00000000-0000-4000-8000-000000000002",
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(runDeploy([directory, "--no-github", "--json"])).resolves.toBe(
+      0
+    );
+
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toEqual({
+      sourceType: "managed",
+      serverId,
+      deploymentId: "00000000-0000-4000-8000-000000000002",
+      status: "pending",
+      webUrl: `https://manufact.com/cloud/primary-demo/servers/${serverId}/overview`,
+    });
+    expect(openBrowser).not.toHaveBeenCalled();
+  });
+
+  it("encodes the selected organization and server ID as separate route segments", async () => {
+    const directory = await project("encoded-dashboard");
+    cloudApiForOrganization.mockResolvedValueOnce({
+      api,
+      organizationId: "org_2",
+      organizationSlug: "other org/?#",
+    });
+    api.multipartRequest.mockResolvedValue({
+      server: { id: "server/id?#", slug: null },
+      deploymentId: "dep_1",
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--org", "org_2", "--no-github", "--json"])
+    ).resolves.toBe(0);
+
+    expect(cloudApiForOrganization).toHaveBeenCalledWith("org_2");
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+      webUrl:
+        "https://cloud.example.test/cloud/other%20org%2F%3F%23/servers/server%2Fid%3F%23/overview",
+    });
+  });
+
+  it.each([null, ""])(
+    "keeps successful deployments without inventing a dashboard for slug %j",
+    async (organizationSlug) => {
+      const directory = await project("missing-org-slug");
+      cloudApiForOrganization.mockResolvedValueOnce({
+        api,
+        organizationId: "org_1",
+        organizationSlug,
+      });
+      api.multipartRequest.mockResolvedValue({
+        server: { id: "srv_1", slug: "not-an-org" },
+        deploymentId: "dep_1",
+      });
+      const stdout = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation(() => true);
+
+      await expect(
+        runDeploy([directory, "--no-github", "--json"])
+      ).resolves.toBe(0);
+
+      expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+        serverId: "srv_1",
+        deploymentId: "dep_1",
+        status: "pending",
+        webUrl: null,
+      });
+      expect(openBrowser).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["primary-demo", null])(
+    "opens only a canonical dashboard for slug %j",
+    async (organizationSlug) => {
+      const directory = await project("open-dashboard");
+      cloudApiForOrganization.mockResolvedValueOnce({
+        api,
+        organizationId: "org_1",
+        organizationSlug,
+      });
+      api.multipartRequest.mockResolvedValue({
+        server: { id: "srv_1", slug: "wrong-dashboard" },
+        deploymentId: "dep_1",
+      });
+      vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+      const stderr = vi
+        .spyOn(process.stderr, "write")
+        .mockImplementation(() => true);
+
+      await expect(
+        runDeploy([directory, "--no-github", "--open"])
+      ).resolves.toBe(0);
+
+      if (organizationSlug === null) {
+        expect(openBrowser).not.toHaveBeenCalled();
+        expect(stderr.mock.calls.flat().join("")).toContain(
+          "no dashboard slug"
+        );
+      } else {
+        expect(openBrowser).toHaveBeenCalledExactlyOnceWith(
+          "https://cloud.example.test/cloud/primary-demo/servers/srv_1/overview"
+        );
+      }
+    }
+  );
+
   it("creates a managed server from a local source archive", async () => {
     const directory = await project("managed-app");
     await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
@@ -375,6 +509,8 @@ describe("deploy agent contract", () => {
       sourceType: "managed",
       serverId: "srv_1",
       deploymentId: "dep_1",
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_1/overview",
     });
     expect(
       JSON.parse(
@@ -827,7 +963,9 @@ describe("deploy agent contract", () => {
       throw new Error(`Unexpected request: ${path}`);
     });
     api.multipartRequest.mockResolvedValue({ commitSha: "abc123" });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
 
     await expect(runDeploy([directory, "--json"])).resolves.toBe(0);
 
@@ -842,6 +980,10 @@ describe("deploy agent contract", () => {
         branch: "main",
         trigger: "redeploy",
       }),
+    });
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_existing/overview",
     });
   });
 
@@ -1015,7 +1157,9 @@ describe("deploy agent contract", () => {
         throw new Error(`Unexpected request: ${path}`);
       }
     );
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
 
     await expect(
       runDeploy([
@@ -1034,6 +1178,10 @@ describe("deploy agent contract", () => {
         encoding: "utf8",
       }).trim()
     ).toBe("");
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_github/overview",
+    });
   });
 
   it("synchronizes configuration before a linked GitHub redeploy", async () => {
@@ -1065,7 +1213,9 @@ describe("deploy agent contract", () => {
       if (path === "/deployments") return { id: "dep_github_config" };
       throw new Error(`Unexpected request: ${path}`);
     });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
 
     await expect(
       runDeploy([
@@ -1108,6 +1258,10 @@ describe("deploy agent contract", () => {
         branch: "main",
         trigger: "manual",
       }),
+    });
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_github_config/overview",
     });
   });
 });

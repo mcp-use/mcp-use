@@ -1,10 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { cloudApiUrl, CloudApi } from "../../src/commands/cloud-api.js";
+const { readJson } = vi.hoisted(() => ({
+  readJson: vi.fn(async () => ({})),
+}));
+
+vi.mock("../../src/commands/shared.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/commands/shared.js")>()),
+  readJson,
+}));
+
+import {
+  cloudApiUrl,
+  cloudApiForOrganization,
+  CloudApi,
+} from "../../src/commands/cloud-api.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+  readJson.mockReset();
+  readJson.mockResolvedValue({});
 });
 
 describe("cloud API endpoint configuration", () => {
@@ -15,6 +30,55 @@ describe("cloud API endpoint configuration", () => {
     vi.stubEnv("MCP_USE_CLOUD_API_URL", "http://v2.local:9000/api/v1/");
     expect(cloudApiUrl()).toBe("http://v2.local:9000/api/v1");
   });
+});
+
+describe("cloud organization dashboard context", () => {
+  it.each([
+    [undefined, {}, "org_1", "primary-demo"],
+    [
+      undefined,
+      { orgId: "org_2", orgSlug: "stale-slug" },
+      "org_2",
+      "team-current",
+    ],
+    ["org_2", { orgId: "org_1" }, "org_2", "team-current"],
+    ["team-current", { orgId: "org_1" }, "org_2", "team-current"],
+    ["org_3", {}, "org_3", null],
+  ])(
+    "returns the live selected slug for selector %j and config %j",
+    async (selector, config, organizationId, organizationSlug) => {
+      readJson.mockResolvedValue(config);
+      vi.stubEnv("MCP_USE_API_KEY", "test-key");
+      const fetch = vi.fn(async () =>
+        Response.json({
+          user_id: "user_1",
+          email: "test@example.com",
+          default_profile_id: "org_1",
+          profiles: [
+            {
+              id: "org_1",
+              profile_name: "Personal",
+              slug: "primary-demo",
+              role: "owner",
+            },
+            {
+              id: "org_2",
+              profile_name: "Team",
+              slug: "team-current",
+              role: "member",
+            },
+            { id: "org_3", profile_name: "Legacy", slug: null, role: "owner" },
+          ],
+        })
+      );
+      vi.stubGlobal("fetch", fetch);
+
+      const result = await cloudApiForOrganization(selector);
+
+      expect(result).toMatchObject({ organizationId, organizationSlug });
+      expect(fetch).toHaveBeenCalledOnce();
+    }
+  );
 });
 
 describe("cloud API error normalization", () => {
