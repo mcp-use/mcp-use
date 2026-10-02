@@ -93,6 +93,20 @@ Use `"stateless"` while clients are migrating. Use `"reject"` when every client 
 
 See [`ServerConfig`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.index.html#serverconfig) for the complete configuration surface.
 
+### Call the endpoint over raw HTTP
+
+Because each request is self-contained, curl, custom clients, and SDKs outside the MCP TypeScript ecosystem can talk to the endpoint directly. A `POST` names its method twice — once in the body and once in the `Mcp-Method` header — and a body whose method has no matching header is rejected with HTTP 400 and error code `-32020`:
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -H 'Mcp-Method: tools/list' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+Send the `accept` header when the request does not carry the modern envelope in `params._meta`; a wildcard `Accept` is rejected with HTTP 406. `MCPClient`, `@mcp-use/client`, and SDKs built on `@modelcontextprotocol/client` set these headers for you, so they only matter when you speak the protocol yourself.
+
 ## Explore server capabilities
 
 | Capability | Use it for                                                                       | Guide                                                        |
