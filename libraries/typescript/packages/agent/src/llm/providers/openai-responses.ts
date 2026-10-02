@@ -16,6 +16,7 @@ import {
   buildEndpoint,
   buildHeaders,
   throwLlmRequestError,
+  toPlainText,
 } from "./openai-shared.js";
 import { tokenUsageFromRecord } from "../usage.js";
 
@@ -38,14 +39,6 @@ function toResponsesUserContent(content: string | ContentPart[]): unknown {
     if (p.type === "text") return { type: "input_text", text: p.text };
     return { type: "input_image", image_url: p.url };
   });
-}
-
-function toPlainText(content: string | ContentPart[]): string {
-  if (typeof content === "string") return content;
-  return content
-    .filter((part): part is Extract<ContentPart, { type: "text" }> => part.type === "text")
-    .map((part) => part.text)
-    .join("\n");
 }
 
 /** Seed Responses `input` from prior UI/history messages (once per tool-loop run). */
