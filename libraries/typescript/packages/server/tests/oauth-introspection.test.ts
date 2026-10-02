@@ -70,6 +70,52 @@ describe("RFC 7662 custom-provider acceptance", () => {
     expect(introspection.receivedTokens).toEqual([opaqueToken]);
   });
 
+  it("exposes the same ctx.auth shape to middleware and tool callbacks", async () => {
+    const opaqueToken = "opaque-token-shared-auth-shape";
+    introspection.response = activePayload({
+      scope: "mcp tools:read",
+      permissions: ["tools:read", "widgets:write"],
+      resource: "http://localhost/mcp",
+    });
+    let middlewareAuth: unknown;
+    let callbackAuth: unknown;
+
+    const server = new MCPServer({
+      name: "introspection-shared-auth-shape",
+      version: "1.0.0",
+      oauth: introspectionProvider(introspection.endpoint),
+    });
+    server.use("mcp:tools/call", async (ctx, next) => {
+      middlewareAuth = ctx.auth;
+      return next();
+    });
+    server.tool({ name: "whoami" }, (_params, ctx) => {
+      callbackAuth = ctx.auth;
+      return { content: [{ type: "text", text: "ok" }] };
+    });
+
+    const started = await server.listen(0);
+    try {
+      const url = new URL(`http://127.0.0.1:${started.port}/mcp`);
+      const response = await callTool(url, opaqueToken);
+      expect(response.status).toBe(200);
+
+      expect(middlewareAuth).toEqual(callbackAuth);
+      expect(middlewareAuth).toMatchObject({
+        user: { id: "user-1", email: "user@example.test" },
+        payload: introspection.response,
+        permissions: ["tools:read", "widgets:write"],
+        clientId: "client-1",
+        scopes: ["mcp", "tools:read"],
+        accessToken: opaqueToken,
+      });
+      expect(middlewareAuth).not.toHaveProperty("token");
+      expect(middlewareAuth).not.toHaveProperty("extra");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("rejects inactive, expired, malformed, and resource-mismatched introspection responses", async () => {
     const invalidResponses: readonly IntrospectionPayload[] = [
       { active: false },
