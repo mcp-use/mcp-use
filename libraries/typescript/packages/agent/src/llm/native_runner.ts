@@ -40,12 +40,15 @@ export async function* streamNativeAgentSteps(
   options: NativeRunOptions
 ): AsyncGenerator<AgentStep, string, void> {
   let finalText = "";
+  let turnText = "";
+  let turnHasToolCall = false;
   const pendingSteps = new Map<string, AgentStep>();
 
   for await (const ev of streamNativeAgent(driver, options)) {
     if (ev.type === "text-delta") {
-      finalText += ev.delta;
+      turnText += ev.delta;
     } else if (ev.type === "tool-call-ready") {
+      turnHasToolCall = true;
       const pendingStep = {
         action: {
           tool: ev.toolName,
@@ -68,6 +71,12 @@ export async function* streamNativeAgentSteps(
         observation,
       };
       pendingSteps.delete(ev.toolCallId);
+    } else if (ev.type === "done") {
+      if (!turnHasToolCall) {
+        finalText = turnText;
+      }
+      turnText = "";
+      turnHasToolCall = false;
     } else if (ev.type === "error") {
       throw new Error(ev.message);
     }
