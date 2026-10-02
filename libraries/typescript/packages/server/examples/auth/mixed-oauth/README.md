@@ -6,6 +6,10 @@ resources, a resource template, and a prompt, which always need sign-in, and
 views, which load signed out. A built-in Better Auth server handles dynamic
 client registration, PKCE, sign-in, consent, and tokens, all in memory.
 
+Clients with HTTP loopback callbacks must register with
+`application_type: "native"`. Better Auth 1.7 validates redirect URIs by client
+type and binds each registered client to this example's MCP resource.
+
 Sign-in is anonymous and needs no credentials, so anyone who can reach the
 server can get a token. Everything resets when the process stops. This is a
 testing tool, not a production identity setup.
