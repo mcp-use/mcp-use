@@ -59,6 +59,9 @@ export async function* streamNativeAgentSteps(
     } else if (ev.type === "tool-result") {
       const pendingStep = pendingSteps.get(ev.toolCallId);
       if (!pendingStep) continue;
+      // Text streamed before a tool call belongs to that intermediate turn.
+      // Like runNativeAgent, return only the text of the final turn.
+      finalText = "";
       const observation =
         typeof ev.result === "string"
           ? ev.result
