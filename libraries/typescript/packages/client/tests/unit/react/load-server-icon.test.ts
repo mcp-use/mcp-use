@@ -24,13 +24,8 @@ class BlobFileReader {
 
 const FAVICON = "data:image/png;base64,ZmF2aWNvbg==";
 
-async function loadIcon(iconResponse: Response | Error) {
-  vi.stubGlobal(
-    "fetch",
-    iconResponse instanceof Error
-      ? vi.fn().mockRejectedValue(iconResponse)
-      : vi.fn().mockResolvedValue(iconResponse)
-  );
+async function loadIcon(fetchIcon: typeof fetch) {
+  vi.stubGlobal("fetch", fetchIcon);
   let serverInfo: { name: string; version: string; icon?: string } = {
     name: "demo",
     version: "1.0.0",
@@ -58,6 +53,7 @@ describe("loadServerIcon", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -66,7 +62,9 @@ describe("loadServerIcon", () => {
       type: "image/png",
     });
 
-    const { result, icon } = await loadIcon(new Response(png));
+    const { result, icon } = await loadIcon(
+      vi.fn().mockResolvedValue(new Response(png))
+    );
 
     expect(result).toBe("data:image/png;base64,iVBORw==");
     expect(icon).toBe(result);
@@ -75,10 +73,12 @@ describe("loadServerIcon", () => {
 
   it("falls back to the favicon when the icon request returns an HTTP error", async () => {
     const { result, icon } = await loadIcon(
-      new Response("Not Found", {
-        status: 404,
-        headers: { "content-type": "text/html" },
-      })
+      vi.fn().mockResolvedValue(
+        new Response("Not Found", {
+          status: 404,
+          headers: { "content-type": "text/html" },
+        })
+      )
     );
 
     expect(result).toBe(FAVICON);
@@ -87,9 +87,30 @@ describe("loadServerIcon", () => {
   });
 
   it("falls back to the favicon when the icon request fails", async () => {
-    const { result, icon } = await loadIcon(new TypeError("Failed to fetch"));
+    const { result, icon } = await loadIcon(
+      vi.fn().mockRejectedValue(new TypeError("Failed to fetch"))
+    );
 
     expect(result).toBe(FAVICON);
     expect(icon).toBe(FAVICON);
   });
+
+  it("falls back to the favicon when the icon host never answers", async () => {
+    // Keep the real abort behavior without waiting seconds for it.
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, "timeout").mockImplementation(() => timeout(10));
+    const neverAnswers = vi.fn(
+      (_url: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(init.signal?.reason)
+          );
+        })
+    );
+
+    const { result, icon } = await loadIcon(neverAnswers);
+
+    expect(result).toBe(FAVICON);
+    expect(icon).toBe(FAVICON);
+  }, 2_000);
 });

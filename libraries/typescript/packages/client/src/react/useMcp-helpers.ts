@@ -113,15 +113,18 @@ export async function loadServerIcon(params: {
 }
 
 /**
- * Fetch an icon as a data URL, or return null when the request fails or the
- * server answers with an HTTP error, so the caller can fall back.
+ * Fetch an icon as a data URL, or return null when the request fails, takes
+ * longer than 5 seconds or the server answers with an HTTP error, so the
+ * caller can fall back.
  */
 async function fetchIconDataUrl(
   url: string,
   addLog: AddLog
 ): Promise<string | null> {
   try {
-    const response = await fetch(url);
+    // A host that never answers would otherwise hold up the favicon fallback
+    // and anyone awaiting `ensureIconLoaded()` indefinitely.
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) {
       addLog("debug", `Server icon request returned HTTP ${response.status}`);
       return null;
