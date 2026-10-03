@@ -34,10 +34,14 @@ describe("CodeExecutor", () => {
         throw new Error("Boom");
       } catch (e) {
         console.error(e);
+        console.error({ error: e });
       }
       return "ok";
     `);
-    expect(result.logs).toEqual(["[ERROR] Error: Boom"]);
+    expect(result.logs).toEqual([
+      "[ERROR] Error: Boom",
+      `[ERROR] ${JSON.stringify({ error: "Error: Boom" }, null, 2)}`,
+    ]);
     expect(result.result).toBe("ok");
   });
 
@@ -52,6 +56,21 @@ describe("CodeExecutor", () => {
     expect(result.result).toBe("ok");
     expect(result.logs).toEqual([
       JSON.stringify({ id: "1n", self: "[Circular]" }, null, 2),
+    ]);
+  });
+
+  it("logs values whose toString or getters throw without aborting the run", async () => {
+    const result = await executor.execute(`
+      const fn = () => {};
+      fn.toString = () => { throw new Error("toString"); };
+      const tagged = { get [Symbol.toStringTag]() { throw new Error("tag"); } };
+      console.log(fn, tagged);
+      return "ok";
+    `);
+    expect(result.error).toBeNull();
+    expect(result.result).toBe("ok");
+    expect(result.logs).toEqual([
+      "[unserializable value] [unserializable value]",
     ]);
   });
 

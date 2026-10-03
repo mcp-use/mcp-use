@@ -84,23 +84,29 @@ export function isVMAvailable(): boolean {
  * the executed code.
  */
 function formatLogArgument(arg: unknown): string {
-  if (typeof arg !== "object" || arg === null) return String(arg);
-  // An error's message and stack are not enumerable, so JSON.stringify gives
-  // "{}". `instanceof Error` is false for errors created in the VM context.
-  if (Object.prototype.toString.call(arg) === "[object Error]") {
-    return String(arg);
-  }
   try {
+    if (typeof arg !== "object" || arg === null) return String(arg);
+    // An error's message and stack are not enumerable, so JSON.stringify gives
+    // "{}". `instanceof Error` is false for errors created in the VM context.
+    if (Object.prototype.toString.call(arg) === "[object Error]") {
+      return String(arg);
+    }
     return JSON.stringify(arg, jsonLogReplacer(), 2);
   } catch {
-    return String(arg);
+    // A getter, toJSON or toString defined by the executed code threw.
+    try {
+      return String(arg);
+    } catch {
+      return "[unserializable value]";
+    }
   }
 }
 
 /**
- * JSON.stringify replacer that writes BigInt values as `123n` and circular
- * references as "[Circular]" instead of throwing. Other values serialize as
- * they would without a replacer.
+ * JSON.stringify replacer that writes nested errors as `Error: message`,
+ * BigInt values as `123n` and circular references as "[Circular]" instead of
+ * printing `{}` or throwing. Other values serialize as they would without a
+ * replacer.
  */
 function jsonLogReplacer(): (
   this: unknown,
@@ -111,6 +117,9 @@ function jsonLogReplacer(): (
   return function (this: unknown, _key: string, value: unknown): unknown {
     if (typeof value === "bigint") return `${value}n`;
     if (typeof value !== "object" || value === null) return value;
+    if (Object.prototype.toString.call(value) === "[object Error]") {
+      return String(value);
+    }
     // `this` is the object that holds `value`; drop entries that are no
     // longer on the path from the root.
     while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this) {
