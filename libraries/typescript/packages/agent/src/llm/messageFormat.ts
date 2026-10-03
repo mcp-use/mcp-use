@@ -72,6 +72,57 @@ function messageText(content: unknown): string {
   return JSON.stringify(content ?? "");
 }
 
+/**
+ * Whether every entry looks like a content block with a string `type`.
+ *
+ * An empty array qualifies, so empty tool content stays an empty string rather
+ * than being stringified to `"[]"`.
+ */
+function isContentBlockArray(value: unknown): value is Array<{ type: string }> {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        item !== null &&
+        typeof item === "object" &&
+        typeof (item as { type?: unknown }).type === "string"
+    )
+  );
+}
+
+/**
+ * Rewrite a LangChain `image_url` block into the MCP `image` shape so one
+ * conversion handles both vocabularies. Other blocks pass through untouched.
+ */
+function normalizeToolBlock(block: { type: string }): unknown {
+  if (block.type !== "image_url") return block;
+  const raw = (block as { image_url?: unknown }).image_url;
+  const url =
+    typeof raw === "string"
+      ? raw
+      : ((raw as { url?: unknown } | undefined)?.url as string | undefined);
+  if (typeof url !== "string") return block;
+  const parsed = parseDataUrl(url);
+  if (parsed === null) {
+    // A remote URL carries no bytes to embed, so keep the reference visible
+    // instead of letting it fall through to an "unsupported block" marker.
+    return { type: "text", text: `[image: ${url}]` };
+  }
+  return { type: "image", data: parsed.data, mimeType: parsed.mimeType };
+}
+
+/**
+ * Tool-message content for the provider, preserving non-text blocks.
+ *
+ * `messageText` keeps only `.text`, which silently discards images returned by
+ * a tool. `toolResultToContent` already handles an MCP result object, so block
+ * arrays are wrapped to reuse that one conversion.
+ */
+function toolContentForProvider(content: unknown): string | ContentPart[] {
+  if (!isContentBlockArray(content)) return toolResultToContent(content);
+  return toolResultToContent({ content: content.map(normalizeToolBlock) });
+}
+
 function langChainMessageType(message: LangChainMessageLike): string {
   try {
     if (typeof message._getType === "function") return message._getType();
@@ -119,7 +170,7 @@ export function convertExternalHistoryToProvider(
         message.status === "error" || isToolResultError(message.content);
       return {
         role: "tool",
-        content,
+        content: toolContentForProvider(message.content),
         toolCallId: message.tool_call_id ?? `external_${index}`,
         ...(message.name ? { toolName: message.name } : {}),
         toolResult: message.content,
