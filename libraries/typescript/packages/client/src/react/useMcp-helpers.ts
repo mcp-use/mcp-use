@@ -75,22 +75,16 @@ export async function loadServerIcon(params: {
     const iconUrl = params.serverInfo.icons?.[0]?.src;
     if (iconUrl) {
       params.addLog("info", "Server provided icon:", iconUrl);
-      const response = await fetch(iconUrl);
-      const blob = await response.blob();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-
-      if (params.isMounted()) {
-        params.setServerInfo((previous) =>
-          previous ? { ...previous, icon: base64 } : undefined
-        );
-        params.addLog("debug", "Server icon converted to base64");
+      const icon = await fetchIconDataUrl(iconUrl, params.addLog);
+      if (icon) {
+        if (params.isMounted()) {
+          params.setServerInfo((previous) =>
+            previous ? { ...previous, icon } : undefined
+          );
+          params.addLog("debug", "Server icon converted to base64");
+        }
+        return icon;
       }
-      return base64;
     }
 
     if (params.url) {
@@ -114,6 +108,33 @@ export async function loadServerIcon(params: {
     return null;
   } catch (error) {
     params.addLog("debug", "Icon loading failed (non-critical):", error);
+    return null;
+  }
+}
+
+/**
+ * Fetch an icon as a data URL, or return null when the request fails or the
+ * server answers with an HTTP error, so the caller can fall back.
+ */
+async function fetchIconDataUrl(
+  url: string,
+  addLog: AddLog
+): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      addLog("debug", `Server icon request returned HTTP ${response.status}`);
+      return null;
+    }
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    addLog("debug", "Server icon request failed:", error);
     return null;
   }
 }
