@@ -92,6 +92,28 @@ describe("runAuthPopup", () => {
     await expect(promise).resolves.toEqual({ kind: "success" });
   });
 
+  it("returns an authorization code and issuer for opener-owned exchange", async () => {
+    const promise = runAuthPopup({
+      popup: makePopupStub() as unknown as Window,
+      state: FLOW_STATE,
+      tokensKey: TOKENS_KEY,
+    });
+
+    postCallbackMessage({
+      type: MCP_AUTH_CALLBACK_MESSAGE_TYPE,
+      success: true,
+      state: FLOW_STATE,
+      authorizationCode: "authorization-code",
+      issuer: "https://auth.example.com",
+    });
+
+    await expect(promise).resolves.toEqual({
+      kind: "success",
+      authorizationCode: "authorization-code",
+      issuer: "https://auth.example.com",
+    });
+  });
+
   it("ignores result messages belonging to a different flow's state", async () => {
     const popup = makePopupStub();
     const promise = runAuthPopup({
