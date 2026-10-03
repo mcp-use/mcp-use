@@ -1,7 +1,7 @@
 import { BrowserOAuthClientProvider } from "../auth/browser.js";
 import type { OAuthClientInformation } from "@modelcontextprotocol/client";
 import type { MCPServerInfo } from "../core/session.js";
-import { detectFavicon } from "../utils/favicon.js";
+import { blobToDataUrl, detectFavicon } from "../utils/favicon.js";
 
 export const USE_MCP_SERVER_NAME = "inspector-server";
 
@@ -126,13 +126,7 @@ async function fetchIconDataUrl(
       addLog("debug", `Server icon request returned HTTP ${response.status}`);
       return null;
     }
-    const blob = await response.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    return await blobToDataUrl(await response.blob());
   } catch (error) {
     addLog("debug", "Server icon request failed:", error);
     return null;

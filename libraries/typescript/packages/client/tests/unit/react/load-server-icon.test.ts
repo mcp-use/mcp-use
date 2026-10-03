@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { loadServerIcon } from "../../../src/react/useMcp-helpers.js";
 import { detectFavicon } from "../../../src/utils/favicon.js";
+import type * as favicon from "../../../src/utils/favicon.js";
 
-vi.mock("../../../src/utils/favicon.js", () => ({
+vi.mock("../../../src/utils/favicon.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof favicon>()),
   detectFavicon: vi.fn(),
 }));
 
