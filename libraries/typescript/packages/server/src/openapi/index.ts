@@ -68,8 +68,15 @@ export function registerOpenAPITools(
           inputBindings
         ),
       },
-      async (params) =>
-        callOpenAPIOperation(operation, params, options, inputBindings, baseUrl)
+      async (params, ctx) =>
+        callOpenAPIOperation(
+          operation,
+          params,
+          options,
+          inputBindings,
+          baseUrl,
+          ctx.signal
+        )
     );
   }
 }
@@ -413,7 +420,8 @@ async function callOpenAPIOperation(
   params: Record<string, unknown>,
   options: FromOpenAPIOptions,
   inputBindings: OpenAPIInputBindings,
-  baseUrl: string
+  baseUrl: string,
+  signal: AbortSignal
 ): Promise<CallToolResult> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const url = buildUrl(operation, params, inputBindings.parameters, baseUrl);
@@ -432,6 +440,7 @@ async function callOpenAPIOperation(
     method: operation.method.toUpperCase(),
     headers,
     ...(body !== undefined && { body }),
+    signal,
   });
   const contentType = response.headers.get("content-type") ?? "";
 
