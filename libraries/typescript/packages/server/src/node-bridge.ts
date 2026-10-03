@@ -249,35 +249,30 @@ export async function toWebRequest(
       // Keep the bytes as received. Unlike the SDK bridge this was vendored
       // from, it also serves custom routes, whose uploads and other non-JSON
       // bodies would be corrupted by decoding them as UTF-8 text.
-      const chunks: Uint8Array[] = [];
+      const parts: BlobPart[] = [];
       let text = "";
       for await (const chunk of req) {
         if (typeof chunk === "string") {
-          // Encode consecutive string chunks together, so a surrogate pair
-          // split between two of them stays one character.
+          // Join consecutive string chunks before they are encoded, so a
+          // surrogate pair split between two of them stays one character.
           text += chunk;
           continue;
         }
         if (text !== "") {
-          chunks.push(new TextEncoder().encode(text));
+          parts.push(text);
           text = "";
         }
-        chunks.push(chunk);
+        // The DOM BlobPart type excludes views over a SharedArrayBuffer, but
+        // Blob accepts and copies them at runtime.
+        parts.push(chunk as Uint8Array<ArrayBuffer>);
       }
       if (text !== "") {
-        chunks.push(new TextEncoder().encode(text));
+        parts.push(text);
       }
-      const length = chunks.reduce(
-        (total, bytes) => total + bytes.byteLength,
-        0
-      );
-      if (length > 0) {
-        const collected = new Uint8Array(length);
-        let offset = 0;
-        for (const bytes of chunks) {
-          collected.set(bytes, offset);
-          offset += bytes.byteLength;
-        }
+      // Blob copies the chunks once, and Request reads from the Blob without
+      // copying the body again.
+      const collected = new Blob(parts);
+      if (collected.size > 0) {
         body = collected;
       }
     } else {

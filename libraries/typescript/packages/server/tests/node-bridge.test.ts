@@ -150,4 +150,15 @@ describe("Node request bridge", () => {
 
     await expect(request.text()).resolves.toBe("café😀!");
   });
+
+  it("leaves an empty POST without a body", async () => {
+    const request = await toWebRequest({
+      method: "POST",
+      url: "/",
+      headers: { host: "localhost" },
+      async *[Symbol.asyncIterator]() {},
+    });
+
+    expect(request.body).toBeNull();
+  });
 });
