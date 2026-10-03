@@ -654,8 +654,8 @@ function copyDirectoryWithProcessing(
   versions: Record<string, string>,
   isDevelopment: boolean
 ) {
-  mkdirSync(dest, { recursive: true });
   const entries = readdirSync(src, { withFileTypes: true });
+  mkdirSync(dest, { recursive: true });
 
   for (const entry of entries) {
     if (entry.name === ".git") {
