@@ -159,13 +159,13 @@ export function useConnectionFormState(
       headers: Object.keys(headers).length > 0 ? headers : undefined,
       autoProxyFallback,
       ...(oauth ? { oauth } : {}),
-      ...(Number.isFinite(parsedRequestTimeout)
-        ? { requestTimeout: parsedRequestTimeout }
-        : {}),
+      requestTimeout: Number.isFinite(parsedRequestTimeout)
+        ? parsedRequestTimeout
+        : undefined,
       resetTimeoutOnProgress: resetTimeoutOnProgress === "True",
-      ...(Number.isFinite(parsedMaxTotalTimeout)
-        ? { maxTotalTimeout: parsedMaxTotalTimeout }
-        : {}),
+      maxTotalTimeout: Number.isFinite(parsedMaxTotalTimeout)
+        ? parsedMaxTotalTimeout
+        : undefined,
     };
   };
 
