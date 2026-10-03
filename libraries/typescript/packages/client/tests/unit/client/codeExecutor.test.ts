@@ -28,6 +28,33 @@ describe("CodeExecutor", () => {
     expect(result.result).toBe("done");
   });
 
+  it("logs the message of a caught error instead of {}", async () => {
+    const result = await executor.execute(`
+      try {
+        throw new Error("Boom");
+      } catch (e) {
+        console.error(e);
+      }
+      return "ok";
+    `);
+    expect(result.logs).toEqual(["[ERROR] Error: Boom"]);
+    expect(result.result).toBe("ok");
+  });
+
+  it("logs values JSON cannot represent without aborting the run", async () => {
+    const result = await executor.execute(`
+      const value = { id: 1n };
+      value.self = value;
+      console.log(value);
+      return "ok";
+    `);
+    expect(result.error).toBeNull();
+    expect(result.result).toBe("ok");
+    expect(result.logs).toEqual([
+      JSON.stringify({ id: "1n", self: "[Circular]" }, null, 2),
+    ]);
+  });
+
   it("handles async code", async () => {
     const result = await executor.execute(`
       await new Promise(resolve => setTimeout(resolve, 10));
