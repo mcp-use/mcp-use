@@ -137,6 +137,7 @@ describe("NodeOAuthClientProvider", () => {
     );
     expect(launcherResponse.headers.get("location")).toContain("state=");
     expect(launcherResponse.headers.get("cache-control")).toBe("no-store");
+    expect(launcherResponse.headers.get("connection")).toBe("close");
     const responsePromise: Promise<NodeOAuthAuthorizationResponse> =
       provider.getAuthorizationResponse();
     const legacyCodePromise = provider.getAuthorizationCode();
@@ -150,6 +151,7 @@ describe("NodeOAuthClientProvider", () => {
     const callbackResponse = await fetch(callback);
 
     expect(callbackResponse.status).toBe(200);
+    expect(callbackResponse.headers.get("connection")).toBe("close");
     await expect(responsePromise).resolves.toEqual({
       code: "authorization-code",
       iss: "https://auth.example.com",
@@ -219,5 +221,47 @@ describe("NodeOAuthClientProvider", () => {
         occupier.close();
       }
     }
+  });
+
+  it("closes in-flight and keep-alive sockets immediately on callback completion", async () => {
+    const provider = await NodeOAuthClientProvider.create(
+      "https://mcp.example.com/mcp",
+      {
+        authTimeoutMs: 5_000,
+        kvStore: new MemoryKVStore(),
+        openBrowser: vi.fn(),
+        preferredPort: 37_000 + (process.pid % 1_000),
+        portRange: 100,
+      }
+    );
+
+    const authorizationUrl = new URL("https://auth.example.com/authorize");
+    authorizationUrl.searchParams.set("state", "test-state");
+    await provider.redirectToAuthorization(authorizationUrl);
+
+    // Open an idle keep-alive socket that never sends a request.
+    // Because no request is sent, Connection: close on a response cannot be what closes it.
+    const { connect } = await import("node:net");
+    const idleSocket = connect(provider.callbackPort, "127.0.0.1");
+    await new Promise<void>((resolve) => idleSocket.once("connect", resolve));
+    idleSocket.resume();
+
+    const idleSocketClosed = new Promise<void>((resolve) =>
+      idleSocket.once("close", resolve)
+    );
+
+    // Complete the authorization flow via an active HTTP request
+    const callbackUrl = `http://127.0.0.1:${provider.callbackPort}/callback?code=test-code&state=test-state`;
+    const callbackResponse = await fetch(callbackUrl);
+    expect(callbackResponse.status).toBe(200);
+    const body = await callbackResponse.text();
+    expect(body).toContain("Authentication complete");
+
+    const response = await provider.getAuthorizationResponse();
+    expect(response.code).toBe("test-code");
+
+    // The idle keep-alive socket must be closed / destroyed by loopback teardown
+    await idleSocketClosed;
+    expect(idleSocket.destroyed).toBe(true);
   });
 });
