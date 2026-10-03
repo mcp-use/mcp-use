@@ -156,23 +156,12 @@ export abstract class BaseCodeExecutor {
           }
 
           for (const tool of tools) {
-            // Build tool info based on detail level (before filtering)
-            if (detailLevel === "names") {
-              allTools.push({ name: tool.name, server: serverName });
-            } else if (detailLevel === "descriptions") {
-              allTools.push({
-                name: tool.name,
-                server: serverName,
-                description: tool.description,
-              });
-            } else {
-              allTools.push({
-                name: tool.name,
-                server: serverName,
-                description: tool.description,
-                input_schema: tool.inputSchema,
-              });
-            }
+            allTools.push({
+              name: tool.name,
+              server: serverName,
+              description: tool.description,
+              input_schema: tool.inputSchema,
+            });
           }
         } catch (e) {
           logger.warn(`Failed to search tools in server ${serverName}: ${e}`);
@@ -192,14 +181,30 @@ export abstract class BaseCodeExecutor {
         });
       }
 
+      // Detail level controls the returned fields, not which tools can match.
+      // Keep descriptions available for searching even in names-only mode.
+      const results = filteredTools.map((tool): ToolSearchResult => {
+        if (detailLevel === "names") {
+          return { name: tool.name, server: tool.server };
+        }
+        if (detailLevel === "descriptions") {
+          return {
+            name: tool.name,
+            server: tool.server,
+            description: tool.description,
+          };
+        }
+        return tool;
+      });
+
       // Return metadata along with results
       return {
         meta: {
           total_tools: allTools.length,
           namespaces: Array.from(allNamespaces).sort(),
-          result_count: filteredTools.length,
+          result_count: results.length,
         },
-        results: filteredTools,
+        results,
       };
     };
   }
