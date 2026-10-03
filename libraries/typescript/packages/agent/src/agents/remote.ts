@@ -344,8 +344,8 @@ export class RemoteAgent {
       // Check for error responses (even with 200 status)
       if (typeof result === "object" && result !== null) {
         // Check for actual error conditions (not just presence of error field)
-        if (result.status === "error" || result.error !== null) {
-          const errorMsg = result.error ?? String(result);
+        if (result.status === "error" || result.error != null) {
+          const errorMsg = JSON.stringify(result.error);
           logger.error(`❌ Remote agent execution failed: ${errorMsg}`);
           throw new Error(`Remote agent execution failed: ${errorMsg}`);
         }
