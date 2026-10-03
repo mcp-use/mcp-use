@@ -518,6 +518,65 @@ describe("MCPServer.fromOpenAPI", () => {
     }
   });
 
+  it("converts OpenAPI 3.0 boolean exclusive bounds", async () => {
+    captured.length = 0;
+    const spec: OpenAPIDocument = {
+      openapi: "3.0.3",
+      info: { title: "Exclusive bounds API" },
+      servers: [{ url: upstreamBaseUrl }],
+      paths: {
+        "/pages": {
+          get: {
+            operationId: "listPages",
+            parameters: [
+              {
+                name: "size",
+                in: "query",
+                schema: {
+                  type: "integer",
+                  minimum: 0,
+                  exclusiveMinimum: true,
+                  maximum: 100,
+                  exclusiveMaximum: false,
+                },
+              },
+            ],
+            responses: { "200": { description: "ok" } },
+          },
+        },
+      },
+    };
+    const connection = await connect(MCPServer.fromOpenAPI({ spec }));
+    try {
+      const { tools } = await connection.client.listTools();
+      const size = (tools[0]?.inputSchema.properties as Record<string, object>)[
+        "size"
+      ];
+      expect(size).toEqual({
+        type: "integer",
+        exclusiveMinimum: 0,
+        maximum: 100,
+        description: "query parameter",
+      });
+
+      const rejected = await connection.client.callTool({
+        name: "listPages",
+        arguments: { size: 0 },
+      });
+      expect(rejected.isError).toBe(true);
+      expect(captured).toHaveLength(0);
+
+      const accepted = await connection.client.callTool({
+        name: "listPages",
+        arguments: { size: 100 },
+      });
+      expect(accepted.isError).toBeFalsy();
+      expect(captured[0]?.url).toBe("/v1/pages?size=100");
+    } finally {
+      await connection.close();
+    }
+  });
+
   it("requires an upstream base URL when operations are present", () => {
     expect(() =>
       MCPServer.fromOpenAPI({
