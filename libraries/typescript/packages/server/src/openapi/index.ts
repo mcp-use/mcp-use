@@ -68,8 +68,15 @@ export function registerOpenAPITools(
           inputBindings
         ),
       },
-      async (params) =>
-        callOpenAPIOperation(operation, params, options, inputBindings, baseUrl)
+      async (params, ctx) =>
+        callOpenAPIOperation(
+          operation,
+          params,
+          options,
+          inputBindings,
+          baseUrl,
+          ctx.signal
+        )
     );
   }
 }
@@ -413,7 +420,8 @@ async function callOpenAPIOperation(
   params: Record<string, unknown>,
   options: FromOpenAPIOptions,
   inputBindings: OpenAPIInputBindings,
-  baseUrl: string
+  baseUrl: string,
+  signal: AbortSignal
 ): Promise<CallToolResult> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const url = buildUrl(operation, params, inputBindings.parameters, baseUrl);
@@ -428,11 +436,23 @@ async function callOpenAPIOperation(
     headers["content-type"] = "application/json";
   }
 
-  const response = await fetchImpl(url, {
-    method: operation.method.toUpperCase(),
-    headers,
-    ...(body !== undefined && { body }),
-  });
+  let response: Response;
+  try {
+    response = await fetchImpl(url, {
+      method: operation.method.toUpperCase(),
+      headers,
+      ...(body !== undefined && { body }),
+      signal,
+    });
+  } catch (error) {
+    // The client cancelled the call and the upstream request was aborted.
+    // That is an expected outcome, not a tool failure, so do not let it
+    // reject the handler and show up as an error.
+    if (signal.aborted) {
+      return { content: [{ type: "text", text: "Request was cancelled." }] };
+    }
+    throw error;
+  }
   const contentType = response.headers.get("content-type") ?? "";
 
   if (!response.ok) {
