@@ -1,7 +1,7 @@
 import type { MCPClient } from "@mcp-use/client";
 import type { BaseConnector } from "@mcp-use/client";
 import { logger } from "@mcp-use/client";
-import { ToolPruner } from "tool-prune";
+import type { ToolPruner } from "tool-prune";
 import type { ZodSchema } from "zod";
 import { NativeAdapter } from "../adapters/native_adapter.js";
 import { createLlmDriver, type LlmDriver } from "../llm/driver.js";
@@ -149,6 +149,9 @@ export class MCPAgent {
    */
   constructor(options: MCPAgentOptions) {
     if (options.agentId) {
+      if (options.pruneTools) {
+        throw new Error("pruneTools is not supported for remote agents.");
+      }
       this.isRemote = true;
       this.remoteAgent = new RemoteAgent({
         agentId: options.agentId,
@@ -162,7 +165,6 @@ export class MCPAgent {
         options.systemPrompt ??
         "You are a helpful assistant with access to MCP tools.";
       this.disallowedTools = [];
-      this.pruneTools = options.pruneTools;
       this.exposeResourcesAsTools = true;
       this.exposePromptsAsTools = true;
       this.memoryEnabled = options.memoryEnabled ?? true;
@@ -452,39 +454,46 @@ export class MCPAgent {
     }
   }
 
-  private extractPruningQuery(options: ResolvedRunOptions): string {
+  private extractPruningQuery(
+    options: ResolvedRunOptions,
+    builtMessages?: ProviderMessage[]
+  ): string {
     if (options.prompt && options.prompt.trim().length > 0) {
       return options.prompt.trim();
     }
-    if (options.messages?.length) {
-      for (let i = options.messages.length - 1; i >= 0; i--) {
-        const msg = options.messages[i];
-        if (msg?.role === "user") {
-          if (
-            typeof msg.content === "string" &&
-            msg.content.trim().length > 0
-          ) {
-            return msg.content.trim();
-          }
-          if (Array.isArray(msg.content)) {
-            const text = msg.content
-              .filter(
-                (part): part is { type: "text"; text: string } =>
-                  part?.type === "text" && typeof part.text === "string"
-              )
-              .map((part) => part.text)
-              .join(" ")
-              .trim();
-            if (text.length > 0) return text;
-          }
+    const candidates = builtMessages ?? [
+      ...(options.externalHistory?.length
+        ? convertExternalHistoryToProvider(options.externalHistory)
+        : []),
+      ...(options.messages ?? []),
+    ];
+    for (let i = candidates.length - 1; i >= 0; i--) {
+      const msg = candidates[i];
+      if (msg?.role === "user") {
+        if (typeof msg.content === "string" && msg.content.trim().length > 0) {
+          return msg.content.trim();
+        }
+        if (Array.isArray(msg.content)) {
+          const text = msg.content
+            .filter(
+              (part): part is { type: "text"; text: string } =>
+                part?.type === "text" && typeof part.text === "string"
+            )
+            .map((part) => part.text)
+            .join(" ")
+            .trim();
+          if (text.length > 0) return text;
         }
       }
     }
     return "";
   }
 
-  private getOrCreateToolPruner(baseOptions?: ToolPruneOptions): ToolPruner {
+  private async getOrCreateToolPruner(
+    baseOptions?: ToolPruneOptions
+  ): Promise<ToolPruner> {
     if (!this.toolPruner) {
+      const { ToolPruner } = await import("tool-prune");
       const defs = this.providerTools.map((tool) => ({
         name: tool.name,
         description: tool.description ?? "",
@@ -496,7 +505,8 @@ export class MCPAgent {
   }
 
   private async resolveToolsForRun(
-    options: ResolvedRunOptions
+    options: ResolvedRunOptions,
+    builtMessages?: ProviderMessage[]
   ): Promise<import("../llm/types.js").ProviderTool[]> {
     const pruneConfig =
       options.pruneTools !== undefined ? options.pruneTools : this.pruneTools;
@@ -504,7 +514,7 @@ export class MCPAgent {
       return this.providerTools;
     }
 
-    const query = this.extractPruningQuery(options);
+    const query = this.extractPruningQuery(options, builtMessages);
     if (!query) {
       return this.providerTools;
     }
@@ -520,12 +530,24 @@ export class MCPAgent {
     const mergedOpts: ToolPruneOptions = { ...baseOpts, ...runOpts };
 
     try {
-      const pruner = this.getOrCreateToolPruner(baseOpts);
-      const selected = await pruner.filter(query, mergedOpts);
+      const pruner = await this.getOrCreateToolPruner(baseOpts);
       const prunerState = pruner as unknown as {
+        endpoint?: string;
+        apiKey?: string;
+        model?: string;
         _wasmEngine?: unknown;
         _tqEngine?: unknown;
       };
+      prunerState.endpoint =
+        mergedOpts.endpoint || "https://api.typesafe.ai/v1/systemone";
+      if (mergedOpts.apiKey !== undefined) {
+        prunerState.apiKey = mergedOpts.apiKey;
+      }
+      if (mergedOpts.model !== undefined) {
+        prunerState.model = mergedOpts.model;
+      }
+
+      const selected = await pruner.filter(query, mergedOpts);
       if (prunerState._wasmEngine && !prunerState._tqEngine) {
         prunerState._tqEngine = prunerState._wasmEngine;
       }
@@ -553,9 +575,10 @@ export class MCPAgent {
   }
 
   private async nativeRunParams(options: ResolvedRunOptions) {
+    const messages = this.buildMessages(options);
     return {
-      messages: this.buildMessages(options),
-      tools: await this.resolveToolsForRun(options),
+      messages,
+      tools: await this.resolveToolsForRun(options, messages),
       callTool: this.callTool!,
       maxSteps: options.maxSteps ?? this.maxSteps,
       signal: options.signal,
@@ -610,6 +633,9 @@ export class MCPAgent {
       );
     }
     if (this.isRemote && this.remoteAgent) {
+      if (options.pruneTools) {
+        throw new Error("pruneTools is not supported for remote agents.");
+      }
       return this.remoteAgent.run(
         options.prompt ?? "",
         options.maxSteps,
@@ -670,6 +696,9 @@ export class MCPAgent {
       signal
     );
     if (this.isRemote && this.remoteAgent) {
+      if (options.pruneTools) {
+        throw new Error("pruneTools is not supported for remote agents.");
+      }
       const result = await this.remoteAgent.run(
         options.prompt ?? "",
         options.maxSteps,

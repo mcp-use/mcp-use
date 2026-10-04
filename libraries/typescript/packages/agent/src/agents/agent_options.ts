@@ -69,8 +69,6 @@ export interface ToolPruneOptions {
   endpoint?: string;
   /** TypeSafe System One model identifier. Defaults to `"jev-latest"`. */
   model?: string;
-  /** Minimum confidence threshold for tool selection. Defaults to `0.85`. */
-  threshold?: number;
   /** Minimum number of tools retained in `"auto"` mode. Defaults to `1`. */
   minK?: number;
   /** Maximum number of tools retained in `"auto"` mode. Defaults to `5`. */
@@ -115,6 +113,8 @@ export interface MCPAgentOptions {
    *
    * Pass `true` for default automatic pruning or a {@link ToolPruneOptions}
    * object to customize candidate count and engine settings. Defaults to `false`.
+   * Supported by the native local agent only; remote agents (`agentId`) reject
+   * this option.
    */
   pruneTools?: boolean | ToolPruneOptions;
   /** Exposes MCP resources as callable tools. Defaults to `true`. */

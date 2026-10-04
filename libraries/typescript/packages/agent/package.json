@@ -60,7 +60,9 @@
   },
   "dependencies": {
     "@mcp-use/client": "workspace:*",
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.0.0"
+  },
+  "optionalDependencies": {
     "tool-prune": "^0.3.0"
   },
   "peerDependencies": {

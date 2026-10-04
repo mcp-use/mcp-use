@@ -186,9 +186,6 @@ importers:
       langfuse:
         specifier: ^3.38.6
         version: 3.38.6
-      tool-prune:
-        specifier: ^0.3.0
-        version: 0.3.0
     devDependencies:
       '@langchain/anthropic':
         specifier: ^1.0.0
@@ -220,6 +217,10 @@ importers:
       zod:
         specifier: 4.4.3
         version: 4.4.3
+    optionalDependencies:
+      tool-prune:
+        specifier: ^0.3.0
+        version: 0.3.0
 
   packages/cli:
     dependencies:
@@ -18457,6 +18458,7 @@ snapshots:
   tool-prune@0.3.0:
     optionalDependencies:
       turboquant-search: 0.1.1
+    optional: true
 
   tough-cookie@6.0.0:
     dependencies:

@@ -241,6 +241,106 @@ describe("MCPAgent tool pruning (tool-prune)", () => {
     );
   });
 
+  it("extracts pruning query from externalHistory when prompt and messages are omitted", async () => {
+    const connection = createCatalogConnection();
+    const agent = new MCPAgent({
+      llm: { provider: "openai", model: "gpt-4o", apiKey: "test-key" },
+      mcpServers: [connection],
+      pruneTools: { topK: 2, engine: "turboquant" },
+    });
+    const { capturedTools } = attachMockDriver(agent);
+
+    await agent.run({
+      externalHistory: [
+        {
+          type: "human",
+          content: "List running Kubernetes pods in the production namespace",
+        } as unknown as import("../../src/agents/types.js").BaseMessage,
+      ],
+    });
+
+    expect(capturedTools[0]).toHaveLength(2);
+    expect(capturedTools[0]!.map((t) => t.name)).toContain(
+      "kubernetes_get_pods"
+    );
+  });
+
+  it("applies per-run endpoint overrides even after the pruner is cached", async () => {
+    const connection = createCatalogConnection();
+    const agent = new MCPAgent({
+      llm: { provider: "openai", model: "gpt-4o", apiKey: "test-key" },
+      mcpServers: [connection],
+      pruneTools: { topK: 1, engine: "turboquant" },
+    });
+    const { capturedTools } = attachMockDriver(agent);
+
+    // Warm up the cached pruner instance
+    await agent.run({
+      prompt: "Execute a SQL query on the PostgreSQL database",
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          answers: {
+            tool: {
+              choice: "stripe_create_refund",
+              confidence: 0.99,
+              probabilities: { stripe_create_refund: 0.99 },
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    try {
+      await agent.run({
+        prompt: "Refund this Stripe charge",
+        pruneTools: {
+          topK: 1,
+          engine: "typesafe",
+          apiKey: "ts-test-key",
+          endpoint: "https://custom.typesafe.example/v1/systemone",
+        },
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://custom.typesafe.example/v1/systemone",
+        expect.objectContaining({ method: "POST" })
+      );
+      expect(capturedTools[1]).toHaveLength(1);
+      expect(capturedTools[1]![0]?.name).toBe("stripe_create_refund");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("rejects pruneTools on remote agents", async () => {
+    expect(
+      () =>
+        new MCPAgent({
+          llm: "openai/gpt-4o",
+          agentId: "remote-agent-123",
+          apiKey: "remote-key",
+          pruneTools: true,
+        })
+    ).toThrow(/pruneTools is not supported for remote agents/);
+
+    const remoteAgent = new MCPAgent({
+      llm: "openai/gpt-4o",
+      agentId: "remote-agent-123",
+      apiKey: "remote-key",
+    });
+
+    await expect(
+      remoteAgent.run({
+        prompt: "Hello",
+        pruneTools: true,
+      })
+    ).rejects.toThrow(/pruneTools is not supported for remote agents/);
+  });
+
   it("fails open to the full toolset when prompt and messages are empty", async () => {
     const connection = createCatalogConnection();
     const agent = new MCPAgent({

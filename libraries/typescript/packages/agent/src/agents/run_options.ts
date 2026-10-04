@@ -34,6 +34,9 @@ export interface RunOptions<T = string> {
    *
    * Pass `true` or {@link ToolPruneOptions} to prune schemas for this run, or
    * `false` to disable agent-level pruning for this run.
+   *
+   * Supported by the native local agent only. Remote agents reject this option,
+   * and the LangChain entry point ignores it.
    */
   pruneTools?: boolean | ToolPruneOptions;
   /**
