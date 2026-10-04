@@ -20,6 +20,7 @@ export type {
   SimplifiedModeOptions,
 } from "./agents/types.js";
 export type { RunOptions } from "./agents/run_options.js";
+export type { ToolPruneOptions } from "./agents/agent_options.js";
 export { LangChainAdapter } from "./adapters/langchain_adapter.js";
 export { ServerManager } from "./managers/server_manager.js";
 export type { IServerManager } from "./managers/types.js";

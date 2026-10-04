@@ -1,5 +1,6 @@
 import type { ZodSchema } from "zod";
 import type { ProviderMessage } from "../llm/types.js";
+import type { ToolPruneOptions } from "./agent_options.js";
 import type { RunOptions } from "./run_options.js";
 import type { BaseMessage } from "./types.js";
 
@@ -16,6 +17,7 @@ export function normalizeRunOptions<T>(
   manageConnector?: boolean;
   externalHistory?: BaseMessage[];
   messages?: ProviderMessage[];
+  pruneTools?: boolean | ToolPruneOptions;
   schema?: ZodSchema<T>;
   signal?: AbortSignal;
 } {
@@ -26,6 +28,7 @@ export function normalizeRunOptions<T>(
       manageConnector: queryOrOptions.manageConnector,
       externalHistory: queryOrOptions.externalHistory,
       messages: queryOrOptions.messages,
+      pruneTools: queryOrOptions.pruneTools,
       schema: queryOrOptions.schema,
       signal: queryOrOptions.signal,
     };

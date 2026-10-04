@@ -186,6 +186,9 @@ importers:
       langfuse:
         specifier: ^3.38.6
         version: 3.38.6
+      tool-prune:
+        specifier: ^0.3.0
+        version: 0.3.0
     devDependencies:
       '@langchain/anthropic':
         specifier: ^1.0.0
@@ -9531,6 +9534,10 @@ packages:
     resolution: {integrity: sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA==}
     engines: {node: '>=0.6'}
 
+  tool-prune@0.3.0:
+    resolution: {integrity: sha512-CKAycmhuWOCFyPuOtAxMV70ccSufePgIrdaAXq3yf1G9YFhEItbQF5phMd7jqgMu625LlTvvBbMsU5kNIaVALw==}
+    engines: {node: '>=18.0.0'}
+
   tough-cookie@6.0.0:
     resolution: {integrity: sha512-kXuRi1mtaKMrsLUxz3sQYvVl37B0Ns6MzfrtV5DvJceE9bPyspOqk9xxv7XbZWcfLWbFmm997vl83qUWVJA64w==}
     engines: {node: '>=16'}
@@ -9591,6 +9598,14 @@ packages:
 
   tunnel-rat@0.1.2:
     resolution: {integrity: sha512-lR5VHmkPhzdhrM092lI2nACsLO4QubF0/yoOhzX7c+wIpbN1GjHNzCc91QlpxBi+cnx8vVJ+Ur6vL5cEoQPFpQ==}
+
+  turboquant-search@0.1.1:
+    resolution: {integrity: sha512-nB67pexxo8bvk607Bx4xUxSHeRDvqIvmB0ifm49Qs1dDj6BDt5WTLJm4Mbq8VPTAEoah75cp2NAyXdQeDfI//Q==}
+    hasBin: true
+
+  turboquant-wasm@0.4.1:
+    resolution: {integrity: sha512-AKZHlsxGS9u2SPb1TblL61hyaismZPRrDyGqvn6zcU2v4ZW+BQq+fROUb3E6a3MsKEO3W+0piVZ6qNKGS92yZw==}
+    engines: {node: '>=20'}
 
   tw-animate-css@1.4.0:
     resolution: {integrity: sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK7WlvmUxpcj6Kgu6EKqjrGFe3QQ==}
@@ -18439,6 +18454,10 @@ snapshots:
 
   toidentifier@1.0.1: {}
 
+  tool-prune@0.3.0:
+    optionalDependencies:
+      turboquant-search: 0.1.1
+
   tough-cookie@6.0.0:
     dependencies:
       tldts: 7.0.23
@@ -18538,6 +18557,14 @@ snapshots:
       - '@types/react'
       - immer
       - react
+
+  turboquant-search@0.1.1:
+    dependencies:
+      turboquant-wasm: 0.4.1
+    optional: true
+
+  turboquant-wasm@0.4.1:
+    optional: true
 
   tw-animate-css@1.4.0: {}
 

@@ -13,6 +13,7 @@ export {
   type MCPAgentOptions,
   type McpConnectionLike,
   type McpServersInput,
+  type ToolPruneOptions,
   type RunOptions,
   type AgentStep,
   type ProviderName,

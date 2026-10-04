@@ -46,6 +46,41 @@ export type McpServersInput =
   | Record<string, MCPServerConfig>
   | McpConnectionLike[];
 
+/**
+ * Configures pre-flight MCP tool pruning via `tool-prune` before sending tool
+ * schemas to the language model.
+ */
+export interface ToolPruneOptions {
+  /**
+   * Number of top candidate tools to expose per run, or `"auto"` to select
+   * candidates dynamically based on score drop-off. Defaults to `"auto"`.
+   */
+  topK?: number | "auto";
+  /**
+   * Scoring engine used to rank tools against the user query.
+   *
+   * Defaults to `"typesafe"` when `apiKey` or `TYPESAFE_API_KEY` is present,
+   * and falls back to offline `"turboquant"` quantization otherwise.
+   */
+  engine?: "typesafe" | "turboquant";
+  /** TypeSafe System One API key override. */
+  apiKey?: string;
+  /** TypeSafe System One endpoint URL override. */
+  endpoint?: string;
+  /** TypeSafe System One model identifier. Defaults to `"jev-latest"`. */
+  model?: string;
+  /** Minimum confidence threshold for tool selection. Defaults to `0.85`. */
+  threshold?: number;
+  /** Minimum number of tools retained in `"auto"` mode. Defaults to `1`. */
+  minK?: number;
+  /** Maximum number of tools retained in `"auto"` mode. Defaults to `5`. */
+  maxK?: number;
+  /** Minimum TurboQuant score floor in `"auto"` mode. Defaults to `0.12`. */
+  minScore?: number;
+  /** Minimum calibrated probability floor in `"auto"` mode. Defaults to `0.2`. */
+  minProbability?: number;
+}
+
 /** Configures a local or remote {@link MCPAgent}. */
 export interface MCPAgentOptions {
   /**
@@ -74,6 +109,14 @@ export interface MCPAgentOptions {
   systemPrompt?: string | null;
   /** MCP tool names that must not be exposed to the model. */
   disallowedTools?: string[];
+  /**
+   * Prunes model-visible MCP tool schemas per query using `tool-prune` before
+   * calling the LLM while keeping all registered tools callable.
+   *
+   * Pass `true` for default automatic pruning or a {@link ToolPruneOptions}
+   * object to customize candidate count and engine settings. Defaults to `false`.
+   */
+  pruneTools?: boolean | ToolPruneOptions;
   /** Exposes MCP resources as callable tools. Defaults to `true`. */
   exposeResourcesAsTools?: boolean;
   /** Exposes MCP prompts as callable tools. Defaults to `true`. */
