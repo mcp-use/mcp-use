@@ -215,6 +215,14 @@ class TestConnectorCreation(unittest.TestCase):
         self.assertEqual(connector.args, ["-m", "mcp_server"])
         self.assertIsNone(connector.env)
 
+    def test_create_stdio_connector_without_args(self):
+        """A stdio config with only a command is accepted (args is optional)."""
+        connector = create_connector_from_config({"command": "my-mcp-server"})
+
+        self.assertIsInstance(connector, StdioConnector)
+        self.assertEqual(connector.command, "my-mcp-server")
+        self.assertEqual(connector.args, [])
+
     def test_create_connector_invalid_config(self):
         """Test creating a connector with invalid config raises ValueError."""
         server_config = {"invalid": "config"}
