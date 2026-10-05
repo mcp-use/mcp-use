@@ -76,13 +76,7 @@ export default defineConfig([
       "#mcp-use-vite-handler",
     ],
     define: packageVersionDefine,
-    esbuildOptions(options) {
-      minifyFrameworkOutput(options);
-      // Compact internal bindings in the edge build while retaining public
-      // export and property names within the existing artifact size budgets.
-      options.minifyIdentifiers = true;
-      options.keepNames = true;
-    },
+    esbuildOptions: minifyFrameworkOutput,
   },
   // Node gets a self-contained root bundle. Inlining Hono and the v2 SDK
   // removes module-linking overhead from cold process starts, while the
