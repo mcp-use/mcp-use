@@ -1,0 +1,36 @@
+{
+  "name": "mcp-use-example-bookshop",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A tiny fictional bookshop demonstrating ChatGPT Plugin Extensions.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "test:wire": "node tests/wire.mjs",
+    "test:ui": "vitest run"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@mcp-use/client": "workspace:*",
+    "@modelcontextprotocol/ext-apps": "2.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "happy-dom": "^20.10.6",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

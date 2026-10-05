@@ -72,6 +72,16 @@ export const examples = [
     resourceTemplates: ["repository-file"],
   }),
   local("views/a2ui", { tools: ["render-ui"], view: true }),
+  local("views/bookshop", {
+    tools: [
+      "open_bookshop",
+      "read_cart",
+      "set_cart_item",
+      "settings.read",
+      "settings.update",
+    ],
+    view: true,
+  }),
   local("views/basic", { tools: ["search-fruits"], view: true }),
   local("views/excalidraw", { view: true }),
   local("views/file-upload", { view: true }),
