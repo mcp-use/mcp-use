@@ -277,7 +277,13 @@ export async function* streamResponsesTurn(
 
   const callBuffers = new Map<
     string,
-    { index: number; name: string; argsJson: string; started: boolean }
+    {
+      index: number;
+      name: string;
+      callId: string;
+      argsJson: string;
+      started: boolean;
+    }
   >();
   let nextIndex = 0;
   let completedOutput: unknown[] = [];
@@ -304,16 +310,25 @@ export async function* streamResponsesTurn(
     if (type === "response.output_item.added") {
       const item = parsed.item as Record<string, unknown> | undefined;
       if (item?.type === "function_call") {
+        // The Responses API identifies this item as `id` (fc_...) here and
+        // keys the function_call_arguments delta/done events by `item_id`.
+        // `call_id` is the id the tool loop uses, so expose it as toolCallId.
+        const itemId = typeof item.id === "string" ? item.id : undefined;
         const callId =
-          typeof item.call_id === "string" ? item.call_id : `call_${nextIndex}`;
+          typeof item.call_id === "string"
+            ? item.call_id
+            : (itemId ?? `call_${nextIndex}`);
         const name = typeof item.name === "string" ? item.name : "";
         const idx = nextIndex++;
-        callBuffers.set(callId, {
+        const buffer = {
           index: idx,
           name,
+          callId,
           argsJson: "",
           started: true,
-        });
+        };
+        callBuffers.set(itemId ?? callId, buffer);
+        if (itemId && itemId !== callId) callBuffers.set(callId, buffer);
         yield {
           type: "tool-call-start",
           index: idx,
@@ -325,15 +340,21 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.delta") {
-      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      // These events carry `item_id`, not `call_id`.
+      const eventKey =
+        typeof parsed.item_id === "string"
+          ? parsed.item_id
+          : typeof parsed.call_id === "string"
+            ? parsed.call_id
+            : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
-      const buf = callBuffers.get(callId);
+      const buf = callBuffers.get(eventKey);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
         yield {
           type: "tool-call-args-delta",
           index: buf.index,
-          toolCallId: callId,
+          toolCallId: buf.callId,
           toolName: buf.name,
           argsDelta: delta,
         };
@@ -342,16 +363,22 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.done") {
-      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      // These events carry `item_id`, not `call_id`.
+      const eventKey =
+        typeof parsed.item_id === "string"
+          ? parsed.item_id
+          : typeof parsed.call_id === "string"
+            ? parsed.call_id
+            : "";
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";
-      const buf = callBuffers.get(callId);
+      const buf = callBuffers.get(eventKey);
       if (buf) {
         if (argsRaw) buf.argsJson = argsRaw;
         yield {
           type: "tool-call-ready",
           index: buf.index,
-          toolCallId: callId,
+          toolCallId: buf.callId,
           toolName: buf.name,
           args: parseArgs(buf.argsJson || argsRaw),
         };

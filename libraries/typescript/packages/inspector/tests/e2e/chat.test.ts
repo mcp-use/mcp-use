@@ -233,13 +233,6 @@ test.describe("Inspector Chat Tests", () => {
     page,
     context,
   }) => {
-    // Known gap: the tool-invocation message part carries empty args, so the
-    // drawer renders "{}" for a call that clearly sent a message argument
-    // (the result echoes it). Expected failure until the args are recorded.
-    test.fail(
-      true,
-      "Chat tool-invocation parts carry empty args; drawer shows {}"
-    );
     // First, create a tool call to test the drawer
     await page
       .getByTestId("chat-input")
