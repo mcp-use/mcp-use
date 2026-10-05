@@ -145,4 +145,40 @@ describe("streamNativeAgentSteps", () => {
       runNativeAgent(preambleThenAnswerDriver(), options)
     ).resolves.toBe("");
   });
+
+  it("returns an empty string when aborted before the requested tool runs, like runNativeAgent", async () => {
+    const callTool = vi.fn().mockResolvedValue("a.ts");
+
+    // Streaming: abort once the tool call is announced, before it runs.
+    const streaming = new AbortController();
+    const steps = streamNativeAgentSteps(preambleThenAnswerDriver(), {
+      messages: [],
+      tools: [],
+      callTool,
+      signal: streaming.signal,
+    });
+    expect((await steps.next()).done).toBe(false);
+    streaming.abort();
+    await expect(returnValue(steps)).resolves.toBe("");
+
+    // Non-streaming: abort while the tool-call turn is being generated.
+    const nonStreaming = new AbortController();
+    const driver = preambleThenAnswerDriver();
+    const complete = driver.complete.bind(driver);
+    driver.complete = async (params) => {
+      const turn = await complete(params);
+      nonStreaming.abort();
+      return turn;
+    };
+    await expect(
+      runNativeAgent(driver, {
+        messages: [],
+        tools: [],
+        callTool,
+        signal: nonStreaming.signal,
+      })
+    ).resolves.toBe("");
+
+    expect(callTool).not.toHaveBeenCalled();
+  });
 });
