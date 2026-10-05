@@ -90,25 +90,46 @@ function isContentBlockArray(value: unknown): value is Array<{ type: string }> {
   );
 }
 
-/**
- * Rewrite a LangChain `image_url` block into the MCP `image` shape so one
- * conversion handles both vocabularies. Other blocks pass through untouched.
- */
-function normalizeToolBlock(block: { type: string }): unknown {
-  if (block.type !== "image_url") return block;
-  const raw = (block as { image_url?: unknown }).image_url;
-  const url =
-    typeof raw === "string"
-      ? raw
-      : ((raw as { url?: unknown } | undefined)?.url as string | undefined);
-  if (typeof url !== "string") return block;
+function imageFromUrl(url: string): unknown {
   const parsed = parseDataUrl(url);
   if (parsed === null) {
     // A remote URL carries no bytes to embed, so keep the reference visible
-    // instead of letting it fall through to an "unsupported block" marker.
+    // instead of letting the block be dropped or marked unsupported.
     return { type: "text", text: `[image: ${url}]` };
   }
   return { type: "image", data: parsed.data, mimeType: parsed.mimeType };
+}
+
+/**
+ * Rewrite LangChain image blocks into the MCP `image` shape so one conversion
+ * handles both vocabularies. LangChain data blocks spell the MIME type
+ * `mime_type` and may reference an image by URL instead of carrying bytes;
+ * MCP-shaped and other blocks pass through untouched.
+ */
+function normalizeToolBlock(block: { type: string }): unknown {
+  if (block.type === "image_url") {
+    const raw = (block as { image_url?: unknown }).image_url;
+    const url =
+      typeof raw === "string"
+        ? raw
+        : ((raw as { url?: unknown } | undefined)?.url as string | undefined);
+    return typeof url === "string" ? imageFromUrl(url) : block;
+  }
+  if (block.type !== "image") return block;
+  const image = block as {
+    data?: unknown;
+    mimeType?: unknown;
+    mime_type?: unknown;
+    url?: unknown;
+  };
+  if (typeof image.data === "string") {
+    const mimeType =
+      typeof image.mimeType === "string" && image.mimeType
+        ? image.mimeType
+        : image.mime_type;
+    return { type: "image", data: image.data, mimeType };
+  }
+  return typeof image.url === "string" ? imageFromUrl(image.url) : block;
 }
 
 /**

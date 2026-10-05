@@ -74,6 +74,41 @@ describe("convertExternalHistoryToProvider tool content", () => {
     expect(message!.content).toBe("");
   });
 
+  it.each([
+    {
+      shape: "base64 with snake_case mime_type",
+      block: {
+        type: "image",
+        source_type: "base64",
+        data: PNG,
+        mime_type: "image/jpeg",
+      },
+      expected: [
+        {
+          type: "image",
+          data: PNG,
+          mimeType: "image/jpeg",
+          url: `data:image/jpeg;base64,${PNG}`,
+        },
+      ],
+    },
+    {
+      shape: "remote url without data",
+      block: {
+        type: "image",
+        source_type: "url",
+        url: "https://example.com/shot.jpg",
+      },
+      expected: "[image: https://example.com/shot.jpg]",
+    },
+  ])("maps LangChain image blocks ($shape)", ({ block, expected }) => {
+    const [message] = convertExternalHistoryToProvider([
+      new ToolMessage({ content: [block], tool_call_id: "call_8" }) as never,
+    ]);
+
+    expect(message!.content).toMatchObject(expected);
+  });
+
   it("keeps a remote image_url reference visible", () => {
     const [message] = convertExternalHistoryToProvider([
       new ToolMessage({
