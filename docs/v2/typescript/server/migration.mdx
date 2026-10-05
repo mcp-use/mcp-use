@@ -455,7 +455,7 @@ Use the focused v2 surface:
 | widget display mode fields         | `useDisplayMode()`                                            |
 | `<McpUseProvider autoSize>`        | remove the provider; automatic resizing is enabled by default |
 
-`viewConfig` supports `autoResize`, `displayModes`, and `preferredDisplayMode`. The values below are
+`viewConfig` supports `autoResize` and `displayModes`. Both values below are
 the defaults, so omit the export when they are correct for the View:
 
 ```tsx
@@ -469,25 +469,6 @@ export const viewConfig = {
 
 `displayModes` must include `"inline"`. Use `useSendSizeChanged()` only when
 `autoResize` is `false` and the View reports its size manually.
-
-To request an initial fullscreen render in ChatGPT, add
-`preferredDisplayMode: "fullscreen"` alongside
-`displayModes: ["inline", "fullscreen"]`. The preference must belong to the
-supported list. Build and development tooling capture the named `viewConfig`
-export in the view manifest and emit `_meta["openai/ui"].availableDisplayModes`
-and `.preferredDisplayMode` on HTML resource content, before the app initializes.
-The resource advertises the supported `inline`/`fullscreen` subset for ChatGPT.
-The browser advertises the full supported list in its MCP Apps capabilities,
-including `pip` for hosts that support it.
-
-ChatGPT supports `inline` and `fullscreen`; it does not currently support `pip`.
-The initial preference is a hint that the host may ignore. Use `useDisplayMode()`
-for explicit runtime requests and accept the actual returned mode.
-
-Keep `viewConfig` statically readable: object/array literals, local `const`
-references and spreads, and TypeScript `as` / `satisfies` are supported.
-Imported config values and runtime expressions cause a build error. This lets
-metadata extraction avoid executing components or browser-only imports.
 
 Compose optional presentation components such as `ThemeProvider`,
 `ViewControls`, and your own error boundary. The framework owns the connection,
