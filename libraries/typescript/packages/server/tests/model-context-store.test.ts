@@ -180,6 +180,25 @@ describe("ModelContextStore contribution coordinator", () => {
     }
   });
 
+  it("does not dispatch a deferred widget write after disposal", async () => {
+    const setWidgetState = vi.fn();
+    vi.stubGlobal("window", {
+      openai: { setWidgetState },
+      addEventListener() {},
+      removeEventListener() {},
+    });
+    try {
+      const { store } = fixture();
+      store.initializeViewState({ count: 1 });
+      await Promise.resolve();
+      store.dispose();
+      await tick();
+      expect(setWidgetState).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("disposal rejects waiters and fences late responses without sending a clear", async () => {
     const { store, writes, responses } = fixture();
     const add = store.addAttachment("a", { type: "text", text: "A" });

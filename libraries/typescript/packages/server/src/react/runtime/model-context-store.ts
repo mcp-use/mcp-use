@@ -541,6 +541,7 @@ export class ModelContextStore {
     const sendEpoch = this.#epoch;
     this.#sending = publication;
     this.#inFlight = Promise.resolve().then(async () => {
+      if (this.#disposed || sendEpoch !== this.#epoch) return;
       let failed = false;
       try {
         const chatGptApi = getChatGptWidgetApi();
