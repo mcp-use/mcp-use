@@ -219,6 +219,7 @@ type Identifier = Extract<ESTree.Node, { type: "Identifier" }>;
 type Scope = {
   parent?: Scope;
   functionScope: boolean;
+  owner?: ESTree.Node;
   bindings: Map<string, Identifier>;
 };
 type ScopedNode = {
@@ -292,7 +293,12 @@ function indexScopes(program: ESTree.Program) {
       node.type === "ForInStatement" ||
       node.type === "ForOfStatement"
     )
-      scope = { parent: scope, functionScope: isFunction, bindings: new Map() };
+      scope = {
+        parent: scope,
+        functionScope: isFunction,
+        ...(isFunction ? { owner: node } : {}),
+        bindings: new Map(),
+      };
     if (
       node.type === "FunctionDeclaration" ||
       node.type === "FunctionExpression" ||
@@ -374,6 +380,60 @@ function assertImmutable(
     }
   }
   const unknown = Symbol("unknown static value");
+  // Calls in deferred browser components may consume config references. Calls
+  // made while initializing the module must still be checked, including local
+  // helpers, aliases, object methods, IIFEs, and callbacks passed to other code.
+  const initializers = new Map<Identifier, ESTree.Node>();
+  for (const { node } of indexed.nodes) {
+    if (node.type === "VariableDeclarator" && node.init) {
+      for (const binding of bindingIdentifiers(node.id))
+        initializers.set(binding, node.init);
+    } else if (
+      (node.type === "FunctionDeclaration" ||
+        node.type === "FunctionExpression" ||
+        node.type === "ClassDeclaration") &&
+      node.id
+    ) {
+      initializers.set(node.id, node);
+    }
+  }
+  const initializingFunctions = new Set<ESTree.Node>();
+  function initializationScope(scope: Scope): boolean {
+    if (scope.functionScope)
+      return !scope.owner || initializingFunctions.has(scope.owner);
+    return scope.parent ? initializationScope(scope.parent) : true;
+  }
+  function activateFunctions(node: ESTree.Node, seen = new Set<ESTree.Node>()) {
+    if (seen.has(node)) return;
+    seen.add(node);
+    if (
+      node.type === "FunctionDeclaration" ||
+      node.type === "FunctionExpression" ||
+      node.type === "ArrowFunctionExpression"
+    ) {
+      initializingFunctions.add(node);
+      return;
+    }
+    const binding = references.get(node);
+    const initializer = binding && initializers.get(binding);
+    if (initializer) activateFunctions(initializer, seen);
+    for (const child of children(node)) activateFunctions(child, seen);
+  }
+  let activeCount: number;
+  do {
+    activeCount = initializingFunctions.size;
+    for (const { node, scope } of indexed.nodes) {
+      if (!initializationScope(scope)) continue;
+      if (node.type === "CallExpression" || node.type === "NewExpression") {
+        activateFunctions(node.callee);
+        for (const argument of node.arguments) activateFunctions(argument);
+      } else if (node.type === "TaggedTemplateExpression") {
+        activateFunctions(node.tag);
+        for (const expression of node.quasi.expressions)
+          activateFunctions(expression);
+      }
+    }
+  } while (activeCount !== initializingFunctions.size);
   function staticValue(node: ESTree.Node): unknown {
     const binding = references.get(node);
     if (binding && values.has(binding)) return values.get(binding);
@@ -486,7 +546,7 @@ function assertImmutable(
       }
     }
   }
-  for (const { node } of indexed.nodes) {
+  for (const { node, scope } of indexed.nodes) {
     if (
       (node.type === "AssignmentExpression" &&
         (writeTarget(node.left) || containsProtected(node.right))) ||
@@ -495,6 +555,7 @@ function assertImmutable(
         node.operator === "delete" &&
         writeTarget(node.argument)) ||
       ((node.type === "CallExpression" || node.type === "NewExpression") &&
+        initializationScope(scope) &&
         (containsProtected(
           node.callee.type === "MemberExpression"
             ? node.callee.object
@@ -504,8 +565,11 @@ function assertImmutable(
       ((node.type === "ForInStatement" || node.type === "ForOfStatement") &&
         node.left.type !== "VariableDeclaration" &&
         writeTarget(node.left)) ||
-      (node.type === "TaggedTemplateExpression" && containsProtected(node)) ||
+      (node.type === "TaggedTemplateExpression" &&
+        initializationScope(scope) &&
+        containsProtected(node)) ||
       (node.type === "ReturnStatement" &&
+        initializationScope(scope) &&
         node.argument &&
         containsProtected(node.argument))
     )

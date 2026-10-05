@@ -150,6 +150,35 @@ describe("static viewConfig extraction", () => {
       )
     ).toEqual({ displayModes: ["inline"] });
   });
+  it("allows deferred components to consume config objects through calls", () => {
+    expect(
+      readViewConfig(
+        source(`export const viewConfig = {displayModes: ["inline"]};
+        function readModes() { return viewConfig.displayModes; }
+        export default function View() {
+          console.log(viewConfig);
+          const [modes] = useState(viewConfig.displayModes);
+          const selected = useMemo(() => viewConfig.displayModes, [viewConfig.displayModes]);
+          return renderModes(readModes(), modes, selected);
+        }`)
+      )
+    ).toEqual({ displayModes: ["inline"] });
+  });
+  it.each([
+    "function init() { mutate(viewConfig); } init();",
+    "const init = () => mutate(viewConfig); const alias = init; alias();",
+    "const helpers = {init() { mutate(viewConfig); }}; helpers.init();",
+    "function inner() { mutate(viewConfig); } function outer() { inner(); } outer();",
+    "run(() => mutate(viewConfig));",
+    "(() => mutate(viewConfig))();",
+    "function getConfig() { return viewConfig; } mutate(getConfig());",
+  ])("rejects config escapes through initialization helpers: %s", (code) => {
+    expect(() =>
+      readViewConfig(
+        source(`export const viewConfig = {displayModes: ["inline"]}; ${code}`)
+      )
+    ).toThrow("Cannot statically extract viewConfig");
+  });
   it.each([
     'export * from "./config";',
     "export const viewConfig = {autoResize: true}; for (viewConfig.autoResize of [false]) {}",

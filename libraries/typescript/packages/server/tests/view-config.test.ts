@@ -56,7 +56,9 @@ describe("viewConfig display preferences", () => {
           },
         },
       })
-    ).toThrow("must belong to displayModes");
+    ).toThrow(
+      /View "card" has an invalid viewConfig: .*must belong to displayModes/
+    );
   });
   it("does not retain views from a failed manifest when priming is retried", () => {
     const server = new MCPServer({ name: "retry-view", version: "1" });

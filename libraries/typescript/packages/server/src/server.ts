@@ -713,8 +713,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.#assertNotStarted("views", "manifest");
     // Validate the complete candidate before committing registry or options so
     // a failed attempt can be retried without retaining part of its manifest.
-    for (const entry of Object.values(views)) {
-      normalizeViewConfig(entry.viewConfig);
+    for (const [name, entry] of Object.entries(views)) {
+      try {
+        normalizeViewConfig(entry.viewConfig);
+      } catch (error) {
+        throw new Error(
+          `View "${name}" has an invalid viewConfig: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error }
+        );
+      }
     }
     this.#viewsDevMode = options?.dev === true;
     this.#embeddedViewAssets = options?.assets;
