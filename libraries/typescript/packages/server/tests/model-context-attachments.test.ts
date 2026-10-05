@@ -510,6 +510,37 @@ describe("native model context", () => {
     expect(writes).toHaveLength(0);
   });
 
+  it("reconciles buffered removal before permitting retry after a rejected write", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { store, responses, observe, writes } = fixture();
+    const initial = Promise.all([
+      store.add("a", text("A")),
+      store.add("b", text("B")),
+    ]);
+    await tick();
+    responses[0]!.resolve(ack("U1"));
+    await initial;
+    const add = store.add("c", text("C"));
+    const rejected = expect(add).rejects.toThrow();
+    await tick();
+    observe({ updateId: "removed-b", content: [text("A")] });
+    responses[1]!.reject(
+      Object.assign(new Error("denied"), {
+        name: "ProtocolError",
+        code: -32602,
+      })
+    );
+    await rejected;
+    const retry = store.retryContext().catch((error: unknown) => error);
+    await tick();
+    expect(writes).toHaveLength(2);
+    expect(await retry).toBeInstanceOf(Error);
+    expect(
+      store.getSnapshot().attachments.map((item) => item.key)
+    ).not.toContain("b");
+    expect(store.getSnapshot().pending).toBe(false);
+  });
+
   it("cancels queued initialization on disposal and never publishes after late connection", async () => {
     const { store, app, connection, writes } = fixture({ delayed: true });
     const add = store.add("a", text("A"));
