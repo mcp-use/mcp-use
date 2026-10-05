@@ -61,18 +61,18 @@ describe("sanitizeUrl", () => {
       );
     });
 
-    it("encodes raw unencoded special characters in paths", () => {
+    it("follows WHATWG URL parser serialization for raw path characters", () => {
       expect(sanitizeUrl("https://example.com/docs/C++")).toBe(
-        "https://example.com/docs/C%2B%2B"
+        "https://example.com/docs/C++"
       );
       expect(sanitizeUrl("https://example.com/foo|bar")).toBe(
-        "https://example.com/foo%7Cbar"
+        "https://example.com/foo|bar"
       );
       expect(sanitizeUrl("https://example.com/foo;bar")).toBe(
-        "https://example.com/foo%3Bbar"
+        "https://example.com/foo;bar"
       );
       expect(sanitizeUrl("https://example.com/user@data")).toBe(
-        "https://example.com/user%40data"
+        "https://example.com/user@data"
       );
     });
 
@@ -82,9 +82,9 @@ describe("sanitizeUrl", () => {
       );
     });
 
-    it("encodes rogue percent signs that are not valid hex octets", () => {
+    it("preserves malformed percent sequences according to URL parser serialization", () => {
       expect(sanitizeUrl("https://example.com/path%zz")).toBe(
-        "https://example.com/path%25zz"
+        "https://example.com/path%zz"
       );
     });
 
@@ -102,13 +102,19 @@ describe("sanitizeUrl", () => {
   });
 
   describe("query parameters and credentials", () => {
-    it("properly encodes query parameters", () => {
+    it("properly handles query parameters", () => {
       expect(
         sanitizeUrl(
           "https://example.com/oauth?redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&client_id=123"
         )
       ).toBe(
         "https://example.com/oauth?redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&client_id=123"
+      );
+    });
+
+    it("preserves query parameters with escapes, empty values, and flags without re-encoding", () => {
+      expect(sanitizeUrl("https://example.com/oauth?x=%2f&empty=&flag")).toBe(
+        "https://example.com/oauth?x=%2f&empty=&flag"
       );
     });
 
