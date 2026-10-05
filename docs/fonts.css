@@ -45,7 +45,10 @@ body {
   background-color: currentColor;
 }
 
-#sidebar-content img[src="/images/icons/openai.svg"] {
+#sidebar-content
+  a
+  div:has(> img[src="/images/icons/openai.svg"])
+  > img[src="/images/icons/openai.svg"] {
   visibility: hidden;
 }
 

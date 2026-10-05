@@ -308,6 +308,7 @@ OAuth servers also expose `ctx.auth`.
 
 ### Define fields and layout
 
+Register at least one field.
 Fields support boolean, string, string enum, number, and integer schemas.
 Use a Standard Schema library with JSON Schema conversion, such as Zod.
 Give each field a non-blank `title`.
@@ -391,11 +392,15 @@ Use object literals, array literals, local `const` references, and spreads.
 TypeScript `as` and `satisfies` wrappers also work.
 Imported values and runtime expressions cause an extraction error when tooling detects the named configuration.
 
+Keep the configuration and its shared object or array references immutable.
+Tooling rejects writes to those references and calls that could mutate them during module initialization, including calls through local helpers.
+Components can read the configuration through calls such as `useState` and `useMemo` after initialization.
+
 <Warning>
-  Export `viewConfig` directly from the view module. An `export *` re-export can
-  omit the configuration from build metadata without an error. Use the direct
-  export shown above to keep resource metadata and browser configuration
-  consistent.
+  Declare and export `viewConfig` locally in the view module. A value `export *`
+  without a local configuration causes an extraction error because tooling cannot
+  resolve the configuration through another module. Type-only wildcard exports
+  are allowed, as are unrelated value wildcards alongside a local configuration.
 </Warning>
 
 ### Request a mode at runtime
