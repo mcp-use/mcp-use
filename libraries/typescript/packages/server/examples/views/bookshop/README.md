@@ -42,20 +42,22 @@ the request-resolved asset base. The monochrome book icon is also server brandin
 
 Start with `src/index.ts` for the server and `views/bookshop/view.tsx` for the UI.
 The view entry only declares display modes and handles loading/error states. Its
-ready branch mounts `Shop`; the screen components receive domain data and callbacks.
+ready branch mounts `BookshopRouter` and `Shop`; the screen components receive
+domain data and callbacks and read their route parameters with React Router.
 `src/data.ts` defines the output schema and infers `BookshopData`, `Book`, and
 `BookshopSettings`, so the server and UI share one data contract.
 
-| Feature                                                     | Where to look                                            |
-| ----------------------------------------------------------- | -------------------------------------------------------- |
-| Global/thread launchers, tools, native settings             | `src/index.ts`                                           |
-| Output schema and domain types                              | `src/data.ts`; fictional catalog in `src/catalog.ts`     |
-| View configuration and loading/error states                 | `views/bookshop/view.tsx`                                |
-| Tool calls, local URL navigation, header, inline/fullscreen | `views/bookshop/shop.tsx`; URL helpers in `src/route.ts` |
-| Library, search, shared book controls                       | `views/bookshop/catalog.tsx`                             |
-| Book details and typed text/resource attachments            | `views/bookshop/details.tsx`                             |
-| Demo cart and appearance settings                           | `views/bookshop/cart-settings.tsx`                       |
-| Attachment feedback, list, remove, clear                    | `views/bookshop/attachments.tsx`                         |
+| Feature                                          | Where to look                                        |
+| ------------------------------------------------ | ---------------------------------------------------- |
+| Global/thread launchers, tools, native settings  | `src/index.ts`                                       |
+| Output schema and domain types                   | `src/data.ts`; fictional catalog in `src/catalog.ts` |
+| View configuration and loading/error states      | `views/bookshop/view.tsx`                            |
+| Tool calls, routes, header, inline/fullscreen    | `views/bookshop/shop.tsx`                            |
+| Memory history and incoming host-link adapter    | `views/bookshop/routing.tsx`                         |
+| Library, search, shared book controls            | `views/bookshop/catalog.tsx`                         |
+| Book details and typed text/resource attachments | `views/bookshop/details.tsx`                         |
+| Demo cart and appearance settings                | `views/bookshop/cart-settings.tsx`                   |
+| Attachment feedback, list, remove, clear         | `views/bookshop/attachments.tsx`                     |
 
 ## Cart, settings, and chat context
 
@@ -69,16 +71,21 @@ Concurrent callers use last-write-wins. Refresh after another view/model changes
 cart or native settings. Mounted views hold snapshots, with no cross-view push.
 The in-app settings controls update the same preferences as native settings.
 
-**Add to chat** uses `imageFromUrl(coverUrl, { title })` from `mcp-use/react`
-to fetch and encode the actual PNG cover, then passes it to `useModelContext().add`. Product details
+**Add to chat** calls `add(key, { type: "image", src: "/covers/...", title })`.
+Like the SDK's `Image` component, image blocks resolve public paths against the request's asset base; the SDK fetches,
+validates, and converts the PNG bytes internally. Product details
 also offer **Add book details**, a text block with a friendly title and cover
-thumbnail, and **Add reading sample**, an embedded plain-text resource containing
-the displayed excerpt. Stable keys update the same item without duplicating it.
+thumbnail using the same public path, and **Add reading sample**, an embedded
+plain-text resource containing the displayed excerpt. Stable keys update the same item without duplicating it.
 Cart updates, browsing, and settings changes never attach anything automatically.
 The example does not duplicate removable evidence in background model context.
 `read_cart` remains the authoritative way for the model to inspect shopping state.
 
 The catalog and details components call `add(stableKey, block)` explicitly.
+Image fetch or conversion errors reject that action. Image content becomes native
+base64 evidence; thumbnail paths resolve to URLs and remain URL metadata. The SDK
+also accepts direct `data` plus `mimeType` instead of `src`; Bookshop uses public
+paths so its display and attachment references stay consistent.
 Text and resource blocks use the exported `ModelContextBlock` type. Each block
 supplies a friendly top-level `title`; the context panel reads `block.title`
 without knowing protocol metadata. `AttachButton` only handles the clicked
@@ -109,12 +116,25 @@ Supported app routes are `/` (library), `/books`, `/products/moonlit-atlas`,
 `/books?q=moon` opens the filtered catalog. Unknown products and malformed or
 external URLs show a recoverable missing-page screen.
 
-The view has one app-local URL. Initial host links take precedence over the tool's
-route. Later host URL changes replace it. Local clicks and search update that same
-state, preserving unrelated query parameters, including repeated values. Search
-is preserved when visiting details/cart and returning to the library. Data refresh
-updates the snapshot without resetting navigation. Nothing writes the host URL
-or browser history, and no router package is needed.
+`BookshopRouter` uses React Router's
+[`MemoryRouter`](https://reactrouter.com/api/declarative-routers/MemoryRouter). Its initial entry is the
+validated host deep link when present, otherwise the opening tool's route.
+`Shop` declares `/`, `/books`, `/products/:id`, `/cart`, `/settings`, and the
+missing-page fallback with `Routes` and `Route`. Details read `id` with
+`useParams`; the catalog reads `q` with `useSearchParams`.
+
+Local page buttons use `useNavigate` and carry the current `useLocation().search`,
+including repeated query parameters. Search edits clone those parameters and
+replace only `q`, replacing the current memory-history entry instead of adding an
+entry for every keystroke. Page changes push entries. A small `IncomingLink`
+adapter forwards a changed host URL with `replace: true`; its previous-URL ref
+prevents local navigation from reapplying an old host link. `appPath` validates
+incoming app-relative URLs; it does not match screens or manage navigation.
+
+The router stays mounted across tool-data refreshes, so refreshed cart/settings
+data does not reset navigation or memory history. Nothing writes the host URL or
+browser history. There are no browser Back/Forward claims or custom router
+framework. React Router is the example's only additional runtime dependency.
 
 The current `useDeepLink()` exposes only the latest URL string. If the host sends
 A, the reader navigates locally to B, and the host explicitly sends A again, the

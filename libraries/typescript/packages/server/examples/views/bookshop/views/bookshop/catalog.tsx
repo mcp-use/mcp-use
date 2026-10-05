@@ -1,9 +1,5 @@
-import {
-  getPublicBaseUrl,
-  Image,
-  imageFromUrl,
-  useModelContext,
-} from "mcp-use/react";
+import { Image, useModelContext } from "mcp-use/react";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import type { Book } from "../../src/data.js";
 import { AttachButton } from "./attachments.js";
 
@@ -14,13 +10,11 @@ interface BookActionsProps {
   onChangeQuantity: (id: Book["id"], quantity: number) => void;
 }
 interface CatalogProps {
-  filtered: Book[];
-  query: string;
+  books: Book[];
   showDescriptions: boolean;
   busy: boolean;
   quantity: (id: Book["id"]) => number;
   onChangeQuantity: BookActionsProps["onChangeQuantity"];
-  navigate: (path: string, patch?: Record<string, string | null>) => void;
 }
 /** Format the integer USD cents used throughout this demo. */
 export const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -62,13 +56,12 @@ export function BookActions({
       <AttachButton
         key={`bookshop:cover:${book.id}`}
         label="Add to chat"
-        onAttach={async () =>
-          add(
-            `bookshop:cover:${book.id}`,
-            await imageFromUrl(`${getPublicBaseUrl()}${book.cover}`, {
-              title: `${book.title} — cover`,
-            })
-          )
+        onAttach={() =>
+          add(`bookshop:cover:${book.id}`, {
+            type: "image",
+            src: `/${book.cover}`,
+            title: `${book.title} — cover`,
+          })
         }
       />
     </>
@@ -77,16 +70,35 @@ export function BookActions({
 
 /** Searchable catalog with independent cart and chat actions. */
 export function Catalog({
-  filtered,
-  query,
+  books,
   showDescriptions,
   busy,
   quantity,
   onChangeQuantity,
-  navigate,
 }: CatalogProps) {
+  const navigate = useNavigate();
+  const { search } = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get("q") ?? "";
+  const filtered = books.filter((book) =>
+    `${book.title} ${book.author} ${book.genre}`
+      .toLowerCase()
+      .includes(query.toLowerCase())
+  );
+  function searchBooks(query: string) {
+    const next = new URLSearchParams(searchParams);
+    if (query) next.set("q", query);
+    else next.delete("q");
+    setSearchParams(next, { replace: true });
+  }
   return (
     <>
+      <div className="page-heading">
+        <h1>Book library</h1>
+        <span className="muted">
+          {filtered.length} {filtered.length === 1 ? "book" : "books"}
+        </span>
+      </div>
       <p className="muted intro">
         Small stories. Other worlds. A fictional collection to explore.
       </p>
@@ -95,9 +107,7 @@ export function Catalog({
         type="search"
         aria-label="Search books"
         value={query}
-        onChange={(event) =>
-          navigate("/books", { q: event.target.value || null })
-        }
+        onChange={(event) => searchBooks(event.target.value)}
         placeholder="Search title, author, or genre…"
       />
       <div className="books">
@@ -105,7 +115,9 @@ export function Catalog({
           <article className="book-card" key={book.id}>
             <button
               className="cover-preview"
-              onClick={() => navigate(`/products/${book.id}`)}
+              onClick={() =>
+                navigate({ pathname: `/products/${book.id}`, search })
+              }
               aria-label={`Details for ${book.title}`}
             >
               <Image src={`/${book.cover}`} alt={`${book.title} cover`} />
@@ -118,7 +130,9 @@ export function Catalog({
               <h2>
                 <button
                   className="title"
-                  onClick={() => navigate(`/products/${book.id}`)}
+                  onClick={() =>
+                    navigate({ pathname: `/products/${book.id}`, search })
+                  }
                 >
                   {book.title}
                 </button>
@@ -144,9 +158,7 @@ export function Catalog({
           <BookIcon />
           <h2>No books found</h2>
           <p>Try another title, author, or genre.</p>
-          <button onClick={() => navigate("/books", { q: null })}>
-            Clear search
-          </button>
+          <button onClick={() => searchBooks("")}>Clear search</button>
         </section>
       )}
     </>

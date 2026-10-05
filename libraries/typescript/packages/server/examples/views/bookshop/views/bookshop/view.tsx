@@ -1,4 +1,5 @@
 import { useToolContext, type ViewConfig } from "mcp-use/react";
+import { BookshopRouter } from "./routing.js";
 import { Shop } from "./shop.js";
 import "./view.css";
 
@@ -23,5 +24,9 @@ export default function BookshopView() {
         Could not open bookshop: {view.error.message}
       </main>
     );
-  return <Shop initial={view.toolOutput} />;
+  return (
+    <BookshopRouter initialRoute={view.toolOutput.route}>
+      <Shop initial={view.toolOutput} />
+    </BookshopRouter>
+  );
 }
