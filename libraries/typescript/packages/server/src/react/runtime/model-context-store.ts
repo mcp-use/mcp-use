@@ -154,6 +154,37 @@ function assertValidViewState(state: ViewState): string {
   }
 }
 
+// The development entrypoint opts in to bounded diagnostics. Production views
+// do not initialize this trace or retain protocol events.
+function getContextDiagnosticTrace() {
+  if (typeof window === "undefined") return undefined;
+  return (
+    window as unknown as {
+      __mcpContextTrace?: { events: unknown[]; sequence: number };
+    }
+  ).__mcpContextTrace;
+}
+function contextDebugFingerprint(value: unknown): string {
+  const text = canonicalContext(value);
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++)
+    hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  return (hash >>> 0).toString(16);
+}
+function contextDebugPayload(payload: ContextPayload | undefined) {
+  if (!payload || !getContextDiagnosticTrace()) return null;
+  return {
+    content: payload.content.map((block) => ({
+      type: block.type,
+      fingerprint: contextDebugFingerprint(block),
+    })),
+    structured:
+      payload.structuredContent === undefined
+        ? null
+        : contextDebugFingerprint(payload.structuredContent),
+  };
+}
+
 /**
  * Per-runtime view-state document, model-context tree, and async flush pump.
  *
@@ -217,9 +248,28 @@ export class ModelContextStore {
   #inFlight: Promise<void> | null = null;
   #removeOpenAiListener: (() => void) | null = null;
 
-  /** Create a store backed by the owning view runtime's host connection. */
+  /** Record a bounded local trace without retaining attachment contents. */
+  #trace(event: string, detail: Record<string, unknown> = {}): void {
+    const trace = getContextDiagnosticTrace();
+    if (!trace) return;
+    trace.events.push({
+      seq: ++trace.sequence,
+      ms: Math.round(performance.now()),
+      event,
+      queued: this.#queued,
+      selected: this.#attachments.size,
+      sending: this.#sending?.revision ?? null,
+      desired: this.#desired?.revision ?? null,
+      acknowledged: contextDebugPayload(this.#acknowledged?.payload),
+      ...detail,
+    });
+    if (trace.events.length > 80) trace.events.shift();
+  }
+
+  /** Create a store backed by the owning view runtime's connection boundary. */
   constructor(host: ModelContextStoreHost) {
     this.#host = host;
+    this.#trace("constructed");
     void this.#disposal.catch(() => {});
     this.#hydrateFromChatGpt();
   }
@@ -654,6 +704,7 @@ export class ModelContextStore {
 
   /** Queue removal of one key; attachment-hook lifetime does not own that key. */
   readonly remove = (key: string): Promise<ContextOperationResult> => {
+    this.#trace("remove", { key: contextDebugFingerprint(key) });
     this.#images.get(key)?.cancel();
     return this.#enqueue(() => {
       const payload = this.buildModelContextParams();
@@ -666,6 +717,7 @@ export class ModelContextStore {
 
   /** Clear selected and preparing attachments, preserving background. */
   readonly clearSelection = (): Promise<ContextOperationResult> => {
+    this.#trace("clear");
     for (const image of this.#images.values()) image.cancel();
     return this.#enqueue(() => {
       const blocks = new Set(
@@ -725,6 +777,11 @@ export class ModelContextStore {
       const observation = readContextObservation(
         params[MODEL_CONTEXT_EXTENSION]
       );
+      this.#trace("host-notification", {
+        updateId: observation?.updateId ?? null,
+        contentProvided: observation?.contentProvided ?? false,
+        payload: contextDebugPayload(observation?.payload),
+      });
       if (this.#sending) {
         if (this.#observations.length >= 32)
           throw new Error(
@@ -739,11 +796,16 @@ export class ModelContextStore {
   }
 
   #block(error: unknown): void {
+    this.#trace("blocked");
     this.#blocked = error instanceof Error ? error : new Error(String(error));
     this.#fail(this.#blocked);
   }
 
   #restore(observation: ContextObservation | null): void {
+    this.#trace("restore", {
+      updateId: observation?.updateId ?? null,
+      payload: contextDebugPayload(observation?.payload),
+    });
     this.#backgroundSuppressed = observation === null;
     if (observation === null) {
       this.#hostBaseline = {
@@ -804,6 +866,27 @@ export class ModelContextStore {
     preceding?: ContextPublication | null
   ): void {
     if (this.#blocked) return;
+    this.#trace("reconcile", {
+      duringWrite,
+      updateId: observation?.updateId ?? null,
+      knownUpdate: observation
+        ? this.#history.has(observation.updateId)
+        : false,
+      payload: contextDebugPayload(observation?.payload),
+      preceding: contextDebugPayload(preceding?.payload),
+    });
+    if (
+      observation === null &&
+      this.#acknowledged === this.#hostBaseline &&
+      this.#acknowledged?.payload.content.length === 0 &&
+      this.#acknowledged.payload.structuredContent === undefined
+    ) {
+      this.#trace("accepted-empty-readback");
+      // Empty readback has no updateId. It agrees with an acknowledged empty
+      // publication regardless of ordering, so there is no removed evidence
+      // to resurrect. A clear racing a nonempty write still needs reconciliation.
+      return;
+    }
     if (observation && this.#history.has(observation.updateId)) {
       const sent = this.#history.get(observation.updateId)!;
       if (
@@ -827,6 +910,18 @@ export class ModelContextStore {
           "Cannot reconcile a model context revision without its content"
         )
       );
+      return;
+    }
+    if (
+      observation &&
+      this.#acknowledged === this.#hostBaseline &&
+      canonicalContext(observation.payload) === this.#acknowledged?.serialized
+    ) {
+      // A successful RPC may omit response correlation metadata. Full readback
+      // equal to that acknowledged payload establishes the same state without
+      // inferring an order between revision IDs. Differing readback stays guarded.
+      this.#remember(observation.updateId, this.#acknowledged);
+      this.#trace("accepted-equal-readback");
       return;
     }
     const candidates = [
@@ -1267,13 +1362,32 @@ export class ModelContextStore {
           }
           if (rich) assertContextSupport(app, publication.payload);
           dispatched = true;
+          this.#trace("write", {
+            revision: publication.revision,
+            payload: contextDebugPayload(publication.payload),
+          });
           const result = await app.updateModelContext(
             publication.payload as Parameters<App["updateModelContext"]>[0]
           );
           if (this.#disposed || sendEpoch !== this.#epoch) return;
           if (!rich) this.#legacyNativeAcknowledged = true;
-          if (rich && this.#openai)
-            this.#remember(contextUpdateId(result), publication);
+          if (rich && this.#openai) {
+            const updateId = contextUpdateId(result);
+            const extension = result._meta?.[MODEL_CONTEXT_EXTENSION];
+            const rawId =
+              extension && typeof extension === "object"
+                ? (extension as { updateId?: unknown }).updateId
+                : undefined;
+            this.#trace("ack", {
+              updateId: updateId ?? null,
+              revision: publication.revision,
+              metaPresent: result._meta !== undefined,
+              extensionType: extension === null ? "null" : typeof extension,
+              updateIdType: rawId === null ? "null" : typeof rawId,
+              updateIdNonempty: typeof rawId === "string" && rawId.length > 0,
+            });
+            if (updateId) this.#remember(updateId, publication);
+          }
         }
         if (this.#disposed || sendEpoch !== this.#epoch) return;
         this.#acknowledged = publication;

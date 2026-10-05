@@ -216,16 +216,12 @@ export function readContextObservation(
   });
 }
 
-/** Parse the acknowledgment without treating updateId as a clock or CAS token. @internal */
-export function contextUpdateId(result: unknown): string {
+/** Read optional response correlation; successful RPCs need not return an ID. @internal */
+export function contextUpdateId(result: unknown): string | undefined {
   const meta = (result as { _meta?: Record<string, unknown> } | undefined)
     ?._meta;
   const id = (
     meta?.[MODEL_CONTEXT_EXTENSION] as { updateId?: unknown } | undefined
   )?.updateId;
-  if (typeof id !== "string" || !id)
-    throw new Error(
-      "Missing OpenAI model context acknowledgment updateId; publication outcome is uncertain"
-    );
-  return id;
+  return typeof id === "string" && id.length > 0 ? id : undefined;
 }
