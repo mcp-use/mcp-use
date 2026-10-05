@@ -10,5 +10,7 @@
     "mcp-use": "2.7.3",
     "@mcp-use/tunnel": "0.2.1"
   },
-  "changesets": []
+  "changesets": [
+    "create-app-failed-scaffold-dir"
+  ]
 }

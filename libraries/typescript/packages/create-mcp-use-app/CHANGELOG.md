@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.9-canary.0
+
+### Patch Changes
+
+- b3408b9: A scaffold that fails before copying the template no longer leaves an empty project directory behind. An unknown or invalid `--template`, or a GitHub template that can't be cloned, used to leave `my-project/` in place, so retrying with a valid template failed with `Directory "my-project" already exists!` until the directory was deleted by hand.
+
 ## 2.0.8
 
 ### Patch Changes
