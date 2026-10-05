@@ -6,6 +6,15 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.15" description="October 2026">
+  ## Chat input toolbar spacing
+  Patch release paired with `mcp-use` v2.7.3, keeping multiline messages clear of the chat toolbar and updating dependencies.
+
+- **Fix**: chat input reserves space above the bottom toolbar so multiline text no longer overlaps its controls (`#2735`)
+- **Update**: update Hono to `^4.13.7` and refresh workspace dependency security floors (`#2746`)
+- **Update**: Updated mcp-use to v2.7.3
+</Update>
+
 <Update label="v20.3.14" description="September 2026">
   ## Disconnect abort & UserInfo proxy
   Patch release paired with `mcp-use` v2.7.2. The Express adapter stops holding upstream streams after the client leaves, and the OAuth proxy can fetch UserInfo.

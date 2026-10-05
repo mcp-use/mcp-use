@@ -615,10 +615,12 @@ export function parseMcpArguments(
   }
   const result: Record<string, unknown> = {};
   for (const token of argv) {
-    const typed = token.indexOf(":=");
+    // The key ends at the first "=". It is typed only when that "=" is the
+    // end of ":=", so a plain value may itself contain ":=".
     const plain = token.indexOf("=");
-    const separator = typed >= 0 ? typed : plain;
-    const width = typed >= 0 ? 2 : 1;
+    const typed = plain > 0 && token[plain - 1] === ":";
+    const separator = typed ? plain - 1 : plain;
+    const width = typed ? 2 : 1;
     if (separator <= 0) {
       throw new UsageError(
         `Expected key=value or key:=<json>, received: ${token}`
@@ -626,8 +628,9 @@ export function parseMcpArguments(
     }
     const key = token.slice(0, separator).replace(/^--/, "");
     const raw = token.slice(separator + width);
-    result[key] =
-      typed >= 0 ? parseJsonArgument(raw, `The value for "${key}"`) : raw;
+    result[key] = typed
+      ? parseJsonArgument(raw, `The value for "${key}"`)
+      : raw;
   }
   return result;
 }
