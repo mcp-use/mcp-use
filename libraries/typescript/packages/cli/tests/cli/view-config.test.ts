@@ -89,6 +89,92 @@ describe("static viewConfig extraction", () => {
       readViewConfig(source("export default () => <div/>;"))
     ).toBeUndefined();
   });
+  it("resolves a local constant named undefined before the global value", () => {
+    expect(
+      readViewConfig(
+        source(`const undefined = "fullscreen";
+      export const viewConfig = {preferredDisplayMode: undefined};`)
+      )
+    ).toEqual({ preferredDisplayMode: "fullscreen" });
+  });
+  it("still supports the unshadowed undefined value", () => {
+    expect(
+      readViewConfig(source("export const viewConfig = undefined;"))
+    ).toBeUndefined();
+  });
+  it("ignores type-only wildcard exports", () => {
+    expect(
+      readViewConfig(source('export type * from "./types";'))
+    ).toBeUndefined();
+  });
+  it("allows an explicit config to override a wildcard export", () => {
+    expect(
+      readViewConfig(
+        source(`export * from "./other";
+      export const viewConfig = {autoResize: false};`)
+      )
+    ).toEqual({ autoResize: false });
+  });
+  it("allows unrelated mutations and shadowed config names", () => {
+    expect(
+      readViewConfig(
+        source(`const modes = ["inline"];
+      export const viewConfig = {displayModes: modes};
+      const unrelated = []; unrelated.push("fullscreen");
+      function component(modes) { modes.push("fullscreen"); }
+      function other() { const modes = []; modes.push("fullscreen"); }
+      document.body.innerHTML = "browser only";`)
+      )
+    ).toEqual({ displayModes: ["inline"] });
+  });
+  it("allows primitive reads and independent shallow copies", () => {
+    expect(
+      readViewConfig(
+        source(`const modes = ["inline"];
+      export const viewConfig = {displayModes: modes, autoResize: true};
+      console.log(viewConfig.autoResize, viewConfig.displayModes.length);
+      const enabled = viewConfig.autoResize; console.log(enabled);
+      const clone = [...modes]; clone.push("fullscreen");
+      const flags = {...{autoResize: true}}; flags.autoResize = false;
+      const {autoResize} = viewConfig; console.log(autoResize);
+      function component() { return viewConfig.autoResize; }`)
+      )
+    ).toEqual({ displayModes: ["inline"], autoResize: true });
+  });
+  it("keeps switch block bindings separate from module constants", () => {
+    expect(
+      readViewConfig(
+        source(`const modes = ["inline"];
+      export const viewConfig = {displayModes: modes};
+      switch (1) { case 1: const modes = []; modes.push("fullscreen"); }`)
+      )
+    ).toEqual({ displayModes: ["inline"] });
+  });
+  it.each([
+    'export * from "./config";',
+    "export const viewConfig = {autoResize: true}; for (viewConfig.autoResize of [false]) {}",
+    `export const viewConfig = {autoResize: true}; mutate\`\${viewConfig}\`;`,
+    "const options = {defaultSize: {height: 10}}; export const viewConfig = options; const copy = {...options}; copy.defaultSize.height = 20;",
+    'let undefined = "fullscreen"; export const viewConfig = {preferredDisplayMode: undefined};',
+    'import {undefined} from "./config"; export const viewConfig = {preferredDisplayMode: undefined};',
+    "export const viewConfig = {preferredDisplayMode: /inline/};",
+    "export const viewConfig = {defaultSize: {height: 10n}};",
+    "export const viewConfig = {autoResize: true}; viewConfig.autoResize = false;",
+    "export const viewConfig = {defaultSize: {height: 10}}; viewConfig.defaultSize.height++;",
+    "export const viewConfig = {autoResize: true}; delete viewConfig.autoResize;",
+    'const modes = ["inline"]; modes.push("fullscreen"); export const viewConfig = {displayModes: modes};',
+    'const modes = ["inline"]; const alias = modes; alias[0] = "fullscreen"; export const viewConfig = {displayModes: modes};',
+    'export const viewConfig = {displayModes: ["inline"]}; const {displayModes} = viewConfig; displayModes.push("fullscreen");',
+    'const modes = ["inline"]; mutate(modes); export const viewConfig = {displayModes: modes};',
+    "export const viewConfig = {autoResize: true}; function mutate() { viewConfig.autoResize = false; } mutate();",
+  ])(
+    "rejects config values that cannot be immutable static data: %s",
+    (code) => {
+      expect(() => readViewConfig(source(code))).toThrow(
+        "Cannot statically extract viewConfig"
+      );
+    }
+  );
   it.each([
     "export const viewConfig = makeConfig();",
     'export let viewConfig = {displayModes: ["inline"]};',

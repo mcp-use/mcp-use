@@ -1,5 +1,6 @@
 import { MCPServer, registerViews } from "../src/index.js";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { normalizeViewConfig } from "../src/react/runtime/view-config.js";
 import type { ViewConfig } from "../src/react/runtime/view-config.js";
 
@@ -56,6 +57,34 @@ describe("viewConfig display preferences", () => {
         },
       })
     ).toThrow("must belong to displayModes");
+  });
+  it("does not retain views from a failed manifest when priming is retried", () => {
+    const server = new MCPServer({ name: "retry-view", version: "1" });
+    server.__primeSkills(undefined);
+    expect(() =>
+      server[registerViews]({
+        stale: { kind: "inline", js: "", css: "" },
+        invalid: {
+          kind: "inline",
+          js: "",
+          css: "",
+          viewConfig: {
+            displayModes: ["inline"],
+            preferredDisplayMode: "fullscreen",
+          },
+        },
+      })
+    ).toThrow("must belong to displayModes");
+    server[registerViews]({});
+    server.tool(
+      {
+        name: "stale-binding",
+        outputSchema: z.object({}),
+        view: { name: "stale" },
+      },
+      async () => ({ structuredContent: {}, content: [] })
+    );
+    expect(() => server.__mount()).toThrow(/not in the primed views registry/);
   });
   it("continues to reject a null support list", () => {
     expect(() =>
