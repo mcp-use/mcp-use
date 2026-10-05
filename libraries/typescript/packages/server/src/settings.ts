@@ -77,6 +77,10 @@ function object(value: unknown, label: string): Record<string, unknown> {
     throw new TypeError(`${label} must be an object`);
   return value as Record<string, unknown>;
 }
+function array(value: unknown, label: string): readonly unknown[] {
+  if (!Array.isArray(value)) throw new TypeError(`${label} must be an array`);
+  return value;
+}
 function nonBlank(value: unknown, label: string): asserts value is string {
   if (typeof value !== "string" || !value.trim())
     throw new TypeError(`${label} must be a non-blank string`);
@@ -180,16 +184,12 @@ export function prepareSettings<Fields extends SettingsFields>(
   const layout =
     options.layout === undefined ? undefined : structuredClone(options.layout);
   if (layout !== undefined) {
-    if (!Array.isArray(layout))
-      throw new TypeError("Settings layout must be an array");
-    for (const groupValue of layout) {
+    for (const groupValue of array(layout, "Settings layout")) {
       const group = object(groupValue, "Settings layout group");
       if (group.kind !== "group")
         throw new TypeError("Settings layout groups must have kind 'group'");
       nonBlank(group.title, "Settings layout group title");
-      if (!Array.isArray(group.items))
-        throw new TypeError("Settings layout group items must be an array");
-      for (const itemValue of group.items) {
+      for (const itemValue of array(group.items, "Settings layout group items")) {
         const item = object(itemValue, "Settings layout item");
         if (item.kind === "property") {
           nonBlank(item.property, "Settings layout property");
