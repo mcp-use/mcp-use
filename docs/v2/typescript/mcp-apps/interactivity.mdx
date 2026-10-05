@@ -10,7 +10,6 @@ Interactions in a View can target the MCP server, the model, the host, or the mo
 | ------------------------------------------ | ------------------- |
 | Call a server tool from the View           | `useCallTool()`     |
 | Ask the model to continue the conversation | `useSendFollowUp()` |
-| Read an incoming app route                 | `useDeepLink()`     |
 | Open a URL through the host                | `useOpenExternal()` |
 | Change how the host displays the View      | `useDisplayMode()`  |
 | Let the model act on the mounted View      | `useViewTool()`     |
@@ -191,47 +190,3 @@ export function FruitResults() {
 
 - Use [Model context](/v2/typescript/mcp-apps/model-context) to share View state and visible UI information with the model.
 - Configure [Content Security Policy](/v2/typescript/mcp-apps/content-security-policy) before connecting to external APIs or loading external assets.
-
-## Read an incoming deep link
-
-ChatGPT can open or focus a global entrypoint at an app-relative URL. Use `useDeepLink()` to read that URL through the View's existing MCP Apps connection. It reads the initial host context after connection and updates when another deep link arrives.
-
-The hook returns `{ url: string | undefined }`. `undefined` means the host has supplied no deep link, including hosts that do not support this extension. No separate capability check is required.
-
-```tsx
-import { useEffect, useState } from "react";
-import { useDeepLink } from "mcp-use/react";
-
-export function PartsBrowser() {
-  const { url } = useDeepLink();
-  const [path, setPath] = useState(() => url ?? "/parts");
-
-  useEffect(() => {
-    if (url !== undefined) setPath(url);
-  }, [url]);
-
-  // Validate the route before loading data; authorize data access on the server.
-  if (path === "/parts") {
-    return (
-      <button type="button" onClick={() => setPath("/parts/hex-bolt")}>
-        Open hex bolt
-      </button>
-    );
-  }
-  if (path === "/parts/hex-bolt") return <p>Hex bolt</p>;
-  return <p>Unknown route</p>;
-}
-```
-
-The host provides the URL in `hostContext["openai/deepLink"].url`. The hook also normalizes older hosts' `path` and `query` payloads to this URL shape, matching the official OpenAI Extensions getter. The URL starts with `/`, may include a query string, and cannot contain a fragment. Route parsing and local navigation belong to your application; changing `path` does not update a host URL. The hook subscribes to incoming context and cleans up on unmount.
-
-To construct a web link, encode the plugin ID, entrypoint tool name, and entire app-relative URL:
-
-```ts
-const appPath = "/parts?tag=bolt&sort=asc";
-const link =
-  `https://chatgpt.com/plugins/${encodeURIComponent(pluginId)}` +
-  `/app/${encodeURIComponent(toolName)}?path=${encodeURIComponent(appPath)}`;
-```
-
-See the [OpenAI deep-link specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#deep-links) for native link formats and platform support.
