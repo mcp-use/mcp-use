@@ -1,10 +1,11 @@
 ---
 title: "ChatGPT Extensions"
-description: "Configure ChatGPT app entrypoints, deep links, structured settings, and initial display modes with the TypeScript SDK."
+description: "Add selected model context, app entrypoints, deep links, structured settings, and display modes with the TypeScript SDK."
 icon: "/images/icons/openai.svg"
 ---
 
-Use ChatGPT Extensions to add app launchers, file viewers, incoming routes, native settings, and an initial display preference.
+Use ChatGPT Extensions to add app launchers, file viewers, incoming routes, native settings, and selected model context.
+You can also set an initial display preference.
 The TypeScript SDK converts your declarations to OpenAI extension metadata.
 The host controls which extensions users can access.
 
@@ -12,13 +13,14 @@ Start with a [view-bound MCP App](/v2/typescript/mcp-apps/quickstart).
 Each view needs one bound tool and an `outputSchema`.
 The examples below use the v2 TypeScript API.
 
-| Goal                                          | API                                               |
-| --------------------------------------------- | ------------------------------------------------- |
-| Open an app from navigation or a conversation | `tool.view.entrypoints` with `global` or `thread` |
-| Open a file in a custom viewer                | `tool.view.entrypoints` with `file`               |
-| Read an incoming app route                    | `useDeepLink()`                                   |
-| Add native settings and action buttons        | `server.settings()`                               |
-| Request an initial presentation               | `viewConfig.preferredDisplayMode`                 |
+| Goal                                            | API                                               |
+| ----------------------------------------------- | ------------------------------------------------- |
+| Open an app from navigation or a conversation   | `tool.view.entrypoints` with `global` or `thread` |
+| Open a file in a custom viewer                  | `tool.view.entrypoints` with `file`               |
+| Read an incoming app route                      | `useDeepLink()`                                   |
+| Add native settings and action buttons          | `server.settings()`                               |
+| Attach selected evidence to the next model turn | `useModelContext()`                               |
+| Request an initial presentation                 | `viewConfig.preferredDisplayMode`                 |
 
 ## Check host support
 
@@ -37,6 +39,264 @@ Availability depends on the host release.
 ChatGPT supports `inline` and `fullscreen` display modes.
 Other MCP Apps hosts can support `pip`.
 Test each extension in the host that your users use.
+
+## Attach evidence to the next model turn
+
+Use `useModelContext()` when the user selects evidence to send with the next model turn.
+For example, add a book summary when the user selects **Add to chat**.
+Keep cart actions separate from attachment actions.
+
+Import the hook from `mcp-use/react` and render it in your view.
+The hook activates native context delivery. It needs no `viewConfig` option.
+The SDK checks host capabilities during initialization and checks each block before delivery.
+Calls made during initialization wait for the host connection.
+
+### Add, remove, and clear selected evidence
+
+This component adds a summary, lists selected attachments, and lets the user remove or clear them.
+It catches action errors and shows the shared delivery error.
+
+```tsx
+import { useState } from "react";
+import {
+  useModelContext,
+  type ModelContextOperationResult,
+} from "mcp-use/react";
+
+export default function BookEvidence() {
+  const { attachments, pending, error, add, remove, clearAttachments } =
+    useModelContext();
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<Error | null>(null);
+
+  async function run(action: () => Promise<ModelContextOperationResult>) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await action();
+    } catch (failure) {
+      setActionError(
+        failure instanceof Error ? failure : new Error(String(failure)),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const disabled = busy || pending;
+  const failure = actionError ?? error;
+
+  return (
+    <section aria-label="Chat context">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          void run(() =>
+            add("book:summary", {
+              type: "text",
+              title: "Selected book",
+              text: "The selected edition contains 12 illustrated chapters.",
+            }),
+          );
+        }}
+      >
+        Add to chat
+      </button>
+      <ul>
+        {attachments.map(({ key, block }) => (
+          <li key={key}>
+            {block.title ?? block.type}
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                void run(() => remove(key));
+              }}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        disabled={disabled || attachments.length === 0}
+        onClick={() => {
+          void run(clearAttachments);
+        }}
+      >
+        Clear attachments
+      </button>
+      {pending && <p role="status">Updating context…</p>}
+      {failure && <p role="alert">{failure.message}</p>}
+    </section>
+  );
+}
+```
+
+The hook returns these fields and methods:
+
+| Member               | Behavior                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `attachments`        | Read-only list of selected `{ key, block }` entries. The list can include unsynced entries after a delivery failure.          |
+| `pending`            | `true` during initialization, image preparation, batching, or delivery. `false` alone does not prove that delivery succeeded. |
+| `error`              | Shared delivery or reconciliation error, or `null`. Catch each action's rejection to show validation and preparation errors.  |
+| `add(key, block)`    | Add one attachment or replace the value at the same key. Keep the other attachments.                                          |
+| `remove(key)`        | Remove one selected attachment. Use the key returned in `attachments`, including for restored entries.                        |
+| `clearAttachments()` | Clear the shared attachment collection. Keep separately managed view state, descriptions, and restored background context.    |
+
+Each method returns `Promise<{ status: "synced" | "superseded" }>`.
+`"synced"` confirms context delivery, not permanent selection or a visible composer chip.
+`"superseded"` means a newer action replaced the operation before acknowledgment.
+Catch rejected promises as shown above.
+
+Use distinct, stable application keys, such as `book:summary` and `book:cover`.
+Keys are shared across all hook instances in one view runtime.
+Exact duplicate blocks under different keys reject.
+Unmounting a hook consumer does not clear its selections.
+
+### Choose a content block
+
+The hook supports four block types: `text`, `image`, `resource_link`, and `resource`.
+Each type accepts a friendly top-level `title`.
+The title is also available in `attachments[i].block.title` after host restoration.
+
+These blocks can replace the text block in the example above.
+For the image and thumbnail, put a cover at `public/covers/book.png`.
+
+```typescript
+import type { ModelContextBlock } from "mcp-use/react";
+
+export const bookEvidence = {
+  summary: {
+    type: "text",
+    title: "Book details",
+    text: "An illustrated guide to garden plants, with 12 chapters.",
+    thumbnail: { src: "/covers/book.png", mimeType: "image/png" },
+  },
+  cover: {
+    type: "image",
+    title: "Book cover",
+    src: "/covers/book.png",
+  },
+  manual: {
+    type: "resource_link",
+    title: "Book manual",
+    name: "manual.pdf",
+    uri: "https://example.com/books/manual.pdf",
+    mimeType: "application/pdf",
+  },
+  sample: {
+    type: "resource",
+    title: "Reading sample",
+    resource: {
+      uri: "bookshop://books/garden-guide/sample",
+      mimeType: "text/plain",
+      text: "Chapter 1: Choose plants for the light in your garden.",
+    },
+  },
+} satisfies Record<string, ModelContextBlock>;
+```
+
+Text blocks can include a `thumbnail` with an MCP Icon shape.
+The thumbnail path resolves like the `Image` component's public path and stays a URL.
+The SDK does not fetch thumbnail bytes. ChatGPT iOS currently ignores thumbnails.
+
+Image `src` uses the same public path resolver as `Image`, including proxy and asset-host configuration.
+Absolute URLs pass through the resolver.
+The SDK fetches the image and converts it to native base64 content before changing the selection.
+Source responses must contain PNG, JPEG, GIF, or WebP bytes with the matching `Content-Type`.
+Browser CORS rules apply to remote URLs.
+
+You can also supply base64 bytes directly:
+
+```typescript
+import type { ModelContextImage } from "mcp-use/react";
+
+export function bookCoverFromBytes(data: string): ModelContextImage {
+  return { type: "image", title: "Book cover", data, mimeType: "image/png" };
+}
+```
+
+Use either `src` or `data` plus `mimeType` in an image block.
+Do not combine these forms.
+Returned image attachments contain `data` and `mimeType`, even when you supply `src`.
+
+During image preparation, `pending` is `true` and the previous selection stays visible.
+Other ready keys can sync independently.
+A fetch failure, unsupported or missing `Content-Type`, or empty response rejects the action and preserves the previous attachment.
+A later `add` or `remove` for the same key, or `clearAttachments`, cancels preparation and returns `"superseded"` for that action.
+A late fetch response cannot restore the canceled attachment.
+
+Named types include `ModelContextText`, `ModelContextImage`, `ModelContextResourceLink`, and `ModelContextResource`.
+All are exported from `mcp-use/react`.
+A resource link uses its native `title` field, which takes precedence over unrelated title metadata.
+Text and image titles use OpenAI metadata.
+Embedded-resource titles use SDK metadata; host display of these titles can vary.
+Raw metadata and annotations are preserved. Conflicting shorthand and wire fields reject.
+Audio blocks are not supported.
+
+### Respect host removals
+
+OpenAI host context can restore surviving attachments when the view initializes.
+Restored keys start with `@restored:` and belong to that runtime.
+Use these returned keys to remove restored entries.
+Do not use the reserved prefix for new keys or infer original keys from titles, resource URIs, or list positions.
+
+Confirmed host removals update `attachments` where the SDK can identify the removed blocks.
+Do not add the same evidence again from a render effect or a cart update.
+Keep removable evidence out of duplicate `useViewState` values or `ModelContext` descriptions.
+
+The optional `audience` field accepts `"user"` and `"assistant"` and maps to MCP annotations.
+Audience controls presentation. All blocks still reach the model.
+Assistant-only content can be restored as background instead of a visible attachment.
+Removal affects current context; it does not erase previous conversation turns or backend data.
+
+### Combine context hooks
+
+Render `useModelContext` in the initial view tree when you also use `useViewState` or `ModelContext`.
+The runtime sends attachments, structured view state, and descriptions through one native writer.
+State and descriptions keep their model-visible JSON projection.
+`clearAttachments()` preserves those separate contributions.
+See [Model context](/v2/typescript/mcp-apps/model-context) to choose a channel for each value.
+
+On OpenAI hosts, native host context restores model-visible state after the hook activates.
+Private widget state keeps its separate persistence channel.
+Views that do not render `useModelContext` keep their existing widget-state transport.
+
+Activation rejects if model-visible widget `modelContent` or `imageIds` already exists, or a widget-state write was dispatched.
+The SDK does not clear that persisted context for you.
+Use a view without the conflicting state; reopening alone can retain the conflict.
+A prior native write must finish, and OpenAI host readback must match the acknowledged context before activation.
+
+### Handle delivery failures
+
+A definite host rejection retains the requested selection and sets the shared `error`.
+The next valid `add`, `remove`, or `clearAttachments` makes one fresh delivery attempt with the current selection.
+Invalid input and background updates do not trigger another attempt.
+The public hook has no retry method or automatic retry loop.
+
+A successful model-context response does not require an OpenAI `updateId` in its metadata.
+When present and valid, the SDK uses that ID to correlate a whole context revision.
+The ID is not an attachment key or a compare-and-swap token.
+
+Uncertain transport outcomes or ambiguous host ordering stop further publication and reject subsequent mutations.
+A request that was already sent cannot be recalled.
+Wait for outstanding remote writes to finish before you open a fresh view runtime.
+Another notification or a hook remount does not establish that writes have finished.
+
+### Verify attachment behavior
+
+1. Open the view in the host that your users use.
+2. Add a summary and a cover under different keys. Check that both remain selected.
+3. Remove one attachment in the view. Check that the other remains.
+4. Clear the attachments, then add one again.
+5. Where the host supports composer removal, remove an attachment there and check the view's list.
+6. Change the cart or filter state. Check that removed evidence does not return.
+
+A simulated host can check protocol delivery and errors.
+Use the native host to check composer chips, thumbnails, and host removal behavior.
 
 ## Add global and thread entrypoints
 
@@ -398,9 +658,10 @@ Components can read the configuration through calls such as `useState` and `useM
 
 <Warning>
   Declare and export `viewConfig` locally in the view module. A value `export *`
-  without a local configuration causes an extraction error because tooling cannot
-  resolve the configuration through another module. Type-only wildcard exports
-  are allowed, as are unrelated value wildcards alongside a local configuration.
+  without a local configuration causes an extraction error because tooling
+  cannot resolve the configuration through another module. Type-only wildcard
+  exports are allowed, as are unrelated value wildcards alongside a local
+  configuration.
 </Warning>
 
 ### Request a mode at runtime
