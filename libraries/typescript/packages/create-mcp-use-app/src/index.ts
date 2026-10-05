@@ -643,6 +643,11 @@ async function copyTemplate(
   );
 }
 
+/**
+ * Copy a template into `dest`, creating it. The project directory is only
+ * created here, so a scaffold that fails earlier (unknown template, failed
+ * clone) leaves nothing behind for the next attempt to trip over.
+ */
 function copyDirectoryWithProcessing(
   src: string,
   dest: string,
@@ -650,6 +655,7 @@ function copyDirectoryWithProcessing(
   isDevelopment: boolean
 ) {
   const entries = readdirSync(src, { withFileTypes: true });
+  mkdirSync(dest, { recursive: true });
 
   for (const entry of entries) {
     if (entry.name === ".git") {
@@ -661,7 +667,6 @@ function copyDirectoryWithProcessing(
     const destPath = join(dest, destName);
 
     if (entry.isDirectory()) {
-      mkdirSync(destPath, { recursive: true });
       copyDirectoryWithProcessing(srcPath, destPath, versions, isDevelopment);
     } else if (entry.name === "package.json" || entry.name.endsWith(".json")) {
       const processedContent = processTemplateFile(
@@ -924,10 +929,6 @@ async function main(): Promise<void> {
     mcpUseVersion = defaultVersion;
   }
   const versions = { "mcp-use": mcpUseVersion };
-
-  if (!useCurrentDir) {
-    mkdirSync(projectPath, { recursive: true });
-  }
 
   console.log(ansi.cyan(`🚀 Creating MCP server "${displayName}"...`));
 
