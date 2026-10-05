@@ -1,4 +1,4 @@
-import type { ContentPart, ProviderConfig, TextContentPart } from "../types.js";
+import type { ContentPart, ProviderConfig } from "../types.js";
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
