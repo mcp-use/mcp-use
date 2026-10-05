@@ -1,6 +1,7 @@
 import type { ContentBlock } from "@modelcontextprotocol/server";
 import { ContentBlockSchema, IconSchema } from "@modelcontextprotocol/core";
 import type { App } from "@modelcontextprotocol/ext-apps";
+import { publicAsset } from "../public-assets.js";
 import type { ModelContextBlock } from "../types/model-context.js";
 import {
   canonicalContext,
@@ -12,10 +13,15 @@ import {
 export const MODEL_CONTEXT_EXTENSION = "openai/modelContext";
 
 const RESOURCE_TITLE = "mcp-use/title";
-const presentationCache = new WeakMap<ContentBlock, ModelContextBlock>();
+const presentationCache = new WeakMap<
+  ContentBlock,
+  ModelContextBlock & ContentBlock
+>();
 
 /** Decode friendly presentation without changing the canonical wire block. @internal */
-export function presentContextBlock(block: ContentBlock): ModelContextBlock {
+export function presentContextBlock(
+  block: ContentBlock
+): ModelContextBlock & ContentBlock {
   const cached = presentationCache.get(block);
   if (cached) return cached;
   const meta = block._meta;
@@ -34,7 +40,7 @@ export function presentContextBlock(block: ContentBlock): ModelContextBlock {
       meta?.["openai/thumbnail"] !== undefined && {
         thumbnail: meta["openai/thumbnail"],
       }),
-  }) as ModelContextBlock;
+  }) as ModelContextBlock & ContentBlock;
   presentationCache.set(block, presented);
   return presented;
 }
@@ -51,8 +57,47 @@ export interface ContextObservation {
   payload: ContextPayload;
 }
 
+/** Normalize author input separately from strict native host readback. @internal */
+export function normalizeContextInput(input: ModelContextBlock): {
+  /** Validated native presentation; source image bytes are filled after fetching. */
+  block: ContentBlock;
+  /** Resolved image URL, when conversion is required. */
+  source?: string;
+} {
+  if (input.type === "image" && "src" in input) {
+    if (typeof input.src !== "string" || !input.src.trim())
+      throw new TypeError("Image src must be a nonempty string");
+    if ("data" in input || "mimeType" in input)
+      throw new TypeError("Image src and data/mimeType are mutually exclusive");
+    const { src, ...fields } = input;
+    return {
+      source: publicAsset(src),
+      block: normalizeContextBlock({
+        ...fields,
+        data: "AA==",
+        mimeType: "image/png",
+      }),
+    };
+  }
+  const block =
+    input.type === "text" && input.thumbnail
+      ? {
+          ...input,
+          thumbnail: {
+            ...input.thumbnail,
+            src: publicAsset(input.thumbnail.src),
+          },
+        }
+      : input;
+  return { block: normalizeContextBlock(block) };
+}
+
 /** Normalize convenience fields, preserving raw metadata and annotations. @internal */
 export function normalizeContextBlock(input: ModelContextBlock): ContentBlock {
+  if ("src" in input)
+    throw new TypeError(
+      "Native model context requires image data and mimeType"
+    );
   const block = { ...input } as Record<string, unknown>;
   const meta = { ...(input._meta ?? {}) };
   const annotations = { ...(input.annotations ?? {}) };
@@ -163,7 +208,7 @@ export function readContextObservation(
     contentProvided: state.content !== undefined,
     structuredProvided: state.structuredContent !== undefined,
     payload: {
-      content,
+      content: content as ContentBlock[],
       ...(state.structuredContent !== undefined && {
         structuredContent: state.structuredContent as Record<string, unknown>,
       }),

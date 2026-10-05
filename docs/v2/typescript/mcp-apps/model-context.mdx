@@ -87,22 +87,33 @@ Every kind accepts an optional top-level `title`, and `attachments[i].block.titl
 
 Text-only `thumbnail` accepts an MCP Icon; ChatGPT iOS currently ignores thumbnails. `audience` maps to MCP annotations. Both are decoded on returned blocks. Native resource data, raw metadata, and annotations are preserved; conflicting shorthand and its recognized wire field reject. Audio is not supported.
 
-### Convert an image URL
+### Attach an image from public assets
 
-`imageFromUrl` fetches and converts an image without changing the attachment selection:
+Use the same source path as the `Image` component. The SDK resolves root-relative paths through the view's request-scoped public base, including proxy and asset-host configuration:
 
 ```ts
-import { imageFromUrl } from "mcp-use/react";
+await add(book.id, {
+  type: "image",
+  src: "/covers/book.png",
+  title: book.title,
+});
 
-const image = await imageFromUrl(coverUrl, { title: book.title });
-await add(book.id, image);
+await add(`${book.id}:details`, {
+  type: "text",
+  text: details,
+  thumbnail: { src: "/covers/book.png", mimeType: "image/png" },
+});
 ```
 
-It accepts PNG, JPEG, GIF, and WebP responses, validates HTTP status and Content-Type, and rejects empty bodies or fetch/read failures. Browser CORS rules apply. Pass an optional `signal` to cancel a stale request before adding its result.
+Image sources are fetched internally and converted to native base64 blocks. PNG, JPEG, GIF, and WebP responses are supported; HTTP failures, unsupported or missing Content-Type, empty bodies, and fetch/read failures reject the action without replacing the previous attachment. Browser CORS rules apply. Alternatively, supply native `data` plus `mimeType`; this form is mutually exclusive with `src`. Returned image attachments contain the prepared native bytes.
+
+Text thumbnail paths use the same resolver but remain URLs on the wire and are never fetched by the SDK. Absolute URLs pass through as they do for `Image`.
+
+While an image is being prepared, `pending` is true and the previous selection stays visible. Other ready keys can sync independently. A later same-key `add`, `remove`, or `clearAttachments` cancels pending preparation and settles that action as `superseded`; late network completion cannot re-add it. Disposal or a delivery failure rejects outstanding preparation. No separate conversion helper or cancellation option is required.
 
 Every mutation returns `Promise<{ status: "synced" | "superseded" }>`. A superseded result means a newer action replaced that operation before acknowledgment. Input validation and unsupported modalities reject without changing the shared synchronization error. Calls made during initialization wait for the shared handshake before committing selections.
 
-`attachments` is the effective selection, including unsynced entries after a failure. `pending` covers initialization, batching, and delivery; `pending === false` alone does not mean saved. Use local button state while awaiting each action and display the shared `error` for delivery failures. A definite host rejection leaves the requested selection in place, rejects outstanding operations, and stops automatic publication. The next valid `add`, `remove`, or `clearAttachments` makes one fresh attempt using the current selection. Invalid input and background updates do not retry it. There is no public retry operation or timer-based retry loop. A successful generic-host call acknowledges context delivery without promising composer chips. Capability checks remain internal; an empty modality advertisement does not support every type.
+`attachments` is the effective selection, including unsynced entries after a failure. `pending` covers initialization, image preparation, batching, and delivery; `pending === false` alone does not mean saved. Use local button state while awaiting each action and display the shared `error` for delivery failures. A definite host rejection leaves the requested selection in place, rejects outstanding operations, and stops automatic publication. The next valid `add`, `remove`, or `clearAttachments` makes one fresh attempt using the current selection. Invalid input and background updates do not retry it. There is no public retry operation or timer-based retry loop. A successful generic-host call acknowledges context delivery without promising composer chips. Capability checks remain internal; an empty modality advertisement does not support every type.
 
 ### Respect host removals and restore context
 

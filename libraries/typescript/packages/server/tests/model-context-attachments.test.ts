@@ -853,3 +853,256 @@ it.each([
     expect(writes).toHaveLength(1);
   }
 );
+
+describe("image source preparation", () => {
+  const image = (src = "/cover.png") => ({
+    type: "image" as const,
+    src,
+    title: "Cover",
+  });
+  const response = () =>
+    new Response(new Uint8Array([0, 1, 255]), {
+      headers: { "Content-Type": "image/png" },
+    });
+
+  it("resolves image and thumbnail public paths consistently and snapshots input before fetching", async () => {
+    vi.stubGlobal("__mcpUseViewConfig", {
+      publicBase: "https://cdn.example/proxy/public/",
+    });
+    const download = deferred<Response>();
+    const fetcher = vi.fn(() => download.promise);
+    vi.stubGlobal("fetch", fetcher);
+    const { store, writes, responses } = fixture();
+    const input = {
+      ...image(),
+      audience: ["user" as const],
+      _meta: { note: "original" },
+    };
+    const add = store.add("cover", input);
+    input.src = "/changed.png";
+    input.title = "Changed";
+    input._meta.note = "changed";
+    await tick();
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://cdn.example/proxy/public/cover.png",
+      { signal: expect.any(AbortSignal) }
+    );
+    const detail = store.add("details", {
+      ...text("Details"),
+      thumbnail: { src: "/cover.png", mimeType: "image/png" },
+    });
+    await tick();
+    expect(writes[0]!.content[0]!._meta?.["openai/thumbnail"]).toEqual({
+      src: "https://cdn.example/proxy/public/cover.png",
+      mimeType: "image/png",
+    });
+    responses[0]!.resolve(ack("details"));
+    await detail;
+    expect(store.getSnapshot().pending).toBe(true);
+    download.resolve(response());
+    await tick();
+    expect(writes[1]!.content[1]).toMatchObject({
+      type: "image",
+      data: "AAH/",
+      mimeType: "image/png",
+      _meta: { "openai/title": "Cover", note: "original" },
+      annotations: { audience: ["user"] },
+    });
+    expect(writes[1]!.content[1]).not.toHaveProperty("src");
+    responses[1]!.resolve(ack("image"));
+    await add;
+    expect(store.getSnapshot().pending).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["replace", "remove", "clear"] as const)(
+    "%s supersedes a hung fetch without late resurrection",
+    async (action) => {
+      const download = deferred<Response>();
+      const fetcher = vi.fn(() => download.promise);
+      vi.stubGlobal("fetch", fetcher);
+      const { store, writes, responses } = fixture();
+      const add = store.add("cover", image());
+      await tick();
+      const next =
+        action === "replace"
+          ? store.add("cover", text("new"))
+          : action === "remove"
+            ? store.remove("cover")
+            : store.clearSelection();
+      await expect(add).resolves.toEqual({ status: "superseded" });
+      await tick();
+      responses[0]!.resolve(ack("next"));
+      await next;
+      const count = writes.length;
+      download.resolve(response());
+      await tick();
+      expect(writes).toHaveLength(count);
+      expect(store.getSnapshot().pending).toBe(false);
+      expect(store.getSnapshot().attachments.map((a) => a.block)).toEqual(
+        action === "replace" ? [text("new")] : []
+      );
+    }
+  );
+
+  it("cancels a hung body and does not let invalid mixed input supersede valid preparation", async () => {
+    const body = deferred<ArrayBuffer>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({ "Content-Type": "image/png" }),
+        arrayBuffer: () => body.promise,
+      })
+    );
+    const { store, responses, writes } = fixture();
+    const add = store.add("cover", image());
+    await tick();
+    const mixed = {
+      type: "image" as const,
+      src: "/bad",
+      data: "AA==",
+      mimeType: "image/png",
+    };
+    // @ts-expect-error src and native data are mutually exclusive
+    const invalid: ModelContextBlock = mixed;
+    // @ts-expect-error native data requires its MIME type
+    const incomplete: ModelContextBlock = { type: "image", data: "AA==" };
+    await expect(store.add("cover", invalid)).rejects.toThrow(
+      "mutually exclusive"
+    );
+    await expect(store.add("cover", incomplete)).rejects.toThrow();
+    expect(store.getSnapshot().pending).toBe(true);
+    const clear = store.clearSelection();
+    await expect(add).resolves.toEqual({ status: "superseded" });
+    await tick();
+    responses[0]!.resolve(ack("clear"));
+    await clear;
+    body.resolve(new Uint8Array([2]).buffer);
+    await tick();
+    expect(writes).toHaveLength(1);
+  });
+
+  it("keeps existing selection after fetch failure and permits the next explicit replacement", async () => {
+    const { store, writes, responses } = fixture();
+    const original = store.add("cover", text("original"));
+    await tick();
+    responses[0]!.resolve(ack("original"));
+    await original;
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error("network down"))
+        .mockResolvedValueOnce(response())
+    );
+    await expect(store.add("cover", image())).rejects.toThrow("network down");
+    expect(store.getSnapshot()).toMatchObject({
+      pending: false,
+      error: null,
+      attachments: [{ key: "cover", block: text("original") }],
+    });
+    expect(writes).toHaveLength(1);
+    const next = store.add("cover", image());
+    await tick();
+    responses[1]!.resolve(ack("replaced"));
+    await next;
+    expect(store.getSnapshot().attachments[0]!.block.type).toBe("image");
+  });
+
+  it("lets independent image keys finish in reverse order", async () => {
+    const first = deferred<Response>();
+    const second = deferred<Response>();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise)
+    );
+    const { store, writes, responses } = fixture();
+    const a = store.add("a", image("/a.png"));
+    const b = store.add("b", { ...image("/b.png"), title: "B" });
+    await tick();
+    second.resolve(response());
+    await tick();
+    responses[0]!.resolve(ack("b"));
+    await b;
+    expect(store.getSnapshot()).toMatchObject({
+      pending: true,
+      attachments: [{ key: "b" }],
+    });
+    first.resolve(response());
+    await tick();
+    expect(writes[1]!.content).toHaveLength(2);
+    responses[1]!.resolve(ack("a"));
+    await a;
+  });
+
+  it("rejects unsupported images before fetching and strict readback rejects src", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const { store } = fixture({ support: { text: {} } });
+    await expect(store.add("cover", image())).rejects.toThrow("image");
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(store.getSnapshot()).toMatchObject({ pending: false, error: null });
+    const malformed = fixture({
+      initial: { updateId: "bad", content: [image()] },
+    });
+    await expect(malformed.store.prepare()).rejects.toThrow(
+      "Native model context"
+    );
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects a hung preparation promptly on disposal or uncertain host write", async () => {
+    for (const dispose of [true, false]) {
+      const download = deferred<Response>();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => download.promise)
+      );
+      const { store, writes, responses } = fixture();
+      const add = store.add("cover", image());
+      const rejected = expect(add).rejects.toThrow(
+        dispose ? "disposed" : "uncertain"
+      );
+      await tick();
+      if (dispose) store.dispose();
+      else {
+        const other = store.add("other", text("other"));
+        const failed = expect(other).rejects.toThrow("uncertain");
+        await tick();
+        responses[0]!.reject(new Error("uncertain"));
+        await failed;
+      }
+      await rejected;
+      const count = writes.length;
+      download.resolve(response());
+      await tick();
+      expect(writes).toHaveLength(count);
+      expect(store.getSnapshot().pending).toBe(false);
+    }
+  });
+
+  it("preserves host removal while a replacement is downloading", async () => {
+    const { store, writes, responses, observe } = fixture();
+    const original = store.add("cover", text("original"));
+    await tick();
+    responses[0]!.resolve(ack("original"));
+    await original;
+    const download = deferred<Response>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => download.promise)
+    );
+    const replacement = store.add("cover", image());
+    await tick();
+    observe({ updateId: "removed", content: [] });
+    await expect(replacement).resolves.toEqual({ status: "superseded" });
+    download.resolve(response());
+    await tick();
+    expect(writes).toHaveLength(1);
+    expect(store.getSnapshot().attachments).toEqual([]);
+  });
+});

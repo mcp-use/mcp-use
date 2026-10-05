@@ -4,11 +4,12 @@ import {
   assertContextSupport,
   contextUpdateId,
   MODEL_CONTEXT_EXTENSION,
-  normalizeContextBlock,
+  normalizeContextInput,
   presentContextBlock,
   readContextObservation,
   type ContextObservation,
 } from "./model-context-wire.js";
+import { fetchContextImage } from "./model-context-image.js";
 import type { ContentBlock } from "@modelcontextprotocol/server";
 import {
   buildContextPayload,
@@ -60,6 +61,11 @@ interface OpenAiSetGlobalsEvent extends Event {
 
 interface Attachment extends ContextAttachment {
   generation: number;
+}
+
+interface ImagePreparation {
+  controller: AbortController;
+  cancel(error?: Error): void;
 }
 
 interface Operation {
@@ -176,6 +182,7 @@ export class ModelContextStore {
   });
   #initialized = false;
   #queued = 0;
+  readonly #images = new Map<string, ImagePreparation>();
   #defaultState: ViewState | null = null;
   #earlyStateUpdates: Array<(previous: ViewState | null) => ViewState> = [];
   #restoredBackground: ContentBlock[] = [];
@@ -577,17 +584,20 @@ export class ModelContextStore {
     key: string,
     input: ModelContextBlock
   ): Promise<ContextOperationResult> => {
-    let block: ContentBlock;
+    let normalized: ReturnType<typeof normalizeContextInput>;
     try {
       if (!key || key.startsWith("@restored:"))
         throw new TypeError(
           "Attachment key is empty or uses the reserved @restored: namespace"
         );
-      block = normalizeContextBlock(input);
+      normalized = normalizeContextInput(input);
     } catch (error) {
       return Promise.reject(error);
     }
-    return this.#enqueue(() => {
+    if (this.#disposed)
+      return Promise.reject(new Error("Model context store has been disposed"));
+    this.#images.get(key)?.cancel();
+    const commit = (block: ContentBlock) => {
       const payload = this.buildModelContextParams();
       const existing = this.#attachments.get(key)?.block;
       if (existing)
@@ -595,22 +605,69 @@ export class ModelContextStore {
       payload.content.push(block);
       assertContextSupport(this.#app!, payload);
       return this.addAttachment(key, block);
+    };
+    if (normalized.source === undefined)
+      return this.#enqueue(() => commit(normalized.block));
+
+    const controller = new AbortController();
+    let cancel!: ImagePreparation["cancel"];
+    const cancelled = new Promise<ContextOperationResult>((resolve, reject) => {
+      cancel = (error) => {
+        if (this.#images.get(key) !== preparation) return;
+        this.#images.delete(key);
+        controller.abort();
+        if (error) reject(error);
+        else resolve({ status: "superseded" });
+      };
+    });
+    const preparation = { controller, cancel };
+    this.#images.set(key, preparation);
+    this.#publish(true, this.#snapshot.error);
+    const work = this.prepare().then(async () => {
+      if (this.#images.get(key) !== preparation)
+        return { status: "superseded" as const };
+      if (this.#blocked) throw this.#blocked;
+      // Negotiate before fetching, then validate the complete current payload again at commit.
+      assertContextSupport(this.#app!, { content: [normalized.block] });
+      const bytes = await fetchContextImage(
+        normalized.source!,
+        controller.signal
+      );
+      if (this.#images.get(key) !== preparation)
+        return { status: "superseded" as const };
+      return this.#enqueue(() => {
+        if (this.#images.get(key) !== preparation)
+          return Promise.resolve({ status: "superseded" });
+        this.#images.delete(key);
+        return commit(copyContext({ ...normalized.block, ...bytes }));
+      });
+    });
+    return Promise.race([work, cancelled]).finally(() => {
+      if (this.#images.get(key) === preparation) this.#images.delete(key);
+      if (!this.#disposed)
+        this.#publish(
+          this.#queued > 0 || !!this.#inFlight || this.#flushScheduled,
+          this.#snapshot.error
+        );
     });
   };
 
   /** Queue removal of one key; attachment-hook lifetime does not own that key. */
-  readonly remove = (key: string): Promise<ContextOperationResult> =>
-    this.#enqueue(() => {
+  readonly remove = (key: string): Promise<ContextOperationResult> => {
+    this.#images.get(key)?.cancel();
+    return this.#enqueue(() => {
       const payload = this.buildModelContextParams();
       const block = this.#attachments.get(key)?.block;
       payload.content = payload.content.filter((item) => item !== block);
       assertContextSupport(this.#app!, payload);
       return this.removeAttachment(key);
     });
+  };
 
-  /** Clear selected attachments while keeping generated and restored background. */
-  readonly clearSelection = (): Promise<ContextOperationResult> =>
-    this.#enqueue(() => {
+  /** Clear selected and preparing attachments, preserving background. */
+  readonly clearSelection = (): Promise<ContextOperationResult> => {
+    for (const image of this.#images.values()) image.cancel();
+    return this.#enqueue(() => {
       const blocks = new Set(
         Array.from(this.#attachments.values(), (entry) => entry.block)
       );
@@ -619,6 +676,7 @@ export class ModelContextStore {
       assertContextSupport(this.#app!, payload);
       return this.clearAttachments();
     });
+  };
 
   #enqueue(
     action: () => Promise<ContextOperationResult>
@@ -849,6 +907,7 @@ export class ModelContextStore {
         const separator = identity.lastIndexOf("\0");
         const key = identity.slice(0, separator);
         this.#attachments.delete(key);
+        this.#images.get(key)?.cancel();
       }
     const survivingBlocks = new Set(
       (observation?.payload.content ?? []).map(canonicalContext)
@@ -874,6 +933,7 @@ export class ModelContextStore {
     this.#acknowledged = null; // A prior local success no longer proves host equality.
     this.#desired = null;
     if (observation === null) {
+      for (const image of this.#images.values()) image.cancel();
       this.#backgroundSuppressed = true;
       this.#restoredBackground = [];
       this.#restoredStructured = undefined;
@@ -996,7 +1056,7 @@ export class ModelContextStore {
           })
         )
       ),
-      pending: pending && !this.#blocked,
+      pending: (pending || this.#images.size > 0) && !this.#blocked,
       error,
     };
     for (const listener of this.#contextListeners) listener();
@@ -1031,6 +1091,7 @@ export class ModelContextStore {
   }
 
   #fail(error: Error, throughRevision = Infinity): void {
+    for (const image of this.#images.values()) image.cancel(error);
     for (const operation of this.#operations) {
       if (operation.revision > throughRevision) continue;
       operation.reject(error);

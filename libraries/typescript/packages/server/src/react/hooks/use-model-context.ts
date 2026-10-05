@@ -15,6 +15,10 @@ import type {
  * Attachment keys are shared across all hook instances. Unmounting a consumer
  * does not clear selections. Exact duplicate blocks under different keys reject.
  *
+ * Image src inputs resolve like Image public assets and are fetched before
+ * replacing the selection; direct data plus mimeType remains supported.
+ * Text thumbnail src uses the same resolver and remains a URL. Later same-key
+ * actions or clear cancel image preparation and settle it as superseded.
  * Calls await initialization and negotiate support internally. Successful calls
  * acknowledge context delivery, not composer rendering. Host removals update
  * the selection where unambiguous. Uncertain writes or host ordering pause
