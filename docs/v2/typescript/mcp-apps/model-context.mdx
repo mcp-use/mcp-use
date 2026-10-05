@@ -4,7 +4,7 @@ description: "Choose what the model sees from tool results, structured view stat
 icon: "brain"
 ---
 
-Use model context to give the next model turn the information it needs without duplicating every value rendered by the view. Tool results establish the initial context; `useViewState` and `ModelContext` update it as the user interacts.
+Use model context to give the next model turn the information it needs without duplicating every value rendered by the view. Tool results establish the initial context. `useViewState` and `ModelContext` describe the view; `useModelContext` manages selected native attachments.
 
 ## Choose the right channel
 
@@ -13,9 +13,96 @@ Use model context to give the next model turn the information it needs without d
 | Return a concise tool result                  | A text `content` block                                         |
 | Send structured render data to the view       | Tool-result `structuredContent`, read through `useToolContext` |
 | Keep structured user choices model-visible    | `useViewState`                                                 |
+| Attach selected text, images, or resources    | `useModelContext` with the explicit attachment mode            |
 | Describe what the user currently sees         | `<ModelContext>`                                               |
 | Keep ephemeral UI state private to the iframe | React `useState`                                               |
 | Persist durable business data                 | Your backend                                                   |
+
+## Attach evidence to the next turn
+
+Export the runtime option before rendering any context contributions:
+
+```tsx
+import { useModelContext, type ViewConfig } from "mcp-use/react";
+
+export const viewConfig = { modelContext: "attachments" } satisfies ViewConfig;
+
+export default function BookEvidence() {
+  const { add, attachments, pending, error, retry } = useModelContext();
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          void add("book:summary", {
+            type: "text",
+            text: "The selected edition contains 12 illustrated chapters.",
+            title: "Selected book",
+            thumbnail: { src: "https://example.com/book-cover.png" },
+          }).catch((failure: unknown) => {
+            console.error("Could not attach book evidence", failure);
+          });
+        }}
+      >
+        Add to chat
+      </button>
+      <span>
+        {attachments.length} selected{pending ? " · Syncing context" : ""}
+      </span>
+      {error && (
+        <button
+          onClick={() => {
+            void retry().catch(() => {});
+          }}
+        >
+          Retry context sync
+        </button>
+      )}
+    </>
+  );
+}
+```
+
+The explicit option switches all context contributions to the standard `ui/update-model-context` writer. Generated view state and descriptions use assistant-only background text. Consumers without this option keep the existing visible JSON projection and widget-state transport preference. Attachment mode does not use `setWidgetState.modelContent` or `imageIds` as a second context writer.
+
+`add(key, block)` retains other keys; using the same key updates its value in place. `remove(key)` removes one attachment. `clearAttachments()` clears the shared attachment collection, including restored visible entries, while preserving separately managed background. Unmounting a hook consumer does not clear its selections. Use distinct stable keys across features; exact duplicate blocks under different keys reject. Full snapshot replacement is not part of this public API.
+
+The hook supports these native shapes:
+
+```ts
+await add("book:cover", {
+  type: "image",
+  data: coverBase64,
+  mimeType: "image/png",
+  title: "Book cover",
+});
+await add("book:manual", {
+  type: "resource_link",
+  uri: manualUri,
+  name: "manual.pdf",
+  title: "Book manual",
+});
+await add("book:sample", {
+  type: "resource",
+  resource: { uri: sampleUri, text: sampleText, mimeType: "text/plain" },
+});
+```
+
+Text and image `title` values become OpenAI metadata. Resource-link `title` remains a native field. Text-only `thumbnail` accepts an MCP Icon; ChatGPT iOS currently ignores thumbnails. Embedded resources retain their native `resource` shape, including text or base64 blob data. `audience` maps to MCP annotations. Raw metadata and annotations are preserved; conflicting convenience fields reject. Audio is not supported.
+
+Every mutation returns `Promise<{ status: "synced" | "superseded" }>`. A superseded result means a newer action replaced that operation before acknowledgment. Input validation and unsupported modalities reject without changing the shared synchronization error. Calls made during initialization wait for the shared handshake before committing selections.
+
+`attachments` is the effective selection, including unsynced entries after a failure. `pending` covers initialization, batching, and delivery; `pending === false` alone does not mean saved. Use local button state while awaiting each action, and shared `error` and `retry()` for delivery failures. A successful generic-host call acknowledges context delivery without promising composer chips. Capability checks remain internal; an empty modality advertisement does not support every type.
+
+### Respect host removals and restore context
+
+OpenAI readback can restore surviving blocks before defaults run. Restored keys start with `@restored:` and are local to that runtime. Do not derive original application keys from titles, URIs, or list position. Opaque restored background remains separate from visible attachments.
+
+Confirmed host removals update the selected collection. Later snapshots omit those removed generations. Keep removable evidence out of duplicate `useViewState`, `ModelContext`, or assistant-only fields; the SDK cannot detect semantic duplication. Audience controls presentation, not model access. Removal does not erase prior conversation turns or backend data.
+
+OpenAI `updateId` identifies a whole context revision. It is neither an attachment ID nor a compare-and-swap token. An already-dispatched replacement cannot be recalled. Ambiguous host changes, duplicate removal ambiguity, missing acknowledgments, and uncertain write outcomes pause publication with an error. Retry sends current reconciled state; it cannot resolve an ordering conflict or reconnect a failed runtime. Reopen the view only after outstanding remote writes have finished. Cached host context is not a fresh-read barrier.
+
+Host context restores model-visible context, not private UI state. Keep private state in its supported persistence channel and durable data in your backend.
 
 ## Keep structured choices in view state
 
@@ -40,7 +127,7 @@ function Filters() {
 
 The root state value must be a JSON-serializable object. All components in one mounted view share it. Separate view instances remain isolated.
 
-ChatGPT restores the state through `window.openai.widgetState`. Other MCP Apps hosts keep it for the current iframe lifetime until the protocol provides a restoration channel.
+By default, ChatGPT restores state through `window.openai.widgetState`, and other MCP Apps hosts keep it for the current iframe lifetime. In attachment mode, OpenAI host context can restore model-visible state and attachments. Private UI persistence remains a separate concern.
 
 ## Describe visible UI
 

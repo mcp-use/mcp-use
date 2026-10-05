@@ -25,6 +25,13 @@ import type { DisplayMode } from "../types/host-types.js";
  */
 export interface ViewConfig {
   /**
+   * Opt into native attachments through useModelContext. Uses the standard
+   * context writer and assistant-only background projection instead of widget
+   * modelContent persistence. Private UI state needs separate persistence.
+   * Omit to preserve the existing widget-state transport and visible projection.
+   */
+  modelContext?: "attachments";
+  /**
    * Let ext-apps observe the document and report size changes.
    *
    * @defaultValue true
@@ -55,6 +62,8 @@ export interface ViewConfig {
  * @internal
  */
 export interface NormalizedViewConfig {
+  /** Explicit native-attachment migration; absent preserves compatibility. */
+  modelContext?: "attachments";
   /** Whether the guest `App` auto-measures and reports size changes. */
   autoResize: boolean;
   /** Display modes advertised to the host via App capabilities. */
@@ -88,6 +97,14 @@ const VALID_DISPLAY_MODES: ReadonlySet<string> = new Set<DisplayMode>([
  */
 export function normalizeViewConfig(config?: ViewConfig): NormalizedViewConfig {
   const autoResize = config?.autoResize ?? true;
+  if (
+    config?.modelContext !== undefined &&
+    config.modelContext !== "attachments"
+  ) {
+    throw new Error(
+      'viewConfig.modelContext must be "attachments" when supplied'
+    );
+  }
 
   const modes =
     config?.displayModes === undefined
@@ -138,6 +155,9 @@ export function normalizeViewConfig(config?: ViewConfig): NormalizedViewConfig {
   }
 
   return {
+    ...(config?.modelContext !== undefined && {
+      modelContext: config.modelContext,
+    }),
     ...(preferred !== undefined && { preferredDisplayMode: preferred }),
     autoResize,
     displayModes: normalizedModes,
