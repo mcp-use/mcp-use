@@ -76,6 +76,9 @@ export interface ToolViewConfig {
    * Global/thread launchers must accept `{}`; file launchers require
    * {@link FileEntrypointInput}. Entrypoints open fullscreen in supporting
    * hosts. Typed entrypoints take precedence over raw metadata declarations.
+   * Registration checks the input JSON Schema against `{}` and representative
+   * file payloads for the declared extensions. Application refinements must
+   * also accept host launch arguments; they only run on actual tool calls.
    */
   entrypoints?: readonly ToolViewEntrypoint[];
   /**

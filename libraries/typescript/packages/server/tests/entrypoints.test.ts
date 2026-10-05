@@ -94,7 +94,6 @@ describe("entrypoint wire contract over HTTP", () => {
   });
   let client: Client;
   beforeAll(async () => {
-    const started = await server.listen(0);
     client = new Client(
       { name: "entrypoints-client", version: "1" },
       {
@@ -109,7 +108,12 @@ describe("entrypoint wire contract over HTTP", () => {
       }
     );
     await client.connect(
-      new StreamableHTTPClientTransport(new URL(started.url))
+      new StreamableHTTPClientTransport(
+        new URL("https://entrypoints.test/mcp"),
+        {
+          fetch: async (input, init) => server.fetch(new Request(input, init)),
+        }
+      )
     );
   });
   afterAll(async () => {
