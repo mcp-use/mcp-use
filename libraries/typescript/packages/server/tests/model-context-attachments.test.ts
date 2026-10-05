@@ -74,6 +74,25 @@ afterEach(() => {
 });
 
 describe("native model context", () => {
+  it("does not initialize diagnostic collection in ordinary browser views", () => {
+    const browser = {};
+    vi.stubGlobal("window", browser);
+    fixture();
+    expect(browser).not.toHaveProperty("__mcpContextTrace");
+  });
+
+  it("records protocol shape without contents when the dev entrypoint opts in", async () => {
+    const trace = { events: [] as Array<Record<string, unknown>>, sequence: 0 };
+    vi.stubGlobal("window", { __mcpContextTrace: trace });
+    const { store, responses } = fixture();
+    const added = store.add("a", text("private attachment contents"));
+    await tick();
+    responses[0]!.resolve({});
+    await added;
+    expect(trace.events.some((event) => event.event === "ack")).toBe(true);
+    expect(JSON.stringify(trace)).not.toContain("private attachment contents");
+  });
+
   it("waits for connection, composes concurrent native modalities, and normalizes presentation", async () => {
     const { store, connection, app, writes, responses } = fixture({
       delayed: true,
@@ -285,6 +304,85 @@ describe("native model context", () => {
     expect(writes).toHaveLength(2);
   });
 
+  it.each([
+    ["remove", "before", "revision"],
+    ["remove", "after", "revision"],
+    ["clear", "before", "revision"],
+    ["clear", "after", "revision"],
+    ["remove", "before", "missing"],
+    ["remove", "after", "missing"],
+    ["clear", "before", "missing"],
+    ["clear", "after", "missing"],
+  ] as const)(
+    "accepts a null host echo of an empty %s %s a successful %s-ID response",
+    async (operation, timing, response) => {
+      const { store, responses, observe, writes } = fixture();
+      const added = store.add("a", text("A"));
+      await tick();
+      responses[0]!.resolve(ack("added"));
+      await added;
+
+      const removed =
+        operation === "remove" ? store.remove("a") : store.clearSelection();
+      const outcome = expect(removed).resolves.toEqual({ status: "synced" });
+      await tick();
+      expect(writes[1]!.content).toEqual([]);
+      if (timing === "before") observe(null);
+      responses[1]!.resolve(response === "missing" ? {} : ack("cleared"));
+      await outcome;
+      if (timing === "after") observe(null);
+      expect(store.getSnapshot()).toMatchObject({
+        attachments: [],
+        pending: false,
+        error: null,
+      });
+
+      const next = store.add("b", text("B"));
+      await tick();
+      expect(writes[2]!.content).toEqual([text("B")]);
+      responses[2]!.resolve(ack("next"));
+      await expect(next).resolves.toEqual({ status: "synced" });
+    }
+  );
+
+  it.each([{}, { _meta: { "openai/modelContext": { updateId: 7 } } }])(
+    "accepts successful nonempty RPCs with optional correlation metadata: %j",
+    async (response) => {
+      const { store, responses, writes, observe } = fixture();
+      const added = Promise.all([
+        store.add("a", text("A")),
+        store.add("b", text("B")),
+      ]);
+      await tick();
+      observe({ updateId: "host-add", ...writes[0] });
+      responses[0]!.resolve(response);
+      await added;
+      const removed = store.remove("a");
+      await tick();
+      observe({ updateId: "host-remove", ...writes[1] });
+      responses[1]!.resolve(response);
+      await expect(removed).resolves.toEqual({ status: "synced" });
+      expect(store.getSnapshot()).toMatchObject({
+        pending: false,
+        error: null,
+      });
+      expect(store.getSnapshot().attachments.map((item) => item.key)).toEqual([
+        "b",
+      ]);
+    }
+  );
+
+  it("keeps ambiguous removal guarded when a successful nonempty RPC omits its ID", async () => {
+    const { store, responses, observe } = fixture({ initial: null });
+    const added = store.add("a", text("A"));
+    const rejected = expect(added).rejects.toThrow("ordering");
+    await tick();
+    observe(null);
+    responses[0]!.resolve({});
+    await rejected;
+    await expect(store.add("b", text("B"))).rejects.toThrow("ordering");
+  });
+
   it("blocks null during an in-flight addition and malformed or changed host payloads", async () => {
     const { store, responses, observe, writes } = fixture({ initial: null });
     const add = store.add("a", text("A"));
@@ -348,7 +446,7 @@ describe("native model context", () => {
     const operation = uncertain.store.add("a", text("A"));
     const failure = expect(operation).rejects.toThrow("uncertain");
     await tick();
-    uncertain.responses[0]!.resolve({});
+    uncertain.responses[0]!.reject(new Error("transport disconnected"));
     await failure;
     await expect(uncertain.store.add("next", text("Next"))).rejects.toThrow(
       "uncertain"
