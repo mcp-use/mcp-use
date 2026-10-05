@@ -189,7 +189,10 @@ export function prepareSettings<Fields extends SettingsFields>(
       if (group.kind !== "group")
         throw new TypeError("Settings layout groups must have kind 'group'");
       nonBlank(group.title, "Settings layout group title");
-      for (const itemValue of array(group.items, "Settings layout group items")) {
+      for (const itemValue of array(
+        group.items,
+        "Settings layout group items"
+      )) {
         const item = object(itemValue, "Settings layout item");
         if (item.kind === "property") {
           nonBlank(item.property, "Settings layout property");
