@@ -7,7 +7,13 @@ export interface ModelContextPresentation {
 }
 
 /** Text evidence with optional composer presentation. */
-export type ModelContextText = Extract<ContentBlock, { type: "text" }> &
+export type ModelContextText = Extract<
+  ContentBlock,
+  {
+    /** Selects native text content from the MCP content union. */
+    type: "text";
+  }
+> &
   ModelContextPresentation & {
     /** Composer label, serialized as OpenAI metadata. */
     title?: string;
@@ -16,7 +22,13 @@ export type ModelContextText = Extract<ContentBlock, { type: "text" }> &
   };
 
 /** Native base64 image evidence. */
-export type ModelContextImage = Extract<ContentBlock, { type: "image" }> &
+export type ModelContextImage = Extract<
+  ContentBlock,
+  {
+    /** Selects native image content from the MCP content union. */
+    type: "image";
+  }
+> &
   ModelContextPresentation & {
     /** Image alt text, serialized as OpenAI metadata. */
     title?: string;
@@ -26,7 +38,13 @@ export type ModelContextImage = Extract<ContentBlock, { type: "image" }> &
 export type ModelContextBlock =
   | ModelContextText
   | ModelContextImage
-  | (Extract<ContentBlock, { type: "resource_link" | "resource" }> &
+  | (Extract<
+      ContentBlock,
+      {
+        /** Selects linked and embedded resources from the MCP content union. */
+        type: "resource_link" | "resource";
+      }
+    > &
       ModelContextPresentation);
 
 /** One selected attachment. Restored keys are runtime-local, not persistent IDs. */
