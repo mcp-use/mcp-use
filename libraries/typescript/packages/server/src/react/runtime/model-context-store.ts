@@ -1150,10 +1150,18 @@ export class ModelContextStore {
         failed = true;
         const failure =
           error instanceof Error ? error : new Error(String(error));
+        if (this.#rich) {
+          // A rejected write can still race a user removal. Reconcile buffered
+          // observations before another mutation or explicit retry can publish.
+          for (const observation of this.#observations.splice(0)) {
+            this.#reconcile(observation, true, preceding);
+          }
+        }
         const rejectedByHost =
           failure.name === "ProtocolError" &&
           typeof (failure as Error & { code?: unknown }).code === "number";
-        if (
+        if (this.#blocked) this.#fail(this.#blocked);
+        else if (
           this.#rich &&
           dispatched &&
           !rejectedByHost &&
