@@ -1,5 +1,15 @@
 import type { App } from "@modelcontextprotocol/ext-apps";
 import type { ContentBlock } from "@modelcontextprotocol/server";
+import {
+  buildContextPayload,
+  canonicalContext,
+  copyContext,
+  type ContextAttachment,
+  type ContextOperationResult,
+  type ContextPayload,
+  type ContextPublication,
+  type ContextSnapshot,
+} from "./model-context.js";
 
 /** Model-visible state owned by one mounted view runtime. */
 type ViewState = Record<string, unknown>;
@@ -27,7 +37,7 @@ interface OpenAiWidgetState {
 
 interface ChatGptWidgetApi {
   widgetState?: OpenAiWidgetState | null;
-  setWidgetState(state: OpenAiWidgetState): Promise<void>;
+  setWidgetState(state: OpenAiWidgetState): void | Promise<void>;
 }
 
 interface OpenAiSetGlobalsEvent extends Event {
@@ -38,10 +48,15 @@ interface OpenAiSetGlobalsEvent extends Event {
   };
 }
 
-/** Complete model-visible snapshot sent on every update. */
-interface ModelContextParams {
-  structuredContent: ViewState & { [UI_CONTEXT_KEY]: string };
-  content: ContentBlock[];
+interface Attachment extends ContextAttachment {
+  generation: number;
+}
+
+interface Operation {
+  revision: number;
+  effects: Map<string, number | null>;
+  resolve(result: ContextOperationResult): void;
+  reject(error: Error): void;
 }
 
 /** Narrow runtime surface used by the shared state/context flush pump. */
@@ -131,9 +146,16 @@ export class ModelContextStore {
   /** Bumped on {@link dispose} so late in-flight completions are ignored. */
   #epoch = 0;
   /** Latest complete payload, or null until state/context is first registered. */
-  #desiredSerialized: string | null = null;
+  #desired: ContextPublication | null = null;
+  #revision = 0;
+  readonly #attachments = new Map<string, Attachment>();
+  readonly #generations = new Map<string, number>();
+  readonly #contextListeners = new Set<() => void>();
+  readonly #operations = new Set<Operation>();
+  #snapshot: ContextSnapshot = { attachments: [], pending: false, error: null };
   /** Last successfully delivered payload. */
-  #acknowledgedSerialized: string | null = null;
+  #acknowledged: ContextPublication | null = null;
+  #sending: ContextPublication | null = null;
   #inFlight: Promise<void> | null = null;
   #removeOpenAiListener: (() => void) | null = null;
 
@@ -227,13 +249,18 @@ export class ModelContextStore {
     this.#inFlight = null;
     this.#nodes.clear();
     this.#viewStateListeners.clear();
+    this.#contextListeners.clear();
     this.#removeOpenAiListener?.();
     this.#removeOpenAiListener = null;
     this.#nextOrder = 0;
     this.#viewState = null;
     this.#firstDefaultSerialized = null;
-    this.#desiredSerialized = null;
-    this.#acknowledgedSerialized = null;
+    this.#desired = null;
+    this.#acknowledged = null;
+    this.#sending = null;
+    this.#attachments.clear();
+    this.#generations.clear();
+    this.#fail(new Error("Model context store has been disposed or reset"));
   }
 
   /** Serialize registered context nodes into an indented markdown list. */
@@ -270,16 +297,136 @@ export class ModelContextStore {
     return lines.join("\n");
   }
 
-  /** Build the complete merged payload sent through either host transport. */
-  buildModelContextParams(): ModelContextParams {
-    const structuredContent = {
-      ...(this.#viewState ?? {}),
-      [UI_CONTEXT_KEY]: this.buildDescriptionString(),
+  /** Build one full replacement from all contribution namespaces. */
+  buildModelContextParams(): ContextPayload {
+    return buildContextPayload(
+      this.#viewState,
+      this.buildDescriptionString(),
+      this.#attachments.values()
+    );
+  }
+
+  /** Subscribe to shared selection and delivery status. */
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.#contextListeners.add(listener);
+    return () => {
+      this.#contextListeners.delete(listener);
     };
-    return {
-      structuredContent,
-      content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+  };
+
+  /** Cached snapshot suitable for useSyncExternalStore. */
+  readonly getSnapshot = (): ContextSnapshot => this.#snapshot;
+
+  /** Upsert one native attachment; callers normalize and negotiate before entry. */
+  readonly addAttachment = (
+    key: string,
+    block: ContentBlock
+  ): Promise<ContextOperationResult> => {
+    if (this.#disposed)
+      return Promise.reject(new Error("Model context store has been disposed"));
+    if (!key)
+      return Promise.reject(new TypeError("Attachment key must not be empty"));
+    const normalized = copyContext(block);
+    const fingerprint = canonicalContext(normalized);
+    for (const entry of this.#attachments.values()) {
+      if (entry.key !== key && canonicalContext(entry.block) === fingerprint) {
+        return Promise.reject(
+          new Error("An identical attachment already exists under another key")
+        );
+      }
+    }
+    const generation = (this.#generations.get(key) ?? 0) + 1;
+    this.#generations.set(key, generation);
+    this.#attachments.set(key, { key, block: normalized, generation });
+    return this.#mutate(new Map([[key, generation]]));
+  };
+
+  /** Remove one attachment without changing state or description contributions. */
+  readonly removeAttachment = (
+    key: string
+  ): Promise<ContextOperationResult> => {
+    this.#attachments.delete(key);
+    return this.#mutate(new Map([[key, null]]));
+  };
+
+  /** Clear the explicit attachment namespace only. */
+  readonly clearAttachments = (): Promise<ContextOperationResult> => {
+    const effects = new Map<string, number | null>();
+    for (const key of this.#attachments.keys()) effects.set(key, null);
+    this.#attachments.clear();
+    return this.#mutate(effects);
+  };
+
+  /** Explicitly retry the current desired state, never a saved failed payload. */
+  readonly retry = (): Promise<ContextOperationResult> =>
+    this.#mutate(
+      new Map(
+        Array.from(this.#attachments, ([key, entry]) => [key, entry.generation])
+      )
+    );
+
+  #mutate(
+    effects: Map<string, number | null>
+  ): Promise<ContextOperationResult> {
+    if (this.#disposed)
+      return Promise.reject(new Error("Model context store has been disposed"));
+    const result = new Promise<ContextOperationResult>((resolve, reject) => {
+      this.#operations.add({
+        effects,
+        resolve,
+        reject,
+        revision: this.#revision + 1,
+      });
+    });
+    this.#updateDesiredAndSchedule();
+    return result;
+  }
+
+  #publish(pending: boolean, error: Error | null): void {
+    this.#snapshot = {
+      attachments: Object.freeze(
+        Array.from(this.#attachments.values(), ({ key, block }) =>
+          Object.freeze({ key, block })
+        )
+      ),
+      pending,
+      error,
     };
+    for (const listener of this.#contextListeners) listener();
+  }
+
+  #settle(publication?: ContextPublication): void {
+    for (const operation of this.#operations) {
+      const matches = (entries: ReadonlyMap<string, number>): boolean =>
+        [...operation.effects].every(
+          ([key, generation]) => (entries.get(key) ?? null) === generation
+        );
+      if (
+        !matches(
+          new Map(
+            Array.from(this.#attachments, ([key, entry]) => [
+              key,
+              entry.generation,
+            ])
+          )
+        )
+      ) {
+        operation.resolve({ status: "superseded" });
+      } else if (
+        publication &&
+        publication.revision >= operation.revision &&
+        matches(publication.entries)
+      ) {
+        operation.resolve({ status: "synced" });
+      } else continue;
+      this.#operations.delete(operation);
+    }
+  }
+
+  #fail(error: Error): void {
+    for (const operation of this.#operations) operation.reject(error);
+    this.#operations.clear();
+    this.#publish(false, error);
   }
 
   /** Clear state between tests without disposing the owning runtime. */
@@ -290,8 +437,12 @@ export class ModelContextStore {
     this.#firstDefaultSerialized = null;
     this.#flushScheduled = false;
     this.#inFlight = null;
-    this.#desiredSerialized = null;
-    this.#acknowledgedSerialized = null;
+    this.#desired = null;
+    this.#acknowledged = null;
+    this.#sending = null;
+    this.#attachments.clear();
+    this.#generations.clear();
+    this.#fail(new Error("Model context store has been disposed or reset"));
     // Keep #disposed / #epoch — a disposed store stays disposed.
   }
 
@@ -352,7 +503,18 @@ export class ModelContextStore {
   }
 
   #updateDesiredAndSchedule(): void {
-    this.#desiredSerialized = JSON.stringify(this.buildModelContextParams());
+    if (this.#disposed) return;
+    const payload = copyContext(this.buildModelContextParams());
+    this.#desired = {
+      revision: ++this.#revision,
+      payload,
+      serialized: canonicalContext(payload),
+      entries: new Map(
+        Array.from(this.#attachments, ([key, entry]) => [key, entry.generation])
+      ),
+    };
+    this.#settle();
+    this.#publish(true, null);
     this.#schedulePump();
   }
 
@@ -366,63 +528,63 @@ export class ModelContextStore {
   }
 
   #pump(): void {
-    if (this.#disposed || this.#inFlight) return;
-    if (
-      this.#desiredSerialized === null ||
-      this.#desiredSerialized === this.#acknowledgedSerialized
-    ) {
+    if (this.#disposed || this.#inFlight || this.#sending || !this.#desired)
+      return;
+    const publication = this.#desired;
+    if (publication.serialized === this.#acknowledged?.serialized) {
+      // Equality proves the payload; use the new local identities for equal upserts.
+      this.#settle(publication);
+      this.#publish(false, null);
       return;
     }
-
-    const params = this.buildModelContextParams();
-    const serialized = JSON.stringify(params);
-    this.#desiredSerialized = serialized;
-    if (serialized === this.#acknowledgedSerialized) return;
-
+    this.#publish(true, null);
     const sendEpoch = this.#epoch;
-
-    this.#inFlight = (async () => {
+    this.#sending = publication;
+    this.#inFlight = Promise.resolve().then(async () => {
+      let failed = false;
       try {
         const chatGptApi = getChatGptWidgetApi();
         if (chatGptApi) {
           await chatGptApi.setWidgetState({
             privateContent: {},
             ...chatGptApi.widgetState,
-            modelContent: params.structuredContent,
+            modelContent: publication.payload.structuredContent ?? {},
           });
         } else {
           const app = await this.#host.connect();
           if (this.#disposed || sendEpoch !== this.#epoch) return;
-
           if (app.getHostCapabilities()?.updateModelContext === undefined) {
             if (markModelContextUnsupportedWarned()) {
               console.warn(
                 "[ModelContext] Host does not declare the updateModelContext capability; model-context updates are not sent."
               );
             }
+            failed = true;
+            this.#fail(new Error("This host does not support model context"));
             return;
           }
-
           await app.updateModelContext(
-            params as Parameters<App["updateModelContext"]>[0]
+            publication.payload as Parameters<App["updateModelContext"]>[0]
           );
         }
-
         if (this.#disposed || sendEpoch !== this.#epoch) return;
-        this.#acknowledgedSerialized = serialized;
+        this.#acknowledged = publication;
+        this.#settle(publication);
       } catch (error: unknown) {
         if (this.#disposed || sendEpoch !== this.#epoch) return;
+        failed = true;
+        const failure =
+          error instanceof Error ? error : new Error(String(error));
+        this.#fail(failure);
         console.warn("[mcp-use] Failed to update model context:", error);
       } finally {
-        this.#inFlight = null;
-        if (
-          !this.#disposed &&
-          sendEpoch === this.#epoch &&
-          this.#desiredSerialized !== serialized
-        ) {
-          this.#pump();
+        if (!this.#disposed && sendEpoch === this.#epoch) {
+          this.#inFlight = null;
+          this.#sending = null;
+          if (this.#desired !== publication) this.#pump();
+          else if (!failed) this.#publish(false, null);
         }
       }
-    })();
+    });
   }
 }
