@@ -25,6 +25,7 @@ import { createRequire } from "node:module";
 import { networkInterfaces } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createServer, createServerModuleRunner, normalizePath } from "vite";
@@ -78,7 +79,7 @@ import {
   resolveViewsDir,
   type DiscoveredView,
 } from "./views.js";
-import type { ViewsManifest } from "../views/types.js";
+import type { ViewConfig, ViewsManifest } from "../views/types.js";
 import type { SkillsOptions, SkillsSnapshot } from "../skills/types.js";
 import {
   discoverConfiguredSkills,
@@ -411,7 +412,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   if (!existsSync(resolveViewsDir(options.cwd, viewsDirectory))) {
     console.log("[mcp-use] views directory not configured.");
   }
-  const frontendConfigs = new Map<string, string | undefined>();
+  let frontendConfigs = new Map<string, ViewConfig | undefined>();
   let currentViews: DiscoveredView[] = discoverViews(
     options.cwd,
     viewsDirectory
@@ -512,10 +513,12 @@ export async function runDev(options: DevOptions): Promise<void> {
   ): Promise<{
     server: ServerLike;
     skillsDirectory: string | undefined;
+    frontendConfigs: Map<string, ViewConfig | undefined>;
   }> => {
     const load = async (): Promise<{
       server: ServerLike;
       skillsDirectory: string | undefined;
+      frontendConfigs: Map<string, ViewConfig | undefined>;
     }> => {
       const moduleExports = (await runner.import(entry)) as Record<
         string,
@@ -542,10 +545,14 @@ export async function runDev(options: DevOptions): Promise<void> {
         )
       );
       const viewsManifest = buildDevViewsManifest(viewsSnapshot);
+      const candidateFrontendConfigs = new Map<
+        string,
+        ViewConfig | undefined
+      >();
       for (const view of viewsSnapshot) {
-        frontendConfigs.set(
+        candidateFrontendConfigs.set(
           view.entryPath,
-          JSON.stringify(viewsManifest[view.name]?.viewConfig)
+          viewsManifest[view.name]?.viewConfig
         );
       }
       if (typeof server.__primeViews !== "function") {
@@ -558,7 +565,11 @@ export async function runDev(options: DevOptions): Promise<void> {
         projectRoot: options.cwd,
       });
 
-      return { server, skillsDirectory };
+      return {
+        server,
+        skillsDirectory,
+        frontendConfigs: candidateFrontendConfigs,
+      };
     };
 
     if (localFallbackMcpUrl === undefined) {
@@ -613,7 +624,11 @@ export async function runDev(options: DevOptions): Promise<void> {
   let basePath: string;
   let currentSkillsDirectory: string | undefined;
   try {
-    const { server, skillsDirectory } = await importServer(currentViews);
+    const {
+      server,
+      skillsDirectory,
+      frontendConfigs: candidateFrontendConfigs,
+    } = await importServer(currentViews);
     server.__setEventBus(eventBus);
     basePath = server.basePath ?? "/mcp";
     if (options.inspector !== false) {
@@ -629,6 +644,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     server.__mount();
     currentHandler = async (request) => server.fetch(request);
     currentSkillsDirectory = skillsDirectory;
+    frontendConfigs = candidateFrontendConfigs;
   } catch (error) {
     await runner.close();
     await vite.close();
@@ -656,7 +672,11 @@ export async function runDev(options: DevOptions): Promise<void> {
         const viewsSnapshot = discoverViews(options.cwd, viewsDirectory);
         try {
           runner.evaluatedModules.clear();
-          const { server, skillsDirectory } = await importServer(viewsSnapshot);
+          const {
+            server,
+            skillsDirectory,
+            frontendConfigs: candidateFrontendConfigs,
+          } = await importServer(viewsSnapshot);
           server.__setEventBus(eventBus);
           server.__setRequestLogPrefix(
             inspectorHandler === undefined ? undefined : "[server]"
@@ -674,6 +694,7 @@ export async function runDev(options: DevOptions): Promise<void> {
           currentHandler = nextHandler;
           basePath = nextBasePath;
           currentSkillsDirectory = skillsDirectory;
+          frontendConfigs = candidateFrontendConfigs;
           if (currentSkillsDirectory !== undefined) {
             vite.watcher.add(currentSkillsDirectory);
           }
@@ -742,8 +763,10 @@ export async function runDev(options: DevOptions): Promise<void> {
       if (view) {
         try {
           if (
-            JSON.stringify(readViewConfig(view.entryPath)) !==
-            frontendConfigs.get(view.entryPath)
+            !isDeepStrictEqual(
+              readViewConfig(view.entryPath),
+              frontendConfigs.get(view.entryPath)
+            )
           )
             scheduleReconcile();
         } catch {

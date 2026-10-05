@@ -711,13 +711,17 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       );
     }
     this.#assertNotStarted("views", "manifest");
+    // Validate the complete candidate before committing registry or options so
+    // a failed attempt can be retried without retaining part of its manifest.
+    for (const entry of Object.values(views)) {
+      normalizeViewConfig(entry.viewConfig);
+    }
     this.#viewsDevMode = options?.dev === true;
     this.#embeddedViewAssets = options?.assets;
     if (options?.projectRoot !== undefined) {
       this.#viewsProjectRoot = options.projectRoot;
     }
     for (const [name, entry] of Object.entries(views)) {
-      normalizeViewConfig(entry.viewConfig);
       this.#views.set(name, entry);
     }
     this.#viewsPrimed = true;
