@@ -7,7 +7,10 @@ import type { ToolDefinition } from "./tools.js";
 export interface SettingsField<
   Schema extends StandardSchemaWithJSON = StandardSchemaWithJSON,
 > {
-  /** Primitive Standard Schema with JSON Schema conversion; read() returns effective values. */
+  /**
+   * Primitive Standard Schema with JSON Schema conversion; read() returns effective values.
+   * Validation must preserve supplied values; value-changing transforms are rejected at runtime.
+   */
   schema: Schema;
   /** Non-blank label displayed by the host. */
   title: string;
@@ -50,7 +53,7 @@ export interface SettingsRegistration<
   HasOAuth extends OAuthMode = false,
   TEnv extends Env = Env,
 > {
-  /** Fields convertible to boolean, string, string enum, number, or integer JSON Schema. */
+  /** At least one field convertible to boolean, string, string enum, number, or integer JSON Schema. */
   fields: Fields;
   /** Read tool name; defaults to settings.read. */
   readTool?: string;
@@ -123,6 +126,8 @@ export function prepareSettings<Fields extends SettingsFields>(
   const fields: [string, SettingsField][] = Object.entries(options.fields).map(
     ([name, field]) => [name, { ...field }]
   );
+  if (!fields.length)
+    throw new TypeError("Settings require at least one field");
   const properties: Record<string, unknown> = {};
   for (const [name, field] of fields) {
     nonBlank(field.title, `Setting ${name} title`);
@@ -174,6 +179,42 @@ export function prepareSettings<Fields extends SettingsFields>(
   };
   const layout =
     options.layout === undefined ? undefined : structuredClone(options.layout);
+  if (layout !== undefined) {
+    if (!Array.isArray(layout))
+      throw new TypeError("Settings layout must be an array");
+    for (const groupValue of layout) {
+      const group = object(groupValue, "Settings layout group");
+      if (group.kind !== "group")
+        throw new TypeError("Settings layout groups must have kind 'group'");
+      nonBlank(group.title, "Settings layout group title");
+      if (!Array.isArray(group.items))
+        throw new TypeError("Settings layout group items must be an array");
+      for (const itemValue of group.items) {
+        const item = object(itemValue, "Settings layout item");
+        if (item.kind === "property") {
+          nonBlank(item.property, "Settings layout property");
+          if (!Object.hasOwn(properties, item.property))
+            throw new TypeError(
+              `Settings layout references unknown setting: ${item.property}`
+            );
+        } else if (item.kind === "tool") {
+          nonBlank(item.tool, "Settings layout action tool");
+          nonBlank(item.title, "Settings layout action title");
+          if (
+            item.description !== undefined &&
+            typeof item.description !== "string"
+          )
+            throw new TypeError(
+              "Settings layout action description must be a string"
+            );
+        } else {
+          throw new TypeError(
+            "Settings layout items must have kind 'property' or 'tool'"
+          );
+        }
+      }
+    }
+  }
   const validateValues = async (
     value: unknown,
     partial = false
@@ -201,6 +242,10 @@ export function prepareSettings<Fields extends SettingsFields>(
         (typeof parsed.value === "number" && !Number.isFinite(parsed.value))
       )
         throw new TypeError(`Invalid primitive setting: ${name}`);
+      // Standard Schema exposes only an input parser, not an output validator.
+      // Never silently transform values already made effective by callbacks.
+      if (!Object.is(parsed.value, values[name]))
+        throw new TypeError(`Setting ${name} schema must not transform values`);
       Object.defineProperty(result, name, {
         enumerable: true,
         value: parsed.value,
