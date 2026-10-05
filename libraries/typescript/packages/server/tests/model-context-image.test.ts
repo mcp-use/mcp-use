@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { imageFromUrl } from "../src/react/helpers/image-from-url.js";
+import { fetchContextImage } from "../src/react/runtime/model-context-image.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("imageFromUrl", () => {
+describe("fetchContextImage", () => {
   it.each(["image/png", "image/jpeg", "image/gif", "image/webp"])(
     "encodes binary %s without attaching it",
     async (mimeType) => {
@@ -21,13 +21,9 @@ describe("imageFromUrl", () => {
       vi.stubGlobal("fetch", fetchImage);
       const signal = new AbortController().signal;
       expect(
-        await imageFromUrl("https://example.com/cover", {
-          title: "Cover",
-          signal,
-        })
+        await fetchContextImage("https://example.com/cover", signal)
       ).toEqual({
         type: "image",
-        title: "Cover",
         mimeType,
         data: Buffer.from(bytes).toString("base64"),
       });
@@ -54,9 +50,12 @@ describe("imageFromUrl", () => {
     "rejects unusable responses without producing a block",
     async (response, message) => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
-      await expect(imageFromUrl("https://example.com/cover")).rejects.toThrow(
-        String(message)
-      );
+      await expect(
+        fetchContextImage(
+          "https://example.com/cover",
+          new AbortController().signal
+        )
+      ).rejects.toThrow(String(message));
     }
   );
 
@@ -70,12 +69,18 @@ describe("imageFromUrl", () => {
         arrayBuffer: () => Promise.reject(new Error("body failed")),
       });
     vi.stubGlobal("fetch", fetchImage);
-    await expect(imageFromUrl("https://example.com/cover")).rejects.toThrow(
-      "CORS failure"
-    );
-    await expect(imageFromUrl("https://example.com/cover")).rejects.toThrow(
-      "body failed"
-    );
+    await expect(
+      fetchContextImage(
+        "https://example.com/cover",
+        new AbortController().signal
+      )
+    ).rejects.toThrow("CORS failure");
+    await expect(
+      fetchContextImage(
+        "https://example.com/cover",
+        new AbortController().signal
+      )
+    ).rejects.toThrow("body failed");
     const controller = new AbortController();
     fetchImage.mockResolvedValueOnce({
       ok: true,
@@ -86,7 +91,7 @@ describe("imageFromUrl", () => {
       },
     });
     await expect(
-      imageFromUrl("https://example.com/cover", { signal: controller.signal })
+      fetchContextImage("https://example.com/cover", controller.signal)
     ).rejects.toMatchObject({ name: "AbortError" });
   });
 });

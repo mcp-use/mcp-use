@@ -17,13 +17,30 @@ export interface ModelContextPresentation {
 /** Native text evidence with an optional composer thumbnail. */
 export interface ModelContextText
   extends TextContent, ModelContextPresentation {
-  /** Text attachment icon; ChatGPT iOS currently ignores thumbnails. */
+  /** Text icon; src resolves like Image public assets and stays a URL. iOS ignores it. */
   thumbnail?: Icon;
 }
 
 /** Native base64 image evidence with optional presentation. */
-export interface ModelContextImage
-  extends ImageContent, ModelContextPresentation {}
+export interface ModelContextImageData
+  extends ImageContent, ModelContextPresentation {
+  /** Use data plus mimeType instead of a source URL. */
+  src?: never;
+}
+
+/** Image source resolved exactly like Image's public-folder paths. */
+export interface ModelContextImageSource
+  extends Omit<ImageContent, "data" | "mimeType">, ModelContextPresentation {
+  /** Public-folder path or URL fetched and converted before selection changes. */
+  src: string;
+  /** Source images cannot also provide native bytes. */
+  data?: never;
+  /** The fetched response supplies the MIME type. */
+  mimeType?: never;
+}
+
+/** Choose a source URL or native base64 bytes; returned images contain bytes. */
+export type ModelContextImage = ModelContextImageData | ModelContextImageSource;
 
 /** A linked resource. Its native title takes precedence over title metadata. */
 export interface ModelContextResourceLink
@@ -40,20 +57,12 @@ export type ModelContextBlock =
   | ModelContextResourceLink
   | ModelContextResource;
 
-/** Options for fetching an image without changing the current selection. */
-export interface ImageFromUrlOptions {
-  /** Optional display label retained on the returned image block. */
-  title?: string | undefined;
-  /** Cancels the fetch or response-body read; no attachment is added. */
-  signal?: AbortSignal;
-}
-
 /** One selected attachment. Restored keys are runtime-local, not persistent IDs. */
 export interface ModelContextAttachment {
   /** Opaque application key or a reserved key assigned during host restoration. */
   readonly key: string;
   /** Friendly block, including decoded title and presentation after host restoration. */
-  readonly block: ModelContextBlock;
+  readonly block: Exclude<ModelContextBlock, ModelContextImageSource>;
 }
 
 /** Acknowledgment of one mutation, without promising permanent attachment. */
@@ -66,11 +75,11 @@ export interface ModelContextOperationResult {
 export interface ModelContextHandle {
   /** Effective selection, which can include unsynced entries after a failure. */
   readonly attachments: readonly ModelContextAttachment[];
-  /** True during initialization, batching, or delivery; false is not proof of sync. */
+  /** True during initialization, image preparation, batching, or delivery; false is not proof of sync. */
   readonly pending: boolean;
   /** Shared delivery or reconciliation error; individual validation errors reject. */
   readonly error: Error | null;
-  /** Add or replace one opaque key, preserving other attachments and background. */
+  /** Add or replace one key after preparing its content, preserving other keys and background. */
   add(
     key: string,
     block: ModelContextBlock

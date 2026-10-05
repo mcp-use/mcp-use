@@ -64,7 +64,6 @@ export {
   type ToolContextError,
 } from "./types/result-types.js";
 
-export { imageFromUrl } from "./helpers/image-from-url.js";
 export { useModelContext } from "./hooks/use-model-context.js";
 export type {
   ModelContextHandle,
@@ -72,9 +71,10 @@ export type {
   ModelContextBlock,
   ModelContextText,
   ModelContextImage,
+  ModelContextImageData,
+  ModelContextImageSource,
   ModelContextResourceLink,
   ModelContextResource,
-  ImageFromUrlOptions,
   ModelContextPresentation,
   ModelContextOperationResult,
 } from "./types/model-context.js";
