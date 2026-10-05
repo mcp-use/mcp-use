@@ -255,6 +255,134 @@ describe("native settings", () => {
       await server.close();
     }
   });
+  it("rejects value-changing validators instead of altering effective settings", async () => {
+    // Overwrites retain identical primitive input/output JSON Schemas.
+    const schema = z.number().overwrite((value) => value * 2);
+    const server = new MCPServer({ name: "transformed", version: "1" });
+    const update = vi.fn(() => ({ scale: 3 }));
+    server.settings({
+      fields: { scale: { schema, title: "Scale" } },
+      read: () => ({ scale: 3 }),
+      update,
+    });
+    const read = await request(server, "tools/call", {
+      name: "settings.read",
+      arguments: {},
+    });
+    expect(read.result.isError).toBe(true);
+    expect(JSON.stringify(read.result)).toContain("must not transform values");
+    const input = await request(server, "tools/call", {
+      name: "settings.update",
+      arguments: { set: { scale: 2 } },
+    });
+    expect(input.error ?? input.result?.isError).toBeTruthy();
+    expect(update).not.toHaveBeenCalled();
+    // Zero is unchanged by the validator, so this reaches the callback.
+    const output = await request(server, "tools/call", {
+      name: "settings.update",
+      arguments: { set: { scale: 0 } },
+    });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(output.result.isError).toBe(true);
+    expect(JSON.stringify(output.result)).toContain(
+      "must not transform values"
+    );
+    await server.close();
+  });
+  it("rejects a same-type codec before persisting values its input parser cannot accept", async () => {
+    const schema = z.codec(z.number().max(10), z.number().max(20), {
+      decode: (value) => value * 2,
+      encode: (value) => value / 2,
+    });
+    const server = new MCPServer({ name: "codec", version: "1" });
+    const update = vi.fn((set: Partial<{ scale: number }>) => ({
+      scale: set.scale ?? 0,
+    }));
+    server.settings({
+      fields: { scale: { schema, title: "Scale" } },
+      read: () => ({ scale: 0 }),
+      update,
+    });
+    const result = await request(server, "tools/call", {
+      name: "settings.update",
+      arguments: { set: { scale: 6 } },
+    });
+    expect(result.error ?? result.result?.isError).toBeTruthy();
+    expect(update).not.toHaveBeenCalled();
+    await server.close();
+  });
+  it("rejects empty fields before registering either settings tool", async () => {
+    const server = new MCPServer({ name: "empty", version: "1" });
+    expect(() =>
+      server.settings({ fields: {}, read: () => ({}), update: () => ({}) })
+    ).toThrow(/at least one field/);
+    expect((await request(server, "tools/list")).result.tools).toEqual([]);
+    await server.close();
+  });
+  it.each(
+    [
+      null,
+      {},
+      [null],
+      [{ kind: "section", title: "Display", items: [] }],
+      [{ kind: "group", title: " ", items: [] }],
+      [{ kind: "group", title: "Display", items: {} }],
+      [{ kind: "group", title: "Display", items: [null] }],
+      [{ kind: "group", title: "Display", items: [{ kind: "unknown" }] }],
+      [
+        {
+          kind: "group",
+          title: "Display",
+          items: [{ kind: "property", property: "untis" }],
+        },
+      ],
+      [
+        {
+          kind: "group",
+          title: "Display",
+          items: [{ kind: "property", property: "toString" }],
+        },
+      ],
+      [
+        {
+          kind: "group",
+          title: "Display",
+          items: [{ kind: "tool", tool: " ", title: "Open" }],
+        },
+      ],
+      [
+        {
+          kind: "group",
+          title: "Display",
+          items: [{ kind: "tool", tool: "action", title: " " }],
+        },
+      ],
+      [
+        {
+          kind: "group",
+          title: "Display",
+          items: [
+            { kind: "tool", tool: "action", title: "Open", description: 42 },
+          ],
+        },
+      ],
+    ].map((layout) => ({ layout }))
+  )(
+    "rejects malformed untyped layout %# before registering tools",
+    async ({ layout }) => {
+      const server = new MCPServer({ name: "invalid-layout", version: "1" });
+      expect(() =>
+        server.settings({
+          fields,
+          layout: layout as never,
+          read: () => defaults,
+          update: () => defaults,
+        })
+      ).toThrow(/layout/i);
+      expect((await request(server, "tools/list")).result.tools).toEqual([]);
+      await server.close();
+    }
+  );
   it("supports schema defaults while requiring complete effective callback values", async () => {
     const server = new MCPServer({ name: "defaults", version: "1" });
     const read = vi.fn(() => ({ grid: true }));
