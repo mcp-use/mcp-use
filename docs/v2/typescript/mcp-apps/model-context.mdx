@@ -4,7 +4,11 @@ description: "Choose what the model sees from tool results, structured view stat
 icon: "brain"
 ---
 
-Use model context to give the next model turn the information it needs without duplicating every value rendered by the view. Tool results establish the initial context. `useViewState` and `ModelContext` describe the view; `useModelContext` manages selected native attachments.
+Use model context to give the next model turn the information it needs.
+Tool results establish the initial context.
+`useViewState` and `ModelContext` describe the view.
+`useModelContext` manages selected native attachments.
+Keep each piece of evidence in one context channel.
 
 ## Choose the right channel
 
@@ -20,110 +24,12 @@ Use model context to give the next model turn the information it needs without d
 
 ## Attach evidence to the next turn
 
-Render the hook alongside the view’s context contributions; no runtime option is required:
+Use `useModelContext()` to add selected text, images, resource links, or embedded resources to the next model turn.
+The hook shares one attachment collection across the view.
+You can add, replace, remove, and clear attachments with stable application keys.
 
-```tsx
-import { useModelContext } from "mcp-use/react";
-
-export default function BookEvidence() {
-  const { add, attachments, pending, error } = useModelContext();
-
-  return (
-    <>
-      <button
-        onClick={() => {
-          void add("book:summary", {
-            type: "text",
-            text: "The selected edition contains 12 illustrated chapters.",
-            title: "Selected book",
-            thumbnail: { src: "https://example.com/book-cover.png" },
-          }).catch((failure: unknown) => {
-            console.error("Could not attach book evidence", failure);
-          });
-        }}
-      >
-        Add to chat
-      </button>
-      <span>
-        {attachments.length} selected{pending ? " · Syncing context" : ""}
-      </span>
-      {error && <p role="alert">{error.message}</p>}
-    </>
-  );
-}
-```
-
-Rendering `useModelContext` reserves standard `ui/update-model-context` delivery for the view runtime. Views that never render this hook keep their existing widget-state transport preference. Generated view state and descriptions keep their visible JSON projection; the hook does not silently mark them assistant-only.
-
-Render the hook in the initial view tree when combining it with `useViewState` or `ModelContext`. A legacy native write already in flight finishes before activation. On OpenAI hosts, activation then requires full host readback matching the last acknowledged native snapshot; missing or stale readback blocks activation without replacing current state. Existing model-visible widget `modelContent`, `imageIds`, or an already-dispatched widget-state write prevents activation with a shared error: there is no documented cross-channel replacement guarantee, so the SDK does not risk duplicate evidence or silently clear persistence. Use a view without that persisted model-visible widget state; simply reopening may retain it. Private widget content alone does not prevent activation and is left untouched.
-
-Once activated, model-visible state uses native host context restoration rather than `setWidgetState` persistence. This is a behavior change for views combining the new hook with existing state hooks. Native host context is not private UI storage.
-
-`add(key, block)` retains other keys; using the same key updates its value in place. `remove(key)` removes one attachment. `clearAttachments()` clears the shared attachment collection, including restored visible entries, while preserving separately managed background. Unmounting a hook consumer does not clear its selections. Use distinct stable keys across features; exact duplicate blocks under different keys reject. Full snapshot replacement is not part of this public API.
-
-Import the readable `ModelContextBlock`, `ModelContextText`, `ModelContextImage`, `ModelContextResourceLink`, and `ModelContextResource` types from `mcp-use/react`. The union keeps four discriminated kinds:
-
-```ts
-await add("book:cover", {
-  type: "image",
-  data: coverBase64,
-  mimeType: "image/png",
-  title: "Book cover",
-});
-await add("book:manual", {
-  type: "resource_link",
-  uri: manualUri,
-  name: "manual.pdf",
-  title: "Book manual",
-});
-await add("book:sample", {
-  type: "resource",
-  resource: { uri: sampleUri, text: sampleText, mimeType: "text/plain" },
-  title: "Reading sample",
-});
-```
-
-Every kind accepts an optional top-level `title`, and `attachments[i].block.title` exposes that label after adding or restoring a block. Text and image titles map to OpenAI metadata. A resource-link title remains the native `title` field and takes precedence over unrelated title metadata, which stays unchanged. Embedded-resource titles use SDK-owned `mcp-use/title` metadata for round trips; this does not promise that a host renders a resource title chip.
-
-Text-only `thumbnail` accepts an MCP Icon; ChatGPT iOS currently ignores thumbnails. `audience` maps to MCP annotations. Both are decoded on returned blocks. Native resource data, raw metadata, and annotations are preserved; conflicting shorthand and its recognized wire field reject. Audio is not supported.
-
-### Attach an image from public assets
-
-Use the same source path as the `Image` component. The SDK resolves root-relative paths through the view's request-scoped public base, including proxy and asset-host configuration:
-
-```ts
-await add(book.id, {
-  type: "image",
-  src: "/covers/book.png",
-  title: book.title,
-});
-
-await add(`${book.id}:details`, {
-  type: "text",
-  text: details,
-  thumbnail: { src: "/covers/book.png", mimeType: "image/png" },
-});
-```
-
-Image sources are fetched internally and converted to native base64 blocks. PNG, JPEG, GIF, and WebP responses are supported; HTTP failures, unsupported or missing Content-Type, empty bodies, and fetch/read failures reject the action without replacing the previous attachment. Browser CORS rules apply. Alternatively, supply native `data` plus `mimeType`; this form is mutually exclusive with `src`. Returned image attachments contain the prepared native bytes.
-
-Text thumbnail paths use the same resolver but remain URLs on the wire and are never fetched by the SDK. Absolute URLs pass through as they do for `Image`.
-
-While an image is being prepared, `pending` is true and the previous selection stays visible. Other ready keys can sync independently. A later same-key `add`, `remove`, or `clearAttachments` cancels pending preparation and settles that action as `superseded`; late network completion cannot re-add it. Disposal or a delivery failure rejects outstanding preparation. No separate conversion helper or cancellation option is required.
-
-Every mutation returns `Promise<{ status: "synced" | "superseded" }>`. A superseded result means a newer action replaced that operation before acknowledgment. Input validation and unsupported modalities reject without changing the shared synchronization error. Calls made during initialization wait for the shared handshake before committing selections.
-
-`attachments` is the effective selection, including unsynced entries after a failure. `pending` covers initialization, image preparation, batching, and delivery; `pending === false` alone does not mean saved. Use local button state while awaiting each action and display the shared `error` for delivery failures. A definite host rejection leaves the requested selection in place, rejects outstanding operations, and stops automatic publication. The next valid `add`, `remove`, or `clearAttachments` makes one fresh attempt using the current selection. Invalid input and background updates do not retry it. There is no public retry operation or timer-based retry loop. A successful generic-host call acknowledges context delivery without promising composer chips. Capability checks remain internal; an empty modality advertisement does not support every type.
-
-### Respect host removals and restore context
-
-OpenAI readback can restore surviving blocks before defaults run. Restored keys start with `@restored:` and are local to that runtime. Do not derive original application keys from titles, URIs, or list position. Opaque restored background remains separate from visible attachments.
-
-Confirmed host removals update the selected collection. Later snapshots omit those removed generations. Keep removable evidence out of duplicate `useViewState`, `ModelContext`, or assistant-only fields; the SDK cannot detect semantic duplication. Audience controls presentation, not model access. Removal does not erase prior conversation turns or backend data.
-
-OpenAI `updateId` identifies a whole context revision. It is neither an attachment ID nor a compare-and-swap token. An already-dispatched replacement cannot be recalled. Ambiguous host changes, duplicate removal ambiguity, missing acknowledgments, and uncertain write outcomes pause publication with an error. Further mutations reject without replaying an uncertain write. A fresh runtime can initialize only after outstanding remote writes have finished; another host notification or hook remount is not an ordering barrier. Cached host context is not a fresh-read barrier.
-
-Host context restores model-visible context, not private UI state. Keep private state in its supported persistence channel and durable data in your backend.
+Read [Attach evidence with ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#attach-evidence-to-the-next-model-turn) for complete examples, image inputs, and error handling.
+The guide also explains host removals and how to combine the hook with `useViewState` and `ModelContext`.
 
 ## Keep structured choices in view state
 
@@ -146,9 +52,14 @@ function Filters() {
 }
 ```
 
-The root state value must be a JSON-serializable object. All components in one mounted view share it. Separate view instances remain isolated.
+The root state value must be a JSON-serializable object.
+All components in one mounted view share it.
+Separate view instances remain isolated.
 
-By default, ChatGPT restores state through `window.openai.widgetState`, and other MCP Apps hosts keep it for the current iframe lifetime. After `useModelContext` activates native delivery, OpenAI host context can restore model-visible state and attachments. Private UI persistence remains a separate concern.
+By default, ChatGPT restores state through `window.openai.widgetState`.
+Other MCP Apps hosts keep state for the current iframe lifetime.
+After `useModelContext` activates native delivery, OpenAI host context can restore model-visible state and attachments.
+Private UI persistence remains separate.
 
 ## Describe visible UI
 
@@ -175,10 +86,12 @@ Nested components serialize into an indented tree:
   - Three alerts are unresolved
 ```
 
-For annotations produced by event handlers or other callbacks, store the
-description in React state and render it declaratively:
+For descriptions from event handlers or other callbacks, store the description in React state and render it with `ModelContext`:
 
 ```tsx
+import { useState } from "react";
+import { ModelContext } from "mcp-use/react";
+
 function ProductPicker() {
   const [selection, setSelection] = useState<string | null>(null);
 
@@ -205,20 +118,38 @@ The runtime merges structured state and the serialized context tree into one com
 }
 ```
 
-`_uiContext` is a reserved model-visible field. `useViewState` filters it from application state and rejects developer state containing the same key.
+`_uiContext` is a reserved model-visible field.
+`useViewState` filters it from application state and rejects developer state with the same key.
 
-Every write sends the complete snapshot. On MCP Apps hosts, mcp-use sends the object as `structuredContent` and a JSON text block as `content` through `ui/update-model-context`. On ChatGPT, legacy-only views write the object to `modelContent` with `window.openai.setWidgetState`; views using `useModelContext` use the shared native writer described above.
+Every write sends the complete snapshot.
+On MCP Apps hosts, mcp-use sends the object as `structuredContent` and a JSON text block as `content` through `ui/update-model-context`.
+On ChatGPT, views without `useModelContext` write the object to `modelContent` with `window.openai.setWidgetState`.
+Views with `useModelContext` use the shared native writer described in [ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#combine-context-hooks).
 
 ## Keep ephemeral values local
 
 Use React `useState` for transient details that the model does not need, such as hover state, open tooltips, or animation progress.
 
 ```tsx
-const [hoveredId, setHoveredId] = useState<string | null>(null);
+import { useState } from "react";
+
+function HoverPreview() {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  return (
+    <button
+      onMouseEnter={() => setHoveredId("book:cover")}
+      onMouseLeave={() => setHoveredId(null)}
+    >
+      {hoveredId ? "Show cover preview" : "Preview cover"}
+    </button>
+  );
+}
 ```
 
 ## Next steps
 
+- Use [ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#attach-evidence-to-the-next-model-turn) to add and remove selected evidence.
 - Read the [`useViewState` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#useviewstate) for signatures, errors, and host behavior.
 - Read the [`ModelContext` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#modelcontext) for lifecycle and nesting.
 - Use [Interactivity](/v2/typescript/mcp-apps/interactivity) for tool calls and follow-up messages.
