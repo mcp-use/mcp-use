@@ -2234,7 +2234,6 @@ describe("react bridge runtime", () => {
     }
     bootstrapView({
       default: View as ComponentType,
-      viewConfig: { modelContext: "attachments" },
     });
     await init;
     await waitFor(() => expect(screen.getByText("one:0:false")).not.toBeNull());
@@ -2247,7 +2246,6 @@ describe("react bridge runtime", () => {
       {
         type: "text",
         text: JSON.stringify({ sort: "price", _uiContext: "" }),
-        annotations: { audience: ["assistant"] },
       },
       { type: "text", text: "one" },
       { type: "text", text: "two" },

@@ -1,57 +1,58 @@
-import type { ContentBlock, Icon } from "@modelcontextprotocol/server";
+import type {
+  EmbeddedResource,
+  Icon,
+  ImageContent,
+  ResourceLink,
+  TextContent,
+} from "@modelcontextprotocol/server";
 
-/** Presentation hints for native model context; audience is not a privacy filter. */
+/** Shared presentation on input and output; audience is not a privacy filter. */
 export interface ModelContextPresentation {
+  /** Optional display label. The SDK handles encoding and host restoration. */
+  title?: string | undefined;
   /** Maps to MCP annotations.audience. All blocks still reach the model. */
   audience?: ("user" | "assistant")[];
 }
 
-/** Text evidence with optional composer presentation. */
-export type ModelContextText = Extract<
-  ContentBlock,
-  {
-    /** Selects native text content from the MCP content union. */
-    type: "text";
-  }
-> &
-  ModelContextPresentation & {
-    /** Composer label, serialized as OpenAI metadata. */
-    title?: string;
-    /** Text attachment icon; ChatGPT iOS currently ignores thumbnails. */
-    thumbnail?: Icon;
-  };
+/** Native text evidence with an optional composer thumbnail. */
+export interface ModelContextText
+  extends TextContent, ModelContextPresentation {
+  /** Text attachment icon; ChatGPT iOS currently ignores thumbnails. */
+  thumbnail?: Icon;
+}
 
-/** Native base64 image evidence. */
-export type ModelContextImage = Extract<
-  ContentBlock,
-  {
-    /** Selects native image content from the MCP content union. */
-    type: "image";
-  }
-> &
-  ModelContextPresentation & {
-    /** Image alt text, serialized as OpenAI metadata. */
-    title?: string;
-  };
+/** Native base64 image evidence with optional presentation. */
+export interface ModelContextImage
+  extends ImageContent, ModelContextPresentation {}
 
-/** Supported native context blocks. Raw metadata and annotations are preserved. */
+/** A linked resource. Its native title takes precedence over title metadata. */
+export interface ModelContextResourceLink
+  extends ResourceLink, ModelContextPresentation {}
+
+/** Embedded text or binary resource; its title uses SDK metadata for restoration. */
+export interface ModelContextResource
+  extends EmbeddedResource, ModelContextPresentation {}
+
+/** The four supported native context kinds, with consistent friendly presentation. */
 export type ModelContextBlock =
   | ModelContextText
   | ModelContextImage
-  | (Extract<
-      ContentBlock,
-      {
-        /** Selects linked and embedded resources from the MCP content union. */
-        type: "resource_link" | "resource";
-      }
-    > &
-      ModelContextPresentation);
+  | ModelContextResourceLink
+  | ModelContextResource;
+
+/** Options for fetching an image without changing the current selection. */
+export interface ImageFromUrlOptions {
+  /** Optional display label retained on the returned image block. */
+  title?: string | undefined;
+  /** Cancels the fetch or response-body read; no attachment is added. */
+  signal?: AbortSignal;
+}
 
 /** One selected attachment. Restored keys are runtime-local, not persistent IDs. */
 export interface ModelContextAttachment {
   /** Opaque application key or a reserved key assigned during host restoration. */
   readonly key: string;
-  /** Normalized native block; convenience fields are serialized into wire fields. */
+  /** Friendly block, including decoded title and presentation after host restoration. */
   readonly block: ModelContextBlock;
 }
 
@@ -78,6 +79,4 @@ export interface ModelContextHandle {
   remove(key: string): Promise<ModelContextOperationResult>;
   /** Clear selected attachments globally, preserving separately managed background. */
   clearAttachments(): Promise<ModelContextOperationResult>;
-  /** Retry current reconciled context. Unresolved host races remain blocked. */
-  retry(): Promise<ModelContextOperationResult>;
 }

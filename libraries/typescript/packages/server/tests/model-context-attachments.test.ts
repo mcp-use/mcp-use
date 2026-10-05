@@ -1,3 +1,4 @@
+import type { ModelContextBlock } from "../src/react/types/model-context.js";
 import type { App } from "@modelcontextprotocol/ext-apps";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModelContextStore } from "../src/react/runtime/model-context-store.js";
@@ -34,6 +35,7 @@ function fixture(
     initial?: unknown;
     support?: Record<string, unknown>;
     delayed?: boolean;
+    activate?: boolean;
   } = {}
 ) {
   const writes: ContextPayload[] = [];
@@ -60,7 +62,8 @@ function fixture(
   const connect = vi.fn(() =>
     options.delayed ? connection.promise : Promise.resolve(app)
   );
-  const store = new ModelContextStore({ connect }, true);
+  const store = new ModelContextStore({ connect });
+  if (options.activate !== false) store.activateAttachments();
   const observe = (value: unknown) =>
     store.receiveHostContext({ "openai/modelContext": value });
   return { store, writes, responses, app, connect, connection, observe };
@@ -158,11 +161,7 @@ describe("native model context", () => {
     expect(empty.writes).toHaveLength(0);
   });
 
-  it("requires explicit migration and rejects conflicting helper/raw presentation", async () => {
-    const store = new ModelContextStore({ connect: vi.fn() });
-    await expect(store.add("a", text("A"))).rejects.toThrow(
-      "viewConfig.modelContext"
-    );
+  it("rejects conflicting helper/raw presentation", () => {
     expect(() =>
       normalizeContextBlock({
         type: "text",
@@ -181,11 +180,13 @@ describe("native model context", () => {
     ).toThrow("Conflicting");
   });
 
-  it("restores model context before defaults without echoing or reading stale widget state", async () => {
+  it("restores model context before defaults without echoing or treating private widget state as model context", async () => {
     const widgetWrite = vi.fn();
     vi.stubGlobal("window", {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
       openai: {
-        widgetState: { modelContent: { sort: "stale" } },
+        widgetState: { privateContent: { sort: "private" } },
         setWidgetState: widgetWrite,
       },
     });
@@ -279,7 +280,7 @@ describe("native model context", () => {
     responses[1]!.resolve(ack("U2"));
     await rejected;
     await tick();
-    await expect(store.retryContext()).rejects.toThrow();
+    await expect(store.add("next", text("Next"))).rejects.toThrow();
     expect(store.getSnapshot().pending).toBe(false);
     expect(writes).toHaveLength(2);
   });
@@ -292,7 +293,7 @@ describe("native model context", () => {
     observe(null);
     responses[0]!.resolve(ack("U1"));
     await rejected;
-    await expect(store.retryContext()).rejects.toThrow();
+    await expect(store.add("next", text("Next"))).rejects.toThrow();
     expect(writes).toHaveLength(1);
     const malformed = fixture({ initial: { content: [] } });
     await expect(malformed.store.prepare()).rejects.toThrow("updateId");
@@ -318,23 +319,28 @@ describe("native model context", () => {
         { ...text("background"), annotations: { audience: ["assistant"] } },
       ],
     });
-    await expect(store.retryContext()).rejects.toThrow("duplicate");
+    await expect(store.add("next", text("Next"))).rejects.toThrow("duplicate");
     expect(writes).toHaveLength(0);
   });
 
-  it("retries a rejected generic write, but blocks uncertain OpenAI outcomes", async () => {
+  it("attempts retained selection on the next mutation after a definite rejection, but blocks uncertain outcomes", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const generic = fixture({ openai: false });
     const add = generic.store.add("a", text("A"));
     const rejected = expect(add).rejects.toThrow("denied");
     await tick();
-    generic.responses[0]!.reject(new Error("denied"));
+    generic.responses[0]!.reject(
+      Object.assign(new Error("denied"), {
+        name: "ProtocolError",
+        code: -32602,
+      })
+    );
     await rejected;
     expect(generic.store.getSnapshot()).toMatchObject({
       pending: false,
-      error: new Error("denied"),
+      error: { message: "denied", name: "ProtocolError" },
     });
-    const retry = generic.store.retryContext();
+    const retry = generic.store.add("next", text("Next"));
     await tick();
     generic.responses[1]!.resolve({});
     await retry;
@@ -344,7 +350,9 @@ describe("native model context", () => {
     await tick();
     uncertain.responses[0]!.resolve({});
     await failure;
-    await expect(uncertain.store.retryContext()).rejects.toThrow("uncertain");
+    await expect(uncertain.store.add("next", text("Next"))).rejects.toThrow(
+      "uncertain"
+    );
     expect(uncertain.writes).toHaveLength(1);
   });
 
@@ -414,7 +422,9 @@ describe("native model context", () => {
     expect(store.getSnapshot().error).toBeNull();
     expect(store.getSnapshot().attachments).toHaveLength(1);
     observe({ updateId: "unknown" });
-    await expect(store.retryContext()).rejects.toThrow("without its content");
+    await expect(store.add("next", text("Next"))).rejects.toThrow(
+      "without its content"
+    );
   });
 
   it("rejects unsupported state before committing and validates raw presentation metadata", async () => {
@@ -439,7 +449,7 @@ describe("native model context", () => {
     ).rejects.toThrow("thumbnail");
   });
 
-  it("allows explicit retry of a host rejection but never retries a timed-out publication", async () => {
+  it("allows a new mutation after a host rejection but never replays a timed-out publication", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const { store, responses, writes } = fixture();
     const add = store.add("a", text("A"));
@@ -452,7 +462,7 @@ describe("native model context", () => {
       })
     );
     await rejected;
-    const retry = store.retryContext();
+    const retry = store.add("next", text("Next"));
     await tick();
     responses[1]!.resolve(ack("U2"));
     await retry;
@@ -466,7 +476,7 @@ describe("native model context", () => {
       })
     );
     await timeout;
-    await expect(store.retryContext()).rejects.toThrow("uncertain");
+    await expect(store.add("next", text("Next"))).rejects.toThrow("uncertain");
     expect(writes).toHaveLength(3);
   });
 
@@ -511,7 +521,7 @@ describe("native model context", () => {
   });
 
   it.each([
-    { clear: false, action: "retry" },
+    { clear: false, action: "remove" },
     { clear: true, action: "add" },
   ])(
     "reconciles buffered clear=$clear before $action after a rejected write",
@@ -537,7 +547,7 @@ describe("native model context", () => {
       );
       await rejected;
       const retry = (
-        action === "retry" ? store.retryContext() : store.add("d", text("D"))
+        action === "remove" ? store.remove("c") : store.add("d", text("D"))
       ).catch((error: unknown) => error);
       await tick();
       expect(writes).toHaveLength(2);
@@ -560,3 +570,286 @@ describe("native model context", () => {
     expect(writes).toHaveLength(0);
   });
 });
+
+describe("automatic context activation and friendly presentation", () => {
+  function widget(state: Record<string, unknown> = {}, write = vi.fn()) {
+    const browser = Object.assign(new EventTarget(), {
+      openai: { widgetState: state, setWidgetState: write },
+    });
+    vi.stubGlobal("window", browser);
+    return browser;
+  }
+
+  it("reserves native delivery before co-rendered defaults flush and ignores later widget events", async () => {
+    const browser = widget({ privateContent: { panel: "cart" } });
+    const { store, writes, responses } = fixture({ activate: false });
+    store.initializeViewState({ sort: "price" });
+    store.activateAttachments();
+    const add = store.add("a", text("A"));
+    browser.dispatchEvent(
+      Object.assign(new Event("openai:set_globals"), {
+        detail: {
+          globals: { widgetState: { modelContent: { sort: "stale" } } },
+        },
+      })
+    );
+    await tick();
+    expect(browser.openai.setWidgetState).not.toHaveBeenCalled();
+    expect(browser.openai.widgetState).toEqual({
+      privateContent: { panel: "cart" },
+    });
+    expect(writes).toHaveLength(1);
+    expect(writes[0]!.content[0]).toEqual(
+      text(JSON.stringify({ sort: "price", _uiContext: "" }))
+    );
+    responses[0]!.resolve(ack("native"));
+    await add;
+  });
+
+  it.each([
+    { modelContent: { selected: "book" } },
+    { imageIds: ["image-1"] },
+    { modelContent: 42 },
+    { modelContent: false },
+  ])(
+    "rejects model-visible widget persistence without clearing it: %j",
+    async (state) => {
+      const browser = widget(state);
+      const { store, writes, connect } = fixture();
+      await expect(store.add("a", text("A"))).rejects.toThrow(
+        "model-visible widget state"
+      );
+      expect(browser.openai.widgetState).toEqual(state);
+      expect(browser.openai.setWidgetState).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+      expect(writes).toHaveLength(0);
+    }
+  );
+
+  it("waits for an old widget write and rejects unsafe late activation", async () => {
+    const old = deferred<void>();
+    const browser = widget(
+      {},
+      vi.fn(() => old.promise)
+    );
+    const { store, writes } = fixture({ activate: false });
+    store.initializeViewState({ sort: "price" });
+    await tick();
+    expect(browser.openai.setWidgetState).toHaveBeenCalledTimes(1);
+    const add = store.add("a", text("A"));
+    const rejected = expect(add).rejects.toThrow("model-visible widget state");
+    await tick();
+    expect(writes).toHaveLength(0);
+    old.resolve();
+    await rejected;
+    expect(writes).toHaveLength(0);
+  });
+
+  it.each([false, true])(
+    "drains an old native send, with uncertain failure=%s",
+    async (fail) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { store, app, writes, responses } = fixture({ activate: false });
+      store.initializeViewState({ sort: "price" });
+      await tick();
+      expect(writes).toHaveLength(1);
+      const add = store.add("a", text("A"));
+      const result = add.catch((error: unknown) => error);
+      await tick();
+      expect(writes).toHaveLength(1);
+      if (fail) responses[0]!.reject(new Error("connection lost"));
+      else {
+        vi.spyOn(app, "getHostContext").mockReturnValue({
+          "openai/modelContext": { updateId: "legacy", ...writes[0] },
+        } as ReturnType<App["getHostContext"]>);
+        responses[0]!.resolve(ack("legacy"));
+      }
+      await tick();
+      if (fail) {
+        expect(await result).toEqual(
+          expect.objectContaining({
+            message: expect.stringContaining("uncertain legacy"),
+          })
+        );
+        expect(writes).toHaveLength(1);
+      } else {
+        expect(writes).toHaveLength(2);
+        expect(writes[1]!.content).toEqual([...writes[0]!.content, text("A")]);
+        responses[1]!.resolve(ack("native"));
+        expect(await result).toEqual({ status: "synced" });
+      }
+    }
+  );
+
+  it("disposes during a native handoff without waiting for the old write", async () => {
+    const { store, writes, responses } = fixture({ activate: false });
+    store.initializeViewState({ sort: "price" });
+    await tick();
+    const add = store.add("a", text("A"));
+    const rejected = expect(add).rejects.toThrow("disposed");
+    store.dispose();
+    await rejected;
+    responses[0]!.resolve(ack("late"));
+    await tick();
+    expect(writes).toHaveLength(1);
+  });
+
+  it("retains failed intent, never retries background changes, and recovers on a valid mutation", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { store, writes, responses } = fixture();
+    const rejected = expect(store.add("a", text("A"))).rejects.toThrow(
+      "denied"
+    );
+    await tick();
+    responses[0]!.reject(
+      Object.assign(new Error("denied"), {
+        name: "ProtocolError",
+        code: -32602,
+      })
+    );
+    await rejected;
+    store.updateViewState(() => ({ sort: "price" }));
+    store.setNode({ id: "background", parentId: null, content: "catalog" });
+    await expect(
+      store.add("bad", { type: "text", text: "bad", title: "" })
+    ).rejects.toThrow();
+    await tick();
+    expect(writes).toHaveLength(1);
+    expect(store.getSnapshot()).toMatchObject({
+      pending: false,
+      error: { message: "denied" },
+    });
+    expect(store.getSnapshot().attachments.map(({ key }) => key)).toEqual([
+      "a",
+    ]);
+    const add = store.add("b", text("B"));
+    await tick();
+    expect(writes[1]!.content).toContainEqual(text("A"));
+    expect(writes[1]!.content).toContainEqual(text("B"));
+    expect(writes[1]!.structuredContent).toEqual({
+      sort: "price",
+      _uiContext: "- catalog",
+    });
+    responses[1]!.resolve(ack("recovered"));
+    await add;
+    expect(store.getSnapshot()).toMatchObject({ pending: false, error: null });
+  });
+
+  it("round-trips titles across all four kinds, including native resource-link precedence", async () => {
+    const content = [
+      normalizeContextBlock({
+        type: "text",
+        text: "Text",
+        title: "Text label",
+        audience: ["user"],
+        thumbnail: { src: "https://example.com/icon.png" },
+      }),
+      normalizeContextBlock({
+        type: "image",
+        data: "aA==",
+        mimeType: "image/png",
+        title: "Image label",
+      }),
+      normalizeContextBlock({
+        type: "resource_link",
+        uri: "book://a",
+        name: "a",
+        title: "Native label",
+        _meta: { "openai/title": "Other metadata", custom: true },
+      }),
+      normalizeContextBlock({
+        type: "resource",
+        resource: { uri: "book://a/sample", text: "Sample" },
+        title: "Sample label",
+      }),
+    ];
+    expect(content[3]!._meta).toEqual({ "mcp-use/title": "Sample label" });
+    const { store, writes } = fixture({
+      initial: { updateId: "restored", content },
+    });
+    await store.prepare();
+    const blocks = store.getSnapshot().attachments.map(({ block }) => block);
+    expect(blocks.map((block) => (block as { title?: string }).title)).toEqual([
+      "Text label",
+      "Image label",
+      "Native label",
+      "Sample label",
+    ]);
+    expect(blocks[0]).toMatchObject({
+      audience: ["user"],
+      thumbnail: { src: "https://example.com/icon.png" },
+    });
+    expect(blocks[2]!._meta).toEqual({
+      "openai/title": "Other metadata",
+      custom: true,
+    });
+    expect(
+      blocks.map((block) => normalizeContextBlock(block as ModelContextBlock))
+    ).toEqual(content);
+    expect(Object.isFrozen(blocks[0])).toBe(true);
+    expect(writes).toHaveLength(0);
+  });
+
+  it("preserves removal of the visible generated projection across later attachment mutations", async () => {
+    const { store, writes, responses, observe } = fixture();
+    store.initializeViewState({ sort: "price" });
+    const first = store.add("a", text("A"));
+    await tick();
+    responses[0]!.resolve(ack("U1"));
+    await first;
+    observe({
+      updateId: "removed-background",
+      structuredContent: writes[0]!.structuredContent,
+      content: [text("A")],
+    });
+    const second = store.add("b", text("B"));
+    await tick();
+    expect(writes[1]!.content).toEqual([text("A"), text("B")]);
+    responses[1]!.resolve(ack("U2"));
+    await second;
+  });
+});
+
+it("preserves explicit unsent state changes across native activation hydration", async () => {
+  const { store, app, writes, responses } = fixture({ activate: false });
+  store.initializeViewState({ count: 0 });
+  await tick();
+  store.updateViewState(() => ({ count: 1 }));
+  vi.spyOn(app, "getHostContext").mockReturnValue({
+    "openai/modelContext": { updateId: "legacy", ...writes[0] },
+  } as ReturnType<App["getHostContext"]>);
+  const add = store.add("a", text("A"));
+  // A later functional update must see the retained explicit intent, not count:0.
+  store.updateViewState((previous) => ({ count: Number(previous?.count) + 1 }));
+  responses[0]!.resolve(ack("legacy"));
+  await tick();
+  expect(store.getViewStateSnapshot()).toEqual({ count: 2 });
+  expect(writes[1]!.structuredContent).toEqual({ count: 2, _uiContext: "" });
+  responses[1]!.resolve(ack("native"));
+  await add;
+});
+
+it.each([
+  null,
+  undefined,
+  {
+    updateId: "old",
+    structuredContent: { count: 0, _uiContext: "" },
+    content: [text(JSON.stringify({ count: 0, _uiContext: "" }))],
+  },
+])(
+  "blocks stale or missing readback after an acknowledged legacy native write: %j",
+  async (initial) => {
+    const { store, responses, writes } = fixture({ activate: false, initial });
+    store.initializeViewState({ count: 0 });
+    store.updateViewState(() => ({ count: 1 }));
+    await tick();
+    responses[0]!.resolve(ack("current"));
+    await tick();
+    await expect(store.add("a", text("A"))).rejects.toThrow(
+      "cached host state"
+    );
+    expect(store.getViewStateSnapshot()).toEqual({ count: 1 });
+    expect(writes).toHaveLength(1);
+  }
+);

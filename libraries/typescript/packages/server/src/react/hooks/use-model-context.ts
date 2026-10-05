@@ -8,16 +8,19 @@ import type {
 /**
  * Manage native model context through the view's shared, single writer.
  *
- * Export `viewConfig = { modelContext: "attachments" }` before rendering.
- * This explicit migration uses standard context delivery and assistant-only
- * background projection; it does not replace private widget persistence.
+ * Rendering this hook reserves native context delivery for the runtime; no
+ * view configuration is needed. Legacy-only views retain their transport.
+ * Existing model-visible widget persistence prevents an unsafe handoff and
+ * surfaces an error; the SDK never silently clears that state.
  * Attachment keys are shared across all hook instances. Unmounting a consumer
  * does not clear selections. Exact duplicate blocks under different keys reject.
  *
  * Calls await initialization and negotiate support internally. Successful calls
  * acknowledge context delivery, not composer rendering. Host removals update
  * the selection where unambiguous. Uncertain writes or host ordering pause
- * publication: ordinary retry cannot resolve those conflicts.
+ * publication until a fresh runtime can initialize after outstanding writes stop.
+ * Definite failed writes retain the requested selection and reject. The next
+ * valid mutation makes one fresh attempt; background updates do not retry.
  *
  * Keep removable evidence out of duplicate view state or description fields.
  * Audience annotations affect presentation, not access by the model.
@@ -26,6 +29,7 @@ import type {
  */
 export function useModelContext(): ModelContextHandle {
   const store = useViewRuntime().modelContextStore;
+  store.activateAttachments();
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   useEffect(() => {
     void store.prepare().catch(() => {});
@@ -37,7 +41,6 @@ export function useModelContext(): ModelContextHandle {
       add: store.add,
       remove: store.remove,
       clearAttachments: store.clearSelection,
-      retry: store.retryContext,
     }),
     [snapshot, store]
   );
