@@ -24,6 +24,7 @@ import {
   useSendSizeChanged,
   useToolContext,
   useViewState,
+  useModelContext,
   useViewTheme,
   useViewTool,
   ViewControls,
@@ -2190,6 +2191,75 @@ describe("react bridge runtime", () => {
     // Allow any (erroneous) post-connect flush to drain before asserting.
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(modelContextUpdates).toHaveLength(0);
+  });
+
+  it("shares native attachments across hook consumers and preserves them on consumer unmount", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost(undefined, {
+      updateModelContext: { text: {}, image: {}, structuredContent: {} },
+    });
+    function Add({ name }: { name: string }) {
+      const { add, attachments, pending } = useModelContext();
+      return (
+        <button
+          onClick={() => {
+            void add(name, { type: "text", text: name });
+          }}
+        >
+          {name}:{attachments.length}:{String(pending)}
+        </button>
+      );
+    }
+    function View() {
+      const [show, setShow] = useState(true);
+      const { attachments, clearAttachments } = useModelContext();
+      useViewState({ sort: "price" });
+      return (
+        <>
+          <span data-testid="attachments">
+            {attachments.map((item) => item.key).join(",")}
+          </span>
+          {show && <Add name="one" />}
+          <Add name="two" />
+          <button onClick={() => setShow(false)}>hide</button>
+          <button
+            onClick={() => {
+              void clearAttachments();
+            }}
+          >
+            clear
+          </button>
+        </>
+      );
+    }
+    bootstrapView({
+      default: View as ComponentType,
+      viewConfig: { modelContext: "attachments" },
+    });
+    await init;
+    await waitFor(() => expect(screen.getByText("one:0:false")).not.toBeNull());
+    await act(async () => {
+      screen.getByText("one:0:false").click();
+      screen.getByText("two:0:false").click();
+    });
+    await waitFor(() => expect(screen.getByText("two:2:false")).not.toBeNull());
+    expect(modelContextUpdates.at(-1)?.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify({ sort: "price", _uiContext: "" }),
+        annotations: { audience: ["assistant"] },
+      },
+      { type: "text", text: "one" },
+      { type: "text", text: "two" },
+    ]);
+    await act(async () => screen.getByText("hide").click());
+    expect(screen.getByTestId("attachments").textContent).toBe("one,two");
+    await act(async () => screen.getByText("clear").click());
+    await waitFor(() => expect(screen.getByText("two:0:false")).not.toBeNull());
+    expect(modelContextUpdates.at(-1)?.structuredContent).toEqual({
+      sort: "price",
+      _uiContext: "",
+    });
   });
 
   it("initializes useViewState, shares it across components, and sends complete MCP model context", async () => {

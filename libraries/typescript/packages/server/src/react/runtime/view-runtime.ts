@@ -553,6 +553,7 @@ export function createMcpAppRuntime(
 
     app.onhostcontextchanged = (params) => {
       if (disposed) return;
+      modelContextStore.receiveHostContext(params as Record<string, unknown>);
       applyHostContext({
         ...(hostSnapshot.hostContext ?? {}),
         ...params,
@@ -629,7 +630,10 @@ export function createMcpAppRuntime(
     return connectPromise;
   }
 
-  const modelContextStore = new ModelContextStore({ connect });
+  const modelContextStore = new ModelContextStore(
+    { connect },
+    config.modelContext === "attachments"
+  );
 
   function registerViewTool(
     name: string,
