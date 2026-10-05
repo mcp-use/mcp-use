@@ -153,8 +153,7 @@ export function Settings({
           />
         </label>
         <p className="muted">
-          These are the same preferences as native plugin settings. Refresh
-          after changes from another view.
+          These are the same preferences as native plugin settings.
         </p>
         <details className="link-helper">
           <summary>Make a deep link</summary>

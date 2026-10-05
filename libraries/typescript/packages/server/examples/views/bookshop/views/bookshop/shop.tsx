@@ -20,7 +20,6 @@ export function Shop({ initial }: { initial: BookshopData }) {
   const { displayMode, availableDisplayModes, requestDisplayMode } =
     useDisplayMode();
   const update = useCallTool("set_cart_item");
-  const refresh = useCallTool("read_cart");
   const settings = useCallTool("update_bookshop_settings");
   useEffect(() => {
     setState(initial);
@@ -111,15 +110,6 @@ export function Shop({ initial }: { initial: BookshopData }) {
           onClick={() => navigate({ pathname: "/cart", search })}
         >
           Demo cart <span className="badge">{count}</span>
-        </button>
-        <button
-          className="quiet refresh"
-          disabled={busy}
-          onClick={() => {
-            void updateBookshop(() => refresh.callTool({}));
-          }}
-        >
-          {busy ? "Updating…" : "Refresh"}
         </button>
       </nav>
       {error && (

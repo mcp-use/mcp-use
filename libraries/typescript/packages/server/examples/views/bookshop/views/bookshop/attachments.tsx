@@ -15,19 +15,12 @@ export function AttachButton({
   onAttach: () => Promise<ModelContextOperationResult>;
 }) {
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   async function attach() {
     setBusy(true);
-    setMessage("");
     setError("");
     try {
-      const result = await onAttach();
-      setMessage(
-        result.status === "synced"
-          ? "Last request synced."
-          : "A newer change replaced this request."
-      );
+      await onAttach();
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Could not add context."
@@ -46,7 +39,6 @@ export function AttachButton({
       >
         {busy ? "Adding…" : label}
       </button>
-      {message && <small role="status">{message}</small>}
       {error && <small role="alert">{error}</small>}
     </div>
   );

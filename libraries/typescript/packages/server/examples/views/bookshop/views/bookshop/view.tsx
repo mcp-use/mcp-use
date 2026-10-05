@@ -1,4 +1,4 @@
-import { useToolContext, type ViewConfig } from "mcp-use/react";
+import { ThemeProvider, useToolContext, type ViewConfig } from "mcp-use/react";
 import { BookshopRouter } from "./routing.js";
 import { Shop } from "./shop.js";
 import "./view.css";
@@ -9,8 +9,17 @@ export const viewConfig = {
   preferredDisplayMode: "inline",
 } satisfies ViewConfig;
 
-/** Mount navigation after tool data is ready; later snapshots do not reset it. */
+/** Apply the host palette and fonts to every Bookshop view state. */
 export default function BookshopView() {
+  return (
+    <ThemeProvider>
+      <BookshopContent />
+    </ThemeProvider>
+  );
+}
+
+/** Mount navigation after tool data is ready; later snapshots do not reset it. */
+function BookshopContent() {
   const view = useToolContext<"open_bookshop">();
   if (view.status === "pending")
     return (

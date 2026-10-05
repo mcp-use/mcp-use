@@ -117,9 +117,6 @@
   border-color: var(--line);
   font-weight: 600;
 }
-.bookshop .refresh {
-  margin-left: auto;
-}
 .bookshop .badge {
   display: inline-block;
   min-width: 20px;
