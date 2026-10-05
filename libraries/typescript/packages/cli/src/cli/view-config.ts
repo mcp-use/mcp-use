@@ -383,18 +383,36 @@ function assertImmutable(
   // Calls in deferred browser components may consume config references. Calls
   // made while initializing the module must still be checked, including local
   // helpers, aliases, object methods, IIFEs, and callbacks passed to other code.
-  const initializers = new Map<Identifier, ESTree.Node>();
+  const initializers = new Map<Identifier, Set<ESTree.Node>>();
+  function addInitializer(binding: Identifier, value: ESTree.Node) {
+    const candidates = initializers.get(binding) ?? new Set<ESTree.Node>();
+    candidates.add(value);
+    initializers.set(binding, candidates);
+  }
+  function assignmentBindings(node: ESTree.Node): Identifier[] {
+    const binding = references.get(node);
+    if (binding) return [binding];
+    if (node.type === "MemberExpression")
+      return assignmentBindings(node.object);
+    return children(node).flatMap(assignmentBindings);
+  }
   for (const { node } of indexed.nodes) {
     if (node.type === "VariableDeclarator" && node.init) {
       for (const binding of bindingIdentifiers(node.id))
-        initializers.set(binding, node.init);
+        addInitializer(binding, node.init);
+    } else if (node.type === "AssignmentExpression") {
+      // Retain every possible source, rather than only the last assignment:
+      // an earlier call may have already run the overwritten helper. Tracking
+      // a member assignment on its container also covers object-held aliases.
+      for (const binding of assignmentBindings(node.left))
+        addInitializer(binding, node.right);
     } else if (
       (node.type === "FunctionDeclaration" ||
         node.type === "FunctionExpression" ||
         node.type === "ClassDeclaration") &&
       node.id
     ) {
-      initializers.set(node.id, node);
+      addInitializer(node.id, node);
     }
   }
   const initializingFunctions = new Set<ESTree.Node>();
@@ -415,8 +433,10 @@ function assertImmutable(
       return;
     }
     const binding = references.get(node);
-    const initializer = binding && initializers.get(binding);
-    if (initializer) activateFunctions(initializer, seen);
+    const candidates = binding && initializers.get(binding);
+    if (candidates)
+      for (const initializer of candidates)
+        activateFunctions(initializer, seen);
     for (const child of children(node)) activateFunctions(child, seen);
   }
   let activeCount: number;

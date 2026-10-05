@@ -159,10 +159,30 @@ describe("static viewConfig extraction", () => {
           console.log(viewConfig);
           const [modes] = useState(viewConfig.displayModes);
           const selected = useMemo(() => viewConfig.displayModes, [viewConfig.displayModes]);
-          return renderModes(readModes(), modes, selected);
+          let getter; getter = readModes;
+          return renderModes(getter(), modes, selected);
         }`)
       )
     ).toEqual({ displayModes: ["inline"] });
+  });
+  it.each([
+    "let init; init = helper; init();",
+    "let init = () => {}; init = helper; init();",
+    "let init; init = helper; init(); init = () => {};",
+    "let init, alias; init = alias = helper; init();",
+    "let init; [init] = [helper]; init();",
+    "const actions = {}; actions.init = helper; actions.init();",
+    "let init; function assign() { init = helper; } assign(); init();",
+  ])("rejects assignment-created initialization aliases: %s", (code) => {
+    expect(() =>
+      readViewConfig(
+        source(`
+      export const viewConfig = {displayModes: ["inline"]};
+      function helper() { viewConfig.displayModes.push("fullscreen"); }
+      ${code}
+    `)
+      )
+    ).toThrow("Cannot statically extract viewConfig");
   });
   it.each([
     "function init() { mutate(viewConfig); } init();",
