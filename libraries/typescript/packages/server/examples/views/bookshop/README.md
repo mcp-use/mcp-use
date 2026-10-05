@@ -1,12 +1,13 @@
 # Little Bookshop — ChatGPT Plugin Extensions
 
-Three fictional books, browsing and details, and a demo cart. No credentials,
-external services, payments, orders, or checkout.
+Three fictional books, illustrated covers, a library, reading samples, and a demo
+cart. No credentials, external services, payments, orders, or checkout.
 
 ## Run from this checkout
 
-This example uses the unpublished APIs in the current PR stack. Use the workspace
-packages, rather than an older npm release. From `libraries/typescript`:
+This example uses the unpublished APIs in the current PR stack, including
+`useModelContext`. Use workspace packages rather than an older npm release.
+From `libraries/typescript`:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -16,81 +17,126 @@ pnpm --filter mcp-use-example-bookshop dev --port 3217 --host 127.0.0.1
 
 Open `http://127.0.0.1:3217/inspector` and connect to
 `http://127.0.0.1:3217/mcp`. Call `open_bookshop` with `{}` to render the view.
-The local Inspector can exercise the UI and bridge. Native launchers and
-settings require installation in a supporting ChatGPT host; this example does
-not deploy the server or create a tunnel.
+Native launchers and settings require installation in a supporting host. This
+example does not deploy a server or create a tunnel.
 
-Production and verification commands, also from `libraries/typescript`:
+Production and static verification commands, from `libraries/typescript`:
 
 ```sh
 pnpm --filter mcp-use-example-bookshop build
 pnpm --filter mcp-use-example-bookshop typecheck
+pnpm exec eslint packages/server/examples/views/bookshop --max-warnings 0
+pnpm exec prettier --check packages/server/examples/views/bookshop
 pnpm --filter mcp-use-example-bookshop start --port 3217 --host 127.0.0.1
 ```
 
-## Feature map
+## Design and feature map
 
-| Feature                         | Where to look                                                      |
-| ------------------------------- | ------------------------------------------------------------------ |
-| Global and thread launchers     | `src/index.ts`: `open_bookshop.view.entrypoints`; both accept `{}` |
-| Browse, search, product details | `views/bookshop/view.tsx`; fictional catalog in `src/catalog.ts`   |
-| Server cart and typed UI calls  | `set_cart_item`, `read_cart`, `useCallTool`                        |
-| Inline/fullscreen               | Static `viewConfig` and capability-aware `useDisplayMode` button   |
-| Product/cart deep links         | `useDeepLink`, allowlisted routes in `src/route.ts`                |
-| Simple native settings          | `server.settings`: descriptions and compact catalog                |
-| Model-visible UI summary        | `ModelContext`; `read_cart` supplies authoritative server state    |
+The compact header, 19px screen title, 14px system type, 8px controls, 10px card
+spacing, and host theme variables follow the
+[Bits & Bolts reference at ca16cb3](https://github.com/openai/mcp-extensions/tree/ca16cb3bc015baaa1b849082d8755bbef18770cb/plugins/bits-and-bolts).
+Book covers replace its geometry previews. The three illustrations and excerpts
+are original fictional demo content. Editable SVG originals and their PNG versions
+live under `public/covers`; no remote image service is required. Public URLs use
+the request-resolved asset base. The monochrome book icon is also server branding.
 
-## State and scope
+| Feature                                   | Where to look                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------- |
+| Global and thread launchers               | `src/index.ts`: `open_bookshop.view.entrypoints`; both accept `{}`                |
+| Library, search, details, reading samples | `views/bookshop/view.tsx`; catalog in `src/catalog.ts`                            |
+| Server cart and typed UI calls            | `set_cart_item`, `read_cart`, `useCallTool`                                       |
+| Inline/fullscreen                         | `viewConfig` and capability-aware `useDisplayMode` button                         |
+| Local URL navigation and deep links       | `useDeepLink`, `navigateTo`, `parseRoute`, `routeParams`                          |
+| In-app and native settings                | `update_bookshop_settings` and `server.settings` share preferences                |
+| Explicit chat attachments                 | `useModelContext` in `attachments.tsx`; `viewConfig.modelContext = "attachments"` |
 
-There is **one shared demo cart and one shared preferences object per server
-process**. All model tools, UI instances, connections, global launches, and thread
-launches read the same store. Values survive closing a view or opening another
-connection, but reset when the server restarts. There is no account or thread
-isolation and no durable database. This explicit demo scope avoids inventing a
-conversation-ID API. Never put private user data in this shared store.
+## Cart, settings, and chat context
 
-An Add button calls `set_cart_item` and displays the returned server snapshot;
-it does not keep a separate browser cart. Quantity updates are absolute and
-idempotent; zero removes a book. Updates run synchronously on this single process.
-Concurrent callers use last-write-wins. Press Refresh after another UI/model
-changes the cart or native settings. Independent mounted views are snapshots;
-there is no automatic cross-view push. Local routing/search is ephemeral, and
-`ModelContext` shares what the current view displays. For production, add verified
-authorization and an atomic store scoped to that identity.
+**Add to cart** calls `set_cart_item`. There is one shared demo cart and one shared
+preferences object per server process. All tools, UI instances, global launches,
+and thread launches read that store. Values reset on restart. There is no account
+or thread isolation, database, or purchase flow. Never put private user data here.
+
+Quantities are absolute and idempotent; zero removes a book and nine is the limit.
+Concurrent callers use last-write-wins. Refresh after another view/model changes
+cart or native settings. Mounted views hold snapshots, with no cross-view push.
+The in-app settings controls update the same preferences as native settings.
+
+**Add to chat** sends the actual PNG cover through the SDK hook. Product details
+also offer **Add book details**, a text block with a friendly title and cover
+thumbnail, and **Add reading sample**, an embedded plain-text resource containing
+the displayed excerpt. Stable keys update the same item without duplicating it.
+Cart updates, browsing, and settings changes never attach anything automatically.
+The example does not duplicate removable evidence in background model context.
+`read_cart` remains the authoritative way for the model to inspect shopping state.
+
+Each attachment button awaits its own operation and reports failures or
+supersession. “Context synced” means that operation was acknowledged; it does not
+promise a visible composer chip on every host. The shared panel reads reconciled
+hook state, reports pending/error, offers explicit retry, and lets the reader
+remove or clear attachments independently of the cart. A failed desired entry can
+remain listed while the error explains it is unsynced. The SDK owns connection,
+capability checks, batching, host removal, and remount reconciliation. Retry can
+still reject unsupported content or an unresolved host-ordering conflict; the
+shared error includes the SDK’s explanation.
+
+This example intentionally omits `resource_link`: its small reading sample is
+self-contained, with no external document to retrieve. The `bookshop://` URI
+identifies that embedded resource; it is not an advertised remote resource.
+Audio, 3D, file editing, and implicit background context add no useful behavior to
+this book catalog. They are not simulated merely to exercise more primitives.
 
 ## Deep links
 
-Supported app routes are `/books`, `/products/moonlit-atlas`,
-`/products/small-hours`, `/products/paper-planets`, and `/cart`. Unknown products
-and malformed or external URLs show a recoverable missing-page screen.
+Supported app routes are `/` (library), `/books`, `/products/moonlit-atlas`,
+`/products/small-hours`, `/products/paper-planets`, `/cart`, and `/settings`.
+`/books?q=moon` opens the filtered catalog. Unknown products and malformed or
+external URLs show a recoverable missing-page screen.
 
-Enter your **registered plugin ID** in the view's deep-link helper. It constructs:
+The view has one app-local URL. Initial host links take precedence over the tool's
+route. Later host URL changes replace it. Local clicks and search update that same
+state, preserving unrelated query parameters, including repeated values. Search
+is preserved when visiting details/cart and returning to the library. Data refresh
+updates the snapshot without resetting navigation. Nothing writes the host URL
+or browser history, and no router package is needed.
+
+The current `useDeepLink()` exposes only the latest URL string. If the host sends
+A, the reader navigates locally to B, and the host explicitly sends A again, the
+unchanged hook value cannot trigger navigation. Supporting that case requires an
+SDK activation signal and a host that actually emits the repeated delivery.
+Unrelated theme updates must not count as navigation. This example does not claim
+to fix that separate SDK limitation.
+
+Under Settings → Make a deep link, enter your registered plugin ID. The helper
+percent-encodes the entire app-relative URL, including its query string:
 
 ```text
+https://chatgpt.com/plugins/<encoded-plugin-id>/app/open_bookshop?path=%2Fbooks%3Fq%3Dmoon
 https://chatgpt.com/plugins/<encoded-plugin-id>/app/open_bookshop?path=%2Fcart
-https://chatgpt.com/plugins/<encoded-plugin-id>/app/open_bookshop?path=%2Fproducts%2Fmoonlit-atlas
 ```
 
-These links need a registered, installed plugin and a supporting host. Incoming
-links update the local route; ordinary navigation does not set the host URL.
-Before registration, exercise the same screen by calling `open_bookshop` with
-`{"route":"/cart"}` or `{"route":"/products/moonlit-atlas"}`. That proves rendering,
-not native deep-link delivery. Global/thread launchers are fullscreen in supporting
-hosts; ordinary tool cards prefer inline. Hosts may ignore presentation requests.
+Registration, installation, and a supporting host are required. Before registration,
+call `open_bookshop` with `{"route":"/books?q=moon"}` or `{"route":"/cart"}` to
+exercise the screen. This proves local rendering, not native deep-link delivery.
+Global/thread launchers are fullscreen in supporting hosts; ordinary tool cards
+prefer inline. Hosts may ignore presentation requests.
 
-## Try these prompts
+## Try it
 
 - “Open Little Bookshop.”
-- “Show me Paper Planets.” (`open_bookshop`, route `/products/paper-planets`)
-- “Add two copies of The Moonlit Atlas to the demo cart.”
-- Click Add in the UI, then ask “What's in the demo cart now?” (`read_cart`)
-- “Remove Paper Planets from the demo cart.” (quantity `0`)
-- “Use a compact catalog and hide descriptions.” (`settings.update`)
+- Search “moon”, open its cover, and return to Library; the search remains.
+- Add two copies to the cart, then ask “What's in the demo cart?” (`read_cart`).
+- Open a book, choose Add to chat, and ask about its cover illustration.
+- Add book details and a reading sample, then remove only the cover from context.
+- Change Compact library in Settings, or use native `settings.update`, then Refresh.
 
 ## Verification boundaries
 
-Build and typecheck commands verify the example's packaging and static types.
-Use the Inspector to check the UI, button-to-tool calls, current cart state,
-routing, settings refresh, appearance, and sizing in your host.
-Native ChatGPT launcher placement, native settings controls, and registered
-plugin-link delivery require separate verification in a supporting host.
+Build, typecheck, lint, and formatting verify packaging and static correctness.
+Use the Inspector to check actual tool calls, routing, theme, sizing, cart,
+settings, attachments, host removals, and rejected-operation/retry states.
+The example has no committed test suite or test-only dependencies.
+
+Native ChatGPT launcher placement, native settings controls, composer rendering,
+and registered deep-link delivery require separate verification in a supporting
+host. A local protocol harness does not establish those native-host guarantees.

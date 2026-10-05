@@ -7,7 +7,9 @@ export const books = [
     genre: "Adventure",
     priceCents: 1800,
     description: "A mapmaker follows a wandering island across a sea of stars.",
-    color: "#304d64",
+    cover: "covers/moonlit-atlas.png",
+    excerpt:
+      "The island had moved again. By dawn, Ada’s careful ink lines described a coastline that no longer existed. She folded the map, watched a silver trail vanish into the harbor, and set out to ask the moon for directions.",
   },
   {
     id: "small-hours",
@@ -16,7 +18,9 @@ export const books = [
     genre: "Cozy fiction",
     priceCents: 1400,
     description: "Neighbors turn an abandoned railway into a midnight garden.",
-    color: "#57705c",
+    cover: "covers/small-hours.png",
+    excerpt:
+      "At eleven minutes past midnight, the first tomato appeared on the platform. Nobody admitted planting it. By Friday, the old station clock had become a trellis, and the neighbors had begun arriving with watering cans instead of suitcases.",
   },
   {
     id: "paper-planets",
@@ -26,6 +30,8 @@ export const books = [
     priceCents: 2200,
     description:
       "An archivist discovers a universe folded between library pages.",
-    color: "#875a49",
+    cover: "covers/paper-planets.png",
+    excerpt:
+      "Every book in the archive weighed precisely what it should, except the blue one. It was getting lighter. When Jun opened it, a tiny paper moon slipped from the index and began to orbit the reading lamp.",
   },
 ] as const;

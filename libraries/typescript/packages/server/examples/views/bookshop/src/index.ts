@@ -8,6 +8,7 @@ const server = new MCPServer({
   version: "1.0.0",
   description: "Browse fictional books and a shared demo cart. No checkout.",
   legacy: "stateless",
+  icons: [{ src: "book.svg", mimeType: "image/svg+xml" }],
 });
 
 // One explicit demo store per server process. Every caller shares it.
@@ -24,7 +25,8 @@ const snapshotSchema = z.object({
       genre: z.string(),
       priceCents: z.number().int(),
       description: z.string(),
-      color: z.string(),
+      cover: z.string(),
+      excerpt: z.string(),
     })
   ),
   cart: z.array(
@@ -85,7 +87,7 @@ export const openBookshop = server.tool(
     name: "open_bookshop",
     title: "Little Bookshop",
     description:
-      "Browse fictional books. Open /books, /products/moonlit-atlas, /products/small-hours, /products/paper-planets, or /cart. All callers share a process-local demo cart.",
+      "Browse fictional books. Open /books, /products/moonlit-atlas, /products/small-hours, /products/paper-planets, /cart, or /settings. All callers share a process-local demo cart.",
     inputSchema: z.object({ route: z.string().default("/books") }),
     outputSchema: snapshotSchema,
     annotations: { readOnlyHint: true },
@@ -134,6 +136,31 @@ export const setCartItem = server.tool(
     if (quantity === 0) cart.delete(id);
     else cart.set(id, quantity);
     return result("/cart");
+  }
+);
+
+/** Update the same shared demo preferences exposed by native settings. */
+export const updateBookshopSettings = server.tool(
+  {
+    name: "update_bookshop_settings",
+    title: "Update bookshop appearance",
+    description:
+      "Change the shared demo catalog appearance. Resets on restart.",
+    inputSchema: z.object({
+      showDescriptions: z.boolean(),
+      compact: z.boolean(),
+    }),
+    outputSchema: snapshotSchema,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  (settings) => {
+    preferences = { ...settings };
+    return result("/settings");
   }
 );
 
