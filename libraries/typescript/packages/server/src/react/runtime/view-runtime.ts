@@ -630,10 +630,7 @@ export function createMcpAppRuntime(
     return connectPromise;
   }
 
-  const modelContextStore = new ModelContextStore(
-    { connect },
-    config.modelContext === "attachments"
-  );
+  const modelContextStore = new ModelContextStore({ connect });
 
   function registerViewTool(
     name: string,

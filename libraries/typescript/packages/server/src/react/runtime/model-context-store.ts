@@ -5,6 +5,7 @@ import {
   contextUpdateId,
   MODEL_CONTEXT_EXTENSION,
   normalizeContextBlock,
+  presentContextBlock,
   readContextObservation,
   type ContextObservation,
 } from "./model-context-wire.js";
@@ -110,6 +111,19 @@ function filterUiContext(state: ViewState): ViewState {
   return viewState;
 }
 
+function isGeneratedProjection(
+  block: ContentBlock,
+  state: ViewState | undefined
+): boolean {
+  if (!state || typeof state[UI_CONTEXT_KEY] !== "string") return false;
+  const text = { type: "text", text: JSON.stringify(state) };
+  return (
+    canonicalContext(block) === canonicalContext(text) ||
+    canonicalContext(block) ===
+      canonicalContext({ ...text, annotations: { audience: ["assistant"] } })
+  );
+}
+
 function assertValidViewState(state: ViewState): string {
   if (state === null || Array.isArray(state) || typeof state !== "object") {
     throw new TypeError("useViewState state must be a plain object");
@@ -145,7 +159,15 @@ function assertValidViewState(state: ViewState): string {
  */
 export class ModelContextStore {
   readonly #host: ModelContextStoreHost;
-  readonly #rich: boolean;
+  #rich = false;
+  #activationBarrier: Promise<void> | null = null;
+  #activationError: Error | null = null;
+  #legacyWidgetDispatched = false;
+  #legacyNativeAcknowledged = false;
+  #legacyFailure: Error | null = null;
+  #legacyStateIntent: ViewState | null = null;
+  #deliveryError: Error | null = null;
+  #backgroundAssistantOnly = false;
   #app: App | null = null;
   #preparing: Promise<App> | null = null;
   #cancelInitialization!: (reason: Error) => void;
@@ -189,12 +211,33 @@ export class ModelContextStore {
   #removeOpenAiListener: (() => void) | null = null;
 
   /** Create a store backed by the owning view runtime's host connection. */
-  constructor(host: ModelContextStoreHost, attachments = false) {
+  constructor(host: ModelContextStoreHost) {
     this.#host = host;
-    this.#rich = attachments;
     void this.#disposal.catch(() => {});
-    if (!attachments) this.#hydrateFromChatGpt();
+    this.#hydrateFromChatGpt();
   }
+
+  /** Reserve native delivery synchronously, without network or listener effects. */
+  readonly activateAttachments = (): void => {
+    if (this.#rich || this.#disposed) return;
+    this.#rich = true;
+    this.#activationBarrier = this.#inFlight;
+    this.#desired = null;
+    const widgetState = getChatGptWidgetApi()?.widgetState;
+    const persistedModel = widgetState?.modelContent;
+    if (
+      this.#legacyWidgetDispatched ||
+      (persistedModel !== undefined &&
+        persistedModel !== null &&
+        (typeof persistedModel !== "object" ||
+          Object.keys(persistedModel).length > 0)) ||
+      widgetState?.imageIds?.length
+    ) {
+      this.#activationError = new Error(
+        "Cannot activate native model context alongside existing model-visible widget state. Use a view without persisted modelContent/imageIds; the SDK will not clear them automatically."
+      );
+    }
+  };
 
   /** Stable external-store subscription used by `useViewState`. */
   readonly subscribeViewState = (listener: () => void): (() => void) => {
@@ -263,6 +306,7 @@ export class ModelContextStore {
     }
     const nextState = updater(this.#viewState);
     assertValidViewState(nextState);
+    if (!this.#rich) this.#legacyStateIntent = copyContext(nextState);
     if (this.#rich && this.#app)
       assertContextSupport(
         this.#app,
@@ -410,7 +454,7 @@ export class ModelContextStore {
             { ...this.#restoredStructured, ...state },
             description,
             [],
-            true
+            this.#backgroundAssistantOnly
           )
         : { content: [] as ContentBlock[] };
     return {
@@ -428,15 +472,22 @@ export class ModelContextStore {
 
   /** Initialize attachment mode behind the runtime's shared connection barrier. */
   readonly prepare = (): Promise<App> => {
-    if (!this.#rich)
-      return Promise.reject(
-        new Error(
-          'Set viewConfig.modelContext = "attachments" to use useModelContext'
-        )
-      );
+    this.activateAttachments();
     if (this.#disposed)
       return Promise.reject(new Error("Model context store has been disposed"));
-    this.#preparing ??= Promise.race([this.#host.connect(), this.#disposal])
+    this.#removeOpenAiListener?.();
+    this.#removeOpenAiListener = null;
+    this.#preparing ??= Promise.race([
+      (async () => {
+        await this.#activationBarrier;
+        if (this.#activationError) throw this.#activationError;
+        if (this.#legacyFailure) throw this.#legacyFailure;
+        if (this.#disposed)
+          throw new Error("Model context store has been disposed");
+        return this.#host.connect();
+      })(),
+      this.#disposal,
+    ])
       .then((app) => {
         if (this.#disposed)
           throw new Error("Model context store has been disposed");
@@ -449,10 +500,24 @@ export class ModelContextStore {
           | undefined;
         const hasReadback =
           this.#openai && host && Object.hasOwn(host, MODEL_CONTEXT_EXTENSION);
-        if (hasReadback)
-          this.#restore(readContextObservation(host[MODEL_CONTEXT_EXTENSION]));
+        const observation = hasReadback
+          ? readContextObservation(host[MODEL_CONTEXT_EXTENSION])
+          : undefined;
+        if (
+          this.#openai &&
+          this.#legacyNativeAcknowledged &&
+          (!observation ||
+            !observation.contentProvided ||
+            canonicalContext(observation.payload) !==
+              this.#acknowledged?.serialized)
+        ) {
+          throw new Error(
+            "Cannot activate native context from cached host state that differs from the acknowledged legacy write. Initialize a fresh view after outstanding writes finish."
+          );
+        }
+        if (observation !== undefined) this.#restore(observation);
         this.#initialized = true;
-        let changed = false;
+        let changed = !hasReadback && this.#viewState !== null;
         if (
           !hasReadback &&
           this.#viewState === null &&
@@ -464,6 +529,11 @@ export class ModelContextStore {
           );
           this.#viewState = this.#defaultState;
           changed = true;
+        }
+        if (this.#legacyStateIntent !== null) {
+          const intent = this.#legacyStateIntent;
+          this.#earlyStateUpdates.unshift(() => intent);
+          this.#legacyStateIntent = null;
         }
         for (const updater of this.#earlyStateUpdates) {
           const next = updater(this.#viewState);
@@ -550,19 +620,10 @@ export class ModelContextStore {
       return this.clearAttachments();
     });
 
-  /** Retry only when readback has not left an unresolved ordering conflict. */
-  readonly retryContext = (): Promise<ContextOperationResult> =>
-    this.#enqueue(() => this.retry());
-
   #enqueue(
     action: () => Promise<ContextOperationResult>
   ): Promise<ContextOperationResult> {
-    if (!this.#rich)
-      return Promise.reject(
-        new Error(
-          'Set viewConfig.modelContext = "attachments" to use useModelContext'
-        )
-      );
+    this.activateAttachments();
     if (this.#disposed)
       return Promise.reject(new Error("Model context store has been disposed"));
     this.#queued++;
@@ -581,6 +642,13 @@ export class ModelContextStore {
             this.#queued > 0 || !!this.#inFlight || this.#flushScheduled,
             this.#snapshot.error
           );
+        if (
+          !this.#queued &&
+          !this.#blocked &&
+          !this.#deliveryError &&
+          this.#desired
+        )
+          this.#schedulePump();
       });
   }
 
@@ -636,14 +704,10 @@ export class ModelContextStore {
     else this.#restoredStructured = structured;
     let index = 0;
     for (const block of observation.payload.content) {
-      const generated =
-        framework &&
-        canonicalContext(block) ===
-          canonicalContext({
-            type: "text",
-            text: JSON.stringify(structured),
-            annotations: { audience: ["assistant"] },
-          });
+      const generated = framework && isGeneratedProjection(block, structured);
+      if (generated)
+        this.#backgroundAssistantOnly =
+          block.annotations?.audience?.[0] === "assistant";
       if (
         generated ||
         (block.annotations?.audience?.length === 1 &&
@@ -661,13 +725,7 @@ export class ModelContextStore {
     // background survives separately. Do not infer a mapping from titles or URIs.
     if (framework) {
       this.#restoredBackground = this.#restoredBackground.filter(
-        (block) =>
-          canonicalContext(block) !==
-          canonicalContext({
-            type: "text",
-            text: JSON.stringify(structured),
-            annotations: { audience: ["assistant"] },
-          })
+        (block) => !isGeneratedProjection(block, structured)
       );
     }
     this.#hostBaseline = {
@@ -800,9 +858,13 @@ export class ModelContextStore {
     );
     const generated = candidates[0]!.payload.content.filter(
       (block) =>
-        block.type === "text" &&
-        block.annotations?.audience?.length === 1 &&
-        block.annotations.audience[0] === "assistant"
+        isGeneratedProjection(
+          block,
+          candidates[0]!.payload.structuredContent
+        ) ||
+        (block.type === "text" &&
+          block.annotations?.audience?.length === 1 &&
+          block.annotations.audience[0] === "assistant")
     );
     if (
       generated.some((block) => !survivingBlocks.has(canonicalContext(block)))
@@ -839,7 +901,7 @@ export class ModelContextStore {
     this.#acknowledged = this.#hostBaseline;
     if (observation) this.#remember(observation.updateId, this.#hostBaseline);
     if (hadQueuedWork) this.#updateDesiredAndSchedule();
-    else this.#publish(false, null);
+    else this.#publish(false, this.#deliveryError);
   }
 
   #remember(id: string, publication: ContextPublication): void {
@@ -911,6 +973,7 @@ export class ModelContextStore {
   ): Promise<ContextOperationResult> {
     if (this.#disposed)
       return Promise.reject(new Error("Model context store has been disposed"));
+    this.#deliveryError = null;
     const result = new Promise<ContextOperationResult>((resolve, reject) => {
       this.#operations.add({
         effects,
@@ -927,7 +990,10 @@ export class ModelContextStore {
     this.#snapshot = {
       attachments: Object.freeze(
         Array.from(this.#attachments.values(), ({ key, block }) =>
-          Object.freeze({ key, block })
+          Object.freeze({
+            key,
+            block: this.#rich ? presentContextBlock(block) : block,
+          })
         )
       ),
       pending: pending && !this.#blocked,
@@ -1033,7 +1099,7 @@ export class ModelContextStore {
     applyWidgetState(api.widgetState, false);
 
     const handleSetGlobals = (event: Event): void => {
-      if (this.#disposed) return;
+      if (this.#disposed || this.#rich) return;
       const widgetState = (event as OpenAiSetGlobalsEvent).detail?.globals
         ?.widgetState;
       if (widgetState !== undefined) {
@@ -1055,6 +1121,10 @@ export class ModelContextStore {
     }
     if (this.#blocked) {
       this.#fail(this.#blocked);
+      return;
+    }
+    if (this.#rich && this.#deliveryError) {
+      this.#publish(false, this.#deliveryError);
       return;
     }
     const payload = copyContext(this.buildModelContextParams());
@@ -1083,6 +1153,8 @@ export class ModelContextStore {
   #pump(): void {
     if (
       this.#disposed ||
+      (this.#rich && !this.#initialized) ||
+      (this.#rich && this.#queued > 0 && this.#operations.size === 0) ||
       this.#inFlight ||
       this.#sending ||
       this.#blocked ||
@@ -1099,6 +1171,8 @@ export class ModelContextStore {
       return;
     }
     const preceding = this.#hostBaseline;
+    const rich = this.#rich;
+    const chatGptApi = rich ? undefined : getChatGptWidgetApi();
     this.#publish(true, null);
     const sendEpoch = this.#epoch;
     this.#sending = publication;
@@ -1107,8 +1181,10 @@ export class ModelContextStore {
       let failed = false;
       let dispatched = false;
       try {
-        const chatGptApi = this.#rich ? undefined : getChatGptWidgetApi();
+        if (!rich && this.#rich) return; // Activation canceled a deferred legacy send.
         if (chatGptApi) {
+          this.#legacyWidgetDispatched = true;
+          dispatched = true;
           await chatGptApi.setWidgetState({
             privateContent: {},
             ...chatGptApi.widgetState,
@@ -1117,6 +1193,7 @@ export class ModelContextStore {
         } else {
           const app = await this.#host.connect();
           if (this.#disposed || sendEpoch !== this.#epoch) return;
+          if (!rich && this.#rich) return;
           if (app.getHostCapabilities()?.updateModelContext === undefined) {
             if (markModelContextUnsupportedWarned()) {
               console.warn(
@@ -1127,18 +1204,29 @@ export class ModelContextStore {
             this.#fail(new Error("This host does not support model context"));
             return;
           }
-          if (this.#rich) assertContextSupport(app, publication.payload);
+          if (rich) assertContextSupport(app, publication.payload);
           dispatched = true;
           const result = await app.updateModelContext(
             publication.payload as Parameters<App["updateModelContext"]>[0]
           );
           if (this.#disposed || sendEpoch !== this.#epoch) return;
-          if (this.#rich && this.#openai)
+          if (!rich) this.#legacyNativeAcknowledged = true;
+          if (rich && this.#openai)
             this.#remember(contextUpdateId(result), publication);
         }
         if (this.#disposed || sendEpoch !== this.#epoch) return;
         this.#acknowledged = publication;
-        if (this.#rich) {
+        if (
+          !rich &&
+          this.#legacyStateIntent !== null &&
+          canonicalContext(this.#legacyStateIntent) ===
+            canonicalContext(
+              filterUiContext(publication.payload.structuredContent ?? {})
+            )
+        ) {
+          this.#legacyStateIntent = null;
+        }
+        if (rich) {
           this.#hostBaseline = publication;
           const observations = this.#observations.splice(0);
           for (const observation of observations)
@@ -1150,9 +1238,9 @@ export class ModelContextStore {
         failed = true;
         const failure =
           error instanceof Error ? error : new Error(String(error));
-        if (this.#rich) {
+        if (rich) {
           // A rejected write can still race a user removal. Reconcile buffered
-          // observations before another mutation or explicit retry can publish.
+          // observations before another mutation can publish.
           for (const observation of this.#observations.splice(0)) {
             this.#reconcile(observation, true, preceding);
           }
@@ -1160,15 +1248,14 @@ export class ModelContextStore {
         const rejectedByHost =
           failure.name === "ProtocolError" &&
           typeof (failure as Error & { code?: unknown }).code === "number";
+        if (!rich && dispatched && !rejectedByHost) {
+          this.#legacyFailure = new Error(
+            `Cannot activate native context after an uncertain legacy write: ${failure.message}`
+          );
+        }
+        if (rich) this.#deliveryError = failure;
         if (this.#blocked) this.#fail(this.#blocked);
-        else if (
-          this.#rich &&
-          dispatched &&
-          !rejectedByHost &&
-          (this.#openai ||
-            failure.name === "SdkError" ||
-            /timeout|timed out/i.test(failure.message))
-        ) {
+        else if (rich && dispatched && !rejectedByHost) {
           this.#block(
             new Error(
               `Model context publication outcome is uncertain: ${failure.message}. Reopen the view after outstanding writes finish.`
@@ -1183,7 +1270,7 @@ export class ModelContextStore {
           if (
             !this.#blocked &&
             this.#desired !== publication &&
-            (!this.#rich || !failed)
+            (!rich || !failed)
           )
             this.#pump();
           else if (!failed && !this.#blocked)

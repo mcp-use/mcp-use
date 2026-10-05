@@ -64,7 +64,6 @@ function configsEqual(
   a: NormalizedViewConfig,
   b: NormalizedViewConfig
 ): boolean {
-  if (a.modelContext !== b.modelContext) return false;
   if (a.autoResize !== b.autoResize) return false;
   if (a.preferredDisplayMode !== b.preferredDisplayMode) return false;
   if (a.displayModes.length !== b.displayModes.length) return false;

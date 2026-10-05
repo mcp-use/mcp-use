@@ -11,6 +11,34 @@ import {
 /** OpenAI extension key shared by capability, result metadata and readback. @internal */
 export const MODEL_CONTEXT_EXTENSION = "openai/modelContext";
 
+const RESOURCE_TITLE = "mcp-use/title";
+const presentationCache = new WeakMap<ContentBlock, ModelContextBlock>();
+
+/** Decode friendly presentation without changing the canonical wire block. @internal */
+export function presentContextBlock(block: ContentBlock): ModelContextBlock {
+  const cached = presentationCache.get(block);
+  if (cached) return cached;
+  const meta = block._meta;
+  // A resource-link title is native. Unrelated metadata never overrides it.
+  const title =
+    block.type === "resource_link"
+      ? block.title
+      : meta?.[block.type === "resource" ? RESOURCE_TITLE : "openai/title"];
+  const presented = copyContext({
+    ...block,
+    ...(typeof title === "string" && { title }),
+    ...(block.annotations?.audience && {
+      audience: block.annotations.audience,
+    }),
+    ...(block.type === "text" &&
+      meta?.["openai/thumbnail"] !== undefined && {
+        thumbnail: meta["openai/thumbnail"],
+      }),
+  }) as ModelContextBlock;
+  presentationCache.set(block, presented);
+  return presented;
+}
+
 /** Validated whole-context observation, with opaque revision identity. @internal */
 export interface ContextObservation {
   /** Identifies a whole host revision; never sortable or per-item identity. */
@@ -46,11 +74,13 @@ export function normalizeContextBlock(input: ModelContextBlock): ContentBlock {
     throw new TypeError(`Unsupported model context block type: ${input.type}`);
   }
   if (block.title !== undefined && input.type !== "resource_link") {
-    if (input.type !== "text" && input.type !== "image")
-      throw new TypeError("Only text, image and resource_link support title");
-    if (typeof block.title !== "string")
-      throw new TypeError("Model context title must be a string");
-    merge(meta, "openai/title", block.title);
+    if (typeof block.title !== "string" || !block.title.trim())
+      throw new TypeError("Model context title must be a nonempty string");
+    merge(
+      meta,
+      input.type === "resource" ? RESOURCE_TITLE : "openai/title",
+      block.title
+    );
     delete block.title;
   }
   if (block.thumbnail !== undefined) {
@@ -64,15 +94,21 @@ export function normalizeContextBlock(input: ModelContextBlock): ContentBlock {
   delete block.audience;
   if (Object.keys(meta).length) block._meta = meta;
   if (Object.keys(annotations).length) block.annotations = annotations;
-  if (meta["openai/title"] !== undefined) {
-    if (
-      (input.type !== "text" && input.type !== "image") ||
-      typeof meta["openai/title"] !== "string" ||
-      !meta["openai/title"]
-    )
+  if (
+    meta["openai/title"] !== undefined &&
+    (input.type === "text" || input.type === "image")
+  ) {
+    if (typeof meta["openai/title"] !== "string" || !meta["openai/title"])
       throw new TypeError(
         "OpenAI title requires a nonempty text or image title"
       );
+  }
+  if (
+    input.type === "resource" &&
+    meta[RESOURCE_TITLE] !== undefined &&
+    (typeof meta[RESOURCE_TITLE] !== "string" || !meta[RESOURCE_TITLE].trim())
+  ) {
+    throw new TypeError("Embedded resource title must be a nonempty string");
   }
   if (meta["openai/thumbnail"] !== undefined) {
     if (input.type !== "text")
