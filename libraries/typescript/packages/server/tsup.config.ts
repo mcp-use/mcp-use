@@ -22,7 +22,6 @@ function minifyFrameworkOutput(options: {
 export default defineConfig([
   {
     entry: {
-      index: "src/index.ts",
       // OAuth subpath exports mirror tsc's rootDir:src layout so generated JS
       // and declarations stay aligned with package.json's exports map.
       "oauth/index": "src/oauth/index.ts",
@@ -77,6 +76,30 @@ export default defineConfig([
     ],
     define: packageVersionDefine,
     esbuildOptions: minifyFrameworkOutput,
+  },
+  // Compact only the edge root graph. The CLI and integration entries above
+  // retain readable identifiers, and public function/class names stay intact.
+  {
+    entry: { index: "src/index.ts" },
+    format: ["esm"],
+    target: "node22",
+    dts: false,
+    splitting: true,
+    sourcemap: false,
+    clean: false,
+    external: [
+      "@mcp-use/client",
+      "@mcp-use/cli",
+      "#mcp-use-node-http",
+      "#mcp-use-skills-loader",
+      "#mcp-use-vite-handler",
+    ],
+    define: packageVersionDefine,
+    esbuildOptions(options) {
+      minifyFrameworkOutput(options);
+      options.minifyIdentifiers = true;
+      options.keepNames = true;
+    },
   },
   // Node gets a self-contained root bundle. Inlining Hono and the v2 SDK
   // removes module-linking overhead from cold process starts, while the
