@@ -21,6 +21,7 @@
     "typescript"
   ],
   "imports": {
+    "#mcp-use-buffered-response": "./dist/internal/buffered-response.js",
     "#mcp-use-node-http": {
       "workerd": "./dist/internal/node-http-unavailable.js",
       "browser": "./dist/internal/node-http-unavailable.js",
