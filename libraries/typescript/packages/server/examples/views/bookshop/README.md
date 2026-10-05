@@ -36,19 +36,26 @@ The compact header, 19px screen title, 14px system type, 8px controls, 10px card
 spacing, and host theme variables follow the
 [Bits & Bolts reference at ca16cb3](https://github.com/openai/mcp-extensions/tree/ca16cb3bc015baaa1b849082d8755bbef18770cb/plugins/bits-and-bolts).
 Book covers replace its geometry previews. The three illustrations and excerpts
-are original fictional demo content. Editable SVG originals and their PNG versions
-live under `public/covers`; no remote image service is required. Public URLs use
+are original fictional demo content. The PNG covers live under `public/covers`;
+no remote image service is required. Public URLs use
 the request-resolved asset base. The monochrome book icon is also server branding.
 
-| Feature                                   | Where to look                                                                     |
-| ----------------------------------------- | --------------------------------------------------------------------------------- |
-| Global and thread launchers               | `src/index.ts`: `open_bookshop.view.entrypoints`; both accept `{}`                |
-| Library, search, details, reading samples | `views/bookshop/view.tsx`; catalog in `src/catalog.ts`                            |
-| Server cart and typed UI calls            | `set_cart_item`, `read_cart`, `useCallTool`                                       |
-| Inline/fullscreen                         | `viewConfig` and capability-aware `useDisplayMode` button                         |
-| Local URL navigation and deep links       | `useDeepLink`, `navigateTo`, `parseRoute`, `routeParams`                          |
-| In-app and native settings                | `update_bookshop_settings` and `server.settings` share preferences                |
-| Explicit chat attachments                 | `useModelContext` in `attachments.tsx`; `viewConfig.modelContext = "attachments"` |
+Start with `src/index.ts` for the server and `views/bookshop/view.tsx` for the UI.
+The view entry only declares display modes and handles loading/error states. Its
+ready branch mounts `Shop`; the screen components receive domain data and callbacks.
+`src/data.ts` defines the output schema and infers `BookshopData`, `Book`, and
+`BookshopSettings`, so the server and UI share one data contract.
+
+| Feature                                                     | Where to look                                            |
+| ----------------------------------------------------------- | -------------------------------------------------------- |
+| Global/thread launchers, tools, native settings             | `src/index.ts`                                           |
+| Output schema and domain types                              | `src/data.ts`; fictional catalog in `src/catalog.ts`     |
+| View configuration and loading/error states                 | `views/bookshop/view.tsx`                                |
+| Tool calls, local URL navigation, header, inline/fullscreen | `views/bookshop/shop.tsx`; URL helpers in `src/route.ts` |
+| Library, search, shared book controls                       | `views/bookshop/catalog.tsx`                             |
+| Book details and typed text/resource attachments            | `views/bookshop/details.tsx`                             |
+| Demo cart and appearance settings                           | `views/bookshop/cart-settings.tsx`                       |
+| Attachment feedback, list, remove, clear                    | `views/bookshop/attachments.tsx`                         |
 
 ## Cart, settings, and chat context
 
@@ -62,7 +69,8 @@ Concurrent callers use last-write-wins. Refresh after another view/model changes
 cart or native settings. Mounted views hold snapshots, with no cross-view push.
 The in-app settings controls update the same preferences as native settings.
 
-**Add to chat** sends the actual PNG cover through the SDK hook. Product details
+**Add to chat** uses `imageFromUrl(coverUrl, { title })` from `mcp-use/react`
+to fetch and encode the actual PNG cover, then passes it to `useModelContext().add`. Product details
 also offer **Add book details**, a text block with a friendly title and cover
 thumbnail, and **Add reading sample**, an embedded plain-text resource containing
 the displayed excerpt. Stable keys update the same item without duplicating it.
@@ -70,15 +78,23 @@ Cart updates, browsing, and settings changes never attach anything automatically
 The example does not duplicate removable evidence in background model context.
 `read_cart` remains the authoritative way for the model to inspect shopping state.
 
-Each attachment button awaits its own operation and reports failures or
-supersession. “Context synced” means that operation was acknowledged; it does not
-promise a visible composer chip on every host. The shared panel reads reconciled
-hook state, reports pending/error, offers explicit retry, and lets the reader
-remove or clear attachments independently of the cart. A failed desired entry can
-remain listed while the error explains it is unsynced. The SDK owns connection,
-capability checks, batching, host removal, and remount reconciliation. Retry can
-still reject unsupported content or an unresolved host-ordering conflict; the
-shared error includes the SDK’s explanation.
+The catalog and details components call `add(stableKey, block)` explicitly.
+Text and resource blocks use the exported `ModelContextBlock` type. Each block
+supplies a friendly top-level `title`; the context panel reads `block.title`
+without knowing protocol metadata. `AttachButton` only handles the clicked
+button's pending, success, and error feedback. `useModelContext` activates the
+SDK's attachment coordination automatically, with no view configuration opt-in.
+
+Each button awaits its own operation and reports failures or supersession.
+“Last request synced” means that operation was acknowledged; it does not promise
+a visible composer chip on every host. The shared panel reads reconciled hook
+state, reports pending/error, and lets the reader remove or clear attachments
+independently of the cart. A failed desired entry can remain listed while the
+error explains it is unsynced. After a definite failure, the next valid explicit
+attachment change attempts synchronization once. There is no retry button or
+background replay loop. An uncertain host outcome stays blocked until the SDK
+can establish safe ordering; another click cannot force a replay. The SDK owns
+connection, capability checks, batching, host removal, and remount reconciliation.
 
 This example intentionally omits `resource_link`: its small reading sample is
 self-contained, with no external document to retrieve. The `bookshop://` URI
@@ -134,7 +150,7 @@ prefer inline. Hosts may ignore presentation requests.
 
 Build, typecheck, lint, and formatting verify packaging and static correctness.
 Use the Inspector to check actual tool calls, routing, theme, sizing, cart,
-settings, attachments, host removals, and rejected-operation/retry states.
+settings, attachments, host removals, and rejected-operation and recovery states.
 The example has no committed test suite or test-only dependencies.
 
 Native ChatGPT launcher placement, native settings controls, composer rendering,

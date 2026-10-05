@@ -1,6 +1,7 @@
 import { MCPServer } from "mcp-use";
 import { z } from "zod";
 import { books } from "./catalog.js";
+import { bookId, bookshopSchema, type BookshopData } from "./data.js";
 
 const server = new MCPServer({
   name: "little-bookshop",
@@ -15,34 +16,8 @@ const server = new MCPServer({
 // It resets on restart; it is neither account-scoped nor thread-scoped.
 const cart = new Map<string, number>();
 let preferences = { showDescriptions: true, compact: false };
-const bookId = z.enum(["moonlit-atlas", "small-hours", "paper-planets"]);
-const snapshotSchema = z.object({
-  books: z.array(
-    z.object({
-      id: bookId,
-      title: z.string(),
-      author: z.string(),
-      genre: z.string(),
-      priceCents: z.number().int(),
-      description: z.string(),
-      cover: z.string(),
-      excerpt: z.string(),
-    })
-  ),
-  cart: z.array(
-    z.object({
-      id: bookId,
-      title: z.string(),
-      quantity: z.number().int(),
-      priceCents: z.number().int(),
-    })
-  ),
-  totalCents: z.number().int(),
-  settings: z.object({ showDescriptions: z.boolean(), compact: z.boolean() }),
-  route: z.string(),
-});
 
-function snapshot(route = "/books") {
+function readBookshopData(route = "/books"): BookshopData {
   const lines = books.flatMap((book) => {
     const quantity = cart.get(book.id) ?? 0;
     return quantity
@@ -69,7 +44,7 @@ function snapshot(route = "/books") {
 }
 
 function result(route = "/books") {
-  const state = snapshot(route);
+  const state = readBookshopData(route);
   return {
     content: [
       {
@@ -89,7 +64,7 @@ export const openBookshop = server.tool(
     description:
       "Browse fictional books. Open /books, /products/moonlit-atlas, /products/small-hours, /products/paper-planets, /cart, or /settings. All callers share a process-local demo cart.",
     inputSchema: z.object({ route: z.string().default("/books") }),
-    outputSchema: snapshotSchema,
+    outputSchema: bookshopSchema,
     annotations: { readOnlyHint: true },
     view: {
       name: "bookshop",
@@ -107,7 +82,7 @@ export const readCart = server.tool(
     description:
       "Read the latest shared demo cart and settings. UI changes persist here until the server restarts.",
     inputSchema: z.object({}),
-    outputSchema: snapshotSchema,
+    outputSchema: bookshopSchema,
     annotations: { readOnlyHint: true },
   },
   () => result("/cart")
@@ -124,7 +99,7 @@ export const setCartItem = server.tool(
       id: bookId,
       quantity: z.number().int().min(0).max(9),
     }),
-    outputSchema: snapshotSchema,
+    outputSchema: bookshopSchema,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -150,7 +125,7 @@ export const updateBookshopSettings = server.tool(
       showDescriptions: z.boolean(),
       compact: z.boolean(),
     }),
-    outputSchema: snapshotSchema,
+    outputSchema: bookshopSchema,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,

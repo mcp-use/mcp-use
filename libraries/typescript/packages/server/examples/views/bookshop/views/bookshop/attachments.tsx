@@ -1,45 +1,19 @@
-import { useState } from "react";
-import { getPublicBaseUrl, useModelContext } from "mcp-use/react";
-
-type ContextBlock = Parameters<ReturnType<typeof useModelContext>["add"]>[1];
-
-/** Read the local illustrated cover as actual PNG content for the model. */
-export async function coverContent(
-  path: string,
-  title: string
-): Promise<ContextBlock> {
-  const response = await fetch(`${getPublicBaseUrl()}${path}`);
-  if (!response.ok)
-    throw new Error("Could not load the book cover. Try again.");
-  const blob = await response.blob();
-  const data = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.onerror = () => reject(new Error("Could not read the book cover."));
-    reader.readAsDataURL(blob);
-  });
-  return {
-    type: "image",
-    data,
-    mimeType: "image/png",
-    title: `${title} — cover`,
-  };
-}
+import { useEffect, useState } from "react";
+import {
+  useModelContext,
+  type ModelContextOperationResult,
+} from "mcp-use/react";
 
 /** Each explicit attachment action owns only its own button's busy/error state. */
 export function AttachButton({
-  attachmentKey,
   label,
-  content,
+  onAttach,
 }: {
-  /** Stable key shared by duplicate buttons for the same piece of evidence. */
-  attachmentKey: string;
   /** Human-readable action label. */
   label: string;
-  /** Construct native content only when the reader chooses to attach it. */
-  content: () => ContextBlock | Promise<ContextBlock>;
+  /** Attach the selected evidence only after the reader clicks. */
+  onAttach: () => Promise<ModelContextOperationResult>;
 }) {
-  const { add } = useModelContext();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -48,7 +22,7 @@ export function AttachButton({
     setMessage("");
     setError("");
     try {
-      const result = await add(attachmentKey, await content());
+      const result = await onAttach();
       setMessage(
         result.status === "synced"
           ? "Last request synced."
@@ -80,16 +54,29 @@ export function AttachButton({
 
 /** Read reconciled shared attachment state; removals never change the demo cart. */
 export function ChatContext() {
-  const { attachments, pending, error, remove, clearAttachments, retry } =
+  const { attachments, pending, error, remove, clearAttachments } =
     useModelContext();
   const [actionError, setActionError] = useState("");
-  async function perform(action: () => Promise<unknown>) {
+  useEffect(() => {
+    if (pending) setActionError("");
+  }, [pending]);
+  async function removeAttachment(key: string) {
     setActionError("");
     try {
-      await action();
+      await remove(key);
     } catch (cause) {
       setActionError(
-        cause instanceof Error ? cause.message : "Context update failed."
+        cause instanceof Error ? cause.message : "Could not remove context."
+      );
+    }
+  }
+  async function clearContext() {
+    setActionError("");
+    try {
+      await clearAttachments();
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error ? cause.message : "Could not clear context."
       );
     }
   }
@@ -105,16 +92,7 @@ export function ChatContext() {
       {attachments.length > 0 && (
         <ul className="attachment-list">
           {attachments.map(({ key, block }) => {
-            const title =
-              "title" in block && typeof block.title === "string"
-                ? block.title
-                : block.type === "resource"
-                  ? "text" in block.resource
-                    ? block.resource.text.split("\n")[0] || "Reading sample"
-                    : "Reading sample"
-                  : typeof block._meta?.["openai/title"] === "string"
-                    ? block._meta["openai/title"]
-                    : "Book context";
+            const title = block.title ?? "Book context";
             return (
               <li key={key}>
                 <span>{title}</span>
@@ -122,7 +100,7 @@ export function ChatContext() {
                   className="quiet"
                   aria-label={`Remove ${title}`}
                   onClick={() => {
-                    void perform(() => remove(key));
+                    void removeAttachment(key);
                   }}
                 >
                   Remove
@@ -135,15 +113,7 @@ export function ChatContext() {
       {pending && <p role="status">Syncing context…</p>}
       {error && (
         <p role="alert">
-          Couldn’t sync context. {error.message} Changes may be unsynced.{" "}
-          <button
-            disabled={pending}
-            onClick={() => {
-              void perform(retry);
-            }}
-          >
-            Retry
-          </button>
+          Couldn’t sync context. {error.message} Changes may be unsynced.
         </p>
       )}
       {actionError && actionError !== error?.message && (
@@ -153,7 +123,7 @@ export function ChatContext() {
         <button
           className="quiet"
           onClick={() => {
-            void perform(clearAttachments);
+            void clearContext();
           }}
         >
           Clear chat context
