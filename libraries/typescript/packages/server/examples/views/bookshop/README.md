@@ -16,8 +16,8 @@ pnpm --filter mcp-use-example-bookshop dev --port 3217 --host 127.0.0.1
 
 Open `http://127.0.0.1:3217/inspector` and connect to
 `http://127.0.0.1:3217/mcp`. Call `open_bookshop` with `{}` to render the view.
-The local Inspector can exercise the UI and bridge. Testing native launchers and
-settings requires installation in a supporting ChatGPT host; this example does
+The local Inspector can exercise the UI and bridge. Native launchers and
+settings require installation in a supporting ChatGPT host; this example does
 not deploy the server or create a tunnel.
 
 Production and verification commands, also from `libraries/typescript`:
@@ -25,14 +25,8 @@ Production and verification commands, also from `libraries/typescript`:
 ```sh
 pnpm --filter mcp-use-example-bookshop build
 pnpm --filter mcp-use-example-bookshop typecheck
-pnpm --filter mcp-use-example-bookshop test
-pnpm --filter mcp-use-example-bookshop test:ui
 pnpm --filter mcp-use-example-bookshop start --port 3217 --host 127.0.0.1
-# In another terminal, against that running server:
-BOOKSHOP_URL=http://127.0.0.1:3217/mcp pnpm --filter mcp-use-example-bookshop test:wire
 ```
-
-The wire check changes this server's demo cart and settings, then restores defaults.
 
 ## Feature map
 
@@ -95,17 +89,8 @@ hosts; ordinary tool cards prefer inline. Hosts may ignore presentation requests
 
 ## Verification boundaries
 
-`test` checks route validation and link encoding. `test:wire` uses a real MCP
-HTTP connection: initialization/discovery, launcher and resource metadata, view
-HTML/JS loading, tool results and invalid arguments, cart visibility across two
-connections, and partial settings updates.
-
-`test:ui` renders the actual View in happy-dom, with a real in-memory MCP
-AppBridge forwarding tool calls into the server handlers. It checks button-to-tool
-cart persistence, quantity/removal, search, details, incoming routes, mode requests,
-settings refresh, dark-theme state, and errors. It does not render a browser iframe
-or prove visual layout. Browser checks must separately verify appearance, sizing,
-and host sandbox behavior.
-
+Build and typecheck commands verify the example's packaging and static types.
+Use the Inspector to check the UI, button-to-tool calls, current cart state,
+routing, settings refresh, appearance, and sizing in your host.
 Native ChatGPT launcher placement, native settings controls, and registered
-plugin-link delivery are host behavior and are not proven by those local checks.
+plugin-link delivery require separate verification in a supporting host.

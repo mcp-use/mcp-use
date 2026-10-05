@@ -1396,15 +1396,6 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
     devDependencies:
-      '@mcp-use/client':
-        specifier: workspace:*
-        version: link:../../../../client
-      '@modelcontextprotocol/ext-apps':
-        specifier: 2.0.0
-        version: 2.0.0(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/core@2.0.0)(@modelcontextprotocol/server@2.0.0(patch_hash=2a5f5402571efdc40802e9603a3dd09e22588b4aacad710814c204d79568091e))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
-      '@testing-library/react':
-        specifier: ^16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
@@ -1414,16 +1405,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.17)
-      happy-dom:
-        specifier: ^20.10.6
-        version: 20.10.6
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
-      vitest:
-        specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(@vitest/coverage-v8@4.1.11)(happy-dom@20.10.6)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
-
 
   packages/server/examples/views/excalidraw:
     dependencies:
