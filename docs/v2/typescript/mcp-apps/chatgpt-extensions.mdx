@@ -316,6 +316,9 @@ server.tool(
   {
     name: "open_library",
     title: "Parts library",
+    icons: [
+      { src: "library.svg", mimeType: "image/svg+xml", sizes: ["20x20"] },
+    ],
     inputSchema: z.object({ category: z.string().default("all") }),
     outputSchema: z.object({ category: z.string() }),
     view: {
@@ -339,6 +342,33 @@ The MCP SDK validates tool calls against the input schema, including custom refi
 Entrypoints open fullscreen in supporting hosts.
 Entrypoint calls ignore the tool visibility hint.
 Use a clear tool `title` to name the launcher.
+
+### Set entrypoint tool icons
+
+Set `icons` on the tool definition, alongside `name` and `title`, as shown above.
+Put `library.svg` in `public/`; the SDK emits its absolute asset URL on `tools/list`.
+Absolute HTTP(S) and image data URLs also work.
+
+Follow the [OpenAI icon guidelines](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#icon-guidelines).
+Use a monochrome SVG with a transparent background, `currentColor`, and a 20×20 viewport.
+Use 1.33px strokes for stroke icons.
+For example, save this book icon as `public/library.svg`:
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+  <path fill="none" stroke="currentColor" stroke-width="1.33"
+    stroke-linecap="round" stroke-linejoin="round"
+    d="M10 4.5C7.5 3 5 3 2.5 4v12c2.5-1 5-1 7.5.5 2.5-1.5 5-1.5 7.5-.5V4C15 3 12.5 3 10 4.5v12"/>
+</svg>
+```
+
+`view.entrypoints` declares launch locations in `_meta["openai/ui"].entrypoints`.
+The separate top-level `icons` field supplies the tool's artwork.
+Server constructor `icons` supplies server branding and remains the fallback when a tool has no icon.
+Hosts prefer tool icons, then the local server icon or hosted app logo, then a generic icon.
+
+Call `tools/list` to check the tool's `icons` and fetch each emitted `src`.
+Test the SVG in light and dark host themes.
 
 ## Add a file entrypoint
 

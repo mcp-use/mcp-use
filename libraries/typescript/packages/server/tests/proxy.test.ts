@@ -27,6 +27,14 @@ function buildUpstream(label: string): MCPServer {
     {
       name: "greet",
       description: `Greet through ${label}`,
+      icons: [
+        {
+          src: `https://example.test/${label}.svg`,
+          mimeType: "image/svg+xml",
+          sizes: ["20x20"],
+          theme: "dark",
+        },
+      ],
       inputSchema: z.object({ name: z.string().describe("Person to greet") }),
       outputSchema: z.object({ greeting: z.string() }),
       annotations: { readOnlyHint: true },
@@ -131,6 +139,14 @@ describe("MCPServer.proxy", () => {
     ]);
     expect(tools.find((tool) => tool.name === "alpha_greet")).toMatchObject({
       description: "Greet through alpha",
+      icons: [
+        {
+          src: "https://example.test/alpha.svg",
+          mimeType: "image/svg+xml",
+          sizes: ["20x20"],
+          theme: "dark",
+        },
+      ],
       annotations: { readOnlyHint: true },
       inputSchema: {
         type: "object",
