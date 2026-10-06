@@ -16,8 +16,10 @@
     "model-context-coordinator",
     "native-model-context",
     "native-plugin-settings",
+    "official-mcp-sdk-refresh",
     "plugin-extension-display-modes",
     "propagated-edc25f980ebb8d33",
+    "propagated-ff958b391c824dfa",
     "tool-icons",
     "typed-plugin-entrypoints"
   ]
