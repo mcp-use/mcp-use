@@ -358,6 +358,12 @@ export async function* streamResponsesTurn(
           toolName: buf.name,
           argsDelta: delta,
         };
+      } else if (!buf) {
+        // An unmatched key means the stream surprised us the way the old
+        // keying did; say so instead of discarding the arguments quietly.
+        console.warn(
+          `[openai-responses] dropping ${delta.length} argument bytes for unknown function_call item "${eventKey}"`,
+        );
       }
       continue;
     }
@@ -382,6 +388,10 @@ export async function* streamResponsesTurn(
           toolName: buf.name,
           args: parseArgs(buf.argsJson || argsRaw),
         };
+      } else {
+        console.warn(
+          `[openai-responses] dropping function_call_arguments.done for unknown item "${eventKey}"`,
+        );
       }
       continue;
     }
