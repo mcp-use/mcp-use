@@ -246,26 +246,23 @@ export function normalizeServerBranding(config: {
 }
 
 /**
- * Resolve configured icons for MCP implementation metadata.
+ * Resolve configured icons for MCP implementation and tool metadata.
  *
  * Absolute HTTP(S) and data URLs pass through. Public-relative sources become
  * request-scoped absolute URLs under `${basePath}/_mcp-use/public/`.
  *
- * @param icons - Normalized configured icons.
+ * @param icons - Configured icons, in author order.
  * @param request - HTTP request used to derive the public asset origin.
  * @param basePath - MCP endpoint base path.
- * @returns Icons suitable for the official SDK `Implementation` object.
+ * @returns Icons suitable for official SDK implementation and tool descriptors.
  *
  * @internal
  */
 export function resolveImplementationIcons(
-  icons: readonly Icon[] | undefined,
+  icons: readonly Icon[],
   request: Request | undefined,
   basePath: string
-): Icon[] | undefined {
-  if (icons === undefined) {
-    return undefined;
-  }
+): Icon[] {
   return icons.map((icon) => ({
     ...icon,
     src:

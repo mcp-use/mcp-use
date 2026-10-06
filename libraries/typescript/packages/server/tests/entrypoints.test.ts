@@ -38,6 +38,13 @@ describe("entrypoint wire contract over HTTP", () => {
     {
       name: "open_app",
       title: "My app",
+      icons: [
+        {
+          src: "https://entrypoints.test/app.svg",
+          mimeType: "image/svg+xml",
+          sizes: ["20x20"],
+        },
+      ],
       inputSchema: z.object({
         query: z.string().default("all"),
         optional: z.string().optional(),
@@ -125,6 +132,13 @@ describe("entrypoint wire contract over HTTP", () => {
     const { tools } = await client.listTools();
     expect(tools.find((tool) => tool.name === "open_app")).toMatchObject({
       title: "My app",
+      icons: [
+        {
+          src: "https://entrypoints.test/app.svg",
+          mimeType: "image/svg+xml",
+          sizes: ["20x20"],
+        },
+      ],
       annotations: { readOnlyHint: true },
       _meta: {
         "openai/ui": {
