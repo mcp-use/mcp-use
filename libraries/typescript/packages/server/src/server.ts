@@ -67,6 +67,12 @@ import {
 } from "./middleware/mcp-middleware.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
+import {
+  prepareSettings,
+  type SettingsFields,
+  type SettingsRegistration,
+  type SettingsValues,
+} from "./settings.js";
 import { normalizeCompletions } from "./resource-completion.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
@@ -364,6 +370,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   >();
   readonly #prompts = new Map<string, PromptEntry<TUser, TEnv>>();
   readonly #views = new Map<string, ViewManifestEntry>();
+  #settings: ReturnType<typeof prepareSettings> | undefined;
   #skills: SkillsSnapshot | undefined;
   #skillsPrimed = false;
   #skillsDiscovery: Promise<void> | undefined;
@@ -603,6 +610,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     >
   ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>> {
     this.#assertNotStarted("tool", definition.name);
+    if (
+      this.#settings !== undefined &&
+      [
+        this.#settings.capability.readTool,
+        this.#settings.capability.updateTool,
+      ].includes(definition.name)
+    ) {
+      throw new Error(`Tool "${definition.name}" is reserved for settings`);
+    }
     const schemes = this.#resolveSecuritySchemes(definition);
     validateEntrypointInput(definition);
     this.#validateToolViewBinding(definition);
@@ -622,6 +638,53 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     return Object.freeze({
       name: definition.name,
     }) as ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>>;
+  }
+
+  /**
+   * Register one native plugin settings read/update pair before starting the server.
+   *
+   * Callbacks receive the same request context and OAuth guarantees as ordinary
+   * authenticated tools. They own authorization, defaults, persistence, atomic
+   * partial updates, and cross-field validation. The framework validates field
+   * values and replays both tools and the capability on every request-scoped server.
+   *
+   * @throws When already registered, started, field schemas are unsupported,
+   * or either tool name collides with an existing registration.
+   */
+  settings<const Fields extends SettingsFields>(
+    options: SettingsRegistration<Fields, TUser, HasOAuth<TUser>, TEnv>
+  ): void {
+    this.#assertNotStarted("settings", options.readTool ?? "settings.read");
+    if (this.#settings !== undefined)
+      throw new Error("Settings are already registered on this server");
+    const prepared = prepareSettings(options);
+    for (const name of [
+      prepared.capability.readTool,
+      prepared.capability.updateTool,
+    ]) {
+      if (this.#tools.has(name))
+        throw new Error(`Settings tool "${name}" is already registered`);
+    }
+    const read = options.read;
+    const update = options.update;
+    this.tool(prepared.readDefinition, async (_args, ctx) => ({
+      content: [],
+      structuredContent: {
+        schema: prepared.schema,
+        ...(prepared.layout !== undefined && { layout: prepared.layout }),
+        values: await read(ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>),
+      },
+    }));
+    this.tool(prepared.updateDefinition, async ({ set }, ctx) => ({
+      content: [],
+      structuredContent: {
+        values: await update(
+          set as Partial<SettingsValues<Fields>>,
+          ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>
+        ),
+      },
+    }));
+    this.#settings = prepared;
   }
 
   /**
@@ -1564,6 +1627,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         this.#runOAuthProviderSetup(resource, basePath);
       }
 
+      for (const group of this.#settings?.layout ?? []) {
+        for (const item of group.items) {
+          if (item.kind === "tool" && !this.#tools.has(item.tool))
+            throw new Error(
+              `Settings action tool "${item.tool}" is not registered on this server`
+            );
+        }
+      }
       this.#validateViewBindingsAtMount();
 
       const { handler, fetch: mcpFetch } = createMcpMount(
@@ -1823,10 +1894,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           tools: { listChanged: true },
           prompts: { listChanged: true },
           resources: { listChanged: true, subscribe: true },
-          ...(this.#skills !== undefined && {
+          ...((this.#skills !== undefined || this.#settings !== undefined) && {
             extensions: {
-              [SKILLS_EXTENSION_ID]: { directoryRead: true },
+              ...(this.#skills !== undefined && {
+                [SKILLS_EXTENSION_ID]: { directoryRead: true },
+              }),
+              ...(this.#settings !== undefined && {
+                "openai/settings": this.#settings.capability,
+              }),
             },
+          }),
+          ...(this.#settings !== undefined && {
+            experimental: { "openai/settings": this.#settings.capability },
           }),
         },
         ...(instructions !== undefined && { instructions }),
