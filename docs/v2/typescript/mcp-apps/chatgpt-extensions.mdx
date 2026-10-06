@@ -1,0 +1,741 @@
+---
+title: "ChatGPT Plugin Extensions"
+description: "Add selected model context, app entrypoints, deep links, structured settings, and display modes with the TypeScript SDK."
+icon: "/images/icons/openai.svg"
+---
+
+Use ChatGPT Plugin Extensions to add app launchers, file viewers, incoming routes, native settings, and selected model context.
+You can also set an initial display preference.
+The TypeScript SDK converts your declarations to OpenAI extension metadata.
+The host controls which extensions users can access.
+
+Start with a [view-bound MCP App](/v2/typescript/mcp-apps/quickstart).
+Each view needs one bound tool and an `outputSchema`.
+The examples below use the v2 TypeScript API.
+
+| Goal                                            | API                                               |
+| ----------------------------------------------- | ------------------------------------------------- |
+| Open an app from navigation or a conversation   | `tool.view.entrypoints` with `global` or `thread` |
+| Open a file in a custom viewer                  | `tool.view.entrypoints` with `file`               |
+| Read an incoming app route                      | `useDeepLink()`                                   |
+| Add native settings and action buttons          | `server.settings()`                               |
+| Attach selected evidence to the next model turn | `useModelContext()`                               |
+| Request an initial presentation                 | `viewConfig.preferredDisplayMode`                 |
+
+## Check host support
+
+The [OpenAI platform support table](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#platform-support) describes the following expected support.
+Its web column refers to the ChatGPT Work browser and excludes classic ChatGPT.
+Availability depends on the host release.
+
+| Extension                     | Desktop | Work web | iOS | Android |
+| ----------------------------- | ------- | -------- | --- | ------- |
+| Global and thread entrypoints | Yes     | Yes      | Yes | Yes     |
+| File entrypoints              | Yes     | No       | No  | No      |
+| Deep links                    | Yes     | Yes      | Yes | No      |
+| Structured settings           | Yes     | Yes      | Yes | Yes     |
+| Resource display modes        | Yes     | Yes      | Yes | Yes     |
+
+ChatGPT supports `inline` and `fullscreen` display modes.
+Other MCP Apps hosts can support `pip`.
+Test each extension in the host that your users use.
+
+## Attach evidence to the next model turn
+
+Use `useModelContext()` when the user selects evidence to send with the next model turn.
+For example, add a book summary when the user selects **Add to chat**.
+Keep cart actions separate from attachment actions.
+
+Import the hook from `mcp-use/react` and render it in your view.
+The hook activates native context delivery. It needs no `viewConfig` option.
+The SDK checks host capabilities during initialization and checks each block before delivery.
+Calls made during initialization wait for the host connection.
+
+### Add, remove, and clear selected evidence
+
+This component adds a summary, lists selected attachments, and lets the user remove or clear them.
+It catches action errors and shows the shared delivery error.
+
+```tsx
+import { useState } from "react";
+import {
+  useModelContext,
+  type ModelContextOperationResult,
+} from "mcp-use/react";
+
+export default function BookEvidence() {
+  const { attachments, pending, error, add, remove, clearAttachments } =
+    useModelContext();
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<Error | null>(null);
+
+  async function run(action: () => Promise<ModelContextOperationResult>) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await action();
+    } catch (failure) {
+      setActionError(
+        failure instanceof Error ? failure : new Error(String(failure)),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const disabled = busy || pending;
+  const failure = actionError ?? error;
+
+  return (
+    <section aria-label="Chat context">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          void run(() =>
+            add("book:summary", {
+              type: "text",
+              title: "Selected book",
+              text: "The selected edition contains 12 illustrated chapters.",
+            }),
+          );
+        }}
+      >
+        Add to chat
+      </button>
+      <ul>
+        {attachments.map(({ key, block }) => (
+          <li key={key}>
+            {block.title ?? block.type}
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                void run(() => remove(key));
+              }}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        disabled={disabled || attachments.length === 0}
+        onClick={() => {
+          void run(clearAttachments);
+        }}
+      >
+        Clear attachments
+      </button>
+      {pending && <p role="status">Updating context…</p>}
+      {failure && <p role="alert">{failure.message}</p>}
+    </section>
+  );
+}
+```
+
+The hook returns these fields and methods:
+
+| Member               | Behavior                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `attachments`        | Read-only list of selected `{ key, block }` entries. The list can include unsynced entries after a delivery failure.          |
+| `pending`            | `true` during initialization, image preparation, batching, or delivery. `false` alone does not prove that delivery succeeded. |
+| `error`              | Shared delivery or reconciliation error, or `null`. Catch each action's rejection to show validation and preparation errors.  |
+| `add(key, block)`    | Add one attachment or replace the value at the same key. Keep the other attachments.                                          |
+| `remove(key)`        | Remove one selected attachment. Use the key returned in `attachments`, including for restored entries.                        |
+| `clearAttachments()` | Clear the shared attachment collection. Keep separately managed view state, descriptions, and restored background context.    |
+
+Each method returns `Promise<{ status: "synced" | "superseded" }>`.
+`"synced"` confirms context delivery, not permanent selection or a visible composer chip.
+`"superseded"` means a newer action replaced the operation before acknowledgment.
+Catch rejected promises as shown above.
+
+Use distinct, stable application keys, such as `book:summary` and `book:cover`.
+Keys are shared across all hook instances in one view runtime.
+Exact duplicate blocks under different keys reject.
+Unmounting a hook consumer does not clear its selections.
+
+### Choose a content block
+
+The hook supports four block types: `text`, `image`, `resource_link`, and `resource`.
+Each type accepts a friendly top-level `title`.
+The title is also available in `attachments[i].block.title` after host restoration.
+
+These blocks can replace the text block in the example above.
+For the image and thumbnail, put a cover at `public/covers/book.png`.
+
+```typescript
+import type { ModelContextBlock } from "mcp-use/react";
+
+export const bookEvidence = {
+  summary: {
+    type: "text",
+    title: "Book details",
+    text: "An illustrated guide to garden plants, with 12 chapters.",
+    thumbnail: { src: "/covers/book.png", mimeType: "image/png" },
+  },
+  cover: {
+    type: "image",
+    title: "Book cover",
+    src: "/covers/book.png",
+  },
+  manual: {
+    type: "resource_link",
+    title: "Book manual",
+    name: "manual.pdf",
+    uri: "https://example.com/books/manual.pdf",
+    mimeType: "application/pdf",
+  },
+  sample: {
+    type: "resource",
+    title: "Reading sample",
+    resource: {
+      uri: "bookshop://books/garden-guide/sample",
+      mimeType: "text/plain",
+      text: "Chapter 1: Choose plants for the light in your garden.",
+    },
+  },
+} satisfies Record<string, ModelContextBlock>;
+```
+
+Text blocks can include a `thumbnail` with an MCP Icon shape.
+The thumbnail path resolves like the `Image` component's public path and stays a URL.
+The SDK does not fetch thumbnail bytes. ChatGPT iOS currently ignores thumbnails.
+
+Image `src` uses the same public path resolver as `Image`, including proxy and asset-host configuration.
+Absolute URLs pass through the resolver.
+The SDK fetches the image and converts it to native base64 content before changing the selection.
+Source responses must contain PNG, JPEG, GIF, or WebP bytes with the matching `Content-Type`.
+Browser CORS rules apply to remote URLs.
+
+You can also supply base64 bytes directly:
+
+```typescript
+import type { ModelContextImage } from "mcp-use/react";
+
+export function bookCoverFromBytes(data: string): ModelContextImage {
+  return { type: "image", title: "Book cover", data, mimeType: "image/png" };
+}
+```
+
+Use either `src` or `data` plus `mimeType` in an image block.
+Do not combine these forms.
+Returned image attachments contain `data` and `mimeType`, even when you supply `src`.
+
+During image preparation, `pending` is `true` and the previous selection stays visible.
+Other ready keys can sync independently.
+A fetch failure, unsupported or missing `Content-Type`, or empty response rejects the action and preserves the previous attachment.
+A later `add` or `remove` for the same key, or `clearAttachments`, cancels preparation and returns `"superseded"` for that action.
+A single image is limited to 10 MiB of decoded bytes, whether supplied through `src` or base64 `data`. Source downloads stop when they exceed that limit, including when the response omits its size. An oversized image rejects without replacing the current selection. This is an SDK memory budget, not a host upload-size guarantee.
+A late fetch response cannot restore the canceled attachment.
+
+Named types include `ModelContextText`, `ModelContextImage`, `ModelContextResourceLink`, and `ModelContextResource`.
+All are exported from `mcp-use/react`.
+A resource link uses its native `title` field, which takes precedence over unrelated title metadata.
+Text and image titles use OpenAI metadata.
+Embedded-resource titles use SDK metadata; host display of these titles can vary.
+Raw metadata and annotations are preserved. Conflicting shorthand and wire fields reject.
+Audio blocks are not supported.
+
+### Respect host removals
+
+OpenAI host context can restore surviving attachments when the view initializes.
+Restored keys start with `@restored:` and belong to that runtime.
+Use these returned keys to remove restored entries.
+Do not use the reserved prefix for new keys or infer original keys from titles, resource URIs, or list positions.
+
+Confirmed host removals update `attachments` where the SDK can identify the removed blocks.
+Do not add the same evidence again from a render effect or a cart update.
+Keep removable evidence out of duplicate `useViewState` values or `ModelContext` descriptions.
+
+The optional `audience` field accepts `"user"` and `"assistant"` and maps to MCP annotations.
+Audience controls presentation. All blocks still reach the model.
+Assistant-only content can be restored as background instead of a visible attachment.
+Removal affects current context; it does not erase previous conversation turns or backend data.
+
+### Combine context hooks
+
+Render `useModelContext` in the initial view tree when you also use `useViewState` or `ModelContext`. Native delivery activates when the hook commits, before state and description effects; discarded renders do not change delivery.
+The runtime sends attachments, structured view state, and descriptions through one native writer.
+State and descriptions keep their model-visible JSON projection.
+`clearAttachments()` preserves those separate contributions.
+See [Model context](/v2/typescript/mcp-apps/model-context) to choose a channel for each value.
+
+On OpenAI hosts, native host context restores model-visible state after the hook activates.
+Private widget state keeps its separate persistence channel.
+Views that do not render `useModelContext` keep their existing widget-state transport.
+
+Activation rejects if model-visible widget `modelContent` or `imageIds` already exists, or a widget-state write was dispatched.
+The SDK does not clear that persisted context for you.
+Use a view without the conflicting state; reopening alone can retain the conflict.
+A prior native write must finish, and OpenAI host readback must match the acknowledged context before activation.
+
+### Handle delivery failures
+
+A definite host rejection retains the requested selection and sets the shared `error`.
+The next valid `add`, `remove`, or `clearAttachments` makes one fresh delivery attempt with the current selection.
+Invalid input and background updates do not trigger another attempt.
+The public hook has no retry method or automatic retry loop.
+
+A successful model-context response does not require an OpenAI `updateId` in its metadata.
+When present and valid, the SDK uses that ID to correlate a whole context revision.
+The ID is not an attachment key or a compare-and-swap token.
+
+Uncertain transport outcomes or ambiguous host ordering stop further publication and reject subsequent mutations.
+A request that was already sent cannot be recalled.
+Wait for outstanding remote writes to finish before you open a fresh view runtime.
+Another notification or a hook remount does not establish that writes have finished.
+
+### Verify attachment behavior
+
+1. Open the view in the host that your users use.
+2. Add a summary and a cover under different keys. Check that both remain selected.
+3. Remove one attachment in the view. Check that the other remains.
+4. Clear the attachments, then add one again.
+5. Where the host supports composer removal, remove an attachment there and check the view's list.
+6. Change the cart or filter state. Check that removed evidence does not return.
+
+A simulated host can check protocol delivery and errors.
+Use the native host to check composer chips, thumbnails, and host removal behavior.
+
+## Add global and thread entrypoints
+
+Declare `global` to add an app launcher in navigation.
+Declare `thread` to add a content tab in a conversation.
+Both launchers send `{}` to the tool.
+Each conversation has its own thread app instance.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "parts-library", version: "1.0.0" });
+
+server.tool(
+  {
+    name: "open_library",
+    title: "Parts library",
+    icons: [
+      { src: "library.svg", mimeType: "image/svg+xml", sizes: ["20x20"] },
+    ],
+    inputSchema: z.object({ category: z.string().default("all") }),
+    outputSchema: z.object({ category: z.string() }),
+    view: {
+      name: "library",
+      entrypoints: [{ type: "global" }, { type: "thread" }],
+    },
+  },
+  ({ category }) => ({ content: [], structuredContent: { category } }),
+);
+```
+
+Create `views/library/view.tsx` for this tool.
+Render the initial tool result in the view.
+The initial result already contains the launch data.
+
+Global and thread tools must accept empty arguments.
+Use optional fields or defaults for additional inputs.
+Keep tools with required query inputs separate from launchers.
+The MCP SDK validates tool calls against the input schema, including custom refinements.
+
+Entrypoints open fullscreen in supporting hosts.
+Entrypoint calls ignore the tool visibility hint.
+Use a clear tool `title` to name the launcher.
+
+### Set entrypoint tool icons
+
+Set `icons` on the tool definition, alongside `name` and `title`, as shown above.
+Put `library.svg` in `public/`; the SDK emits its absolute asset URL on `tools/list`.
+Absolute HTTP(S) and image data URLs also work.
+
+Follow the [OpenAI icon guidelines](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#icon-guidelines).
+Use a monochrome SVG with a transparent background, `currentColor`, and a 20×20 viewport.
+Use 1.33px strokes for stroke icons.
+For example, save this book icon as `public/library.svg`:
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+  <path fill="none" stroke="currentColor" stroke-width="1.33"
+    stroke-linecap="round" stroke-linejoin="round"
+    d="M10 4.5C7.5 3 5 3 2.5 4v12c2.5-1 5-1 7.5.5 2.5-1.5 5-1.5 7.5-.5V4C15 3 12.5 3 10 4.5v12"/>
+</svg>
+```
+
+`view.entrypoints` declares launch locations in `_meta["openai/ui"].entrypoints`.
+The separate top-level `icons` field supplies the tool's artwork.
+Server constructor `icons` supplies server branding and remains the fallback when a tool has no icon.
+Hosts prefer tool icons, then the local server icon or hosted app logo, then a generic icon.
+
+Call `tools/list` to check the tool's `icons` and fetch each emitted `src`.
+Test the SVG in light and dark host themes.
+
+## Add a file entrypoint
+
+Declare the file extensions that your view supports.
+Each extension must start with a dot.
+The host sends `file.name` and `file.resourceUri` to the tool.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "csv-viewer", version: "1.0.0" });
+const fileInput = z.object({
+  file: z.object({
+    name: z.string().min(1),
+    resourceUri: z.string().trim().min(1),
+  }),
+});
+
+server.tool(
+  {
+    name: "open_csv",
+    title: "CSV viewer",
+    inputSchema: fileInput,
+    outputSchema: fileInput,
+    view: {
+      name: "csv",
+      entrypoints: [{ type: "file", extensions: [".csv"] }],
+    },
+  },
+  ({ file }) => ({ content: [], structuredContent: { file } }),
+);
+```
+
+Create `views/csv/view.tsx` for this tool.
+The host also sends the file arguments to the view through `ui/notifications/tool-input`.
+Treat `file.resourceUri` as an opaque host handle.
+Use the host resource APIs to read the file.
+The HTML view resource URI identifies the view, not the opened file.
+
+Use a non-empty extension list.
+Require both string fields when `file` is present.
+Additional input fields must be optional or have defaults.
+
+### Combine entrypoint types
+
+One tool can declare all three entrypoint types.
+For a combined tool, make the outer `file` field optional.
+Keep `file.name` and `file.resourceUri` required when `file` is present.
+
+Replace the CSV tool registration above with this registration:
+
+```typescript
+const combinedInput = fileInput.partial();
+
+server.tool(
+  {
+    name: "open_csv",
+    title: "CSV viewer",
+    inputSchema: combinedInput,
+    outputSchema: combinedInput,
+    view: {
+      name: "csv",
+      entrypoints: [
+        { type: "global" },
+        { type: "thread" },
+        { type: "file", extensions: [".csv"] },
+      ],
+    },
+  },
+  (args) => ({ content: [], structuredContent: args }),
+);
+```
+
+The view must show an empty screen when the host sends no file.
+
+### Check entrypoint metadata
+
+Call `tools/list` to inspect the tool descriptor.
+The CSV tool advertises these metadata fields:
+
+```json
+{
+  "ui": { "resourceUri": "ui://views/csv.html" },
+  "openai/ui": {
+    "entrypoints": [{ "type": "file", "extensions": [".csv"] }]
+  }
+}
+```
+
+These fields appear inside the tool's `_meta` object.
+Typed `view.entrypoints` takes precedence over raw `_meta["openai/ui"].entrypoints`.
+If you omit the typed field, existing raw entrypoint declarations pass through.
+
+## Read incoming deep links
+
+Use `useDeepLink()` to read a route that the host sends to a global entrypoint.
+The hook uses the view's existing MCP Apps connection.
+It reads the initial host context and updates when another deep link arrives.
+
+```tsx
+import { useEffect, useState } from "react";
+import { useDeepLink } from "mcp-use/react";
+
+export default function LibraryView() {
+  const { url } = useDeepLink();
+  const [route, setRoute] = useState("/parts");
+
+  useEffect(() => {
+    if (url !== undefined) setRoute(url);
+  }, [url]);
+
+  const incoming = new URL(route, "https://app.example");
+  if (incoming.pathname === "/parts") {
+    const tag = incoming.searchParams.get("tag");
+    return (
+      <main>
+        <p>Parts filter: {tag ?? "all"}</p>
+        <button type="button" onClick={() => setRoute("/parts/hex-bolt")}>
+          Open hex bolt
+        </button>
+      </main>
+    );
+  }
+  if (incoming.pathname === "/parts/hex-bolt") return <p>Hex bolt</p>;
+  return <p>Unknown route</p>;
+}
+```
+
+The hook returns `{ url: string | undefined }`.
+An undefined URL means the host has supplied no link.
+Hosts without deep-link support also return an undefined URL.
+
+The hook reads `hostContext["openai/deepLink"].url`.
+It converts older `path` and `query` payloads to the same URL form.
+It removes its subscription when the component unmounts.
+Local route changes do not update the host URL.
+
+Validate incoming routes before you load data.
+Authorize data access on the server.
+
+### Construct a deep link
+
+Encode the plugin ID, tool name, and complete app-relative URL.
+The app-relative URL must start with `/` and must not contain a fragment.
+
+```typescript
+const pluginId = "parts-library"; // Replace with your registered plugin ID.
+const toolName = "open_library";
+const appUrl = "/parts?tag=bolt&sort=asc";
+
+const link =
+  `https://chatgpt.com/plugins/${encodeURIComponent(pluginId)}` +
+  `/app/${encodeURIComponent(toolName)}?path=${encodeURIComponent(appUrl)}`;
+```
+
+Desktop links use `codex://plugins/<plugin-id>/app/<tool-name>?path=<encoded-url>`.
+iOS links use the `chatgpt` scheme.
+Custom marketplace links include `@<marketplace>` after the plugin ID.
+See the [deep-link specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#deep-links) for the native formats.
+
+## Add structured settings and actions
+
+Register one settings pair before you start the server.
+`server.settings()` creates read and update tools.
+The host discovers these tools through the `openai/settings` capability.
+
+This example keeps one shared settings object in memory.
+The object resets when the process restarts.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "parts-settings", version: "1.0.0" });
+let values: { units: "mm" | "in"; showGrid: boolean } = {
+  units: "mm",
+  showGrid: true,
+};
+
+server.tool(
+  {
+    name: "units_help",
+    title: "Measurement units help",
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true },
+  },
+  () => ({
+    content: [
+      { type: "text", text: "Choose millimeters or inches for dimensions." },
+    ],
+  }),
+);
+
+server.settings({
+  fields: {
+    units: { schema: z.enum(["mm", "in"]), title: "Measurement units" },
+    showGrid: { schema: z.boolean(), title: "Show grid" },
+  },
+  layout: [
+    {
+      kind: "group",
+      title: "Display",
+      items: [
+        { kind: "property", property: "units" },
+        { kind: "property", property: "showGrid" },
+        { kind: "tool", tool: "units_help", title: "About measurement units" },
+      ],
+    },
+  ],
+  read: () => ({ ...values }),
+  update: (set) => {
+    values = { ...values, ...set };
+    return { ...values };
+  },
+});
+```
+
+For a production app, authorize each callback through its `RequestContext` argument.
+Scope stored values to the correct account.
+Persist partial updates atomically before you return all effective values.
+The framework does not provide storage, account scoping, or concurrency control.
+
+The `read` callback receives `ctx`.
+The `update` callback receives `set` and `ctx`.
+The context includes `ctx.request`, `ctx.signal`, and `ctx.client`.
+OAuth servers also expose `ctx.auth`.
+
+### Define fields and layout
+
+Register at least one field.
+Fields support boolean, string, string enum, number, and integer schemas.
+Use a Standard Schema library with JSON Schema conversion, such as Zod.
+Give each field a non-blank `title`.
+You can also supply a `description`.
+Primitive schema constraints still apply.
+Use primitive schemas without value transforms.
+
+Return an effective value for every field from both callbacks.
+This rule also applies to optional fields and fields with schema defaults.
+The wire schema omits default annotations.
+Apply application defaults in the `read` callback.
+
+Use `kind: "property"` for a field control.
+Use `kind: "tool"` for a same-server action button.
+Action tools must accept `{}` and exist before the server starts.
+The MCP SDK validates action arguments when the host calls the tool.
+
+The host places fields absent from `layout` in an Other settings group.
+A regular tool action returns text feedback in settings.
+A view-bound tool action opens an MCP App modal.
+See the [structured settings contract](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#structured-settings) for host behavior.
+
+### Check settings tools
+
+The default tool names are `settings.read` and `settings.update`.
+Set `readTool` and `updateTool` to use distinct, unused names.
+The registration advertises the pair during modern discovery and legacy initialization.
+
+| Call              | Arguments                      | Structured result             |
+| ----------------- | ------------------------------ | ----------------------------- |
+| `settings.read`   | `{}`                           | `{ schema, values, layout? }` |
+| `settings.update` | `{ set: { showGrid: false } }` | `{ values }` with all fields  |
+
+Updates preserve fields absent from `set` through your callback.
+Empty patches, unknown keys, invalid values, and incomplete callback results produce tool errors.
+
+## Set resource display modes
+
+Export `viewConfig` directly from `views/<name>/view.tsx` to declare supported modes and an initial preference.
+Build and development tools read the declaration before the view starts.
+
+```tsx
+import type { ViewConfig } from "mcp-use/react";
+
+export const viewConfig = {
+  autoResize: true,
+  displayModes: ["inline", "fullscreen"],
+  preferredDisplayMode: "fullscreen",
+} satisfies ViewConfig;
+
+export default function LibraryView() {
+  return <main>Parts library</main>;
+}
+```
+
+`displayModes` must include `inline` and contain no duplicates.
+The default list is `["inline", "fullscreen", "pip"]`.
+`autoResize` defaults to `true`.
+With `autoResize: false`, use `useSendSizeChanged()` to report the view size.
+
+`preferredDisplayMode` accepts `inline` or `fullscreen`.
+The preference must appear in `displayModes`.
+The preference has no default, and the host can ignore it.
+Entrypoint launch behavior remains separate from this preference for ordinary tool calls.
+
+The HTML resource content advertises the ChatGPT subset in `_meta["openai/ui"]`:
+
+```json
+{
+  "availableDisplayModes": ["inline", "fullscreen"],
+  "preferredDisplayMode": "fullscreen"
+}
+```
+
+The browser advertises the full configured list through MCP Apps capabilities.
+This list can include `pip` for other hosts.
+
+### Keep the declaration static
+
+Use object literals, array literals, local `const` references, and spreads.
+TypeScript `as` and `satisfies` wrappers also work.
+Imported values and runtime expressions cause an extraction error when tooling detects the named configuration.
+
+Keep the configuration and its shared object or array references immutable.
+Tooling rejects writes to those references and calls that could mutate them during module initialization, including calls through local helpers.
+Components can read the configuration through calls such as `useState` and `useMemo` after initialization.
+
+<Warning>
+  Declare and export `viewConfig` locally in the view module. A value `export *`
+  without a local configuration causes an extraction error because tooling
+  cannot resolve the configuration through another module. Type-only wildcard
+  exports are allowed, as are unrelated value wildcards alongside a local
+  configuration.
+</Warning>
+
+### Request a mode at runtime
+
+Use `useDisplayMode()` for mode changes after initialization.
+Render from the reported `displayMode`.
+A completed request does not guarantee that the host changed the mode.
+
+```tsx
+import { useDisplayMode } from "mcp-use/react";
+
+export function ExpandButton() {
+  const { displayMode, availableDisplayModes, requestDisplayMode } =
+    useDisplayMode();
+
+  if (!availableDisplayModes.includes("fullscreen")) return null;
+  if (displayMode === "fullscreen") return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void requestDisplayMode({ mode: "fullscreen" });
+      }}
+    >
+      Expand
+    </button>
+  );
+}
+```
+
+`availableDisplayModes` contains the intersection of the view modes and host modes.
+If the host supplies no mode list, only `inline` is available.
+Requests for other modes reject before the runtime sends them.
+
+## Verify the integration
+
+1. Call `tools/list` to check entrypoint metadata and settings tool names.
+2. Call an entrypoint tool with its expected empty or file arguments.
+3. Call `settings.read`, then update one field and check the complete result.
+4. Run `npx mcp-use build` to check static `viewConfig` extraction.
+5. Read the HTML view resource to check its display metadata.
+6. Open the app in a supporting host to check launchers, routes, settings actions, and presentation.
+
+Use [MCP Apps interactivity](/v2/typescript/mcp-apps/interactivity) for tool calls and host interactions inside the view.
+Use [model context](/v2/typescript/mcp-apps/model-context) to share the view state with the model.

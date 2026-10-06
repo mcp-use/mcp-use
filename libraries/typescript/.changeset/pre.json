@@ -1,0 +1,26 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.20",
+    "@mcp-use/cli": "4.2.1",
+    "@mcp-use/client": "2.4.0",
+    "create-mcp-use-app": "2.0.8",
+    "@mcp-use/inspector": "20.3.15",
+    "mcp-use": "2.7.3",
+    "@mcp-use/tunnel": "0.2.1"
+  },
+  "changesets": [
+    "create-app-failed-scaffold-dir",
+    "incoming-plugin-deep-links",
+    "model-context-coordinator",
+    "native-model-context",
+    "native-plugin-settings",
+    "official-mcp-sdk-refresh",
+    "plugin-extension-display-modes",
+    "propagated-edc25f980ebb8d33",
+    "propagated-ff958b391c824dfa",
+    "tool-icons",
+    "typed-plugin-entrypoints"
+  ]
+}

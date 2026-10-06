@@ -1,5 +1,6 @@
 import type {
   CallToolResult,
+  Icon,
   InputRequiredResult,
   MetaObject,
   StandardSchemaWithJSON,
@@ -31,6 +32,34 @@ export type ToolSecurityScheme =
       readonly scopes: readonly string[];
     };
 
+/** Manual launch locations advertised by ChatGPT on a view-bound tool. */
+export type ToolViewEntrypoint =
+  | {
+      /** Opens the app from the global launcher. */
+      readonly type: "global";
+    }
+  | {
+      /** Opens the app within the current conversation. */
+      readonly type: "thread";
+    }
+  | {
+      /** Opens a matching file in the app. */
+      readonly type: "file";
+      /** HTML accept-style file extensions, each beginning with a dot. */
+      readonly extensions: readonly string[];
+    };
+
+/** Arguments supplied by the host when opening a file entrypoint. */
+export interface FileEntrypointInput {
+  /** Host-provided file identity and resource reference. */
+  file: {
+    /** File name including its extension, without a filesystem path. */
+    name: string;
+    /** Opaque host resource URI. */
+    resourceUri: string;
+  };
+}
+
 /**
  * Binds a tool to a view directory for MCP Apps rendering.
  *
@@ -43,6 +72,16 @@ export type ToolSecurityScheme =
 export interface ToolViewConfig {
   /** View directory / registry name, e.g. `"product-search-result"`. */
   name: string;
+  /**
+   * Manual launch locations → tool `_meta["openai/ui"].entrypoints`.
+   * Global/thread launchers must accept `{}`; file launchers require
+   * {@link FileEntrypointInput}. Entrypoints open fullscreen in supporting
+   * hosts. Typed entrypoints take precedence over raw metadata declarations.
+   * Registration checks the input JSON Schema against `{}` and representative
+   * file payloads for the declared extensions. Application refinements must
+   * also accept host launch arguments; they only run on actual tool calls.
+   */
+  entrypoints?: readonly ToolViewEntrypoint[];
   /**
    * Human-readable description of the view resource → the resource's
    * `description` on `resources/list` and `resources/read`.
@@ -77,6 +116,13 @@ export interface ToolDefinition {
   title?: string;
   /** LLM-facing description of what the tool does. */
   description?: string;
+  /**
+   * Tool icons advertised on `tools/list`, in author order. Absolute HTTP(S)
+   * and data URLs pass through; paths relative to `public/` become absolute
+   * asset URLs for HTTP requests. Entrypoint hosts prefer these icons over
+   * server branding. Use monochrome SVGs with `currentColor` for ChatGPT.
+   */
+  icons?: Icon[];
   /**
    * Object schema for input validation — any Standard Schema library with
    * JSON Schema conversion ({@link StandardSchemaWithJSON}): zod v4, ArkType,

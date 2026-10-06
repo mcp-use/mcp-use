@@ -24,6 +24,7 @@ export {
   useDynamicTool,
   type CallToolHandle,
 } from "./hooks/use-call-tool.js";
+export { useDeepLink, type DeepLinkHandle } from "./hooks/use-deep-link.js";
 export { useDisplayMode } from "./hooks/use-display-mode.js";
 export { useFiles } from "./hooks/use-files.js";
 export {
@@ -62,3 +63,18 @@ export {
   type CallToolSuccess,
   type ToolContextError,
 } from "./types/result-types.js";
+
+export { useModelContext } from "./hooks/use-model-context.js";
+export type {
+  ModelContextHandle,
+  ModelContextAttachment,
+  ModelContextBlock,
+  ModelContextText,
+  ModelContextImage,
+  ModelContextImageData,
+  ModelContextImageSource,
+  ModelContextResourceLink,
+  ModelContextResource,
+  ModelContextPresentation,
+  ModelContextOperationResult,
+} from "./types/model-context.js";
