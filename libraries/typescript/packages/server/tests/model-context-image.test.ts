@@ -30,16 +30,14 @@ describe("fetchContextImage", () => {
     });
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(body, {
-            headers: {
-              "Content-Type": "image/png",
-              "Content-Length": String(10 * 1024 * 1024 + 1),
-            },
-          })
-        )
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          headers: {
+            "Content-Type": "image/png",
+            "Content-Length": String(10 * 1024 * 1024 + 1),
+          },
+        })
+      )
     );
     const result = fetchContextImage(
       "https://example.com/large",
