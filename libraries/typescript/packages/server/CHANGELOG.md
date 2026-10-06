@@ -1,5 +1,30 @@
 # mcp-use
 
+## 2.8.0-canary.0
+
+### Minor Changes
+
+- 7f55b34: Add `useDeepLink` to `mcp-use/react` to read initial and subsequent ChatGPT deep-link URLs through the existing MCP App connection.
+- ef495f6: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+- 319614f: Add server.settings registration for native ChatGPT plugin settings with typed primitive fields, optional layout, validated read/update tools, request context callbacks, and per-request capability advertisement. Applications retain persistence and authorization responsibilities.
+- ab53ccd: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+- cdcfd7c: Add top-level tool icons to `tools/list`, including proxied tools and public-relative icon assets. Demonstrate themed entrypoint icons in Bookshop and document the tool, entrypoint, and server branding fields.
+- 7eee612: Add typed global, thread, and file entrypoints on tool.view, including launch-contract validation and preserved OpenAI tool metadata.
+
+### Patch Changes
+
+- bec3491: Coordinate model context contributions through immutable send snapshots, preserve description order, and correctly handle coalesced operations, synchronous widget failures, retries, and disposal without changing existing transport defaults. Keep newer operation waiters separate from older write failures, compare Unicode object keys deterministically, fence test resets, and preserve attachment generation identity without retaining removed keys.
+- Updated dependencies [ef495f6]
+- Updated dependencies [ab53ccd]
+- Updated dependencies
+  - @mcp-use/cli@4.3.0-canary.0
+  - @mcp-use/inspector@20.3.16-canary.0
+
 ## 2.7.3
 
 ### Patch Changes

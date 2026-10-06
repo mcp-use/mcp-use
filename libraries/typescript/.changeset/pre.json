@@ -11,6 +11,14 @@
     "@mcp-use/tunnel": "0.2.1"
   },
   "changesets": [
-    "create-app-failed-scaffold-dir"
+    "create-app-failed-scaffold-dir",
+    "incoming-plugin-deep-links",
+    "model-context-coordinator",
+    "native-model-context",
+    "native-plugin-settings",
+    "plugin-extension-display-modes",
+    "propagated-edc25f980ebb8d33",
+    "tool-icons",
+    "typed-plugin-entrypoints"
   ]
 }
