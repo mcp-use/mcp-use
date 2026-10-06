@@ -12,7 +12,7 @@ packages:
   - test_app
 
 catalog:
-  "@modelcontextprotocol/sdk": ">=1.25.2"
+  "@modelcontextprotocol/sdk": "^1.32.1"
 
 onlyBuiltDependencies:
   - "@tailwindcss/oxide"
@@ -26,7 +26,7 @@ minimumReleaseAgeExclude:
   - mcp-use
   - "@mcp-use/*"
   - create-mcp-use-app
-  # v2 SDK betas are tracked closely during the v2 migration and are pinned to
+  # Official MCP SDK releases are tracked closely and are pinned to
   # exact versions in package.json, so bumps are always an explicit, reviewed
   # change rather than an automatic resolution.
   - "@modelcontextprotocol/*"
@@ -82,7 +82,7 @@ overrides:
   dompurify: ">=3.4.13"
   minimatch: ">=10.2.6"
   rollup: ">=4.59.0"
-  "@modelcontextprotocol/sdk": ">=1.25.2"
+  "@modelcontextprotocol/sdk": "^1.32.1"
   ai: ">=5.0.52"
   axios: ">=1.20.0"
   body-parser: ">=2.3.0"
@@ -135,7 +135,7 @@ allowBuilds:
   unrs-resolver: true
 
 patchedDependencies:
-  "@modelcontextprotocol/server@2.0.0": patches/@modelcontextprotocol__server@2.0.0.patch
+  "@modelcontextprotocol/server@2.3.1": patches/@modelcontextprotocol__server@2.3.1.patch
   # OAuth provider 1.7 emits `items?: undefined` in its OpenAPI schema union.
   # Accept that in Better Call's types with exactOptionalPropertyTypes enabled.
   better-call@1.4.0: patches/better-call@1.4.0.patch
