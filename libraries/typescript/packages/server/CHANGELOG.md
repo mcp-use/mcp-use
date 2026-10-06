@@ -1,5 +1,37 @@
 # mcp-use
 
+## 2.8.0
+
+### Minor Changes
+
+- 24bf7b0: Add `useDeepLink` to `mcp-use/react` to read initial and subsequent ChatGPT deep-link URLs through the existing MCP App connection.
+- 24bf7b0: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+- 24bf7b0: Add server.settings registration for native ChatGPT plugin settings with typed primitive fields, optional layout, validated read/update tools, request context callbacks, and per-request capability advertisement. Applications retain persistence and authorization responsibilities.
+- 24bf7b0: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+- 24bf7b0: Add top-level tool icons to `tools/list`, including proxied tools and public-relative icon assets. Demonstrate themed entrypoint icons in Bookshop and document the tool, entrypoint, and server branding fields.
+- 24bf7b0: Add typed global, thread, and file entrypoints on tool.view, including launch-contract validation and preserved OpenAI tool metadata.
+
+### Patch Changes
+
+- 24bf7b0: Coordinate model context contributions through immutable send snapshots, preserve description order, and correctly handle coalesced operations, synchronous widget failures, retries, and disposal without changing existing transport defaults. Keep newer operation waiters separate from older write failures, compare Unicode object keys deterministically, fence test resets, and preserve attachment generation identity without retaining removed keys.
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+- Updated dependencies [24bf7b0]
+- Updated dependencies [24bf7b0]
+- Updated dependencies [24bf7b0]
+- Updated dependencies
+- Updated dependencies [24bf7b0]
+- Updated dependencies [24bf7b0]
+  - @mcp-use/cli@4.3.0
+  - @mcp-use/inspector@20.3.16
+
 ## 2.8.0-canary.1
 
 ### Patch Changes
