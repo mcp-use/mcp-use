@@ -37,6 +37,67 @@ function fixture() {
 }
 
 describe("ModelContextStore contribution coordinator", () => {
+  it("rejects identical Unicode-key metadata regardless of insertion order", async () => {
+    const { store, responses } = fixture();
+    const add = store.addAttachment("a", {
+      type: "text",
+      text: "A",
+      _meta: { é: 1, "e\u0301": 2 },
+    });
+    const duplicate = expect(
+      store.addAttachment("b", {
+        type: "text",
+        text: "A",
+        _meta: { "e\u0301": 2, é: 1 },
+      })
+    ).rejects.toThrow("identical");
+    await tick();
+    responses[0]!.resolve();
+    await add;
+    await duplicate;
+  });
+
+  it("lets the newer publication settle its waiter after an older write fails", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { store, writes, responses } = fixture();
+      const first = store.addAttachment("a", { type: "text", text: "A" });
+      const failed = expect(first).rejects.toThrow("denied");
+      await tick();
+      const outcomes: string[] = [];
+      const second = store.addAttachment("b", { type: "text", text: "B" });
+      void second.then(
+        (result) => outcomes.push(result.status),
+        () => outcomes.push("rejected")
+      );
+      responses[0]!.reject(new Error("denied"));
+      await failed;
+      await tick();
+      expect(writes).toHaveLength(2);
+      expect(outcomes).toEqual([]);
+      responses[1]!.resolve();
+      await expect(second).resolves.toEqual({ status: "synced" });
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it("ignores pre-reset acknowledgements when the next test publishes equal content", async () => {
+    const { store, writes, responses } = fixture();
+    const old = store.addAttachment("a", { type: "text", text: "A" });
+    const cancelled = expect(old).rejects.toThrow("reset");
+    await tick();
+    store.resetForTesting();
+    await cancelled;
+    responses[0]!.resolve();
+    await tick();
+    const fresh = store.addAttachment("a", { type: "text", text: "A" });
+    await tick();
+    expect(writes).toHaveLength(2);
+    responses[1]!.resolve();
+    await expect(fresh).resolves.toEqual({ status: "synced" });
+  });
+
   it("coalesces different keys with state and descriptions, and clears only attachments", async () => {
     const { store, writes, responses } = fixture();
     store.initializeViewState({ sort: "price" });
