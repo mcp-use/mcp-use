@@ -70,6 +70,8 @@ Quantities are absolute and idempotent; zero removes a book and nine is the limi
 Concurrent callers use last-write-wins. Refresh after another view/model changes
 cart or native settings. Mounted views hold snapshots, with no cross-view push.
 The in-app settings controls update the same preferences as native settings.
+Each control sends only its changed field, preserving other preferences changed
+by another view since this view's last refresh.
 
 **Add to chat** calls `add(key, { type: "image", src: "/covers/...", title })`.
 Like the SDK's `Image` component, image blocks resolve public paths against the request's asset base; the SDK fetches,
@@ -84,21 +86,22 @@ The example does not duplicate removable evidence in background model context.
 The catalog and details components call `add(stableKey, block)` explicitly.
 Image fetch or conversion errors reject that action. Image content becomes native
 base64 evidence; thumbnail paths resolve to URLs and remain URL metadata. The SDK
-also accepts direct `data` plus `mimeType` instead of `src`; Bookshop uses public
+also accepts direct `data` plus `mimeType` instead of `src`, with a 10 MiB decoded
+byte limit per image for both forms; Bookshop uses public
 paths so its display and attachment references stay consistent.
 Text and resource blocks use the exported `ModelContextBlock` type. Each block
 supplies a friendly top-level `title`; the context panel reads `block.title`
 without knowing protocol metadata. `AttachButton` only handles the clicked
-button's pending, success, and error feedback. `useModelContext` activates the
+button's pending and error feedback. `useModelContext` activates the
 SDK's attachment coordination automatically, with no view configuration opt-in.
 
-Each button awaits its own operation and reports failures or supersession.
-“Last request synced” means that operation was acknowledged; it does not promise
-a visible composer chip on every host. The shared panel reads reconciled hook
+Each button awaits its own operation and reports failures. Completion does not
+promise a visible composer chip on every host. The shared panel reads reconciled hook
 state, reports pending/error, and lets the reader remove or clear attachments
 independently of the cart. A failed desired entry can remain listed while the
 error explains it is unsynced. After a definite failure, the next valid explicit
-attachment change attempts synchronization once. There is no retry button or
+attachment change attempts synchronization once. Clear stays available when an
+error leaves the desired attachment list empty. There is no retry button or
 background replay loop. An uncertain host outcome stays blocked until the SDK
 can establish safe ordering; another click cannot force a replay. The SDK owns
 connection, capability checks, batching, host removal, and remount reconciliation.

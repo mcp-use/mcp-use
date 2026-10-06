@@ -111,7 +111,7 @@ export function ChatContext() {
       {actionError && actionError !== error?.message && (
         <p role="alert">{actionError}</p>
       )}
-      {attachments.length > 0 && (
+      {(attachments.length > 0 || error) && (
         <button
           className="quiet"
           onClick={() => {

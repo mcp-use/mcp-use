@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useDeepLink } from "mcp-use/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
-import { appPath } from "../../src/route.js";
+import { appPath } from "./route.js";
 
 /** Keep app navigation in memory; the initial host link wins over the tool route. */
 export function BookshopRouter({

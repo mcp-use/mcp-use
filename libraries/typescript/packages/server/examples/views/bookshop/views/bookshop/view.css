@@ -4,6 +4,7 @@
   --ink: var(--color-text-primary, #242424);
   --muted: var(--color-text-secondary, #707070);
   --line: var(--color-border-primary, #dedede);
+  --error: var(--color-text-danger, #b53c3c);
   color: var(--ink);
   background: var(--surface);
   font: 14px/1.5 var(--font-sans, system-ui, sans-serif);
@@ -18,6 +19,7 @@
   --ink: var(--color-text-primary, #eee);
   --muted: var(--color-text-secondary, #aaa);
   --line: var(--color-border-primary, #444);
+  --error: var(--color-text-danger, #f08a8a);
   color-scheme: dark;
 }
 .bookshop * {
@@ -410,7 +412,7 @@
   margin-top: 14px;
 }
 .bookshop [role="alert"] {
-  color: #b53c3c;
+  color: var(--error);
 }
 .bookshop .error {
   margin: 12px 0;

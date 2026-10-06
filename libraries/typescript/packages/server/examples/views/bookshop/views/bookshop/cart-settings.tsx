@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from "react-router";
 import { Image } from "mcp-use/react";
 import type { Book, BookshopData, BookshopSettings } from "../../src/data.js";
-import { pluginLink } from "../../src/route.js";
+import { pluginLink } from "./route.js";
 import { BookIcon, money } from "./catalog.js";
 
 interface CartProps {
@@ -12,7 +12,7 @@ interface CartProps {
 interface SettingsProps {
   settings: BookshopSettings;
   busy: boolean;
-  onChangeSettings: (settings: BookshopSettings) => void;
+  onChangeSettings: (settings: Partial<BookshopSettings>) => void;
   pluginId: string;
   onChangePluginId: (pluginId: string) => void;
 }
@@ -129,7 +129,6 @@ export function Settings({
             disabled={busy}
             onChange={(event) => {
               onChangeSettings({
-                ...settings,
                 showDescriptions: event.target.checked,
               });
             }}
@@ -146,7 +145,6 @@ export function Settings({
             disabled={busy}
             onChange={(event) => {
               onChangeSettings({
-                ...settings,
                 compact: event.target.checked,
               });
             }}

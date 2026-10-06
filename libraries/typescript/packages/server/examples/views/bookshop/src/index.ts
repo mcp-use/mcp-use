@@ -120,10 +120,10 @@ export const updateBookshopSettings = server.tool(
     name: "update_bookshop_settings",
     title: "Update bookshop appearance",
     description:
-      "Change the shared demo catalog appearance. Resets on restart.",
+      "Change selected shared demo appearance preferences. Omitted preferences stay unchanged. Resets on restart.",
     inputSchema: z.object({
-      showDescriptions: z.boolean(),
-      compact: z.boolean(),
+      showDescriptions: z.boolean().optional(),
+      compact: z.boolean().optional(),
     }),
     outputSchema: bookshopSchema,
     annotations: {
@@ -134,7 +134,11 @@ export const updateBookshopSettings = server.tool(
     },
   },
   (settings) => {
-    preferences = { ...settings };
+    preferences = {
+      showDescriptions:
+        settings.showDescriptions ?? preferences.showDescriptions,
+      compact: settings.compact ?? preferences.compact,
+    };
     return result("/settings");
   }
 );
