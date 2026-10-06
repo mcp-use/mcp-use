@@ -6,6 +6,29 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.8.0" description="October 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.8.0&title=ChatGPT%20Plugin%20Extensions&date=2026-10&lang=typescript" alt="Release 2.8.0" />
+  </Frame>
+  ## ChatGPT Plugin Extensions
+  Minor release adding typed ChatGPT Plugin Extensions across server and React APIs, with updated MCP SDKs and richer examples.
+
+- **New** (server): register typed global, thread, and file entrypoints on `tool.view`; launch contracts are validated and OpenAI tool metadata is preserved (`#2737`)
+- **New** (server): register native ChatGPT plugin settings with typed fields, optional layout, validated read/update tools, request context callbacks, and per-request capability advertisement. Applications keep control of persistence and authorization (`#2739`)
+- **New** (server): advertise top-level tool icons in `tools/list`, including proxied tools, and support public-relative icon assets (`#2779`)
+- **New** (@mcp-use/react): `useDeepLink` reads the initial and subsequent ChatGPT deep-link URLs through the existing MCP App connection (`#2738`)
+- **New** (@mcp-use/react): `useModelContext` manages keyed native text, image, resource-link, and embedded-resource attachments. It activates only for committed hook consumers and handles replacement, removal, cancellation, and delivery failures without restoring stale content (`#2776`)
+- **Enhancement** (server): define supported MCP App display modes and an optional initial ChatGPT display preference in the named `viewConfig` export; validate preferences while preserving broader host capabilities (`#2740`)
+- **Enhancement** (@mcp-use/cli): include display-mode configuration in development and production view manifests and pre-bundle the model-context schema for cold iframe startup (`#2740`, `#2776`)
+- **New** (examples): add a Bookshop Plugin Extensions example with entrypoint icons, plugin settings, and model-context attachments (`#2773`)
+- **Fix** (create-mcp-use-app): failed template selection or GitHub template cloning no longer leaves an empty project directory that blocks a retry (`#2765`)
+- **Update** (@mcp-use/client): update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Node follows only same-origin redirects that preserve the request method; browsers reject redirects by default, so configure the final endpoint URL (`#2784`)
+- **Documentation**: add the ChatGPT Plugin Extensions guide for MCP Apps and clarify browser redirect restrictions (`#2772`, #2784)
+- **Update**: Updated @mcp-use/agent to v2.0.21 and @mcp-use/client to v2.4.1
+- **Update**: Updated @mcp-use/inspector to v20.3.16; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.3.0
+- **Update**: Updated create-mcp-use-app to v2.0.9
+</Update>
 <Update label="v2.7.3" description="October 2026">
   ## CLI argument & Windows screenshot fixes
   Patch release fixing CLI argument parsing, Windows browser discovery, scaffold deploy guidance, and Inspector chat input spacing, with dependency security updates.
