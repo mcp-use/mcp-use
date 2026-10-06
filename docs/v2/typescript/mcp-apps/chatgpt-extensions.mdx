@@ -1,0 +1,449 @@
+---
+title: "ChatGPT Extensions"
+description: "Configure ChatGPT app entrypoints, deep links, structured settings, and initial display modes with the TypeScript SDK."
+icon: "/images/icons/openai.svg"
+---
+
+Use ChatGPT Extensions to add app launchers, file viewers, incoming routes, native settings, and an initial display preference.
+The TypeScript SDK converts your declarations to OpenAI extension metadata.
+The host controls which extensions users can access.
+
+Start with a [view-bound MCP App](/v2/typescript/mcp-apps/quickstart).
+Each view needs one bound tool and an `outputSchema`.
+The examples below use the v2 TypeScript API.
+
+| Goal                                          | API                                               |
+| --------------------------------------------- | ------------------------------------------------- |
+| Open an app from navigation or a conversation | `tool.view.entrypoints` with `global` or `thread` |
+| Open a file in a custom viewer                | `tool.view.entrypoints` with `file`               |
+| Read an incoming app route                    | `useDeepLink()`                                   |
+| Add native settings and action buttons        | `server.settings()`                               |
+| Request an initial presentation               | `viewConfig.preferredDisplayMode`                 |
+
+## Check host support
+
+The [OpenAI platform support table](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#platform-support) describes the following expected support.
+Its web column refers to the ChatGPT Work browser and excludes classic ChatGPT.
+Availability depends on the host release.
+
+| Extension                     | Desktop | Work web | iOS | Android |
+| ----------------------------- | ------- | -------- | --- | ------- |
+| Global and thread entrypoints | Yes     | Yes      | Yes | Yes     |
+| File entrypoints              | Yes     | No       | No  | No      |
+| Deep links                    | Yes     | Yes      | Yes | No      |
+| Structured settings           | Yes     | Yes      | Yes | Yes     |
+| Resource display modes        | Yes     | Yes      | Yes | Yes     |
+
+ChatGPT supports `inline` and `fullscreen` display modes.
+Other MCP Apps hosts can support `pip`.
+Test each extension in the host that your users use.
+
+## Add global and thread entrypoints
+
+Declare `global` to add an app launcher in navigation.
+Declare `thread` to add a content tab in a conversation.
+Both launchers send `{}` to the tool.
+Each conversation has its own thread app instance.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "parts-library", version: "1.0.0" });
+
+server.tool(
+  {
+    name: "open_library",
+    title: "Parts library",
+    inputSchema: z.object({ category: z.string().default("all") }),
+    outputSchema: z.object({ category: z.string() }),
+    view: {
+      name: "library",
+      entrypoints: [{ type: "global" }, { type: "thread" }],
+    },
+  },
+  ({ category }) => ({ content: [], structuredContent: { category } }),
+);
+```
+
+Create `views/library/view.tsx` for this tool.
+Render the initial tool result in the view.
+The initial result already contains the launch data.
+
+Global and thread tools must accept empty arguments.
+Use optional fields or defaults for additional inputs.
+Keep tools with required query inputs separate from launchers.
+The MCP SDK validates tool calls against the input schema, including custom refinements.
+
+Entrypoints open fullscreen in supporting hosts.
+Entrypoint calls ignore the tool visibility hint.
+Use a clear tool `title` to name the launcher.
+
+## Add a file entrypoint
+
+Declare the file extensions that your view supports.
+Each extension must start with a dot.
+The host sends `file.name` and `file.resourceUri` to the tool.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "csv-viewer", version: "1.0.0" });
+const fileInput = z.object({
+  file: z.object({
+    name: z.string().min(1),
+    resourceUri: z.string().trim().min(1),
+  }),
+});
+
+server.tool(
+  {
+    name: "open_csv",
+    title: "CSV viewer",
+    inputSchema: fileInput,
+    outputSchema: fileInput,
+    view: {
+      name: "csv",
+      entrypoints: [{ type: "file", extensions: [".csv"] }],
+    },
+  },
+  ({ file }) => ({ content: [], structuredContent: { file } }),
+);
+```
+
+Create `views/csv/view.tsx` for this tool.
+The host also sends the file arguments to the view through `ui/notifications/tool-input`.
+Treat `file.resourceUri` as an opaque host handle.
+Use the host resource APIs to read the file.
+The HTML view resource URI identifies the view, not the opened file.
+
+Use a non-empty extension list.
+Require both string fields when `file` is present.
+Additional input fields must be optional or have defaults.
+
+### Combine entrypoint types
+
+One tool can declare all three entrypoint types.
+For a combined tool, make the outer `file` field optional.
+Keep `file.name` and `file.resourceUri` required when `file` is present.
+
+Replace the CSV tool registration above with this registration:
+
+```typescript
+const combinedInput = fileInput.partial();
+
+server.tool(
+  {
+    name: "open_csv",
+    title: "CSV viewer",
+    inputSchema: combinedInput,
+    outputSchema: combinedInput,
+    view: {
+      name: "csv",
+      entrypoints: [
+        { type: "global" },
+        { type: "thread" },
+        { type: "file", extensions: [".csv"] },
+      ],
+    },
+  },
+  (args) => ({ content: [], structuredContent: args }),
+);
+```
+
+The view must show an empty screen when the host sends no file.
+
+### Check entrypoint metadata
+
+Call `tools/list` to inspect the tool descriptor.
+The CSV tool advertises these metadata fields:
+
+```json
+{
+  "ui": { "resourceUri": "ui://views/csv.html" },
+  "openai/ui": {
+    "entrypoints": [{ "type": "file", "extensions": [".csv"] }]
+  }
+}
+```
+
+These fields appear inside the tool's `_meta` object.
+Typed `view.entrypoints` takes precedence over raw `_meta["openai/ui"].entrypoints`.
+If you omit the typed field, existing raw entrypoint declarations pass through.
+
+## Read incoming deep links
+
+Use `useDeepLink()` to read a route that the host sends to a global entrypoint.
+The hook uses the view's existing MCP Apps connection.
+It reads the initial host context and updates when another deep link arrives.
+
+```tsx
+import { useEffect, useState } from "react";
+import { useDeepLink } from "mcp-use/react";
+
+export default function LibraryView() {
+  const { url } = useDeepLink();
+  const [route, setRoute] = useState("/parts");
+
+  useEffect(() => {
+    if (url !== undefined) setRoute(url);
+  }, [url]);
+
+  const incoming = new URL(route, "https://app.example");
+  if (incoming.pathname === "/parts") {
+    const tag = incoming.searchParams.get("tag");
+    return (
+      <main>
+        <p>Parts filter: {tag ?? "all"}</p>
+        <button type="button" onClick={() => setRoute("/parts/hex-bolt")}>
+          Open hex bolt
+        </button>
+      </main>
+    );
+  }
+  if (incoming.pathname === "/parts/hex-bolt") return <p>Hex bolt</p>;
+  return <p>Unknown route</p>;
+}
+```
+
+The hook returns `{ url: string | undefined }`.
+An undefined URL means the host has supplied no link.
+Hosts without deep-link support also return an undefined URL.
+
+The hook reads `hostContext["openai/deepLink"].url`.
+It converts older `path` and `query` payloads to the same URL form.
+It removes its subscription when the component unmounts.
+Local route changes do not update the host URL.
+
+Validate incoming routes before you load data.
+Authorize data access on the server.
+
+### Construct a deep link
+
+Encode the plugin ID, tool name, and complete app-relative URL.
+The app-relative URL must start with `/` and must not contain a fragment.
+
+```typescript
+const pluginId = "parts-library"; // Replace with your registered plugin ID.
+const toolName = "open_library";
+const appUrl = "/parts?tag=bolt&sort=asc";
+
+const link =
+  `https://chatgpt.com/plugins/${encodeURIComponent(pluginId)}` +
+  `/app/${encodeURIComponent(toolName)}?path=${encodeURIComponent(appUrl)}`;
+```
+
+Desktop links use `codex://plugins/<plugin-id>/app/<tool-name>?path=<encoded-url>`.
+iOS links use the `chatgpt` scheme.
+Custom marketplace links include `@<marketplace>` after the plugin ID.
+See the [deep-link specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#deep-links) for the native formats.
+
+## Add structured settings and actions
+
+Register one settings pair before you start the server.
+`server.settings()` creates read and update tools.
+The host discovers these tools through the `openai/settings` capability.
+
+This example keeps one shared settings object in memory.
+The object resets when the process restarts.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "parts-settings", version: "1.0.0" });
+let values: { units: "mm" | "in"; showGrid: boolean } = {
+  units: "mm",
+  showGrid: true,
+};
+
+server.tool(
+  {
+    name: "units_help",
+    title: "Measurement units help",
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true },
+  },
+  () => ({
+    content: [
+      { type: "text", text: "Choose millimeters or inches for dimensions." },
+    ],
+  }),
+);
+
+server.settings({
+  fields: {
+    units: { schema: z.enum(["mm", "in"]), title: "Measurement units" },
+    showGrid: { schema: z.boolean(), title: "Show grid" },
+  },
+  layout: [
+    {
+      kind: "group",
+      title: "Display",
+      items: [
+        { kind: "property", property: "units" },
+        { kind: "property", property: "showGrid" },
+        { kind: "tool", tool: "units_help", title: "About measurement units" },
+      ],
+    },
+  ],
+  read: () => ({ ...values }),
+  update: (set) => {
+    values = { ...values, ...set };
+    return { ...values };
+  },
+});
+```
+
+For a production app, authorize each callback through its `RequestContext` argument.
+Scope stored values to the correct account.
+Persist partial updates atomically before you return all effective values.
+The framework does not provide storage, account scoping, or concurrency control.
+
+The `read` callback receives `ctx`.
+The `update` callback receives `set` and `ctx`.
+The context includes `ctx.request`, `ctx.signal`, and `ctx.client`.
+OAuth servers also expose `ctx.auth`.
+
+### Define fields and layout
+
+Register at least one field.
+Fields support boolean, string, string enum, number, and integer schemas.
+Use a Standard Schema library with JSON Schema conversion, such as Zod.
+Give each field a non-blank `title`.
+You can also supply a `description`.
+Primitive schema constraints still apply.
+Use primitive schemas without value transforms.
+
+Return an effective value for every field from both callbacks.
+This rule also applies to optional fields and fields with schema defaults.
+The wire schema omits default annotations.
+Apply application defaults in the `read` callback.
+
+Use `kind: "property"` for a field control.
+Use `kind: "tool"` for a same-server action button.
+Action tools must accept `{}` and exist before the server starts.
+The MCP SDK validates action arguments when the host calls the tool.
+
+The host places fields absent from `layout` in an Other settings group.
+A regular tool action returns text feedback in settings.
+A view-bound tool action opens an MCP App modal.
+See the [structured settings contract](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#structured-settings) for host behavior.
+
+### Check settings tools
+
+The default tool names are `settings.read` and `settings.update`.
+Set `readTool` and `updateTool` to use distinct, unused names.
+The registration advertises the pair during modern discovery and legacy initialization.
+
+| Call              | Arguments                      | Structured result             |
+| ----------------- | ------------------------------ | ----------------------------- |
+| `settings.read`   | `{}`                           | `{ schema, values, layout? }` |
+| `settings.update` | `{ set: { showGrid: false } }` | `{ values }` with all fields  |
+
+Updates preserve fields absent from `set` through your callback.
+Empty patches, unknown keys, invalid values, and incomplete callback results produce tool errors.
+
+## Set resource display modes
+
+Export `viewConfig` directly from `views/<name>/view.tsx` to declare supported modes and an initial preference.
+Build and development tools read the declaration before the view starts.
+
+```tsx
+import type { ViewConfig } from "mcp-use/react";
+
+export const viewConfig = {
+  autoResize: true,
+  displayModes: ["inline", "fullscreen"],
+  preferredDisplayMode: "fullscreen",
+} satisfies ViewConfig;
+
+export default function LibraryView() {
+  return <main>Parts library</main>;
+}
+```
+
+`displayModes` must include `inline` and contain no duplicates.
+The default list is `["inline", "fullscreen", "pip"]`.
+`autoResize` defaults to `true`.
+With `autoResize: false`, use `useSendSizeChanged()` to report the view size.
+
+`preferredDisplayMode` accepts `inline` or `fullscreen`.
+The preference must appear in `displayModes`.
+The preference has no default, and the host can ignore it.
+Entrypoint launch behavior remains separate from this preference for ordinary tool calls.
+
+The HTML resource content advertises the ChatGPT subset in `_meta["openai/ui"]`:
+
+```json
+{
+  "availableDisplayModes": ["inline", "fullscreen"],
+  "preferredDisplayMode": "fullscreen"
+}
+```
+
+The browser advertises the full configured list through MCP Apps capabilities.
+This list can include `pip` for other hosts.
+
+### Keep the declaration static
+
+Use object literals, array literals, local `const` references, and spreads.
+TypeScript `as` and `satisfies` wrappers also work.
+Imported values and runtime expressions cause an extraction error when tooling detects the named configuration.
+
+Keep the configuration and its shared object or array references immutable.
+Tooling rejects writes to those references and calls that could mutate them during module initialization, including calls through local helpers.
+Components can read the configuration through calls such as `useState` and `useMemo` after initialization.
+
+<Warning>
+  Declare and export `viewConfig` locally in the view module. A value `export *`
+  without a local configuration causes an extraction error because tooling cannot
+  resolve the configuration through another module. Type-only wildcard exports
+  are allowed, as are unrelated value wildcards alongside a local configuration.
+</Warning>
+
+### Request a mode at runtime
+
+Use `useDisplayMode()` for mode changes after initialization.
+Render from the reported `displayMode`.
+A completed request does not guarantee that the host changed the mode.
+
+```tsx
+import { useDisplayMode } from "mcp-use/react";
+
+export function ExpandButton() {
+  const { displayMode, availableDisplayModes, requestDisplayMode } =
+    useDisplayMode();
+
+  if (!availableDisplayModes.includes("fullscreen")) return null;
+  if (displayMode === "fullscreen") return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void requestDisplayMode({ mode: "fullscreen" });
+      }}
+    >
+      Expand
+    </button>
+  );
+}
+```
+
+`availableDisplayModes` contains the intersection of the view modes and host modes.
+If the host supplies no mode list, only `inline` is available.
+Requests for other modes reject before the runtime sends them.
+
+## Verify the integration
+
+1. Call `tools/list` to check entrypoint metadata and settings tool names.
+2. Call an entrypoint tool with its expected empty or file arguments.
+3. Call `settings.read`, then update one field and check the complete result.
+4. Run `npx mcp-use build` to check static `viewConfig` extraction.
+5. Read the HTML view resource to check its display metadata.
+6. Open the app in a supporting host to check launchers, routes, settings actions, and presentation.
+
+Use [MCP Apps interactivity](/v2/typescript/mcp-apps/interactivity) for tool calls and host interactions inside the view.
+Use [model context](/v2/typescript/mcp-apps/model-context) to share the view state with the model.

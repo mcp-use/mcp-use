@@ -28,6 +28,30 @@ body {
   background: none !important;
 }
 
+/* Render the local OpenAI asset as a mask, using the same colors as Lucide icons. */
+#sidebar-content a div:has(> img[src="/images/icons/openai.svg"]) {
+  background-color: rgb(var(--gray-400));
+  -webkit-mask: url("/images/icons/openai.svg") center / 1rem 1rem no-repeat;
+  mask: url("/images/icons/openai.svg") center / 1rem 1rem no-repeat;
+}
+
+.dark #sidebar-content a div:has(> img[src="/images/icons/openai.svg"]) {
+  background-color: rgb(var(--gray-500));
+}
+
+#sidebar-content
+  a[aria-current="page"]
+  div:has(> img[src="/images/icons/openai.svg"]) {
+  background-color: currentColor;
+}
+
+#sidebar-content
+  a
+  div:has(> img[src="/images/icons/openai.svg"])
+  > img[src="/images/icons/openai.svg"] {
+  visibility: hidden;
+}
+
 html:not([data-current-path^="/v2/typescript/"]) {
   --banner-height: 0px !important;
 }
