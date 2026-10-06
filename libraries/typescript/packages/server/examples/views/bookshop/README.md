@@ -38,7 +38,11 @@ spacing, and host theme variables follow the
 Book covers replace its geometry previews. The three illustrations and excerpts
 are original fictional demo content. The PNG covers live under `public/covers`;
 no remote image service is required. Public URLs use
-the request-resolved asset base. The monochrome book icon is also server branding.
+the request-resolved asset base. `open_bookshop.icons` advertises `public/book.svg`
+on `tools/list` for its global and thread entrypoints. The SVG uses a transparent
+20×20 viewport, `currentColor`, and a 1.33px stroke for light and dark themes.
+The Bookshop server constructor does not set an icon; this artwork belongs to the
+entrypoint tool. Launch locations remain separate in `view.entrypoints`.
 
 Start with `src/index.ts` for the server and `views/bookshop/view.tsx` for the UI.
 The view entry only declares display modes and handles loading/error states. Its

@@ -9,7 +9,6 @@ const server = new MCPServer({
   version: "1.0.0",
   description: "Browse fictional books and a shared demo cart. No checkout.",
   legacy: "stateless",
-  icons: [{ src: "book.svg", mimeType: "image/svg+xml" }],
 });
 
 // One explicit demo store per server process. Every caller shares it.
@@ -61,6 +60,7 @@ export const openBookshop = server.tool(
   {
     name: "open_bookshop",
     title: "Little Bookshop",
+    icons: [{ src: "book.svg", mimeType: "image/svg+xml", sizes: ["20x20"] }],
     description:
       "Browse fictional books. Open /books, /products/moonlit-atlas, /products/small-hours, /products/paper-planets, /cart, or /settings. All callers share a process-local demo cart.",
     inputSchema: z.object({ route: z.string().default("/books") }),
