@@ -21,8 +21,12 @@ describe("official SDK upgrade compatibility", () => {
       fetchToken(provider, "https://other.example.com", {
         metadata: {
           issuer: "https://other.example.com",
+          authorization_endpoint: "https://other.example.com/authorize",
           token_endpoint: "https://other.example.com/token",
+          jwks_uri: "https://other.example.com/jwks",
           response_types_supported: ["code"],
+          subject_types_supported: ["public"],
+          id_token_signing_alg_values_supported: ["RS256"],
         },
         fetchFn,
       })
