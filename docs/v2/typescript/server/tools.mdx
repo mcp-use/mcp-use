@@ -50,6 +50,35 @@ Field descriptions become hints for clients and models. The schema validates
 input before the callback runs and supplies the callback's inferred TypeScript
 type.
 
+## Add tool icons
+
+Set `icons` on the tool definition to advertise artwork on `tools/list`.
+The field uses the exported MCP `Icon` type: `src`, optional `mimeType`, optional `sizes`, and optional `theme` (`"light"` or `"dark"`).
+The SDK preserves icon order and these fields.
+
+```typescript
+server.tool(
+  {
+    name: "open_catalog",
+    title: "Catalog",
+    icons: [
+      { src: "catalog.svg", mimeType: "image/svg+xml", sizes: ["20x20"] },
+    ],
+  },
+  () => ({ content: [{ type: "text", text: "Catalog is ready." }] }),
+);
+```
+
+Put local files under `public/` and use a path relative to that directory.
+For HTTP requests, the SDK emits an absolute URL under `<basePath>/_mcp-use/public/`.
+Absolute HTTP(S) and image data URLs pass through unchanged.
+Tools mounted with `server.proxy()` retain their upstream icons.
+
+Omit `icons` to leave the tool without its own artwork; an explicit empty array stays empty.
+Server constructor `icons` continues to describe server branding.
+For ChatGPT launchers, add icons directly to the entrypoint tool and follow the
+[entrypoint icon guide](/v2/typescript/mcp-apps/chatgpt-extensions#set-entrypoint-tool-icons).
+
 ## Return structured output
 
 Declare `outputSchema` when clients need a typed structured result. Every

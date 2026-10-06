@@ -1762,7 +1762,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       const viewHandler = createViewPublicHandler(basePath, this.#views, {
         dev: this.#viewsPrimed ? this.#viewsDevMode : brandingDevMode,
         projectRoot: this.#viewsProjectRoot,
-        enabled: hasLocalBrandingAsset(this.#branding),
+        enabled:
+          hasLocalBrandingAsset(this.#branding) ||
+          [...this.#tools.values()].some(
+            (entry) =>
+              entry.definition.icons !== undefined &&
+              hasLocalBrandingAsset({ icons: entry.definition.icons })
+          ),
         deferCors: deferViewCors,
         ...(this.#embeddedViewAssets !== undefined && {
           assets: this.#embeddedViewAssets,
@@ -1937,7 +1943,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const basePath = this.#basePath();
 
     for (const entry of this.#tools.values()) {
-      this.#registerTool(server, entry);
+      this.#registerTool(server, entry, request);
     }
     for (const entry of this.#resources.values()) {
       this.#registerResource(server, entry);
@@ -2201,7 +2207,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     wrapListMethod("prompts/list", "prompts");
   }
 
-  #registerTool(server: SdkMcpServer, entry: ToolEntry<TUser, TEnv>): void {
+  #registerTool(
+    server: SdkMcpServer,
+    entry: ToolEntry<TUser, TEnv>,
+    request: Request | undefined
+  ): void {
     const { definition, callback, schemes } = entry;
     const view = definition.view;
 
@@ -2220,6 +2230,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       : uiMeta;
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
+      ...(definition.icons !== undefined && {
+        icons: resolveImplementationIcons(
+          definition.icons,
+          request,
+          this.#basePath()
+        ),
+      }),
       ...(definition.description !== undefined && {
         description: definition.description,
       }),

@@ -1,5 +1,6 @@
 import type {
   CallToolResult,
+  Icon,
   InputRequiredResult,
   MetaObject,
   StandardSchemaWithJSON,
@@ -115,6 +116,13 @@ export interface ToolDefinition {
   title?: string;
   /** LLM-facing description of what the tool does. */
   description?: string;
+  /**
+   * Tool icons advertised on `tools/list`, in author order. Absolute HTTP(S)
+   * and data URLs pass through; paths relative to `public/` become absolute
+   * asset URLs for HTTP requests. Entrypoint hosts prefer these icons over
+   * server branding. Use monochrome SVGs with `currentColor` for ChatGPT.
+   */
+  icons?: Icon[];
   /**
    * Object schema for input validation — any Standard Schema library with
    * JSON Schema conversion ({@link StandardSchemaWithJSON}): zod v4, ArkType,
