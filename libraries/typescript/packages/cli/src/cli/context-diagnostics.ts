@@ -74,18 +74,9 @@ export function sanitizeContextDiagnostic(
           )
             ? block.type
             : "unknown",
-          fingerprint:
-            typeof block.fingerprint === "string" &&
-            /^[a-f0-9]{1,8}$/.test(block.fingerprint)
-              ? block.fingerprint
-              : null,
         };
       }),
-      structured:
-        typeof shape.structured === "string" &&
-        /^[a-f0-9]{1,8}$/.test(shape.structured)
-          ? shape.structured
-          : null,
+      structured: shape.structured === true,
     };
   }
   return result;

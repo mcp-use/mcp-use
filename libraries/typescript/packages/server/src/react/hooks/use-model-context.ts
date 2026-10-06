@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
 import { useViewRuntime } from "../runtime/view-runtime-context.js";
 import type {
   ModelContextAttachment,
@@ -8,7 +13,7 @@ import type {
 /**
  * Manage native model context through the view's shared, single writer.
  *
- * Rendering this hook reserves native context delivery for the runtime; no
+ * Mounting this hook activates native context delivery for the runtime; no
  * view configuration is needed. Legacy-only views retain their transport.
  * Existing model-visible widget persistence prevents an unsafe handoff and
  * surfaces an error; the SDK never silently clears that state.
@@ -33,7 +38,9 @@ import type {
  */
 export function useModelContext(): ModelContextHandle {
   const store = useViewRuntime().modelContextStore;
-  store.activateAttachments();
+  useLayoutEffect(() => {
+    store.activateAttachments();
+  }, [store]);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   useEffect(() => {
     void store.prepare().catch(() => {});

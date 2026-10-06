@@ -74,6 +74,89 @@ afterEach(() => {
 });
 
 describe("native model context", () => {
+  it("keeps native queued mutations failed after a definite rejection until a new action", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { store, writes, responses } = fixture();
+      const first = store.add("a", text("A"));
+      const failed = expect(first).rejects.toThrow("denied");
+      await tick();
+      const second = store.add("b", text("B"));
+      const alsoFailed = expect(second).rejects.toThrow("denied");
+      await tick();
+      responses[0]!.reject(
+        Object.assign(new Error("denied"), {
+          name: "ProtocolError",
+          code: -32602,
+        })
+      );
+      await Promise.all([failed, alsoFailed]);
+      await tick();
+      expect(writes).toHaveLength(1);
+      expect(store.getSnapshot().error?.message).toBe("denied");
+      const clear = store.clearSelection();
+      await tick();
+      expect(writes[1]!.content).toEqual([]);
+      responses[1]!.resolve({});
+      await clear;
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it("does not mistake an old generation for a removed and re-added key", async () => {
+    const { store, responses, observe } = fixture();
+    const old = store.add("a", text("old"));
+    await tick();
+    const removed = store.remove("a");
+    const fresh = store.add("a", text("new"));
+    await tick();
+    responses[0]!.resolve(ack("old"));
+    await tick();
+    responses[1]!.resolve(ack("new"));
+    expect(await old).toEqual({ status: "superseded" });
+    expect(await removed).toEqual({ status: "superseded" });
+    await fresh;
+    observe({ updateId: "old", content: [text("old")] });
+    expect(store.getSnapshot().attachments.map((item) => item.block)).toEqual([
+      text("new"),
+    ]);
+    expect(store.getSnapshot().error).toBeNull();
+  });
+
+  it("rejects whitespace-only raw titles", () => {
+    expect(() =>
+      normalizeContextBlock({ ...text("A"), _meta: { "openai/title": "   " } })
+    ).toThrow("nonempty");
+  });
+
+  it("rejects oversized direct image data before replacing an existing selection", async () => {
+    const { store, responses, writes } = fixture();
+    const first = store.add("cover", {
+      type: "image",
+      data: "aA==",
+      mimeType: "image/png",
+    });
+    await tick();
+    responses[0]!.resolve({});
+    await first;
+    const tooLarge = Buffer.alloc(10 * 1024 * 1024 + 1).toString("base64");
+    const result = store.add("cover", {
+      type: "image",
+      data: tooLarge,
+      mimeType: "image/png",
+    });
+    const rejected = expect(result).rejects.toThrow("10 MiB");
+    await tick();
+    // Settle an erroneous publication too, so the pre-fix assertion cannot hang.
+    responses[1]?.resolve({});
+    await rejected;
+    expect(writes).toHaveLength(1);
+    expect(store.getSnapshot().attachments[0]!.block).toMatchObject({
+      data: "aA==",
+    });
+  });
+
   it("does not initialize diagnostic collection in ordinary browser views", () => {
     const browser = {};
     vi.stubGlobal("window", browser);
@@ -91,6 +174,12 @@ describe("native model context", () => {
     await added;
     expect(trace.events.some((event) => event.event === "ack")).toBe(true);
     expect(JSON.stringify(trace)).not.toContain("private attachment contents");
+    expect(JSON.stringify(trace)).not.toContain("fingerprint");
+    const write = trace.events.find((event) => event.event === "write");
+    expect(write?.payload).toEqual({
+      content: [{ type: "text" }],
+      structured: false,
+    });
   });
 
   it("waits for connection, composes concurrent native modalities, and normalizes presentation", async () => {
@@ -1047,11 +1136,17 @@ describe("image source preparation", () => {
     const body = deferred<ArrayBuffer>();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({ "Content-Type": "image/png" }),
-        arrayBuffer: () => body.promise,
-      })
+      vi.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            async pull(controller) {
+              controller.enqueue(new Uint8Array(await body.promise));
+              controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "image/png" } }
+        )
+      )
     );
     const { store, responses, writes } = fixture();
     const add = store.add("cover", image());

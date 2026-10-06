@@ -164,24 +164,13 @@ function getContextDiagnosticTrace() {
     }
   ).__mcpContextTrace;
 }
-function contextDebugFingerprint(value: unknown): string {
-  const text = canonicalContext(value);
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i++)
-    hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return (hash >>> 0).toString(16);
-}
 function contextDebugPayload(payload: ContextPayload | undefined) {
   if (!payload || !getContextDiagnosticTrace()) return null;
   return {
     content: payload.content.map((block) => ({
       type: block.type,
-      fingerprint: contextDebugFingerprint(block),
     })),
-    structured:
-      payload.structuredContent === undefined
-        ? null
-        : contextDebugFingerprint(payload.structuredContent),
+    structured: payload.structuredContent !== undefined,
   };
 }
 
@@ -231,7 +220,7 @@ export class ModelContextStore {
   #firstDefaultSerialized: string | null = null;
   #flushScheduled = false;
   #disposed = false;
-  /** Bumped on {@link dispose} so late in-flight completions are ignored. */
+  /** Bumped on disposal or test reset so late in-flight completions are ignored. */
   #epoch = 0;
   /** Latest complete payload, or null until state/context is first registered. */
   #desired: ContextPublication | null = null;
@@ -704,7 +693,7 @@ export class ModelContextStore {
 
   /** Queue removal of one key; attachment-hook lifetime does not own that key. */
   readonly remove = (key: string): Promise<ContextOperationResult> => {
-    this.#trace("remove", { key: contextDebugFingerprint(key) });
+    this.#trace("remove");
     this.#images.get(key)?.cancel();
     return this.#enqueue(() => {
       const payload = this.buildModelContextParams();
@@ -1436,7 +1425,8 @@ export class ModelContextStore {
               `Model context publication outcome is uncertain: ${failure.message}. Reopen the view after outstanding writes finish.`
             )
           );
-        } else this.#fail(failure, this.#rich ? undefined : publication.revision);
+        } else
+          this.#fail(failure, this.#rich ? undefined : publication.revision);
         console.warn("[mcp-use] Failed to update model context:", error);
       } finally {
         if (!this.#disposed && sendEpoch === this.#epoch) {

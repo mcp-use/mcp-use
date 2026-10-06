@@ -2,6 +2,7 @@ import type { ContentBlock } from "@modelcontextprotocol/server";
 import { ContentBlockSchema, IconSchema } from "@modelcontextprotocol/core";
 import type { App } from "@modelcontextprotocol/ext-apps";
 import { publicAsset } from "../public-assets.js";
+import { assertContextImageSize } from "./model-context-image.js";
 import type { ModelContextBlock } from "../types/model-context.js";
 import {
   canonicalContext,
@@ -64,6 +65,14 @@ export function normalizeContextInput(input: ModelContextBlock): {
   /** Resolved image URL, when conversion is required. */
   source?: string;
 } {
+  if (input.type === "image" && typeof input.data === "string") {
+    const padding = input.data.endsWith("==")
+      ? 2
+      : input.data.endsWith("=")
+        ? 1
+        : 0;
+    assertContextImageSize(Math.floor((input.data.length * 3) / 4) - padding);
+  }
   if (input.type === "image" && "src" in input) {
     if (typeof input.src !== "string" || !input.src.trim())
       throw new TypeError("Image src must be a nonempty string");
@@ -143,7 +152,10 @@ export function normalizeContextBlock(input: ModelContextBlock): ContentBlock {
     meta["openai/title"] !== undefined &&
     (input.type === "text" || input.type === "image")
   ) {
-    if (typeof meta["openai/title"] !== "string" || !meta["openai/title"])
+    if (
+      typeof meta["openai/title"] !== "string" ||
+      !meta["openai/title"].trim()
+    )
       throw new TypeError(
         "OpenAI title requires a nonempty text or image title"
       );

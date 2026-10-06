@@ -181,7 +181,7 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         lines.push(
           `if (import.meta.hot) {`,
           `  import.meta.hot.accept();`,
-          `  let contextSequence = 0;`,
+          `  let contextSequence = import.meta.hot.data.contextSequence ?? 0;`,
           `  const contextTimer = setInterval(() => {`,
           `    const trace = window.__mcpContextTrace;`,
           `    for (const event of trace?.events ?? []) {`,
@@ -190,7 +190,10 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
           `      import.meta.hot.send("mcp-use:context-diagnostic", event);`,
           `    }`,
           `  }, 500);`,
-          `  import.meta.hot.dispose(() => clearInterval(contextTimer));`,
+          `  import.meta.hot.dispose((data) => {`,
+          `    data.contextSequence = contextSequence;`,
+          `    clearInterval(contextTimer);`,
+          `  });`,
           `}`
         );
       }
