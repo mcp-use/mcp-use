@@ -28,7 +28,7 @@ Use `useModelContext()` to add selected text, images, resource links, or embedde
 The hook shares one attachment collection across the view.
 You can add, replace, remove, and clear attachments with stable application keys.
 
-Read [Attach evidence with ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#attach-evidence-to-the-next-model-turn) for complete examples, image inputs, and error handling.
+Read [Attach evidence with ChatGPT Plugin Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#attach-evidence-to-the-next-model-turn) for complete examples, image inputs, and error handling.
 The guide also explains host removals and how to combine the hook with `useViewState` and `ModelContext`.
 
 ## Keep structured choices in view state
@@ -124,7 +124,7 @@ The runtime merges structured state and the serialized context tree into one com
 Every write sends the complete snapshot.
 On MCP Apps hosts, mcp-use sends the object as `structuredContent` and a JSON text block as `content` through `ui/update-model-context`.
 On ChatGPT, views without `useModelContext` write the object to `modelContent` with `window.openai.setWidgetState`.
-Views with `useModelContext` use the shared native writer described in [ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#combine-context-hooks).
+Views with `useModelContext` use the shared native writer described in [ChatGPT Plugin Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#combine-context-hooks).
 
 ## Keep ephemeral values local
 
@@ -149,7 +149,7 @@ function HoverPreview() {
 
 ## Next steps
 
-- Use [ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#attach-evidence-to-the-next-model-turn) to add and remove selected evidence.
+- Use [ChatGPT Plugin Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#attach-evidence-to-the-next-model-turn) to add and remove selected evidence.
 - Read the [`useViewState` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#useviewstate) for signatures, errors, and host behavior.
 - Read the [`ModelContext` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#modelcontext) for lifecycle and nesting.
 - Use [Interactivity](/v2/typescript/mcp-apps/interactivity) for tool calls and follow-up messages.
