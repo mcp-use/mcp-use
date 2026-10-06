@@ -45,54 +45,73 @@ describe("official SDK upgrade compatibility", () => {
     expect(error.cause).toBe(cause);
   });
 
-  it("rejects a cross-origin redirect and keeps the connection usable", async () => {
-    let redirect = true;
-    const requestedUrls: string[] = [];
-    const fetchMock: typeof fetch = async (input, init) => {
-      requestedUrls.push(String(input));
-      if (init?.method === "GET") return new Response(null, { status: 405 });
-      if (init?.method === "DELETE") return new Response(null, { status: 200 });
-      const request = JSON.parse(init!.body as string);
-      if (request.id === undefined) return new Response(null, { status: 202 });
-      if (request.method === "initialize") {
+  it.each(["cross-origin", "browser opaque"])(
+    "rejects a %s redirect and keeps the connection usable",
+    async (kind) => {
+      let redirect = true;
+      const requestedUrls: string[] = [];
+      const fetchMock: typeof fetch = async (input, init) => {
+        requestedUrls.push(String(input));
+        if (init?.method === "GET") return new Response(null, { status: 405 });
+        if (init?.method === "DELETE")
+          return new Response(null, { status: 200 });
+        const request = JSON.parse(init!.body as string);
+        if (request.id === undefined)
+          return new Response(null, { status: 202 });
+        if (request.method === "initialize") {
+          return Response.json({
+            jsonrpc: "2.0",
+            id: request.id,
+            result: {
+              protocolVersion: "2025-11-25",
+              capabilities: { tools: {} },
+              serverInfo: { name: "redirect-fixture", version: "1.0.0" },
+            },
+          });
+        }
+        if (redirect) {
+          redirect = false;
+          expect(init?.redirect).toBe("manual");
+          if (kind === "browser opaque") {
+            // Browsers conceal every manual redirect target, including redirects
+            // within the same origin, behind an opaqueredirect response.
+            const response = new Response(null);
+            Object.defineProperties(response, {
+              type: { value: "opaqueredirect" },
+              status: { value: 0 },
+              ok: { value: false },
+            });
+            return response;
+          }
+          return new Response(null, {
+            status: 307,
+            headers: { location: "https://other.example.com/mcp" },
+          });
+        }
         return Response.json({
           jsonrpc: "2.0",
           id: request.id,
-          result: {
-            protocolVersion: "2025-11-25",
-            capabilities: { tools: {} },
-            serverInfo: { name: "redirect-fixture", version: "1.0.0" },
-          },
+          result: { tools: [] },
         });
-      }
-      if (redirect) {
-        redirect = false;
-        return new Response(null, {
-          status: 307,
-          headers: { location: "https://other.example.com/mcp" },
-        });
-      }
-      return Response.json({
-        jsonrpc: "2.0",
-        id: request.id,
-        result: { tools: [] },
+      };
+      const connector = new HttpConnector("https://mcp.example.com/mcp", {
+        protocolNegotiation: "legacy",
+        fetch: fetchMock,
       });
-    };
-    const connector = new HttpConnector("https://mcp.example.com/mcp", {
-      protocolNegotiation: "legacy",
-      fetch: fetchMock,
-    });
-    try {
-      await connector.connect();
-      await expect(connector.listTools()).rejects.toThrow(/redirect/i);
-      await expect(connector.listTools()).resolves.toEqual([]);
-      expect(
-        requestedUrls.every((url) => url.startsWith("https://mcp.example.com/"))
-      ).toBe(true);
-    } finally {
-      await connector.disconnect();
+      try {
+        await connector.connect();
+        await expect(connector.listTools()).rejects.toThrow(/redirect/i);
+        await expect(connector.listTools()).resolves.toEqual([]);
+        expect(
+          requestedUrls.every((url) =>
+            url.startsWith("https://mcp.example.com/")
+          )
+        ).toBe(true);
+      } finally {
+        await connector.disconnect();
+      }
     }
-  });
+  );
 
   it.each(["legacy", "modern"] as const)(
     "lists all %s tools when successive pages share a cursor",
