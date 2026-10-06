@@ -362,7 +362,7 @@ export async function* streamResponsesTurn(
         // An unmatched key means the stream surprised us the way the old
         // keying did; say so instead of discarding the arguments quietly.
         console.warn(
-          `[openai-responses] dropping ${delta.length} argument bytes for unknown function_call item "${eventKey}"`,
+          `[openai-responses] dropping ${delta.length} characters for unknown function_call item "${eventKey}"`,
         );
       }
       continue;
