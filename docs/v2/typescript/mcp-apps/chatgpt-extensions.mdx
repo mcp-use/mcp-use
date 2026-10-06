@@ -227,6 +227,7 @@ During image preparation, `pending` is `true` and the previous selection stays v
 Other ready keys can sync independently.
 A fetch failure, unsupported or missing `Content-Type`, or empty response rejects the action and preserves the previous attachment.
 A later `add` or `remove` for the same key, or `clearAttachments`, cancels preparation and returns `"superseded"` for that action.
+A single image is limited to 10 MiB of decoded bytes, whether supplied through `src` or base64 `data`. Source downloads stop when they exceed that limit, including when the response omits its size. An oversized image rejects without replacing the current selection. This is an SDK memory budget, not a host upload-size guarantee.
 A late fetch response cannot restore the canceled attachment.
 
 Named types include `ModelContextText`, `ModelContextImage`, `ModelContextResourceLink`, and `ModelContextResource`.
@@ -255,7 +256,7 @@ Removal affects current context; it does not erase previous conversation turns o
 
 ### Combine context hooks
 
-Render `useModelContext` in the initial view tree when you also use `useViewState` or `ModelContext`.
+Render `useModelContext` in the initial view tree when you also use `useViewState` or `ModelContext`. Native delivery activates when the hook commits, before state and description effects; discarded renders do not change delivery.
 The runtime sends attachments, structured view state, and descriptions through one native writer.
 State and descriptions keep their model-visible JSON projection.
 `clearAttachments()` preserves those separate contributions.

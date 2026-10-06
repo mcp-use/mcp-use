@@ -21,7 +21,7 @@ export interface ModelContextText
   thumbnail?: Icon;
 }
 
-/** Native base64 image evidence with optional presentation. */
+/** Native base64 image evidence, limited to 10 MiB of decoded bytes. */
 export interface ModelContextImageData
   extends ImageContent, ModelContextPresentation {
   /** Use data plus mimeType instead of a source URL. */
@@ -31,7 +31,7 @@ export interface ModelContextImageData
 /** Image source resolved exactly like Image's public-folder paths. */
 export interface ModelContextImageSource
   extends Omit<ImageContent, "data" | "mimeType">, ModelContextPresentation {
-  /** Public-folder path or URL fetched and converted before selection changes. */
+  /** Public-folder path or URL fetched up to 10 MiB and converted before selection changes. */
   src: string;
   /** Source images cannot also provide native bytes. */
   data?: never;

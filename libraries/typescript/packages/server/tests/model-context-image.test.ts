@@ -1,9 +1,82 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchContextImage } from "../src/react/runtime/model-context-image.js";
+import { normalizeContextInput } from "../src/react/runtime/model-context-wire.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("fetchContextImage", () => {
+  it("accepts exactly the decoded-byte budget and rejects one byte beyond it", () => {
+    const input = {
+      type: "image" as const,
+      mimeType: "image/png",
+      data: Buffer.alloc(10 * 1024 * 1024).toString("base64"),
+    };
+    expect(normalizeContextInput(input).block).toEqual(input);
+    expect(() =>
+      normalizeContextInput({
+        ...input,
+        data: Buffer.alloc(10 * 1024 * 1024 + 1).toString("base64"),
+      })
+    ).toThrow("10 MiB");
+  });
+  it("rejects declared oversized images before reading their bytes", async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1]));
+        controller.close();
+      },
+      cancel,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(body, {
+            headers: {
+              "Content-Type": "image/png",
+              "Content-Length": String(10 * 1024 * 1024 + 1),
+            },
+          })
+        )
+    );
+    const result = fetchContextImage(
+      "https://example.com/large",
+      new AbortController().signal
+    );
+    await expect(result).rejects.toThrow("10 MiB");
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it("stops oversized streams even when no length is advertised", async () => {
+    const cancel = vi.fn();
+    let chunks = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (chunks++ === 12) controller.close();
+        else controller.enqueue(new Uint8Array(1024 * 1024));
+      },
+      cancel,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(body, { headers: { "Content-Type": "image/png" } })
+        )
+    );
+    await expect(
+      fetchContextImage(
+        "https://example.com/large",
+        new AbortController().signal
+      )
+    ).rejects.toThrow("10 MiB");
+    expect(cancel).toHaveBeenCalled();
+    expect(chunks).toBeLessThanOrEqual(12);
+  });
+
   it.each(["image/png", "image/jpeg", "image/gif", "image/webp"])(
     "encodes binary %s without attaching it",
     async (mimeType) => {
@@ -63,11 +136,16 @@ describe("fetchContextImage", () => {
     const fetchImage = vi
       .fn()
       .mockRejectedValueOnce(new Error("CORS failure"))
-      .mockResolvedValueOnce({
-        ok: true,
-        headers: new Headers({ "Content-Type": "image/png" }),
-        arrayBuffer: () => Promise.reject(new Error("body failed")),
-      });
+      .mockResolvedValueOnce(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.error(new Error("body failed"));
+            },
+          }),
+          { headers: { "Content-Type": "image/png" } }
+        )
+      );
     vi.stubGlobal("fetch", fetchImage);
     await expect(
       fetchContextImage(
@@ -82,14 +160,17 @@ describe("fetchContextImage", () => {
       )
     ).rejects.toThrow("body failed");
     const controller = new AbortController();
-    fetchImage.mockResolvedValueOnce({
-      ok: true,
-      headers: new Headers({ "Content-Type": "image/png" }),
-      arrayBuffer: async () => {
-        controller.abort();
-        return new Uint8Array([1]).buffer;
-      },
-    });
+    fetchImage.mockResolvedValueOnce(
+      new Response(
+        new ReadableStream({
+          pull(stream) {
+            controller.abort();
+            stream.enqueue(new Uint8Array([1]));
+          },
+        }),
+        { headers: { "Content-Type": "image/png" } }
+      )
+    );
     await expect(
       fetchContextImage("https://example.com/cover", controller.signal)
     ).rejects.toMatchObject({ name: "AbortError" });
