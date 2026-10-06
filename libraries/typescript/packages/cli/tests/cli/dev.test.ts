@@ -1527,6 +1527,24 @@ describe("runDev (views)", () => {
     });
     cleanups.push(() => ws.close());
 
+    // Browser diagnostics use the same dev socket and cannot leak raw payloads.
+    ws.send(
+      JSON.stringify({
+        type: "custom",
+        event: "mcp-use:context-diagnostic",
+        data: {
+          event: "blocked",
+          seq: 1,
+          secret: "private-attachment-payload",
+        },
+      })
+    );
+    const diagnostic = await waitFor(async () =>
+      dev.logs.find((line) => line.includes("[mcp-use context]"))
+    );
+    expect(diagnostic).toContain('"event":"blocked"');
+    expect(diagnostic).not.toContain("private-attachment-payload");
+
     // Populate the client module graph the way a browser loading the view
     // document would: fetch each module and, recursively, its static
     // imports. A 504 is Vite's "outdated optimize dep" — retry like a

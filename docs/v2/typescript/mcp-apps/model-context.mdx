@@ -4,7 +4,11 @@ description: "Choose what the model sees from tool results, structured view stat
 icon: "brain"
 ---
 
-Use model context to give the next model turn the information it needs without duplicating every value rendered by the view. Tool results establish the initial context; `useViewState` and `ModelContext` update it as the user interacts.
+Use model context to give the next model turn the information it needs.
+Tool results establish the initial context.
+`useViewState` and `ModelContext` describe the view.
+`useModelContext` manages selected native attachments.
+Keep each piece of evidence in one context channel.
 
 ## Choose the right channel
 
@@ -13,9 +17,19 @@ Use model context to give the next model turn the information it needs without d
 | Return a concise tool result                  | A text `content` block                                         |
 | Send structured render data to the view       | Tool-result `structuredContent`, read through `useToolContext` |
 | Keep structured user choices model-visible    | `useViewState`                                                 |
+| Attach selected text, images, or resources    | `useModelContext`                                              |
 | Describe what the user currently sees         | `<ModelContext>`                                               |
 | Keep ephemeral UI state private to the iframe | React `useState`                                               |
 | Persist durable business data                 | Your backend                                                   |
+
+## Attach evidence to the next turn
+
+Use `useModelContext()` to add selected text, images, resource links, or embedded resources to the next model turn.
+The hook shares one attachment collection across the view.
+You can add, replace, remove, and clear attachments with stable application keys.
+
+Read [Attach evidence with ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#attach-evidence-to-the-next-model-turn) for complete examples, image inputs, and error handling.
+The guide also explains host removals and how to combine the hook with `useViewState` and `ModelContext`.
 
 ## Keep structured choices in view state
 
@@ -38,9 +52,14 @@ function Filters() {
 }
 ```
 
-The root state value must be a JSON-serializable object. All components in one mounted view share it. Separate view instances remain isolated.
+The root state value must be a JSON-serializable object.
+All components in one mounted view share it.
+Separate view instances remain isolated.
 
-ChatGPT restores the state through `window.openai.widgetState`. Other MCP Apps hosts keep it for the current iframe lifetime until the protocol provides a restoration channel.
+By default, ChatGPT restores state through `window.openai.widgetState`.
+Other MCP Apps hosts keep state for the current iframe lifetime.
+After `useModelContext` activates native delivery, OpenAI host context can restore model-visible state and attachments.
+Private UI persistence remains separate.
 
 ## Describe visible UI
 
@@ -67,10 +86,12 @@ Nested components serialize into an indented tree:
   - Three alerts are unresolved
 ```
 
-For annotations produced by event handlers or other callbacks, store the
-description in React state and render it declaratively:
+For descriptions from event handlers or other callbacks, store the description in React state and render it with `ModelContext`:
 
 ```tsx
+import { useState } from "react";
+import { ModelContext } from "mcp-use/react";
+
 function ProductPicker() {
   const [selection, setSelection] = useState<string | null>(null);
 
@@ -97,20 +118,38 @@ The runtime merges structured state and the serialized context tree into one com
 }
 ```
 
-`_uiContext` is a reserved model-visible field. `useViewState` filters it from application state and rejects developer state containing the same key.
+`_uiContext` is a reserved model-visible field.
+`useViewState` filters it from application state and rejects developer state with the same key.
 
-Every write sends the complete snapshot. On MCP Apps hosts, mcp-use sends the object as `structuredContent` and a JSON text block as `content` through `ui/update-model-context`. On ChatGPT, mcp-use writes the object to `modelContent` with `window.openai.setWidgetState`.
+Every write sends the complete snapshot.
+On MCP Apps hosts, mcp-use sends the object as `structuredContent` and a JSON text block as `content` through `ui/update-model-context`.
+On ChatGPT, views without `useModelContext` write the object to `modelContent` with `window.openai.setWidgetState`.
+Views with `useModelContext` use the shared native writer described in [ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#combine-context-hooks).
 
 ## Keep ephemeral values local
 
 Use React `useState` for transient details that the model does not need, such as hover state, open tooltips, or animation progress.
 
 ```tsx
-const [hoveredId, setHoveredId] = useState<string | null>(null);
+import { useState } from "react";
+
+function HoverPreview() {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  return (
+    <button
+      onMouseEnter={() => setHoveredId("book:cover")}
+      onMouseLeave={() => setHoveredId(null)}
+    >
+      {hoveredId ? "Show cover preview" : "Preview cover"}
+    </button>
+  );
+}
 ```
 
 ## Next steps
 
+- Use [ChatGPT Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#attach-evidence-to-the-next-model-turn) to add and remove selected evidence.
 - Read the [`useViewState` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#useviewstate) for signatures, errors, and host behavior.
 - Read the [`ModelContext` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#modelcontext) for lifecycle and nesting.
 - Use [Interactivity](/v2/typescript/mcp-apps/interactivity) for tool calls and follow-up messages.

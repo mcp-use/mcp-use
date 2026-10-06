@@ -3,7 +3,13 @@ import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { act, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { useState, type ComponentType, type SetStateAction } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  type ComponentType,
+  type SetStateAction,
+} from "react";
 
 import {
   bootstrapView,
@@ -24,6 +30,7 @@ import {
   useSendSizeChanged,
   useToolContext,
   useViewState,
+  useModelContext,
   useViewTheme,
   useViewTool,
   ViewControls,
@@ -2190,6 +2197,162 @@ describe("react bridge runtime", () => {
     // Allow any (erroneous) post-connect flush to drain before asserting.
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(modelContextUpdates).toHaveLength(0);
+  });
+
+  it("does not activate native delivery for an abandoned attachment render", async () => {
+    resetRuntime();
+    const setWidgetState = vi.fn();
+    Object.defineProperty(window, "openai", {
+      configurable: true,
+      value: { widgetState: {}, setWidgetState },
+    });
+    try {
+      const { init, modelContextUpdates } = await startHost(undefined, {
+        updateModelContext: { text: {}, structuredContent: {} },
+      });
+      const never = new Promise<void>(() => {});
+      let renders = 0;
+      const mounted = vi.fn();
+      function Abandoned(): never {
+        useModelContext();
+        renders++;
+        useEffect(mounted, []);
+        throw never;
+      }
+      function View() {
+        const [show, setShow] = useState(true);
+        const [state, setState] = useViewState({ count: 0 });
+        return (
+          <>
+            <button onClick={() => setShow(false)}>abandon</button>
+            <button onClick={() => setState({ count: state.count + 1 })}>
+              count:{state.count}
+            </button>
+            <Suspense fallback={<span>waiting</span>}>
+              {show && <Abandoned />}
+            </Suspense>
+          </>
+        );
+      }
+      bootstrapView({ default: View as ComponentType });
+      await init;
+      await waitFor(() => expect(screen.getByText("waiting")).not.toBeNull());
+      await act(async () => screen.getByText("abandon").click());
+      await act(async () => screen.getByText("count:0").click());
+      await waitFor(() =>
+        expect(setWidgetState).toHaveBeenLastCalledWith({
+          privateContent: {},
+          modelContent: { count: 1, _uiContext: "" },
+        })
+      );
+      expect(renders).toBeGreaterThan(0);
+      expect(mounted).not.toHaveBeenCalled();
+      expect(modelContextUpdates).toEqual([]);
+    } finally {
+      resetRuntime();
+      delete (window as unknown as { openai?: unknown }).openai;
+    }
+  });
+
+  it("activates committed native delivery before child background effects", async () => {
+    resetRuntime();
+    const setWidgetState = vi.fn();
+    Object.defineProperty(window, "openai", {
+      configurable: true,
+      value: { widgetState: {}, setWidgetState },
+    });
+    try {
+      const { init, modelContextUpdates } = await startHost(undefined, {
+        updateModelContext: { text: {}, structuredContent: {} },
+      });
+      function Background() {
+        useViewState({ count: 1 });
+        return <ModelContext content="Catalog" />;
+      }
+      function View() {
+        useModelContext();
+        return <Background />;
+      }
+      bootstrapView({ default: View as ComponentType });
+      await init;
+      await waitFor(() =>
+        expect(modelContextUpdates.at(-1)?.structuredContent).toEqual({
+          count: 1,
+          _uiContext: "- Catalog",
+        })
+      );
+      expect(setWidgetState).not.toHaveBeenCalled();
+    } finally {
+      resetRuntime();
+      delete (window as unknown as { openai?: unknown }).openai;
+    }
+  });
+
+  it("shares native attachments across hook consumers and preserves them on consumer unmount", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost(undefined, {
+      updateModelContext: { text: {}, image: {}, structuredContent: {} },
+    });
+    function Add({ name }: { name: string }) {
+      const { add, attachments, pending } = useModelContext();
+      return (
+        <button
+          onClick={() => {
+            void add(name, { type: "text", text: name });
+          }}
+        >
+          {name}:{attachments.length}:{String(pending)}
+        </button>
+      );
+    }
+    function View() {
+      const [show, setShow] = useState(true);
+      const { attachments, clearAttachments } = useModelContext();
+      useViewState({ sort: "price" });
+      return (
+        <>
+          <span data-testid="attachments">
+            {attachments.map((item) => item.key).join(",")}
+          </span>
+          {show && <Add name="one" />}
+          <Add name="two" />
+          <button onClick={() => setShow(false)}>hide</button>
+          <button
+            onClick={() => {
+              void clearAttachments();
+            }}
+          >
+            clear
+          </button>
+        </>
+      );
+    }
+    bootstrapView({
+      default: View as ComponentType,
+    });
+    await init;
+    await waitFor(() => expect(screen.getByText("one:0:false")).not.toBeNull());
+    await act(async () => {
+      screen.getByText("one:0:false").click();
+      screen.getByText("two:0:false").click();
+    });
+    await waitFor(() => expect(screen.getByText("two:2:false")).not.toBeNull());
+    expect(modelContextUpdates.at(-1)?.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify({ sort: "price", _uiContext: "" }),
+      },
+      { type: "text", text: "one" },
+      { type: "text", text: "two" },
+    ]);
+    await act(async () => screen.getByText("hide").click());
+    expect(screen.getByTestId("attachments").textContent).toBe("one,two");
+    await act(async () => screen.getByText("clear").click());
+    await waitFor(() => expect(screen.getByText("two:0:false")).not.toBeNull());
+    expect(modelContextUpdates.at(-1)?.structuredContent).toEqual({
+      sort: "price",
+      _uiContext: "",
+    });
   });
 
   it("initializes useViewState, shares it across components, and sends complete MCP model context", async () => {

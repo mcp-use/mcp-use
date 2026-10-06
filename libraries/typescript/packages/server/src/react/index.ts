@@ -63,3 +63,18 @@ export {
   type CallToolSuccess,
   type ToolContextError,
 } from "./types/result-types.js";
+
+export { useModelContext } from "./hooks/use-model-context.js";
+export type {
+  ModelContextHandle,
+  ModelContextAttachment,
+  ModelContextBlock,
+  ModelContextText,
+  ModelContextImage,
+  ModelContextImageData,
+  ModelContextImageSource,
+  ModelContextResourceLink,
+  ModelContextResource,
+  ModelContextPresentation,
+  ModelContextOperationResult,
+} from "./types/model-context.js";
