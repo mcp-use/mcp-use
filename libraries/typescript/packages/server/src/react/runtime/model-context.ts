@@ -50,7 +50,7 @@ export function canonicalContext(value: unknown): string {
     if (item && typeof item === "object" && !Array.isArray(item)) {
       return Object.fromEntries(
         Object.entries(item).sort(([left], [right]) =>
-          left.localeCompare(right)
+          left < right ? -1 : left > right ? 1 : 0
         )
       );
     }

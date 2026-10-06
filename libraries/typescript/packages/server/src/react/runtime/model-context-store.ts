@@ -149,7 +149,8 @@ export class ModelContextStore {
   #desired: ContextPublication | null = null;
   #revision = 0;
   readonly #attachments = new Map<string, Attachment>();
-  readonly #generations = new Map<string, number>();
+  // Unique across keys and removals, without retaining historical key strings.
+  #nextGeneration = 0;
   readonly #contextListeners = new Set<() => void>();
   readonly #operations = new Set<Operation>();
   #snapshot: ContextSnapshot = { attachments: [], pending: false, error: null };
@@ -259,7 +260,6 @@ export class ModelContextStore {
     this.#acknowledged = null;
     this.#sending = null;
     this.#attachments.clear();
-    this.#generations.clear();
     this.#fail(new Error("Model context store has been disposed or reset"));
   }
 
@@ -335,8 +335,7 @@ export class ModelContextStore {
         );
       }
     }
-    const generation = (this.#generations.get(key) ?? 0) + 1;
-    this.#generations.set(key, generation);
+    const generation = ++this.#nextGeneration;
     this.#attachments.set(key, { key, block: normalized, generation });
     return this.#mutate(new Map([[key, generation]]));
   };
@@ -423,14 +422,18 @@ export class ModelContextStore {
     }
   }
 
-  #fail(error: Error): void {
-    for (const operation of this.#operations) operation.reject(error);
-    this.#operations.clear();
+  #fail(error: Error, throughRevision = Infinity): void {
+    for (const operation of this.#operations) {
+      if (operation.revision > throughRevision) continue;
+      operation.reject(error);
+      this.#operations.delete(operation);
+    }
     this.#publish(false, error);
   }
 
   /** Clear state between tests without disposing the owning runtime. */
   resetForTesting(): void {
+    this.#epoch += 1;
     this.#nodes.clear();
     this.#nextOrder = 0;
     this.#viewState = null;
@@ -441,9 +444,8 @@ export class ModelContextStore {
     this.#acknowledged = null;
     this.#sending = null;
     this.#attachments.clear();
-    this.#generations.clear();
     this.#fail(new Error("Model context store has been disposed or reset"));
-    // Keep #disposed / #epoch — a disposed store stays disposed.
+    // Keep #disposed — a disposed store stays disposed.
   }
 
   /** Internal serialized tree for tests. */
@@ -576,7 +578,7 @@ export class ModelContextStore {
         failed = true;
         const failure =
           error instanceof Error ? error : new Error(String(error));
-        this.#fail(failure);
+        this.#fail(failure, publication.revision);
         console.warn("[mcp-use] Failed to update model context:", error);
       } finally {
         if (!this.#disposed && sendEpoch === this.#epoch) {
