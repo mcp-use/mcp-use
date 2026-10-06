@@ -153,12 +153,14 @@ export type {
   InferToolInput,
   InferToolName,
   InferToolOutput,
+  FileEntrypointInput,
   ToolCallback,
   ToolDefinition,
   ToolRef,
   ToolResult,
   ToolSecurityScheme,
   ToolViewConfig,
+  ToolViewEntrypoint,
 } from "./tools.js";
 export type {
   ExternalViewManifestEntry,

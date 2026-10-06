@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { defineConfig } from "tsup";
+import { defineConfig, type Options } from "tsup";
 
 const frameworkPackage = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8")
@@ -8,6 +8,20 @@ const frameworkPackage = JSON.parse(
 const packageVersionDefine = {
   __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
 };
+
+// Every build must use the same module-local response/request identity maps.
+// A private package import shares them without exposing mutable global state.
+const sharedBufferedResponse: Options["esbuildPlugins"] = [
+  {
+    name: "shared-buffered-response",
+    setup(build) {
+      build.onResolve({ filter: /(?:^|\/)buffered-response\.js$/ }, () => ({
+        path: "#mcp-use-buffered-response",
+        external: true,
+      }));
+    },
+  },
+];
 
 function minifyFrameworkOutput(options: {
   minifySyntax?: boolean;
@@ -22,7 +36,6 @@ function minifyFrameworkOutput(options: {
 export default defineConfig([
   {
     entry: {
-      index: "src/index.ts",
       // OAuth subpath exports mirror tsc's rootDir:src layout so generated JS
       // and declarations stay aligned with package.json's exports map.
       "oauth/index": "src/oauth/index.ts",
@@ -46,6 +59,7 @@ export default defineConfig([
       "internal/resource-completion": "src/resource-completion.ts",
       // Internal-only validation entry; absent from package exports.
       "internal/usage": "src/usage.ts",
+      "internal/buffered-response": "src/buffered-response.ts",
       // Runtime-only binary: owns `mcp-use start` and delegates development
       // commands to the separately installed @mcp-use/cli package.
       bin: "src/bin.ts",
@@ -76,10 +90,36 @@ export default defineConfig([
       "#mcp-use-vite-handler",
     ],
     define: packageVersionDefine,
+    esbuildPlugins: sharedBufferedResponse,
     esbuildOptions: minifyFrameworkOutput,
   },
-  // Node gets a self-contained root bundle. Inlining Hono and the v2 SDK
-  // removes module-linking overhead from cold process starts, while the
+  // Compact only the edge root graph. The CLI and integration entries above
+  // retain readable identifiers, and public function/class names stay intact.
+  {
+    entry: { index: "src/index.ts" },
+    format: ["esm"],
+    target: "node22",
+    dts: false,
+    splitting: true,
+    sourcemap: false,
+    clean: false,
+    external: [
+      "@mcp-use/client",
+      "@mcp-use/cli",
+      "#mcp-use-node-http",
+      "#mcp-use-skills-loader",
+      "#mcp-use-vite-handler",
+    ],
+    define: packageVersionDefine,
+    esbuildPlugins: sharedBufferedResponse,
+    esbuildOptions(options) {
+      minifyFrameworkOutput(options);
+      options.minifyIdentifiers = true;
+      options.keepNames = true;
+    },
+  },
+  // Node inlines Hono and the v2 SDK to reduce module-linking overhead on
+  // cold process starts, while sharing the private response identity module. The
   // generic root above stays split and free of Node builtins for Workers.
   {
     entry: {
@@ -99,6 +139,7 @@ export default defineConfig([
       "zod",
     ],
     define: packageVersionDefine,
+    esbuildPlugins: sharedBufferedResponse,
     esbuildOptions(options) {
       minifyFrameworkOutput(options);
       options.alias = {
