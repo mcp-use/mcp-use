@@ -147,7 +147,8 @@ function resolveCspOptions(
 }
 
 /**
- * Resource `_meta.ui` for a primed view.
+ * Resource metadata for a primed view, including `_meta.ui` and the
+ * OpenAI resource display-mode extension.
  *
  * Emits `csp` by merging author `view.csp`, env (`CSP_URLS` / `CSP_*_DOMAINS`),
  * and MCP auto-append (`MCP_URL` → connect; assets origin → resource).
@@ -170,7 +171,19 @@ export function buildResourceUiMeta(
     ui["prefersBorder"] = authorFacts.prefersBorder;
   }
 
-  return { [UI_META_KEY]: ui };
+  return {
+    [UI_META_KEY]: ui,
+    ...(authorFacts?.displayModes !== undefined && {
+      "openai/ui": {
+        availableDisplayModes: authorFacts.displayModes.filter(
+          (mode) => mode === "inline" || mode === "fullscreen"
+        ),
+        ...(authorFacts.preferredDisplayMode !== undefined && {
+          preferredDisplayMode: authorFacts.preferredDisplayMode,
+        }),
+      },
+    }),
+  };
 }
 
 /**

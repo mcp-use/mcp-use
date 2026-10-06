@@ -1,3 +1,4 @@
+import { normalizeViewConfig } from "./react/runtime/view-config.js";
 import {
   localhostAllowedHostnames,
   localhostAllowedOrigins,
@@ -710,6 +711,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       );
     }
     this.#assertNotStarted("views", "manifest");
+    // Validate the complete candidate before committing registry or options so
+    // a failed attempt can be retried without retaining part of its manifest.
+    for (const [name, entry] of Object.entries(views)) {
+      try {
+        normalizeViewConfig(entry.viewConfig);
+      } catch (error) {
+        throw new Error(
+          `View "${name}" has an invalid viewConfig: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error }
+        );
+      }
+    }
     this.#viewsDevMode = options?.dev === true;
     this.#embeddedViewAssets = options?.assets;
     if (options?.projectRoot !== undefined) {
@@ -2283,9 +2296,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     basePath: string
   ): void {
     const uri = viewResourceUri(viewName);
-    const authorFacts = this.#viewResourceFacts(
-      this.#viewBindings.get(viewName)?.config
-    );
+    const frontendConfig = normalizeViewConfig(entry.viewConfig);
+    const authorFacts = {
+      ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),
+      displayModes: frontendConfig.displayModes,
+      ...(frontendConfig.preferredDisplayMode !== undefined && {
+        preferredDisplayMode: frontendConfig.preferredDisplayMode,
+      }),
+    };
     const resourceConfig = viewResourceConfig(
       viewName,
       entry,

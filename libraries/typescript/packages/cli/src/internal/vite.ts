@@ -7,3 +7,5 @@ export {
   isViewEntryPath,
 } from "../cli/views.js";
 export { syncMcpEnvDeclaration } from "../cli/mcp-env-declaration.js";
+
+export { readViewConfig } from "../cli/view-config.js";
