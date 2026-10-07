@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.3.1-canary.1
+
+### Patch Changes
+
+- 4d93a2e: Fix deployment dashboard links to use the selected organization slug and server ID for managed uploads and GitHub deployments. Leave the link unavailable when an organization has no slug instead of returning an invalid route.
+
 ## 4.3.1-canary.0
 
 ### Patch Changes
