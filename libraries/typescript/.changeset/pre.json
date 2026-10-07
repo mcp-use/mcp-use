@@ -15,6 +15,7 @@
     "fix-deploy-dashboard-route",
     "fix-server-logging-streaming",
     "inspector-tool-timeouts",
-    "propagated-6d6aee3719385e40"
+    "propagated-6d6aee3719385e40",
+    "strict-github-deploy-origin"
   ]
 }
