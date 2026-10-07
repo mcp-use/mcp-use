@@ -1,4 +1,9 @@
-import type { CallToolResult, Tool } from "@modelcontextprotocol/client";
+import type {
+  CallToolResult,
+  ProtocolEra,
+  RequestOptions,
+  Tool,
+} from "@modelcontextprotocol/client";
 import type { MCPClient } from "../core/node.js";
 import { BaseConnector } from "../transport/base.js";
 
@@ -94,6 +99,51 @@ Remember: Always discover and understand available tools before attempting to us
 const DETAIL_LEVELS = new Set(["names", "descriptions", "full"]);
 
 /**
+ * Throws if the signal is aborted, using the signal's reason or a standard AbortError.
+ */
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  if (typeof signal.throwIfAborted === "function") {
+    signal.throwIfAborted();
+  }
+  throw signal.reason ?? new Error("This operation was aborted");
+}
+
+/**
+ * Races an async operation against an AbortSignal, rejecting immediately if the signal aborts.
+ */
+function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) {
+    return promise;
+  }
+  throwIfAborted(signal);
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener("abort", onAbort);
+      try {
+        throwIfAborted(signal);
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
+/**
  * CodeModeConnector provides a special "code mode" interface for executing JavaScript/TypeScript
  * code with access to MCP tools. Unlike other connectors, it doesn't establish its own external
  * connection - instead, it wraps an already-connected BaseMCPClient and exposes special tools
@@ -112,6 +162,13 @@ export class CodeModeConnector extends BaseConnector {
     this.mcpClient = client;
     this.connected = true; // No connection phase needed - immediately ready
     this._tools = this._createToolsList();
+    this.toolsCache = this._tools;
+    this.capabilitiesCache = { tools: {} };
+    this.serverInfoCache = {
+      name: "code_mode",
+      version: "1.0.0",
+      description: "MCP Code Mode Internal Server",
+    };
   }
 
   protected override async establishTransport(): Promise<void> {
@@ -182,26 +239,139 @@ export class CodeModeConnector extends BaseConnector {
   }
 
   // Override tools getter to return static list immediately
-  get tools(): Tool[] {
+  override get tools(): Tool[] {
     return this._tools;
   }
 
-  async initialize(): Promise<any> {
-    this.toolsCache = this._tools;
-    return { capabilities: {}, version: "1.0.0" };
+  /**
+   * Returns fresh tools available in code mode.
+   *
+   * @param options - Optional per-request options (e.g. abort signal).
+   * @returns List of Tool objects for execute_code and search_tools.
+   */
+  override async listTools(options?: RequestOptions): Promise<Tool[]> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    throwIfAborted(options?.signal);
+    return [...this._tools];
   }
 
-  async callTool(
+  override get protocolEra(): ProtocolEra | undefined {
+    return this.connected ? "modern" : undefined;
+  }
+
+  override get negotiatedProtocolVersion(): string | undefined {
+    return this.connected ? "2026-07-28" : undefined;
+  }
+
+  override async initialize(): Promise<any> {
+    this.toolsCache = this._tools;
+    this.capabilitiesCache = { tools: {} };
+    this.serverInfoCache = {
+      name: "code_mode",
+      version: "1.0.0",
+      description: "MCP Code Mode Internal Server",
+    };
+    return {
+      capabilities: this.capabilitiesCache,
+      serverInfo: this.serverInfoCache,
+      protocolVersion: "2026-07-28",
+    };
+  }
+
+  /**
+   * Code mode internal server does not expose resources. Returns an empty list.
+   *
+   * @param _cursor - Optional pagination cursor (unused).
+   * @param options - Optional request options.
+   * @returns Empty resource list.
+   */
+  override async listResources(
+    _cursor?: string,
+    options?: RequestOptions
+  ): Promise<{
+    /** Empty resource list in code mode. */
+    resources: any[];
+  }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    throwIfAborted(options?.signal);
+    return { resources: [] };
+  }
+
+  /**
+   * Code mode internal server does not expose resources. Returns an empty list.
+   *
+   * @param options - Optional request options.
+   * @returns Empty resource list.
+   */
+  override async listAllResources(options?: RequestOptions): Promise<{
+    /** Empty resource list in code mode. */
+    resources: any[];
+  }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    throwIfAborted(options?.signal);
+    return { resources: [] };
+  }
+
+  /**
+   * Code mode internal server does not expose resource templates. Returns an empty list.
+   *
+   * @param options - Optional request options.
+   * @returns Empty resource template list.
+   */
+  override async listResourceTemplates(options?: RequestOptions): Promise<{
+    /** Empty resource template list in code mode. */
+    resourceTemplates: any[];
+  }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    throwIfAborted(options?.signal);
+    return { resourceTemplates: [] };
+  }
+
+  /**
+   * Code mode internal server does not expose prompts. Returns an empty list.
+   *
+   * @param options - Optional request options.
+   * @returns Empty prompt list.
+   */
+  override async listPrompts(options?: RequestOptions): Promise<{
+    /** Empty prompt list in code mode. */
+    prompts: any[];
+  }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    throwIfAborted(options?.signal);
+    return { prompts: [] };
+  }
+
+  override async callTool(
     name: string,
-    args: Record<string, any>
+    args: Record<string, any>,
+    options?: RequestOptions
   ): Promise<CallToolResult> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    throwIfAborted(options?.signal);
+
     if (name === "execute_code") {
       const code = args.code as string;
       const timeout = (args.timeout as number) || 30000;
 
       // We need to access executeCode on the client
       // Since BaseConnector doesn't know about executeCode, we cast client
-      const result = await this.mcpClient.executeCode(code, timeout);
+      const result = await raceAbort(
+        this.mcpClient.executeCode(code, timeout),
+        options?.signal
+      );
 
       return {
         content: [
@@ -218,9 +388,12 @@ export class CodeModeConnector extends BaseConnector {
         | "descriptions"
         | "full";
 
-      const result = await this.mcpClient.searchTools(
-        query,
-        DETAIL_LEVELS.has(detailLevel) ? detailLevel : "full"
+      const result = await raceAbort(
+        this.mcpClient.searchTools(
+          query,
+          DETAIL_LEVELS.has(detailLevel) ? detailLevel : "full"
+        ),
+        options?.signal
       );
 
       return {
