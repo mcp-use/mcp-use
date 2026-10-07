@@ -17,7 +17,8 @@
  * - `debug`: echoes compact truncated input/output on the detail line:
  *   `tools/call greet {"who":"world"} -> "hi world" raw-request/0.0.0`.
  * - `trace`: debug plus a full request/response dump (headers and bodies)
- *   after the summary.
+ *   after the summary. SSE response bodies are never read or dumped, so
+ *   logging does not delay progress or other streaming notifications.
  */
 import {
   CLIENT_INFO_META_KEY,
@@ -48,8 +49,8 @@ export interface LoggingOptions {
   /**
    * Verbosity: `info` (compact lines without payloads, default), `debug`
    * (adds compact truncated input/output on the detail line), or `trace`
-   * (debug plus full request/response header and body dumps). The
-   * `MCP_USE_LOG_LEVEL` environment variable overrides this when set.
+   * (debug plus full request/response header and body dumps, excluding SSE
+   * response bodies). The `MCP_USE_LOG_LEVEL` environment variable overrides this when set.
    */
   level?: LogLevel;
 }
@@ -592,7 +593,9 @@ function formatRequestLogLine(line: RequestLogLine): string {
 /**
  * Fetch middleware logging every request in the compact single-line format (see
  * the module docs). `MCPServer` registers it automatically unless
- * `config.logging.enabled` is `false`.
+ * `config.logging.enabled` is `false`. SSE responses are logged when the
+ * response becomes available without reading their bodies or waiting for
+ * stream completion.
  */
 export function requestLogger(
   options: RequestLoggerOptions = {}
@@ -674,6 +677,17 @@ export function requestLogger(
       throw error;
     }
 
+    // SSE can carry notifications during any MCP method (including tools/call).
+    // Reading a clone here waits for EOF before the transport can send headers
+    // or chunks. Keep both outcome extraction and trace dumping off the stream.
+    const streaming =
+      description.streaming ||
+      response.headers
+        .get("content-type")
+        ?.split(";", 1)[0]
+        ?.trim()
+        .toLowerCase() === "text/event-stream";
+
     const detail =
       description.mcpRequest === undefined
         ? undefined
@@ -684,7 +698,7 @@ export function requestLogger(
       if (echoPayloads && detail.input !== undefined) {
         suffix.push(inlineJson(detail.input));
       }
-      const outcome: ResponseOutcome = description.streaming
+      const outcome: ResponseOutcome = streaming
         ? { errorMessage: null }
         : await extractResponseOutcome(response, request);
       if (
@@ -705,12 +719,7 @@ export function requestLogger(
     logLine(response.status, detail, suffix);
 
     if (level === "trace") {
-      await printTraceDump(
-        response,
-        requestHeaders,
-        requestBody,
-        !description.streaming
-      );
+      await printTraceDump(response, requestHeaders, requestBody, !streaming);
     }
 
     return response;
