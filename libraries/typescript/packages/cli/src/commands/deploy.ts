@@ -1303,10 +1303,39 @@ function normalizeGitMutationError(error: unknown, cwd: string): CommandError {
 }
 
 function parseGitHubRepository(remote: string): string {
-  const match = remote.match(
-    /github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/
-  );
-  if (match?.[1] === undefined || match[2] === undefined) {
+  let repository: string | undefined;
+
+  // Check the original Git URL syntax before URL normalizes separators or paths.
+  const rawPath = remote.match(
+    /^[a-z][a-z\d+.-]*:\/\/[^/?#\\\s]+(\/[^?#\\\s]*)$/i
+  )?.[1];
+
+  try {
+    const url = new URL(remote);
+    if (
+      rawPath !== undefined &&
+      ["http:", "https:", "ssh:", "git:"].includes(url.protocol) &&
+      url.hostname.toLowerCase() === "github.com" &&
+      url.port === "" &&
+      url.search === "" &&
+      url.hash === "" &&
+      !hasExplicitUrlPort(remote)
+    ) {
+      repository = gitHubRepositoryFromPath(rawPath);
+    }
+  } catch {
+    // Git's SCP-like remotes (for example git@github.com:owner/repo.git)
+    // are not valid URLs and are handled below.
+  }
+
+  if (repository === undefined) {
+    const scpLike = remote.match(/^(?:[^@/\s]+@)?github\.com:(.+)$/i);
+    if (scpLike?.[1] !== undefined) {
+      repository = gitHubRepositoryFromPath(`/${scpLike[1]}`);
+    }
+  }
+
+  if (repository === undefined) {
     const safeRemote = redactGitDiagnostic(remote);
     throw new CommandError(
       "unsupported_remote",
@@ -1327,7 +1356,29 @@ function parseGitHubRepository(remote: string): string {
       }
     );
   }
+  return repository;
+}
+
+function gitHubRepositoryFromPath(pathname: string): string | undefined {
+  const match = pathname.match(/^\/([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/);
+  if (
+    match?.[1] === undefined ||
+    match[2] === undefined ||
+    match[1] === "." ||
+    match[1] === ".." ||
+    match[2] === "." ||
+    match[2] === ".."
+  ) {
+    return undefined;
+  }
   return `${match[1]}/${match[2]}`;
+}
+
+function hasExplicitUrlPort(remote: string): boolean {
+  const authority = remote.match(/^[a-z][a-z\d+.-]*:\/\/([^/?#\s]+)/i)?.[1];
+  if (authority === undefined) return false;
+  const hostAndPort = authority.slice(authority.lastIndexOf("@") + 1);
+  return hostAndPort.includes(":");
 }
 
 function redactGitDiagnostic(value: string): string {
