@@ -209,7 +209,8 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       if (!accepted) return 0;
     }
 
-    const { api, organizationId } = await cloudApiForOrganization(values.org);
+    const { api, organizationId, organizationSlug } =
+      await cloudApiForOrganization(values.org);
     const existing = await readJson<ProjectLink | null>(linkPath, null);
     const createNew = values.new === true || existing === null;
     if (
@@ -287,6 +288,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       return await deployManaged({
         api,
         organizationId,
+        organizationSlug,
         cwd,
         linkPath,
         existing: createNew ? null : existing,
@@ -298,6 +300,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
     return await deployGitHub({
       api,
       organizationId,
+      organizationSlug,
       cwd,
       linkPath,
       existing: createNew ? null : existing,
@@ -371,13 +374,23 @@ function normalizeDeployPatterns(values: string[]): string[] {
 async function deployManaged(input: {
   api: CloudApi;
   organizationId: string;
+  organizationSlug: string | null;
   cwd: string;
   linkPath: string;
   existing: ProjectLink | null;
   values: DeployValues;
   json: boolean;
 }): Promise<number> {
-  const { api, organizationId, cwd, linkPath, existing, values, json } = input;
+  const {
+    api,
+    organizationId,
+    organizationSlug,
+    cwd,
+    linkPath,
+    existing,
+    values,
+    json,
+  } = input;
   const projectRoot = cwd;
   const sourceRoot = resolveContainedPath(
     cwd,
@@ -465,8 +478,8 @@ async function deployManaged(input: {
   await ensureLocalMcpUseIgnored(projectRoot);
   return finishDeployment({
     sourceType: "managed",
+    organizationSlug,
     serverId,
-    ...(serverSlug !== undefined ? { serverSlug } : {}),
     deploymentId,
     label: "managed source",
     values,
@@ -496,13 +509,23 @@ export function assertManagedArchiveSize(sizeBytes: number): void {
 async function deployGitHub(input: {
   api: CloudApi;
   organizationId: string;
+  organizationSlug: string | null;
   cwd: string;
   linkPath: string;
   existing: ProjectLink | null;
   values: DeployValues;
   json: boolean;
 }): Promise<number> {
-  const { api, organizationId, cwd, linkPath, existing, values, json } = input;
+  const {
+    api,
+    organizationId,
+    organizationSlug,
+    cwd,
+    linkPath,
+    existing,
+    values,
+    json,
+  } = input;
   let probe = await probeGit(cwd);
   let repository: string;
   let installation: Installation | undefined;
@@ -718,8 +741,8 @@ async function deployGitHub(input: {
   await ensureLocalMcpUseIgnored(repositoryRoot);
   return finishDeployment({
     sourceType: "github",
+    organizationSlug,
     serverId,
-    ...(serverSlug !== undefined ? { serverSlug } : {}),
     deploymentId,
     label: repository,
     values,
@@ -1791,14 +1814,18 @@ function deploymentNotCreated(serverId: string): CommandError {
 
 function finishDeployment(input: {
   sourceType: "github" | "managed";
+  organizationSlug: string | null;
   serverId: string;
-  serverSlug?: string | null;
   deploymentId: string;
   label: string;
   values: DeployValues;
   json: boolean;
 }): number {
-  const webUrl = `${cloudWebUrl()}/${encodeURIComponent(input.serverSlug ?? input.serverId)}`;
+  // A server slug identifies its MCP endpoint, not its dashboard page.
+  // Older organizations without a slug cannot supply a canonical dashboard URL.
+  const webUrl = input.organizationSlug
+    ? `${cloudWebUrl()}/cloud/${encodeURIComponent(input.organizationSlug)}/servers/${encodeURIComponent(input.serverId)}/overview`
+    : null;
   const result = {
     sourceType: input.sourceType,
     serverId: input.serverId,
@@ -1806,7 +1833,13 @@ function finishDeployment(input: {
     status: "pending",
     webUrl,
   };
-  if (input.values.open === true) openBrowser(webUrl);
+  if (input.values.open === true) {
+    if (webUrl !== null) openBrowser(webUrl);
+    else
+      process.stderr.write(
+        "Dashboard unavailable: the selected organization has no dashboard slug.\n"
+      );
+  }
   printResult(
     result,
     input.json,
