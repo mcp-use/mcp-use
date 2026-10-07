@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.17-canary.1
+
+### Patch Changes
+
+- 53dcb47: Apply saved Inspector timeout settings to tool calls, preserve cleared timeouts when reopening or renaming a connection, and explain what blank timeout fields mean.
+
 ## 20.3.17-canary.0
 
 ### Patch Changes
