@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.8.1-canary.0
+
+### Patch Changes
+
+- 8749db8: Prevent request logging from buffering SSE responses so tool progress and log notifications reach clients before tool completion. SSE response bodies are skipped at every logging level, including trace, while finite JSON outcome logging is preserved.
+- Updated dependencies
+  - @mcp-use/cli@4.3.1-canary.0
+  - @mcp-use/inspector@20.3.17-canary.0
+
 ## 2.8.0
 
 ### Minor Changes

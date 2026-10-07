@@ -11,6 +11,8 @@
     "@mcp-use/tunnel": "0.2.1"
   },
   "changesets": [
-    "create-app-windows-install"
+    "create-app-windows-install",
+    "fix-server-logging-streaming",
+    "propagated-6d6aee3719385e40"
   ]
 }
