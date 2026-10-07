@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import { getRequestBag, jsonBodyMiddleware } from "../src/fetch-app.js";
 import { MCPServer, requestLogger } from "../src/index.js";
-import type { ServerConfig } from "../src/index.js";
+import type { LoggingOptions, ServerConfig } from "../src/index.js";
 
 /** The per-request `_meta` envelope every 2026-07-28 request carries. */
 const MODERN_ENVELOPE = {
@@ -99,6 +99,172 @@ describe("requestLogger (via MCPServer.fetch)", () => {
       .map((call) => call.map(String).join(" "))
       .flatMap((entry) => entry.split("\n"));
   }
+
+  for (const transport of ["fetch", "listen"] as const) {
+    it.each([
+      ["disabled", { enabled: false }],
+      ["default", {}],
+      ["info", { level: "info" }],
+      ["debug", { level: "debug" }],
+      ["trace", { level: "trace" }],
+    ] satisfies [string, LoggingOptions][])(
+      `delivers progress and logs before tool completion via ${transport} (%s)`,
+      async (_label, logging) => {
+        const server = buildServer({ logging });
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        let completed = false;
+        server.tool({ name: "gated" }, async (_params, ctx) => {
+          await ctx.reportProgress(1, 2, "working");
+          await ctx.sendLog("info", "working", "logging-test");
+          await gate;
+          completed = true;
+          return { content: [{ type: "text", text: "done" }] };
+        });
+        const messages: Record<string, unknown>[] = [];
+        const controller = new AbortController();
+        let reading: Promise<void> | undefined;
+        let pendingResponse: Promise<void> | undefined;
+        let response: Response | undefined;
+        let responseError: unknown;
+        try {
+          const request = mcpRequest(
+            "tools/call",
+            { name: "gated" },
+            {
+              "mcp-name": "gated",
+            }
+          );
+          const body = await request.json();
+          body.params._meta.progressToken = "logging-progress";
+          const url =
+            transport === "listen" ? (await server.listen(0)).url : request.url;
+          const progressRequest = new Request(url, {
+            method: "POST",
+            headers: request.headers,
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+          pendingResponse = (
+            transport === "listen"
+              ? fetch(progressRequest)
+              : server.fetch(progressRequest)
+          )
+            .then((value) => {
+              response = value;
+            })
+            .catch((error: unknown) => {
+              responseError = error;
+            });
+          await vi.waitFor(
+            () => {
+              if (responseError) throw responseError;
+              expect(response).toBeDefined();
+            },
+            {
+              timeout: 2000,
+            }
+          );
+          await pendingResponse;
+          expect(response!.headers.get("content-type")).toContain(
+            "text/event-stream"
+          );
+          const reader = response!.body!.getReader();
+          reading = (async () => {
+            const decoder = new TextDecoder();
+            let buffered = "";
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffered += decoder.decode(value, { stream: true });
+              let end: number;
+              while ((end = buffered.indexOf("\n")) !== -1) {
+                const line = buffered.slice(0, end).trimEnd();
+                buffered = buffered.slice(end + 1);
+                if (line.startsWith("data:"))
+                  messages.push(JSON.parse(line.slice(5)));
+              }
+            }
+          })();
+          await vi.waitFor(() => expect(messages).toHaveLength(2), {
+            timeout: 2000,
+          });
+          expect(completed).toBe(false);
+          expect(messages).toMatchObject([
+            {
+              method: "notifications/progress",
+              params: {
+                progressToken: "logging-progress",
+                progress: 1,
+                total: 2,
+              },
+            },
+            {
+              method: "notifications/message",
+              params: { level: "info", data: "working" },
+            },
+          ]);
+          release();
+          await reading;
+          expect(completed).toBe(true);
+          expect(messages).toHaveLength(3);
+          expect(messages[2]).toMatchObject({
+            id: 1,
+            result: { content: [{ type: "text", text: "done" }] },
+          });
+          if ("level" in logging && logging.level === "trace") {
+            expect(loggedLines().join("\n")).toContain(
+              "(streaming — not dumped)"
+            );
+          }
+        } finally {
+          release();
+          controller.abort();
+          await pendingResponse;
+          if (reading) await reading.catch(() => {});
+          else await response?.text().catch(() => {});
+          await server.close();
+        }
+      }
+    );
+  }
+
+  it.each(["text/event-stream", "Text/Event-Stream; charset=utf-8"])(
+    "does not clone or dump an SSE response (%s), including non-MCP routes",
+    async (contentType) => {
+      let close!: () => void;
+      const response = new Response(
+        new ReadableStream({
+          start(controller) {
+            close = () => controller.close();
+          },
+        }),
+        { headers: { "content-type": contentType, "set-cookie": "secret" } }
+      );
+      const cloneSpy = vi.spyOn(response, "clone");
+      let pending: Promise<Response> | undefined;
+      try {
+        let returned = false;
+        pending = requestLogger({ level: "trace" })(
+          new Request("http://localhost/events"),
+          async () => response
+        ).then((value) => {
+          returned = true;
+          return value;
+        });
+        await vi.waitFor(() => expect(returned).toBe(true), { timeout: 2000 });
+        expect(await pending).toBe(response);
+        expect(cloneSpy).not.toHaveBeenCalled();
+        expect(loggedLines().join("\n")).toContain("(streaming — not dumped)");
+        expect(loggedLines().join("\n")).not.toContain("secret");
+      } finally {
+        close();
+        await pending;
+      }
+    }
+  );
 
   it("logs one complete MCP record for tools/call", async () => {
     const server = buildServer();
