@@ -465,6 +465,9 @@ export function ConnectionSettingsForm({
           value={requestTimeout}
           onChange={(e) => setRequestTimeout(e.target.value)}
         />
+        <p className="text-xs text-muted-foreground">
+          Leave blank to use the default 10-minute request timeout.
+        </p>
       </div>
       <div className="space-y-2">
         <Label className="text-sm">Maximum Total Timeout</Label>
@@ -474,6 +477,10 @@ export function ConnectionSettingsForm({
           value={maxTotalTimeout}
           onChange={(e) => setMaxTotalTimeout(e.target.value)}
         />
+        <p className="text-xs text-muted-foreground">
+          Leave blank for no overall time limit. The request timeout still
+          applies.
+        </p>
       </div>
       <div className="space-y-2">
         <Label className="text-sm">Reset Timeout on Progress</Label>

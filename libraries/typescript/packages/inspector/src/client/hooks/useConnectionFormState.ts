@@ -76,17 +76,19 @@ export function useConnectionFormState(
     setClientSecret(editable.oauth?.clientSecret || "");
     setScope(editable.oauth?.scope || "");
 
-    if (editable.requestTimeout !== undefined) {
-      setRequestTimeout(String(editable.requestTimeout));
-    }
-    if (editable.resetTimeoutOnProgress !== undefined) {
-      setResetTimeoutOnProgress(
-        editable.resetTimeoutOnProgress ? "True" : "False"
-      );
-    }
-    if (editable.maxTotalTimeout !== undefined) {
-      setMaxTotalTimeout(String(editable.maxTotalTimeout));
-    }
+    setRequestTimeout(
+      editable.requestTimeout === undefined
+        ? ""
+        : String(editable.requestTimeout)
+    );
+    setResetTimeoutOnProgress(
+      (editable.resetTimeoutOnProgress ?? true) ? "True" : "False"
+    );
+    setMaxTotalTimeout(
+      editable.maxTotalTimeout === undefined
+        ? ""
+        : String(editable.maxTotalTimeout)
+    );
   }, [connectionId, enabled]);
 
   const buildConfig = (): EditableConnectionConfig | null => {
@@ -159,13 +161,13 @@ export function useConnectionFormState(
       headers: Object.keys(headers).length > 0 ? headers : undefined,
       autoProxyFallback,
       ...(oauth ? { oauth } : {}),
-      ...(Number.isFinite(parsedRequestTimeout)
-        ? { requestTimeout: parsedRequestTimeout }
-        : {}),
+      requestTimeout: Number.isFinite(parsedRequestTimeout)
+        ? parsedRequestTimeout
+        : undefined,
       resetTimeoutOnProgress: resetTimeoutOnProgress === "True",
-      ...(Number.isFinite(parsedMaxTotalTimeout)
-        ? { maxTotalTimeout: parsedMaxTotalTimeout }
-        : {}),
+      maxTotalTimeout: Number.isFinite(parsedMaxTotalTimeout)
+        ? parsedMaxTotalTimeout
+        : undefined,
     };
   };
 
