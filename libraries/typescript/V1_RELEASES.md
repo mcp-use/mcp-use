@@ -58,10 +58,10 @@ npm view mcp-use dist-tags --json
 
 Expect `legacy-v1` to point to the new 1.x release and `latest` to remain on
 the current v2 release. Inspect the published artifact and test a clean v1
-consumer before upgrading customer deployments. Source tests passing and npm
+consumer before upgrading deployed applications. Source tests passing and npm
 publication are separate from validation under the deployed workload.
 
-Customers can install the maintenance channel or pin the verified release:
+Install the maintenance channel or pin the verified release:
 
 ```sh
 npm install mcp-use@legacy-v1
