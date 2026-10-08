@@ -1,5 +1,44 @@
 # mcp-use
 
+## 2.8.1-canary.4
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.3.1-canary.3
+  - @mcp-use/inspector@20.3.17-canary.2
+
+## 2.8.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [45bc353]
+  - @mcp-use/cli@4.3.1-canary.2
+
+## 2.8.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4d93a2e]
+  - @mcp-use/cli@4.3.1-canary.1
+
+## 2.8.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [53dcb47]
+  - @mcp-use/inspector@20.3.17-canary.1
+
+## 2.8.1-canary.0
+
+### Patch Changes
+
+- 8749db8: Prevent request logging from buffering SSE responses so tool progress and log notifications reach clients before tool completion. SSE response bodies are skipped at every logging level, including trace, while finite JSON outcome logging is preserved.
+- Updated dependencies
+  - @mcp-use/cli@4.3.1-canary.0
+  - @mcp-use/inspector@20.3.17-canary.0
+
 ## 2.8.0
 
 ### Minor Changes

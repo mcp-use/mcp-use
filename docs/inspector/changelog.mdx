@@ -6,6 +6,17 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.17" description="October 2026">
+  ## Saved tool timeout settings
+  Patch release paired with `mcp-use` v2.8.1, applying connection timeout settings to tool calls and preserving cleared values.
+
+- **Fix**: tool calls use the saved request timeout, maximum total timeout, and reset-on-progress setting instead of hard-coded defaults (`#2656`)
+- **Fix**: cleared timeout fields stay cleared when reopening or renaming a connection (`#2656`)
+- **Fix**: changing a connection URL rejects duplicates before removing the existing connection (`#2656`)
+- **Enhancement**: connection settings explain that a blank request timeout uses the 10-minute default and a blank maximum total timeout removes the overall time limit while retaining the request timeout (`#2656`)
+- **Update**: Updated mcp-use to v2.8.1
+</Update>
+
 <Update label="v20.3.16" description="October 2026">
   ## Framework release alignment
   Patch release paired with `mcp-use` v2.8.0, rebuilding the bundled Inspector with the ChatGPT Plugin Extensions framework updates.

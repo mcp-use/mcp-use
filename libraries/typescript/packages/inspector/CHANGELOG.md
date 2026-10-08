@@ -1,5 +1,23 @@
 # @mcp-use/inspector
 
+## 20.3.17-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17-canary.1
+
+### Patch Changes
+
+- 53dcb47: Apply saved Inspector timeout settings to tool calls, preserve cleared timeouts when reopening or renaming a connection, and explain what blank timeout fields mean.
+
+## 20.3.17-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.16
 
 ### Patch Changes

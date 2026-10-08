@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.4.2-canary.0
+
+### Patch Changes
+
+- b3990f0: Implement `listTools` and protocol metadata on `CodeModeConnector`
+
 ## 2.4.1
 
 ### Patch Changes

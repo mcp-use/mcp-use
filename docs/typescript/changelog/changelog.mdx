@@ -6,6 +6,23 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.8.1" description="October 2026">
+  ## Streaming, code mode & deployment fixes
+  Patch release fixing streamed tool notifications, code-mode discovery, CLI deployment links and remote validation, Windows scaffolding, and Inspector tool timeouts.
+
+- **Fix** (server): request logging no longer buffers SSE response bodies, so tool progress and log notifications reach clients before tool completion. This applies at every logging level, including trace; finite JSON response logging is preserved (`#2789`)
+- **Fix** (@mcp-use/client): `CodeModeConnector.listTools()` returns `execute_code` and `search_tools`, exposes tool capabilities and protocol metadata, and returns empty resource, resource-template, and prompt lists (`#2488`)
+- **Fix** (@mcp-use/client): `CodeModeConnector` honors request abort signals for listing and tool calls, including cancellation while waiting for code execution or tool search (`#2488`)
+- **Fix** (@mcp-use/cli): deployment dashboard links use the selected organization slug and server ID for managed uploads and GitHub deployments; organizations without a slug no longer receive an invalid link (`#2744`)
+- **Fix** (@mcp-use/cli): `mcp-use deploy` validates that Git remotes are hosted on `github.com`, rejecting other hosts that merely contain `github.com` in their hostname or path (`#2687`)
+- **Fix** (create-mcp-use-app): `--install` and the install prompt run npm and pnpm through a shell on Windows so their `.cmd` shims work instead of failing with `spawn npm ENOENT` (`#2696`)
+- **Fix** (@mcp-use/inspector): tool calls honor saved timeout settings and cleared timeouts stay cleared; see the [Inspector changelog](/inspector/changelog) (`#2656`)
+- **Update**: Updated @mcp-use/agent to v2.0.22 and @mcp-use/client to v2.4.2
+- **Update**: Updated @mcp-use/inspector to v20.3.17; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.3.1
+- **Update**: Updated create-mcp-use-app to v2.0.10
+</Update>
+
 <Update label="v2.8.0" description="October 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.8.0&title=ChatGPT%20Plugin%20Extensions&date=2026-10&lang=typescript" alt="Release 2.8.0" />

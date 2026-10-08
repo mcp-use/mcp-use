@@ -209,7 +209,8 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       if (!accepted) return 0;
     }
 
-    const { api, organizationId } = await cloudApiForOrganization(values.org);
+    const { api, organizationId, organizationSlug } =
+      await cloudApiForOrganization(values.org);
     const existing = await readJson<ProjectLink | null>(linkPath, null);
     const createNew = values.new === true || existing === null;
     if (
@@ -287,6 +288,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       return await deployManaged({
         api,
         organizationId,
+        organizationSlug,
         cwd,
         linkPath,
         existing: createNew ? null : existing,
@@ -298,6 +300,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
     return await deployGitHub({
       api,
       organizationId,
+      organizationSlug,
       cwd,
       linkPath,
       existing: createNew ? null : existing,
@@ -371,13 +374,23 @@ function normalizeDeployPatterns(values: string[]): string[] {
 async function deployManaged(input: {
   api: CloudApi;
   organizationId: string;
+  organizationSlug: string | null;
   cwd: string;
   linkPath: string;
   existing: ProjectLink | null;
   values: DeployValues;
   json: boolean;
 }): Promise<number> {
-  const { api, organizationId, cwd, linkPath, existing, values, json } = input;
+  const {
+    api,
+    organizationId,
+    organizationSlug,
+    cwd,
+    linkPath,
+    existing,
+    values,
+    json,
+  } = input;
   const projectRoot = cwd;
   const sourceRoot = resolveContainedPath(
     cwd,
@@ -465,8 +478,8 @@ async function deployManaged(input: {
   await ensureLocalMcpUseIgnored(projectRoot);
   return finishDeployment({
     sourceType: "managed",
+    organizationSlug,
     serverId,
-    ...(serverSlug !== undefined ? { serverSlug } : {}),
     deploymentId,
     label: "managed source",
     values,
@@ -496,13 +509,23 @@ export function assertManagedArchiveSize(sizeBytes: number): void {
 async function deployGitHub(input: {
   api: CloudApi;
   organizationId: string;
+  organizationSlug: string | null;
   cwd: string;
   linkPath: string;
   existing: ProjectLink | null;
   values: DeployValues;
   json: boolean;
 }): Promise<number> {
-  const { api, organizationId, cwd, linkPath, existing, values, json } = input;
+  const {
+    api,
+    organizationId,
+    organizationSlug,
+    cwd,
+    linkPath,
+    existing,
+    values,
+    json,
+  } = input;
   let probe = await probeGit(cwd);
   let repository: string;
   let installation: Installation | undefined;
@@ -718,8 +741,8 @@ async function deployGitHub(input: {
   await ensureLocalMcpUseIgnored(repositoryRoot);
   return finishDeployment({
     sourceType: "github",
+    organizationSlug,
     serverId,
-    ...(serverSlug !== undefined ? { serverSlug } : {}),
     deploymentId,
     label: repository,
     values,
@@ -1280,10 +1303,39 @@ function normalizeGitMutationError(error: unknown, cwd: string): CommandError {
 }
 
 function parseGitHubRepository(remote: string): string {
-  const match = remote.match(
-    /github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/
-  );
-  if (match?.[1] === undefined || match[2] === undefined) {
+  let repository: string | undefined;
+
+  // Check the original Git URL syntax before URL normalizes separators or paths.
+  const rawPath = remote.match(
+    /^[a-z][a-z\d+.-]*:\/\/[^/?#\\\s]+(\/[^?#\\\s]*)$/i
+  )?.[1];
+
+  try {
+    const url = new URL(remote);
+    if (
+      rawPath !== undefined &&
+      ["http:", "https:", "ssh:", "git:"].includes(url.protocol) &&
+      url.hostname.toLowerCase() === "github.com" &&
+      url.port === "" &&
+      url.search === "" &&
+      url.hash === "" &&
+      !hasExplicitUrlPort(remote)
+    ) {
+      repository = gitHubRepositoryFromPath(rawPath);
+    }
+  } catch {
+    // Git's SCP-like remotes (for example git@github.com:owner/repo.git)
+    // are not valid URLs and are handled below.
+  }
+
+  if (repository === undefined) {
+    const scpLike = remote.match(/^(?:[^@/\s]+@)?github\.com:(.+)$/i);
+    if (scpLike?.[1] !== undefined) {
+      repository = gitHubRepositoryFromPath(`/${scpLike[1]}`);
+    }
+  }
+
+  if (repository === undefined) {
     const safeRemote = redactGitDiagnostic(remote);
     throw new CommandError(
       "unsupported_remote",
@@ -1304,7 +1356,29 @@ function parseGitHubRepository(remote: string): string {
       }
     );
   }
+  return repository;
+}
+
+function gitHubRepositoryFromPath(pathname: string): string | undefined {
+  const match = pathname.match(/^\/([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/);
+  if (
+    match?.[1] === undefined ||
+    match[2] === undefined ||
+    match[1] === "." ||
+    match[1] === ".." ||
+    match[2] === "." ||
+    match[2] === ".."
+  ) {
+    return undefined;
+  }
   return `${match[1]}/${match[2]}`;
+}
+
+function hasExplicitUrlPort(remote: string): boolean {
+  const authority = remote.match(/^[a-z][a-z\d+.-]*:\/\/([^/?#\s]+)/i)?.[1];
+  if (authority === undefined) return false;
+  const hostAndPort = authority.slice(authority.lastIndexOf("@") + 1);
+  return hostAndPort.includes(":");
 }
 
 function redactGitDiagnostic(value: string): string {
@@ -1791,14 +1865,18 @@ function deploymentNotCreated(serverId: string): CommandError {
 
 function finishDeployment(input: {
   sourceType: "github" | "managed";
+  organizationSlug: string | null;
   serverId: string;
-  serverSlug?: string | null;
   deploymentId: string;
   label: string;
   values: DeployValues;
   json: boolean;
 }): number {
-  const webUrl = `${cloudWebUrl()}/${encodeURIComponent(input.serverSlug ?? input.serverId)}`;
+  // A server slug identifies its MCP endpoint, not its dashboard page.
+  // Older organizations without a slug cannot supply a canonical dashboard URL.
+  const webUrl = input.organizationSlug
+    ? `${cloudWebUrl()}/cloud/${encodeURIComponent(input.organizationSlug)}/servers/${encodeURIComponent(input.serverId)}/overview`
+    : null;
   const result = {
     sourceType: input.sourceType,
     serverId: input.serverId,
@@ -1806,7 +1884,13 @@ function finishDeployment(input: {
     status: "pending",
     webUrl,
   };
-  if (input.values.open === true) openBrowser(webUrl);
+  if (input.values.open === true) {
+    if (webUrl !== null) openBrowser(webUrl);
+    else
+      process.stderr.write(
+        "Dashboard unavailable: the selected organization has no dashboard slug.\n"
+      );
+  }
   printResult(
     result,
     input.json,

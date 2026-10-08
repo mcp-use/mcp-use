@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
   cpSync,
@@ -28,6 +28,7 @@ import {
   deriveProjectInfo,
   findUnsafeEntries,
   getDeployCommand,
+  runPackageManager,
   updateIndexTs,
   updatePackageJson,
 } from "./utils.js";
@@ -103,37 +104,6 @@ function parseCli(argv: string[]): {
       bun: values.bun as boolean | undefined,
     },
   };
-}
-
-function runPackageManager(
-  packageManager: string,
-  args: string[],
-  cwd: string
-): Promise<{ stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(packageManager, args, {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
-    });
-
-    let stderr = "";
-    child.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve({ stderr });
-      } else {
-        reject(new Error(`${packageManager} install failed:\n${stderr}`));
-      }
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
-  });
 }
 
 function detectPackageManager(): string | null {
