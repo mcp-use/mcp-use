@@ -6,16 +6,9 @@ resolvers. Each **Create demo file** call makes a new `.md` copy under the runti
 working directory's `.mcp-use/notes-demo/`; it never resets an existing file and
 accepts a sample note ID rather than a path.
 
-## Preparation status
-
-The catalog, resource resolver, demo-file creator, and catalog view are prepared.
-Mention search uses the verified implementation from PR #2792
-(`cf9dc19545a153ab7efc2b4548d25870d89a55fe`); its empty-query suggestions and
-resource resolution are exercised through the actual MCP HTTP handler.
-The file-entrypoint editor and its conflict handling must be wired against the
-verified host-files branch before this example is runnable. The example must then
-be based on the verified mentions branch, with both feature heads present. No
-native desktop verification has been performed.
+This example requires both host-file and composer-mentions extensions from the
+stacked feature PRs. Editing a generated copy does not change the bundled catalog
+or the contents resolved by a sample-note mention.
 
 ## Run from the stacked checkout
 
@@ -41,7 +34,22 @@ The MCP endpoint is `http://127.0.0.1:3000/mcp`. Call `open-notes`, or choose
 Markdown Notes in a supporting host's global launcher. The catalog shows a note
 selector, a plain Markdown preview, **Create demo file**, and an **Open** button
 after creation. The server returns the new file's absolute path; **Open** passes
-that exact path to `useOpenFile({ path })` through the host bridge.
+that exact path to the async function returned by `useOpenFile()`.
+
+The `.md`/`.txt` file entrypoint displays a textarea, save state, **Save**,
+**Check latest**, and **Reload and discard draft**. A server tool checks
+`ctx.client.resource().path` against the bounded demo directory before the View
+mounts `useHostFile({ representation: "text", subscribe: true })`. The injected
+path stays server-side. Missing metadata, outside files, and symlinks are rejected.
+This check assumes a trusted host connection; client metadata is not an identity
+or authorization mechanism.
+
+The editor keeps the draft's base ETag separately from subscription updates and
+passes it explicitly as `ifMatch`. Conflicts retain the draft and require an
+explicit reload before another save. Checking latest preserves the draft;
+reloading replaces it with current contents and the new ETag. Read-only files,
+missing ETags, binary contents, unsupported hosts, and too-large saves show clear
+states. A failed subscription still allows manual refresh.
 
 ## Native desktop setup
 
@@ -59,26 +67,35 @@ The inspector can verify catalog rendering and MCP tool/resource calls. It
 also provides **Preview mentions** in the Tools tab for `search-notes`; try an
 empty query, `pack`, and a query with no matches. The preview displays returned
 resource names, titles, and URIs.
-The inspector
-does not establish native file-opening or desktop composer behavior. Tests using
-temporary files or a mocked host must be identified as such; neither is native
-desktop end-to-end verification.
+The inspector does not establish native file-opening or desktop composer
+behavior. Native desktop end-to-end verification has not been performed.
 
 The wire tests use the real server and MCP HTTP handler with mocked empty View
-assets. Filesystem tests create real temporary files. Neither suite simulates a
-native desktop or claims native mention insertion.
+assets and host-injected path metadata. Filesystem tests create real temporary
+files; editor tests mock the host-file hook. These tests do not establish native
+file opening, native resource read/write, or composer insertion.
 
-## Manual checklist for the completed stack
+From `libraries/typescript`, verify the production build and start flow:
+
+```sh
+pnpm verify:examples --example=views-markdown-notes
+```
+
+This starts the actual built server, loads built View assets, resolves mention
+links, and creates a demo file. Its file-entrypoint identity is explicitly mocked;
+it checks MCP contracts rather than native desktop behavior.
+
+## Manual desktop checklist
 
 - Global launch: see all three notes; create two copies and verify their names
   differ and existing edits survive another creation.
 - Open/read/save: create a copy, click **Open**, choose Markdown Notes if asked,
   read its text, edit it, and save. Verify the same physical file changed.
-  The editor must use the ETag from its loaded snapshot as explicit `ifMatch`.
+  Saves use the ETag from the loaded draft snapshot as explicit `ifMatch`.
 - External change/conflict: leave an unsaved edit, change the physical file
   externally, and verify the local draft survives. Saving with its original
   ETag must show a conflict and must not overwrite the external version. Reload
-  should be an explicit choice that replaces the draft with current file text.
+  replaces the draft only after choosing **Reload and discard draft**.
 - Read-only/unsupported: use a host that cannot write or does not implement the
   file extension. Verify a clear state and disabled save; unsupported **Open**
   should report the host error without fabricating a successful open.
