@@ -308,10 +308,13 @@ export async function mountMcp(
     const acceptHeader = c.req.header("Accept") || c.req.header("accept") || "";
     const clientSupportsSSE = acceptHeader.includes("text/event-stream");
 
-    // Use stateless mode if:
-    // 1. Explicitly configured as stateless, OR
-    // 2. Client doesn't support SSE (no text/event-stream in Accept header)
-    const useStatelessMode = config.stateless || !clientSupportsSSE;
+    // Session DELETE does not require an SSE Accept header. Route it to the
+    // original transport while preserving v1's JSON-only request mode and
+    // explicit stateless configuration.
+    const sessionId = c.req.header("mcp-session-id");
+    const isSessionDelete = c.req.method === "DELETE" && !!sessionId;
+    const useStatelessMode =
+      config.stateless || (!clientSupportsSSE && !isSessionDelete);
 
     if (useStatelessMode) {
       // STATELESS MODE: New server instance per request
@@ -365,7 +368,6 @@ export async function mountMcp(
       }
     } else {
       // STATEFUL MODE: Session management (Node.js default)
-      const sessionId = c.req.header("mcp-session-id");
 
       // Handle HEAD requests for keep-alive/health checks
       if (c.req.method === "HEAD") {
@@ -513,114 +515,159 @@ export async function mountMcp(
       // For new sessions or initialization, create new transport and server
       // Generate session ID first so we can pass it to getServerForSession for ref storage
       const newSessionId = generateUUID();
-      const server = mcpServerInstance.getServerForSession(newSessionId);
-      const transport = new WebStandardStreamableHTTPServerTransport({
-        sessionIdGenerator: () => newSessionId,
+      let allocatedServer:
+        | ReturnType<typeof mcpServerInstance.getServerForSession>
+        | undefined;
+      let allocatedTransport:
+        | InstanceType<typeof WebStandardStreamableHTTPServerTransport>
+        | undefined;
+      let sessionEstablished = false;
+      try {
+        const server = mcpServerInstance.getServerForSession(newSessionId);
+        allocatedServer = server;
+        const transport = new WebStandardStreamableHTTPServerTransport({
+          sessionIdGenerator: () => newSessionId,
 
-        onsessioninitialized: async (sid: string) => {
-          if (getDebugLevel() !== "info") {
-            console.log(`[MCP] Session initialized: ${sid}`);
-          }
-          transports.set(sid, transport);
+          onsessioninitialized: async (sid: string) => {
+            if (getDebugLevel() !== "info") {
+              console.log(`[MCP] Session initialized: ${sid}`);
+            }
+            transports.set(sid, transport);
 
-          // Store full session data in memory (includes transport, server, context)
-          const sessionData: SessionData = {
-            transport,
-            server,
-            lastAccessedAt: Date.now(),
-            context: c,
-            honoContext: c,
-          };
-          sessions.set(sid, sessionData);
+            // Store full session data in memory (includes transport, server, context)
+            const sessionData: SessionData = {
+              transport,
+              server,
+              lastAccessedAt: Date.now(),
+              context: c,
+              honoContext: c,
+            };
+            sessions.set(sid, sessionData);
 
-          // Store only serializable metadata in sessionStore
-          await sessionStore.set(sid, {
-            lastAccessedAt: Date.now(),
-          });
+            // Store only serializable metadata in sessionStore
+            await sessionStore.set(sid, {
+              lastAccessedAt: Date.now(),
+            });
 
-          // Capture client capabilities after initialization completes
-          // The server.oninitialized callback fires after the client sends the initialized notification
-          server.server.oninitialized = async () => {
-            const clientCapabilities = server.server.getClientCapabilities();
-            const clientInfo =
-              server.server.getClientVersion?.() ||
-              (server.server as any).getClientInfo?.() ||
-              {};
-            const protocolVersion =
-              (server.server as any).getProtocolVersion?.() || "unknown";
+            // Capture client capabilities after initialization completes
+            // The server.oninitialized callback fires after the client sends the initialized notification
+            server.server.oninitialized = async () => {
+              const clientCapabilities = server.server.getClientCapabilities();
+              const clientInfo =
+                server.server.getClientVersion?.() ||
+                (server.server as any).getClientInfo?.() ||
+                {};
+              const protocolVersion =
+                (server.server as any).getProtocolVersion?.() || "unknown";
 
-            // Update metadata in sessionStore
-            const metadata = await sessionStore.get(sid);
-            if (metadata) {
-              metadata.clientCapabilities = clientCapabilities;
-              metadata.clientInfo = clientInfo;
-              metadata.protocolVersion = String(protocolVersion);
-              await sessionStore.set(sid, metadata);
+              // Update metadata in sessionStore
+              const metadata = await sessionStore.get(sid);
+              if (metadata) {
+                metadata.clientCapabilities = clientCapabilities;
+                metadata.clientInfo = clientInfo;
+                metadata.protocolVersion = String(protocolVersion);
+                await sessionStore.set(sid, metadata);
 
-              if (getDebugLevel() !== "info") {
-                console.log(
-                  `[MCP] Captured client capabilities for session ${sid}:`,
-                  clientCapabilities ? Object.keys(clientCapabilities) : "none"
-                );
+                if (getDebugLevel() !== "info") {
+                  console.log(
+                    `[MCP] Captured client capabilities for session ${sid}:`,
+                    clientCapabilities
+                      ? Object.keys(clientCapabilities)
+                      : "none"
+                  );
+                }
               }
-            }
 
-            // Update in-memory session data
-            const sessionData = sessions.get(sid);
-            if (sessionData) {
-              sessionData.clientCapabilities = clientCapabilities;
-              sessionData.clientInfo = clientInfo;
-            }
+              // Update in-memory session data
+              const sessionData = sessions.get(sid);
+              if (sessionData) {
+                sessionData.clientCapabilities = clientCapabilities;
+                sessionData.clientInfo = clientInfo;
+              }
 
-            // Track server initialize event
-            Telemetry.getInstance()
-              .trackServerInitialize({
-                protocolVersion: String(protocolVersion),
-                clientInfo: clientInfo || {},
-                clientCapabilities: clientCapabilities || {},
-                sessionId: sid,
-              })
-              .catch((e) =>
-                console.debug(`Failed to track server initialize: ${e}`)
+              // Track server initialize event
+              Telemetry.getInstance()
+                .trackServerInitialize({
+                  protocolVersion: String(protocolVersion),
+                  clientInfo: clientInfo || {},
+                  clientCapabilities: clientCapabilities || {},
+                  sessionId: sid,
+                })
+                .catch((e) =>
+                  console.debug(`Failed to track server initialize: ${e}`)
+                );
+            };
+          },
+
+          onsessionclosed: async (sid: string) => {
+            if (getDebugLevel() !== "info") {
+              console.log(`[MCP] Session closed: ${sid}`);
+            }
+            transports.delete(sid);
+
+            // Clean up stream manager
+            await streamManager.delete(sid);
+
+            // Clean up session metadata
+            await sessionStore.delete(sid);
+            sessions.delete(sid);
+
+            // Clean up resource subscriptions for this session
+            mcpServerInstance.cleanupSessionSubscriptions?.(sid);
+
+            // Clean up registered refs for hot reload support
+            mcpServerInstance.cleanupSessionRefs?.(sid);
+          },
+        });
+
+        allocatedTransport = transport;
+        wrapTransportForStreamManager(transport, newSessionId, streamManager);
+
+        // Connect server to transport
+        await server.connect(transport);
+
+        const newSessionResponse = await runWithContext(
+          c,
+          async () => transport.handleRequest(c.req.raw),
+          newSessionId
+        );
+        if (c.req.method === "GET") {
+          await registerSseStream(transport, newSessionId, streamManager);
+        }
+        sessionEstablished =
+          newSessionResponse.ok &&
+          sessions.has(newSessionId) &&
+          !c.req.raw.signal.aborted;
+        return newSessionResponse;
+      } finally {
+        // Registrations are allocated before initialization. Rejected requests
+        // never become active sessions, so idle cleanup cannot find their refs.
+        // Also undo partial registration if connect, the store, or handling fails.
+        if (!sessionEstablished) {
+          transports.delete(newSessionId);
+          sessions.delete(newSessionId);
+          const cleanups = await Promise.allSettled([
+            Promise.resolve().then(() =>
+              mcpServerInstance.cleanupSessionSubscriptions?.(newSessionId)
+            ),
+            Promise.resolve().then(() =>
+              mcpServerInstance.cleanupSessionRefs?.(newSessionId)
+            ),
+            Promise.resolve().then(() => streamManager.delete(newSessionId)),
+            Promise.resolve().then(() => sessionStore.delete(newSessionId)),
+            Promise.resolve().then(() => allocatedServer?.close()),
+            Promise.resolve().then(() => allocatedTransport?.close()),
+          ]);
+          for (const cleanup of cleanups) {
+            if (cleanup.status === "rejected") {
+              console.warn(
+                `[MCP] Error cleaning up unsuccessful session ${newSessionId}:`,
+                cleanup.reason
               );
-          };
-        },
-
-        onsessionclosed: async (sid: string) => {
-          if (getDebugLevel() !== "info") {
-            console.log(`[MCP] Session closed: ${sid}`);
+            }
           }
-          transports.delete(sid);
-
-          // Clean up stream manager
-          await streamManager.delete(sid);
-
-          // Clean up session metadata
-          await sessionStore.delete(sid);
-          sessions.delete(sid);
-
-          // Clean up resource subscriptions for this session
-          mcpServerInstance.cleanupSessionSubscriptions?.(sid);
-
-          // Clean up registered refs for hot reload support
-          mcpServerInstance.cleanupSessionRefs?.(sid);
-        },
-      });
-
-      wrapTransportForStreamManager(transport, newSessionId, streamManager);
-
-      // Connect server to transport
-      await server.connect(transport);
-
-      const newSessionResponse = await runWithContext(
-        c,
-        async () => transport.handleRequest(c.req.raw),
-        newSessionId
-      );
-      if (c.req.method === "GET") {
-        await registerSseStream(transport, newSessionId, streamManager);
+        }
       }
-      return newSessionResponse;
     }
   };
 
