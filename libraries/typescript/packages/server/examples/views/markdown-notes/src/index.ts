@@ -78,9 +78,65 @@ export const createDemoFile = server.tool(
   })
 );
 
-server.mentions({
+const fileInput = z.object({
+  file: z.object({ name: z.string(), resourceUri: z.string() }),
+});
+
+/** Bind an opaque host-opened Markdown or text file to the editor View. */
+export const openNoteFile = server.tool(
+  {
+    name: "open-note-file",
+    title: "Edit demo note",
+    description: "Read and edit a Markdown Notes demo copy opened by the host.",
+    inputSchema: fileInput,
+    outputSchema: fileInput,
+    annotations: { readOnlyHint: true },
+    view: {
+      name: "note-file",
+      entrypoints: [{ type: "file", extensions: [".md", ".txt"] }],
+      description: "A plain text editor for a bounded demo file",
+      prefersBorder: true,
+    },
+  },
+  async ({ file }) => ({ content: [], structuredContent: { file } })
+);
+
+/** Check the host-injected path on the server without sending it to the View. */
+export const checkDemoFile = server.tool(
+  {
+    name: "check-demo-file",
+    title: "Check demo file",
+    description:
+      "Allow only regular Markdown or text files inside this app's demo directory.",
+    inputSchema: z.object({}),
+    outputSchema: z.object({ allowed: z.boolean(), message: z.string() }),
+    visibility: "app",
+    annotations: { readOnlyHint: true },
+  },
+  async (_args, ctx) => {
+    const resource = ctx.client.resource();
+    const allowed =
+      resource !== undefined &&
+      /\.(md|txt)$/i.test(resource.path) &&
+      (await files.contains(resource.path));
+    return {
+      content: [],
+      structuredContent: {
+        allowed,
+        message: allowed
+          ? "Demo file verified."
+          : "Open a demo copy created by Markdown Notes. Files outside the demo directory cannot be edited here.",
+      },
+    };
+  }
+);
+
+/** App-visible composer search returning links resolved by this server's resources. */
+export const searchMentions = server.mentions({
   name: "search-notes",
   title: "Search notes",
+  description:
+    "Search three bundled Markdown notes; an empty query lists all notes.",
   search: async ({ query }) => ({ items: searchNotes(query) }),
 });
 

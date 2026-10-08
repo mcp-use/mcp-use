@@ -1,3 +1,5 @@
+import type { ResourceLink } from "mcp-use";
+
 /** Bundled, immutable notes used by the catalog, resolver, and demo creator. */
 export const notes = [
   {
@@ -30,7 +32,7 @@ export function findNote(id: string) {
 }
 
 /** Return resource links whose exact URIs have app-owned resource resolvers. */
-export function searchNotes(query: string) {
+export function searchNotes(query: string): ResourceLink[] {
   const needle = query.trim().toLocaleLowerCase("en");
   return notes
     .filter((note) =>

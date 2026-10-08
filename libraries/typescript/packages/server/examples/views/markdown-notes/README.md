@@ -9,6 +9,9 @@ accepts a sample note ID rather than a path.
 ## Preparation status
 
 The catalog, resource resolver, demo-file creator, and catalog view are prepared.
+Mention search uses the verified implementation from PR #2792
+(`cf9dc19545a153ab7efc2b4548d25870d89a55fe`); its empty-query suggestions and
+resource resolution are exercised through the actual MCP HTTP handler.
 The file-entrypoint editor and its conflict handling must be wired against the
 verified host-files branch before this example is runnable. The example must then
 be based on the verified mentions branch, with both feature heads present. No
@@ -53,9 +56,17 @@ files the host can open. The example does not synthesize browser `file://` URLs
 or translate cloud paths into local desktop paths.
 
 The inspector can verify catalog rendering and MCP tool/resource calls. It
+also provides **Preview mentions** in the Tools tab for `search-notes`; try an
+empty query, `pack`, and a query with no matches. The preview displays returned
+resource names, titles, and URIs.
+The inspector
 does not establish native file-opening or desktop composer behavior. Tests using
 temporary files or a mocked host must be identified as such; neither is native
 desktop end-to-end verification.
+
+The wire tests use the real server and MCP HTTP handler with mocked empty View
+assets. Filesystem tests create real temporary files. Neither suite simulates a
+native desktop or claims native mention insertion.
 
 ## Manual checklist for the completed stack
 
