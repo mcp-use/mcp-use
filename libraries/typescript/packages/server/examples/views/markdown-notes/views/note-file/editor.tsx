@@ -28,14 +28,12 @@ export function NoteEditor() {
 
   async function save() {
     if (!draft?.etag || !file.canWrite || busy || conflict) return;
+    const ifMatch = draft.etag;
     const submitted = draft;
     setBusy(true);
     setMessage("");
     try {
-      const result = await file.write(
-        { text: submitted.text },
-        { ifMatch: submitted.etag! }
-      );
+      const result = await file.write({ text: submitted.text }, { ifMatch });
       if (result.outcome === "saved") {
         setDraft({
           text: submitted.text,
@@ -147,8 +145,8 @@ export function NoteEditor() {
       </header>
       {readOnly && (
         <p role="status" className="text-sm">
-          Read only: the host has not provided write permission and a version
-          token.
+          Read only: the host has not provided both write permission and a
+          version token.
         </p>
       )}
       {changed && (

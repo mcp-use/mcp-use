@@ -124,8 +124,10 @@ export const checkDemoFile = server.tool(
       structuredContent: {
         allowed,
         message: allowed
-          ? "Demo file verified."
-          : "Open a demo copy created by Markdown Notes. Files outside the demo directory cannot be edited here.",
+          ? "Demo file checked."
+          : resource === undefined
+            ? "The host did not provide opened-file metadata. Open a demo copy in a supporting native desktop host."
+            : "Open a demo copy created by Markdown Notes. Files outside the demo directory cannot be edited here.",
       },
     };
   }

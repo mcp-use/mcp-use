@@ -1526,6 +1526,12 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
     devDependencies:
+      happy-dom:
+        specifier: ^20.10.6
+        version: 20.10.6
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1

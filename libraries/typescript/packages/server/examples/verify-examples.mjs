@@ -315,6 +315,93 @@ async function assertScenario(connection, example, origin) {
       .map((item) => item.text)
       .join("\n") ?? "";
   switch (example.scenario) {
+    case "markdown-notes": {
+      const catalog = await connection.callTool("open-notes", {});
+      const notes = catalog.structuredContent?.notes;
+      if (!Array.isArray(notes) || notes.length !== 3)
+        throw new Error(
+          "Markdown Notes did not return its three-note catalog."
+        );
+      const emptyQuery = await connection.callTool("search-notes", {
+        query: "",
+      });
+      const links = emptyQuery.structuredContent?.items;
+      if (!Array.isArray(links) || links.length !== 3)
+        throw new Error("Empty mention search did not return all three notes.");
+      for (const link of links) {
+        const note = notes.find((item) => item.id === link.name);
+        const resource = await connection.readResource(link.uri);
+        if (
+          link.type !== "resource_link" ||
+          !note ||
+          resource.contents?.[0]?.text !== note.content
+        )
+          throw new Error(
+            "A note mention did not resolve to its catalog contents."
+          );
+      }
+      const typed = await connection.callTool("search-notes", {
+        query: "pack",
+      });
+      if (
+        typed.structuredContent?.items?.length !== 1 ||
+        typed.structuredContent.items[0]?.name !== "packing-list"
+      )
+        throw new Error("Composer typeahead did not find Packing list.");
+      const missing = await connection.callTool("search-notes", {
+        query: "no-such-note",
+      });
+      if (missing.structuredContent?.items?.length !== 0)
+        throw new Error(
+          "No-match mention search did not return an empty list."
+        );
+      const created = await connection.callTool("create-demo-file", {
+        noteId: "welcome",
+      });
+      const file = created.structuredContent;
+      const root = resolve(
+        examplesRoot,
+        example.directory,
+        ".mcp-use",
+        "notes-demo"
+      );
+      if (
+        typeof file?.path !== "string" ||
+        typeof file.name !== "string" ||
+        dirname(file.path) !== root ||
+        file.path !== join(root, file.name)
+      )
+        throw new Error(
+          "Demo creation did not return a bounded absolute runtime path."
+        );
+      try {
+        if (
+          (await readFile(file.path, "utf8")) !==
+          notes.find((note) => note.id === "welcome")?.content
+        )
+          throw new Error("The generated demo file did not contain Welcome.");
+        // Mocked opaque host identity; this call checks the server contract only.
+        const input = {
+          file: {
+            name: file.name,
+            resourceUri: "mock-host://notes/created-copy",
+          },
+        };
+        const opened = await connection.callTool("open-note-file", input);
+        if (JSON.stringify(opened.structuredContent) !== JSON.stringify(input))
+          throw new Error(
+            "File entrypoint did not preserve its opaque host identity."
+          );
+        const denied = await connection.callTool("check-demo-file", {});
+        if (denied.structuredContent?.allowed !== false)
+          throw new Error(
+            "File editing was allowed without host-injected metadata."
+          );
+      } finally {
+        await rm(file.path, { force: true });
+      }
+      return;
+    }
     case "basic": {
       const result = await connection.callTool("greet", { name: "Ada" });
       if (!text(result).includes("Ada"))
