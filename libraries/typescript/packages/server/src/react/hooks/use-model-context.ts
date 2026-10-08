@@ -34,6 +34,28 @@ import type {
  * Keep removable evidence out of duplicate view state or description fields.
  * Audience annotations affect presentation, not access by the model.
  *
+ * @example
+ * ```tsx
+ * import { useModelContext } from "mcp-use/react";
+ *
+ * function Selection() {
+ *   const { add, pending, error } = useModelContext();
+ *   async function select() {
+ *     try {
+ *       await add("selected-item", { type: "text", text: "Selected item: Blue mug" });
+ *     } catch (error) {
+ *       console.error("Could not deliver model context", error);
+ *     }
+ *   }
+ *   return (
+ *     <>
+ *       <button disabled={pending} onClick={select}>Share selection</button>
+ *       {error && <p role="alert">{error.message}</p>}
+ *     </>
+ *   );
+ * }
+ * ```
+ *
  * @returns Shared attachments, pending/error, and stable mutation methods.
  */
 export function useModelContext(): ModelContextHandle {
