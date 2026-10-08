@@ -227,11 +227,79 @@ describe("OpenAI Responses streaming", () => {
       events.push(event);
     }
 
+    const delta = events.find((e) => e.type === "tool-call-args-delta");
+    expect(delta).toMatchObject({
+      toolCallId: "call_xyz",
+      toolName: "tool_c",
+      argsDelta: '{"city":"Rome"}',
+    });
     const ready = events.find((e) => e.type === "tool-call-ready");
     expect(ready).toMatchObject({
       toolCallId: "call_xyz",
       toolName: "tool_c",
       args: { city: "Rome" },
+    });
+  });
+
+  it("resolves call_id-keyed events when item id equals call_id", async () => {
+    // A producer can send identical item.id and call_id and tag the
+    // arguments events with call_id only. The call: alias must still be in
+    // the map, or those events lose the arguments.
+    const sse = sseBody([
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: {
+          id: "same_id",
+          type: "function_call",
+          call_id: "same_id",
+          name: "tool_d",
+          arguments: "",
+        },
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        call_id: "same_id",
+        output_index: 0,
+        delta: '{"n":2}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        call_id: "same_id",
+        output_index: 0,
+        arguments: '{"n":2}',
+      },
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(sse, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )
+    );
+
+    const events = [];
+    for await (const event of streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-5-nano", apiKey: "test-key" },
+      input: [],
+      tools: [],
+    })) {
+      events.push(event);
+    }
+
+    const delta = events.find((e) => e.type === "tool-call-args-delta");
+    expect(delta).toMatchObject({
+      toolCallId: "same_id",
+      toolName: "tool_d",
+      argsDelta: '{"n":2}',
+    });
+    const ready = events.find((e) => e.type === "tool-call-ready");
+    expect(ready).toMatchObject({
+      toolCallId: "same_id",
+      toolName: "tool_d",
+      args: { n: 2 },
     });
   });
 });

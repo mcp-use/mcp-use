@@ -329,10 +329,11 @@ export async function* streamResponsesTurn(
         };
         // Prefix the map keys: a nonstandard producer can hand out an
         // item id that equals another call's call_id, and unprefixed keys
-        // would let the second call's entry overwrite the first.
+        // would let the second call's entry overwrite the first. The call:
+        // alias goes in unconditionally, since arguments events may key on
+        // call_id when item_id is absent or empty.
         if (itemId) callBuffers.set(`item:${itemId}`, buffer);
-        if (!itemId || itemId !== callId)
-          callBuffers.set(`call:${callId}`, buffer);
+        callBuffers.set(`call:${callId}`, buffer);
         yield {
           type: "tool-call-start",
           index: idx,
