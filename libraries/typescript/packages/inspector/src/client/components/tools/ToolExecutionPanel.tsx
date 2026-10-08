@@ -33,8 +33,13 @@ import { copyToClipboard } from "@/client/utils/browser";
 import { cn } from "@/client/lib/utils";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { ToolInputForm } from "./ToolInputForm";
+import {
+  MentionSearchPreview,
+  type MentionPreviewCall,
+} from "./MentionSearchPreview";
 
 interface ToolExecutionPanelProps {
+  callTool?: MentionPreviewCall;
   selectedTool: Tool | null;
   toolArgs: Record<string, unknown>;
   payloadToSend?: Record<string, unknown>;
@@ -56,6 +61,7 @@ interface ToolExecutionPanelProps {
 }
 
 export function ToolExecutionPanel({
+  callTool,
   selectedTool,
   toolArgs,
   payloadToSend,
@@ -371,6 +377,14 @@ export function ToolExecutionPanel({
           </div>
         )}
 
+        {callTool && (
+          <MentionSearchPreview
+            key={selectedTool.name}
+            tool={selectedTool}
+            callTool={callTool}
+            isConnected={isConnected}
+          />
+        )}
         <ToolInputForm
           selectedTool={selectedTool}
           toolArgs={toolArgs}

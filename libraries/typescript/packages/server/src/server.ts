@@ -75,6 +75,13 @@ import {
   type SettingsValues,
 } from "./settings.js";
 import { normalizeCompletions } from "./resource-completion.js";
+import {
+  prepareMentions,
+  finalizeMentionsMeta,
+  type MentionsRegistration,
+  type MentionSearchParams,
+  type MentionSearchResult,
+} from "./mentions.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
 import { getOAuthProtectedResourceMetadataUrl } from "./oauth/index.js";
@@ -255,6 +262,8 @@ function clientUsage(
 
 /** Type-erased registry entry replayed when a per-request SDK server is built. */
 interface ToolEntry<TUser, TEnv extends Env> {
+  /** Generated mention tools retain app visibility after UI serialization. */
+  mentions?: true;
   /** Declarative tool metadata and schemas supplied at registration time. */
   definition: ToolDefinition;
   /** Tool callback widened for heterogeneous storage in the registry. */
@@ -686,6 +695,40 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       },
     }));
     this.#settings = prepared;
+  }
+
+  /**
+   * Register a composer mention search tool before startup.
+   *
+   * Search receives the ordinary request context, authentication defaults, and
+   * cancellation signal. Authorization, ranking, limits, and resource identity
+   * remain application-owned. Hosts may ignore the marker; explicit tool calls
+   * still work. App visibility is always included, without requiring a View.
+   *
+   * @param options - Tool descriptor and search callback returning resource links.
+   * @returns A normal tool reference with typed query input and link output.
+   * @throws When started, the name or callback is invalid, or the name collides.
+   */
+  mentions<const Name extends string>(
+    options: MentionsRegistration<
+      RequestContext<TUser, HasOAuth<TUser>, TEnv>,
+      Name
+    >
+  ): ToolRef<Name, MentionSearchParams, MentionSearchResult> {
+    this.#assertNotStarted("mentions", options.name);
+    const definition = prepareMentions(options);
+    if (this.#tools.has(options.name))
+      throw new Error(`Mention tool "${options.name}" is already registered`);
+    const search = options.search;
+    const ref = this.tool(definition, async (params, ctx) => ({
+      content: [],
+      structuredContent: await search(
+        params,
+        ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>
+      ),
+    }));
+    this.#tools.get(options.name)!.mentions = true;
+    return ref;
   }
 
   /**
@@ -2215,11 +2258,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const { definition, callback, schemes } = entry;
     const view = definition.view;
 
-    const uiMeta = buildToolUiMeta(
+    const serializedUiMeta = buildToolUiMeta(
       view?.name,
       definition.visibility,
       buildEntrypointMeta(definition)
     );
+    const uiMeta = entry.mentions
+      ? finalizeMentionsMeta(definition, serializedUiMeta)
+      : serializedUiMeta;
     // Hand-written `_meta.securitySchemes` is already in `uiMeta`; only the
     // generated schemes are added here.
     const toolMeta = this.#generatesSecuritySchemes(entry)
