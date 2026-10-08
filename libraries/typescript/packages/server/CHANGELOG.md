@@ -1,5 +1,19 @@
 # mcp-use
 
+## 2.8.1
+
+### Patch Changes
+
+- 6bf3a79: Prevent request logging from buffering SSE responses so tool progress and log notifications reach clients before tool completion. SSE response bodies are skipped at every logging level, including trace, while finite JSON outcome logging is preserved.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies [6bf3a79]
+- Updated dependencies [6bf3a79]
+- Updated dependencies [6bf3a79]
+- Updated dependencies [6bf3a79]
+- Updated dependencies [6bf3a79]
+  - @mcp-use/cli@4.3.1
+  - @mcp-use/inspector@20.3.17
+
 ## 2.8.1-canary.4
 
 ### Patch Changes
