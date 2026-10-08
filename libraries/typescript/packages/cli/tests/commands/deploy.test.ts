@@ -7,9 +7,12 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { gunzipSync } from "node:zlib";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -39,6 +42,7 @@ import {
 } from "../../src/commands/deploy.js";
 
 const directories: string[] = [];
+const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -470,6 +474,8 @@ describe("deploy agent contract", () => {
       join(directory, "node_modules", "dep.js"),
       "console.log('dep');\n"
     );
+    await mkdir(join(directory, ".git"));
+    await writeFile(join(directory, ".git", "config"), "[core]\n");
 
     api.multipartRequest.mockResolvedValue({
       server: { id: "srv_bypass", slug: "gitignore-bypass-safety" },
@@ -489,6 +495,111 @@ describe("deploy agent contract", () => {
     expect(entries).not.toContain("app/.envrc");
     expect(entries).not.toContain("app/.DS_Store");
     expect(entries.some((entry) => entry.includes("node_modules"))).toBe(false);
+    expect(entries).not.toContain("app/.git/config");
+    expect(entries.some((entry) => entry.includes("/.git/"))).toBe(false);
+  });
+
+  it("preserves case-sensitive Git ignore matching in archive contents", async () => {
+    const directory = await project("gitignore-case-sensitive");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await writeFile(join(directory, ".gitignore"), "config.ts\n");
+    await writeFile(
+      join(directory, "Config.ts"),
+      "export const title = 'Config';\n"
+    );
+    await mkdir(join(directory, "nested"));
+    await writeFile(
+      join(directory, "nested", "config.ts"),
+      "export const title = 'config';\n"
+    );
+    await writeFile(
+      join(directory, "nested", "other.ts"),
+      "export const other = true;\n"
+    );
+
+    api.multipartRequest.mockResolvedValue({
+      server: { id: "srv_case", slug: "gitignore-case-sensitive" },
+      deploymentId: "dep_case",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--no-github", "--region", "US", "--json"])
+    ).resolves.toBe(0);
+
+    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
+    const entries = await archiveEntries(form.get("sourceFile") as Blob);
+
+    // Case-distinct allowed file is preserved
+    expect(entries).toContain("app/Config.ts");
+    // Traversal inside nested directory succeeds for non-ignored files
+    expect(entries).toContain("app/nested/other.ts");
+    // Matching-case exclusion control is excluded
+    expect(entries).not.toContain("app/nested/config.ts");
+  });
+
+  it("settles the archive collector without unhandled rejection when .gitignore is a directory", async () => {
+    const directory = await project("gitignore-is-directory");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await mkdir(join(directory, ".gitignore"));
+
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          user_id: "u1",
+          email: "test@example.com",
+          profiles: [
+            { id: "org_1", profile_name: "Org", slug: "org", role: "admin" },
+          ],
+          default_profile_id: "org_1",
+        })
+      );
+    });
+
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", () => resolve())
+    );
+    const port = (server.address() as { port: number }).port;
+    const binPath = fileURLToPath(
+      new URL("../../dist/bin.js", import.meta.url)
+    );
+
+    try {
+      await execFileAsync(
+        process.execPath,
+        [binPath, "deploy", directory, "--no-github", "--json"],
+        {
+          env: {
+            ...process.env,
+            MCP_USE_API_KEY: "test_key",
+            MCP_USE_CLOUD_API_URL: `http://127.0.0.1:${port}/api/v1`,
+          },
+        }
+      );
+      expect.unreachable("expected deploy to fail");
+    } catch (error: unknown) {
+      const execError = error as {
+        code?: number;
+        stderr: string;
+        stdout: string;
+      };
+      expect(execError.code).toBe(1);
+      const lines = execError.stderr.trim().split(/\r?\n/).filter(Boolean);
+      expect(lines).toHaveLength(1);
+      const parsed = JSON.parse(lines[0]!);
+      expect(parsed).toMatchObject({
+        error: {
+          code: "command_failed",
+          message: expect.stringMatching(/EISDIR|EPERM/),
+        },
+      });
+      expect(execError.stderr).not.toContain("UnhandledPromiseRejection");
+      expect(execError.stderr).not.toContain("triggerUncaughtException");
+    } finally {
+      server.closeAllConnections?.();
+      server.close();
+    }
   });
 
   it("accepts -y as the documented non-interactive consent alias", async () => {

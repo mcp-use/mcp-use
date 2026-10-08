@@ -1343,6 +1343,7 @@ async function installationFor(
 }
 
 async function packProject(projectRoot: string): Promise<Buffer> {
+  const ig = await loadGitIgnore(projectRoot);
   const gzip = createGzip();
   const chunks: Buffer[] = [];
   const collecting = (async () => {
@@ -1351,12 +1352,12 @@ async function packProject(projectRoot: string): Promise<Buffer> {
     }
   })();
   try {
-    const ig = await loadGitIgnore(projectRoot);
     await addDirectoryToArchive(gzip, projectRoot, "", ig);
     await writeArchiveChunk(gzip, Buffer.alloc(1024));
     gzip.end();
   } catch (error) {
     gzip.destroy(error instanceof Error ? error : new Error(String(error)));
+    await collecting.catch(() => {});
     throw error;
   }
   await collecting;
@@ -1367,7 +1368,7 @@ async function loadGitIgnore(projectRoot: string): Promise<Ignore | undefined> {
   try {
     const gitignorePath = join(projectRoot, ".gitignore");
     const content = await readFile(gitignorePath, "utf8");
-    return ignore().add(content);
+    return ignore({ ignorecase: false }).add(content);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     return undefined;
