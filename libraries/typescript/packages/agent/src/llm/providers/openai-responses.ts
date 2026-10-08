@@ -327,8 +327,12 @@ export async function* streamResponsesTurn(
           argsJson: "",
           started: true,
         };
-        callBuffers.set(itemId ?? callId, buffer);
-        if (itemId && itemId !== callId) callBuffers.set(callId, buffer);
+        // Prefix the map keys: a nonstandard producer can hand out an
+        // item id that equals another call's call_id, and unprefixed keys
+        // would let the second call's entry overwrite the first.
+        if (itemId) callBuffers.set(`item:${itemId}`, buffer);
+        if (!itemId || itemId !== callId)
+          callBuffers.set(`call:${callId}`, buffer);
         yield {
           type: "tool-call-start",
           index: idx,
@@ -342,10 +346,10 @@ export async function* streamResponsesTurn(
     if (type === "response.function_call_arguments.delta") {
       // These events carry `item_id`, not `call_id`.
       const eventKey =
-        typeof parsed.item_id === "string"
-          ? parsed.item_id
+        typeof parsed.item_id === "string" && parsed.item_id !== ""
+          ? `item:${parsed.item_id}`
           : typeof parsed.call_id === "string"
-            ? parsed.call_id
+            ? `call:${parsed.call_id}`
             : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
       const buf = callBuffers.get(eventKey);
@@ -371,10 +375,10 @@ export async function* streamResponsesTurn(
     if (type === "response.function_call_arguments.done") {
       // These events carry `item_id`, not `call_id`.
       const eventKey =
-        typeof parsed.item_id === "string"
-          ? parsed.item_id
+        typeof parsed.item_id === "string" && parsed.item_id !== ""
+          ? `item:${parsed.item_id}`
           : typeof parsed.call_id === "string"
-            ? parsed.call_id
+            ? `call:${parsed.call_id}`
             : "";
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";

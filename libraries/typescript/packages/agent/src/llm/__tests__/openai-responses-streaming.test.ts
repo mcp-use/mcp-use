@@ -109,4 +109,129 @@ describe("OpenAI Responses streaming", () => {
       args: { message: "Drawer test" },
     });
   });
+
+  it("keeps calls apart when one call's item id equals another's call_id", async () => {
+    // A nonstandard producer can hand out an fc_... item id that equals some
+    // other call's call_id. Unprefixed map keys would let the second call's
+    // entry overwrite the first, and the first call's deltas would come out
+    // with the second call's toolCallId and toolName.
+    const sse = sseBody([
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: {
+          id: "fc_1",
+          type: "function_call",
+          call_id: "call_1",
+          name: "tool_a",
+          arguments: "",
+        },
+      },
+      {
+        type: "response.output_item.added",
+        output_index: 1,
+        item: {
+          id: "fc_2",
+          type: "function_call",
+          call_id: "fc_1",
+          name: "tool_b",
+          arguments: "",
+        },
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        item_id: "fc_1",
+        output_index: 0,
+        delta: '{"a":1}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "fc_1",
+        output_index: 0,
+        arguments: '{"a":1}',
+      },
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(sse, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )
+    );
+
+    const events = [];
+    for await (const event of streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-5-nano", apiKey: "test-key" },
+      input: [],
+      tools: [],
+    })) {
+      events.push(event);
+    }
+
+    const delta = events.find((e) => e.type === "tool-call-args-delta");
+    expect(delta).toMatchObject({ toolCallId: "call_1", toolName: "tool_a" });
+    const ready = events.find((e) => e.type === "tool-call-ready");
+    expect(ready).toMatchObject({
+      toolCallId: "call_1",
+      toolName: "tool_a",
+      args: { a: 1 },
+    });
+  });
+
+  it("falls back to call_id when item_id is an empty string", async () => {
+    const sse = sseBody([
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: {
+          id: "",
+          type: "function_call",
+          call_id: "call_xyz",
+          name: "tool_c",
+          arguments: "",
+        },
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        item_id: "",
+        call_id: "call_xyz",
+        output_index: 0,
+        delta: '{"city":"Rome"}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "",
+        call_id: "call_xyz",
+        output_index: 0,
+        arguments: '{"city":"Rome"}',
+      },
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(sse, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )
+    );
+
+    const events = [];
+    for await (const event of streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-5-nano", apiKey: "test-key" },
+      input: [],
+      tools: [],
+    })) {
+      events.push(event);
+    }
+
+    const ready = events.find((e) => e.type === "tool-call-ready");
+    expect(ready).toMatchObject({
+      toolCallId: "call_xyz",
+      toolName: "tool_c",
+      args: { city: "Rome" },
+    });
+  });
 });
