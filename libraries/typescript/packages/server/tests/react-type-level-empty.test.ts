@@ -6,6 +6,15 @@ import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
 import type { ToolRef } from "../src/index.js";
+import type {
+  useHostFile,
+  useOpenFile,
+  HostFileHandle,
+  HostFileOptions,
+  HostFileContent,
+  HostFileData,
+  ResourceWriteResult,
+} from "../src/react/index.js";
 import type { DeepPartial } from "../src/react/types/register.js";
 import type {
   CallToolHandle,
@@ -114,5 +123,33 @@ describe("useCallTool empty Register", () => {
     >().toEqualTypeOf<FromExplicit>();
 
     expect(true).toBe(true);
+  });
+});
+
+describe("host file public types", () => {
+  it("binds reads without a URI argument and requires guarded writes", () => {
+    expectTypeOf<typeof useHostFile>().parameters.toEqualTypeOf<
+      [options?: HostFileOptions | undefined]
+    >();
+    expectTypeOf<
+      ReturnType<typeof useHostFile>
+    >().toEqualTypeOf<HostFileHandle>();
+    expectTypeOf<Parameters<HostFileHandle["write"]>>().toEqualTypeOf<
+      [HostFileContent, { ifMatch: string }]
+    >();
+    expectTypeOf<ReturnType<HostFileHandle["write"]>>().toEqualTypeOf<
+      Promise<ResourceWriteResult>
+    >();
+    expectTypeOf<{
+      text: string;
+      blob: string;
+    }>().not.toMatchTypeOf<HostFileContent>();
+    expectTypeOf<ReturnType<typeof useOpenFile>>().toEqualTypeOf<
+      (args: { path: string }) => Promise<void>
+    >();
+  });
+  it("narrows text/blob reads without conversion", () => {
+    const data: HostFileData = { uri: "opaque", text: "", writable: false };
+    if ("text" in data) expectTypeOf(data.text).toEqualTypeOf<string>();
   });
 });

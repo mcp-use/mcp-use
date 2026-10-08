@@ -9,6 +9,12 @@ import type {
   ContentBlock,
 } from "@modelcontextprotocol/server";
 
+import {
+  EmptyResultSchema,
+  ResourceUpdatedNotificationParamsSchema,
+} from "@modelcontextprotocol/core";
+import { HostFileStore } from "./host-file-store.js";
+
 import type { DisplayMode } from "../types/host-types.js";
 import type { FileMetadata } from "../types/file-types.js";
 import {
@@ -176,6 +182,9 @@ export interface McpAppRuntime {
    */
   readonly modelContextStore: ModelContextStore;
 
+  /** Runtime-owned opening file, shared subscription, and write serialization. */
+  readonly hostFileStore: HostFileStore;
+
   /** Connect once, or return the cached in-flight / settled connection promise. */
   connect(): Promise<App>;
   /**
@@ -225,6 +234,8 @@ export interface McpAppRuntime {
   sendMessage(params: SendMessageParams): Promise<void>;
   /** Ask the host to open an external link. */
   openLink(params: OpenLinkParams): Promise<void>;
+  /** Ask the host to open a server-provided absolute file path. */
+  openFile(params: { path: string }): Promise<void>;
   /** Request a display-mode change from the host. */
   requestDisplayMode(params: RequestDisplayModeParams): Promise<void>;
   /** Notify the host of a size change. */
@@ -439,6 +450,7 @@ export function createMcpAppRuntime(
     }
     hostSnapshot = { ...hostSnapshot, ...patch };
     hostChannel.emit();
+    hostFileStore.sync();
   }
 
   function syncThemeFromHost(hostContext: McpUiHostContext | undefined): void {
@@ -488,6 +500,7 @@ export function createMcpAppRuntime(
     // lifecycle notifications must not mutate the View context.
     app.ontoolinput = (params) => {
       if (disposed || toolSnapshot.status !== "pending") return;
+      hostFileStore.receiveInput(params.arguments ?? {});
       patchTool({ toolInput: params.arguments ?? {} });
     };
 
@@ -572,6 +585,13 @@ export function createMcpAppRuntime(
     );
     installEmptyToolHandlers(app);
     installRuntimeEventHandlers(app);
+    app.setNotificationHandler(
+      "notifications/resources/updated",
+      { params: ResourceUpdatedNotificationParamsSchema },
+      (params) => {
+        if (!disposed) hostFileStore.updated(params.uri);
+      }
+    );
     return app;
   }
 
@@ -631,6 +651,11 @@ export function createMcpAppRuntime(
   }
 
   const modelContextStore = new ModelContextStore({ connect });
+  const hostFileStore = new HostFileStore({
+    app,
+    connect,
+    getHostSnapshot: () => hostSnapshot,
+  });
 
   function registerViewTool(
     name: string,
@@ -663,6 +688,8 @@ export function createMcpAppRuntime(
     if (disposed) return;
     disposed = true;
     modelContextStore.dispose();
+    app.removeNotificationHandler("notifications/resources/updated");
+    const hostFileDisposal = hostFileStore.dispose();
     toolRegistryActivated = false;
     toolChannel.clear();
     hostChannel.clear();
@@ -680,6 +707,7 @@ export function createMcpAppRuntime(
     if (activeRuntime === runtime) {
       activeRuntime = null;
     }
+    await hostFileDisposal;
     await closeAppQuietly(app);
   }
 
@@ -713,6 +741,27 @@ export function createMcpAppRuntime(
       );
     }
     await app.openLink(params);
+  }
+
+  async function openFile(params: { path: string }): Promise<void> {
+    if (typeof params?.path !== "string" || !params.path.trim()) {
+      throw new Error(
+        "Opening a host file requires a non-blank server-provided path"
+      );
+    }
+    const path = params.path;
+    const app = await connect();
+    if (
+      app.getHostCapabilities()?.experimental?.["openai/files"] === undefined
+    ) {
+      throw new Error(
+        "Host does not advertise the openai/files capability required to open files"
+      );
+    }
+    await app.request(
+      { method: "openai/files/open", params: { path } },
+      EmptyResultSchema
+    );
   }
 
   async function requestDisplayMode(
@@ -779,6 +828,7 @@ export function createMcpAppRuntime(
   const runtime: McpAppRuntime = {
     config,
     modelContextStore,
+    hostFileStore,
     connect,
     dispose,
     subscribeTool: toolChannel.subscribe,
@@ -795,6 +845,7 @@ export function createMcpAppRuntime(
     callServerTool,
     sendMessage,
     openLink,
+    openFile,
     requestDisplayMode,
     sendSizeChanged,
     uploadFile,

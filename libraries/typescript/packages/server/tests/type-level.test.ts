@@ -715,3 +715,8 @@ describe("prompt input_required return-position checks", () => {
     expect(server).toBeDefined();
   });
 });
+
+// Request-scoped metadata never implies a path exists.
+expectTypeOf<ReturnType<RequestClientContext["resource"]>>().toEqualTypeOf<
+  { path: string } | undefined
+>();

@@ -163,6 +163,16 @@ function buildViewsServer(): MCPServer {
     };
   });
 
+  server.tool({ name: "client-resource-probe" }, async (_params, ctx) => {
+    const resource = ctx.client.resource();
+    if (resource) resource.path = "mutated";
+    // Intentional disclosure by this probe; ordinary tools do not expose paths.
+    return {
+      content: [],
+      structuredContent: { resource: ctx.client.resource() ?? null },
+    };
+  });
+
   server.tool({ name: "client-user-probe" }, async (_params, ctx) => {
     const user = ctx.client.user();
     if (user !== undefined) {
@@ -889,6 +899,53 @@ describe("views server core (e2e over HTTP)", () => {
       extension: null,
       supportsViews: false,
     });
+  });
+
+  it("extracts request-scoped resource paths with fresh objects and intentional disclosure only", async () => {
+    const paths = ["/execution/a.md", "C:\\execution\\b.md", " /opaque path "];
+    const results = await Promise.all(
+      paths.map((path) =>
+        uiClient.callTool({
+          name: "client-resource-probe",
+          arguments: {},
+          _meta: { "openai/resource": { path } },
+        })
+      )
+    );
+    results.forEach((result, index) =>
+      expect(result.structuredContent).toEqual({
+        resource: { path: paths[index] },
+      })
+    );
+    const absent = await uiClient.callTool({
+      name: "client-resource-probe",
+      arguments: {},
+    });
+    expect(absent.structuredContent).toEqual({ resource: null });
+    const ordinary = await uiClient.callTool({
+      name: "search-fruits",
+      arguments: {},
+      _meta: { "openai/resource": { path: "/execution/private.md" } },
+    });
+    expect(JSON.stringify(ordinary)).not.toContain("/execution/private.md");
+  });
+
+  it.each([
+    null,
+    [],
+    "file:///execution/a",
+    {},
+    { path: null },
+    { path: 1 },
+    { path: "" },
+    { path: "   " },
+  ])("ignores malformed request resource metadata %j", async (resource) => {
+    const result = await uiClient.callTool({
+      name: "client-resource-probe",
+      arguments: {},
+      _meta: { "openai/resource": resource },
+    });
+    expect(result.structuredContent).toEqual({ resource: null });
   });
 
   it("normalizes current OpenAI user metadata and returns defensive copies", async () => {
