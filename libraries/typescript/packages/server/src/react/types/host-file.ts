@@ -84,6 +84,8 @@ export interface HostFileHandle {
   /**
    * Replace the opened file's contents using an explicit draft base token.
    * Conflict tokens are never attached to old contents; refresh to reconcile.
+   * A newer read or host invalidation during a save is retained when its response
+   * arrives; the promise still returns the host outcome for the submitted contents.
    * @param content - Exactly one of text or base64 blob.
    * @param options - Required non-empty opaque ETag in `ifMatch`.
    * @returns The verified host outcome, without automatic retries.

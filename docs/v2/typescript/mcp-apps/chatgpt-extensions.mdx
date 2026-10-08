@@ -542,7 +542,10 @@ export default function NoteEditor() {
 For conflict reconciliation, call `await file.refresh()` to obtain the current
 contents and ETag, then explicitly review or merge them with your retained draft.
 The SDK does not attach a conflict token to old contents or automatically retry
-a save. `saved` adopts the submitted contents and returned ETag; `conflict` and
+a save. `saved` adopts the submitted contents and returned ETag unless a newer
+read or host invalidation arrived while that save was in flight. In that case the
+newer snapshot or pending invalidation is retained, while the promise still
+returns the host outcome for the submitted contents. `conflict` and
 `too-large` retain the previous contents and token. After a conflict or failed
 read/write, refresh successfully before saving again.
 

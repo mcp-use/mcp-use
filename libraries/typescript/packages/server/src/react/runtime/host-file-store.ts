@@ -14,10 +14,15 @@ const RESOURCE_EXTENSION = "openai/resource";
 // EmptyResultSchema is strict, and standard resource unions strip extra fields.
 const hostResultSchema = ResultSchema.passthrough();
 
-type Opening =
+type Opening = Readonly<
   | { status: "pending" | "unsupported" }
   | { status: "error"; error: Error }
-  | { status: "file"; file: NonNullable<HostFileHandle["file"]> };
+  | { status: "file"; file: Readonly<NonNullable<HostFileHandle["file"]>> }
+>;
+interface SaveFence {
+  revision: number;
+  readSequence: number;
+}
 type Snapshot = Omit<HostFileHandle, "refresh" | "write">;
 type SnapshotPatch = { [K in keyof Snapshot]?: Snapshot[K] | undefined };
 interface Host {
@@ -67,7 +72,7 @@ function writeResult(value: unknown): ResourceWriteResult {
 
 /** Runtime-owned opening identity, write queue and shared subscription. @internal */
 export class HostFileStore {
-  opening: Opening = { status: "pending" };
+  #opening: Opening = Object.freeze({ status: "pending" });
   disposed = false;
   saveRevision = 0;
   writable = false;
@@ -88,18 +93,22 @@ export class HostFileStore {
 
   /** Capture only the first complete rendering input. */
   receiveInput(input: Record<string, unknown>): void {
-    if (this.disposed || this.opening.status !== "pending") return;
-    if (!("file" in input)) this.opening = { status: "unsupported" };
+    if (this.disposed || this.#opening.status !== "pending") return;
+    if (!("file" in input))
+      this.#opening = Object.freeze({ status: "unsupported" });
     else {
       const file = record(input.file);
-      this.opening =
+      const opening: Opening =
         file &&
         typeof file.name === "string" &&
         typeof file.resourceUri === "string" &&
         file.resourceUri.trim()
           ? {
               status: "file",
-              file: { name: file.name, resourceUri: file.resourceUri },
+              file: Object.freeze({
+                name: file.name,
+                resourceUri: file.resourceUri,
+              }),
             }
           : {
               status: "error",
@@ -107,6 +116,7 @@ export class HostFileStore {
                 "Malformed complete host file input: expected name and non-blank resourceUri"
               ),
             };
+      this.#opening = Object.freeze(opening);
     }
     this.sync();
   }
@@ -133,7 +143,7 @@ export class HostFileStore {
       ] === undefined
     )
       return { status: "unsupported" };
-    return this.opening;
+    return this.#opening;
   }
 
   /** Connect through the runtime and reject unsupported or inactive openings. */
@@ -178,8 +188,8 @@ export class HostFileStore {
   }
   #queueSubscription(): void {
     this.#subscriptionQueue = this.#subscriptionQueue.then(async () => {
-      if (this.opening.status !== "file") return;
-      const uri = this.opening.file.resourceUri;
+      if (this.#opening.status !== "file") return;
+      const uri = this.#opening.file.resourceUri;
       const wanted = !this.disposed && this.#subscribers.size > 0;
       if (wanted === this.#subscribed) return;
       try {
@@ -204,8 +214,8 @@ export class HostFileStore {
   updated(uri: string): void {
     if (
       this.disposed ||
-      this.opening.status !== "file" ||
-      uri !== this.opening.file.resourceUri
+      this.#opening.status !== "file" ||
+      uri !== this.#opening.file.resourceUri
     )
       return;
     this.invalidate();
@@ -243,8 +253,17 @@ export class HostFileStore {
     );
     return result;
   }
-  /** Adopt saved contents/token without allowing earlier reads to overwrite them. */
-  saved(replacement: HostFileContent, etag: string): void {
+  /** Capture invalidation and read ordering immediately before a save request. */
+  saveFence(): SaveFence {
+    return { revision: this.saveRevision, readSequence: this.#readSequence };
+  }
+  /** Adopt a save only if no newer read or invalidation has been observed. */
+  saved(replacement: HostFileContent, etag: string, fence: SaveFence): void {
+    if (
+      this.saveRevision !== fence.revision ||
+      this.#permissionSequence > fence.readSequence
+    )
+      return;
     ++this.saveRevision;
     for (const session of this.sessions) session.saved(replacement, etag);
   }
@@ -335,7 +354,14 @@ export class HostFileSession {
       });
       return;
     }
-    this.#patch({ file: state.file });
+    const published = this.#snapshot.file;
+    if (
+      !published ||
+      published.name !== state.file.name ||
+      published.resourceUri !== state.file.resourceUri
+    ) {
+      this.#patch({ file: { ...state.file } });
+    }
     if (!this.#started) {
       this.#started = true;
       void this.refresh().catch(() => {});
@@ -353,8 +379,9 @@ export class HostFileSession {
   /** Adopt saved contents/token without allowing earlier reads to overwrite them. */
   saved(replacement: HostFileContent, etag: string): void {
     const data = this.#snapshot.data;
-    const uri = this.#snapshot.file?.resourceUri;
-    if (!uri) return;
+    const opening = this.#store.state();
+    if (opening.status !== "file") return;
+    const uri = opening.file.resourceUri;
     const metadata = {
       uri,
       writable: data?.writable ?? this.#store.writable,
@@ -497,6 +524,7 @@ export class HostFileSession {
         !nonEmpty(data.etag)
       )
         throw new Error("The opened host file has no valid writable snapshot");
+      const fence = this.#store.saveFence();
       try {
         const result = writeResult(
           await app.request(
@@ -509,7 +537,7 @@ export class HostFileSession {
         );
         this.#assertActive(generation);
         if (result.outcome === "saved")
-          this.#store.saved(replacement, result.etag);
+          this.#store.saved(replacement, result.etag, fence);
         else if (result.outcome === "conflict") this.#store.invalidate();
         return result;
       } catch (error) {
