@@ -397,6 +397,70 @@ describe("guarded writes and races", () => {
     expect(host.write).not.toHaveBeenCalled();
   });
 
+  it("keeps reads, writes, notifications and cleanup on the opening URI when public identities are mutated", async () => {
+    const host = await setup();
+    const hook = mount(host.runtime);
+    await input(host.bridge);
+    await ready(hook);
+    await waitFor(() => expect(hook.result.current.isSubscribed).toBe(true));
+    const substitute = "host-resource://another-file";
+    const exposedFile = hook.result.current.file!;
+    exposedFile.resourceUri = substitute;
+    hook.result.current.data!.uri = substitute;
+
+    await expect(
+      hook.result.current.write({ text: "forbidden" }, { ifMatch: "v1" })
+    ).rejects.toThrow(/valid writable/);
+    expect(host.write).not.toHaveBeenCalled();
+    await update(host.bridge, substitute);
+    expect(host.read).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await hook.result.current.refresh();
+    });
+    expect(
+      host.requests
+        .filter((request) => request.method === "resources/read")
+        .at(-1)?.params
+    ).toEqual({ uri: URI });
+    expect(hook.result.current.data?.uri).toBe(URI);
+
+    // A separately mutated display identity cannot taint saved contents either.
+    hook.result.current.file!.resourceUri = substitute;
+    await act(async () => {
+      await hook.result.current.write({ text: "saved" }, { ifMatch: "v1" });
+    });
+    expect(
+      host.requests.filter(
+        (request) => request.method === "openai/resources/write"
+      )
+    ).toEqual([
+      {
+        method: "openai/resources/write",
+        params: { uri: URI, text: "saved", ifMatch: "v1" },
+      },
+    ]);
+    expect(hook.result.current.data).toMatchObject({
+      uri: URI,
+      text: "saved",
+      etag: "v2",
+    });
+
+    await update(host.bridge);
+    await waitFor(() => expect(host.read).toHaveBeenCalledTimes(3));
+    hook.unmount();
+    await waitFor(() => expect(host.unsubscribe).toHaveBeenCalledTimes(1));
+    expect(
+      host.requests.filter((request) => /subscribe/.test(request.method))
+    ).toEqual([
+      { method: "resources/subscribe", params: { uri: URI } },
+      { method: "resources/unsubscribe", params: { uri: URI } },
+    ]);
+    expect(host.requests.every((request) => request.params?.uri === URI)).toBe(
+      true
+    );
+  });
+
   it("rejects attempts to substitute the snapshot URI before writing", async () => {
     const host = await setup();
     const hook = mount(host.runtime, { subscribe: false });
@@ -548,6 +612,110 @@ describe("guarded writes and races", () => {
     });
     expect(hook.result.current.error?.message).toMatch(/write denied/);
     expect(hook.result.current.canWrite).toBe(false);
+  });
+
+  it.each(["notification", "manual refresh"])(
+    "preserves newer contents observed by %s before a delayed saved response",
+    async (observation) => {
+      const host = await setup();
+      const hook = mount(host.runtime);
+      await input(host.bridge);
+      await ready(hook);
+      await waitFor(() => expect(hook.result.current.isSubscribed).toBe(true));
+      const delayed = deferred<Record<string, unknown>>();
+      host.write.mockReturnValueOnce(delayed.promise);
+      const saving = hook.result.current.write(
+        { text: "saved-v2" },
+        { ifMatch: "v1" }
+      );
+      await waitFor(() => expect(host.write).toHaveBeenCalledTimes(1));
+      host.read.mockResolvedValueOnce(
+        text("external-v3", { writable: true, etag: "v3" })
+      );
+      if (observation === "notification") await update(host.bridge);
+      else
+        await act(async () => {
+          await hook.result.current.refresh();
+        });
+      await waitFor(() => expect(hook.result.current.data?.etag).toBe("v3"));
+      await act(async () => {
+        delayed.resolve({ outcome: "saved", etag: "v2" });
+        expect(await saving).toEqual({ outcome: "saved", etag: "v2" });
+      });
+      expect(hook.result.current.data).toMatchObject({
+        text: "external-v3",
+        etag: "v3",
+      });
+      expect(hook.result.current.canWrite).toBe(true);
+    }
+  );
+
+  it("keeps a resource invalidation pending when a saved response arrives before its read", async () => {
+    const host = await setup();
+    const hook = mount(host.runtime);
+    await input(host.bridge);
+    await ready(hook);
+    await waitFor(() => expect(hook.result.current.isSubscribed).toBe(true));
+    const save = deferred<Record<string, unknown>>();
+    host.write.mockReturnValueOnce(save.promise);
+    const saving = hook.result.current.write(
+      { text: "saved-v2" },
+      { ifMatch: "v1" }
+    );
+    await waitFor(() => expect(host.write).toHaveBeenCalledTimes(1));
+    const read = deferred<ReadResourceResult>();
+    host.read.mockReturnValueOnce(read.promise);
+    await update(host.bridge);
+    await waitFor(() => expect(host.read).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      save.resolve({ outcome: "saved", etag: "v2" });
+      await saving;
+    });
+    expect(hook.result.current.data).toMatchObject({
+      text: "Hello",
+      etag: "v1",
+    });
+    expect(hook.result.current.canWrite).toBe(false);
+    expect(hook.result.current.isRefreshing).toBe(true);
+    await act(async () => {
+      read.resolve(text("external-v3", { writable: true, etag: "v3" }));
+    });
+    await waitFor(() => expect(hook.result.current.data?.etag).toBe("v3"));
+    expect(hook.result.current.canWrite).toBe(true);
+  });
+
+  it("adopts a save after an earlier read completes while its response is pending", async () => {
+    const host = await setup();
+    const hook = mount(host.runtime, { subscribe: false });
+    await input(host.bridge);
+    await ready(hook);
+    const read = deferred<ReadResourceResult>();
+    host.read.mockReturnValueOnce(read.promise);
+    let refreshing!: ReturnType<typeof hook.result.current.refresh>;
+    act(() => {
+      refreshing = hook.result.current.refresh();
+    });
+    await waitFor(() => expect(host.read).toHaveBeenCalledTimes(2));
+    const save = deferred<Record<string, unknown>>();
+    host.write.mockReturnValueOnce(save.promise);
+    const saving = hook.result.current.write(
+      { text: "saved-v2" },
+      { ifMatch: "v1" }
+    );
+    await waitFor(() => expect(host.write).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      read.resolve(text("Hello"));
+      await refreshing;
+    });
+    await act(async () => {
+      save.resolve({ outcome: "saved", etag: "v2" });
+      await saving;
+    });
+    expect(hook.result.current.data).toMatchObject({
+      text: "saved-v2",
+      etag: "v2",
+    });
+    expect(hook.result.current.canWrite).toBe(true);
   });
 
   it("ignores a slow pre-save read and stale read failure", async () => {
