@@ -3,6 +3,7 @@ import {
   extractFunctionCalls,
   responsesReasoningFields,
   seedInputFromMessages,
+  streamResponsesTurn,
 } from "../providers/openai-responses";
 import { OpenAIResponsesDriver } from "../providers/openai-responses-driver";
 import { toolResultToContent } from "../toolResultParts";
@@ -147,16 +148,49 @@ describe("responsesReasoningFields", () => {
   });
 });
 
-describe("Responses SSE event mapping", () => {
-  it("parses function_call_arguments.done into tool-call-ready shape", () => {
-    const payload = {
-      type: "response.function_call_arguments.done",
-      call_id: "call_abc",
-      arguments: '{"city":"Paris"}',
-    };
-    const args = JSON.parse(payload.arguments);
-    expect(args).toEqual({ city: "Paris" });
-    expect(payload.call_id).toBe("call_abc");
+describe("streamResponsesTurn function-call argument events", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keys argument deltas by item_id and emits tool-call-ready with parsed args", async () => {
+    const sseLines = [
+      'data: {"type":"response.output_item.added","item":{"id":"fc_1","type":"function_call","call_id":"call_abc","name":"get_weather","arguments":""}}',
+      'data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","output_index":0,"delta":"{\\"city\\":"}',
+      'data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","output_index":0,"delta":"\\"Paris\\"}"}',
+      'data: {"type":"response.function_call_arguments.done","item_id":"fc_1","output_index":0,"arguments":"{\\"city\\":\\"Paris\\"}"}',
+      'data: {"type":"response.completed","response":{"status":"completed","output":[{"id":"fc_1","type":"function_call","call_id":"call_abc","name":"get_weather","arguments":"{\\"city\\":\\"Paris\\"}"}]}}',
+      "data: [DONE]",
+    ].join("\n\n") + "\n\n";
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(sseLines, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      })
+    );
+
+    const events: Array<Record<string, unknown>> = [];
+    const turn = streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-5", apiKey: "k" },
+      input: [],
+      tools: [],
+    });
+    for (;;) {
+      const next = await turn.next();
+      if (next.done) break;
+      events.push(next.value as Record<string, unknown>);
+    }
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain("tool-call-start");
+    const deltas = events.filter((e) => e.type === "tool-call-args-delta");
+    expect(deltas).toHaveLength(2);
+    const ready = events.find((e) => e.type === "tool-call-ready") as
+      | { toolCallId: string; args: Record<string, unknown> }
+      | undefined;
+    expect(ready).toBeDefined();
+    expect(ready!.toolCallId).toBe("call_abc");
+    expect(ready!.args).toEqual({ city: "Paris" });
   });
 });
 
