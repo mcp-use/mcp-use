@@ -483,7 +483,11 @@ class MCPServer(FastMCP):
                 session_id = self._get_session_id_from_request()
 
                 context = ServerMiddlewareContext(
-                    message=request.params,
+                    # The MCP SDK's internal tool-cache refresh invokes the
+                    # registered ListToolsRequest handler with request=None
+                    # (Server._get_cached_tool_definition), so request.params
+                    # is not guaranteed to exist here.
+                    message=request.params if request is not None else None,
                     method=method,
                     timestamp=datetime.now(UTC),
                     transport=self._transport_type,
