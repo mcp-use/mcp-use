@@ -35,8 +35,8 @@ runs on pushes to `v1` affecting the TypeScript tree or that workflow:
 The allowed package lines are `mcp-use@1.x`, `@mcp-use/cli@3.x`,
 `@mcp-use/inspector@12.x`, and `create-mcp-use-app@0.14.x`.
 For this session-cleanup changeset, Changesets plans `mcp-use@1.34.7`,
-`@mcp-use/cli@3.6.8`, and `@mcp-use/inspector@12.0.7`. The latter two are
-dependency propagation bumps; their source code is unchanged.
+`@mcp-use/cli@3.6.8`, and `@mcp-use/inspector@12.0.7`. The CLI also fixes
+maintenance-channel update notices; the Inspector bump propagates dependencies.
 The script rejects prerelease mode and a GitHub ref other than `v1`.
 It skips already published versions when resuming an interrupted release.
 GitHub Releases are not created by this maintenance job.
@@ -72,3 +72,6 @@ npm install mcp-use@1.34.7
 An existing `^1.x` range can resolve a new 1.x patch when its lockfile is
 updated. An exact version or unchanged lockfile requires an explicit update
 and rebuild. Installing `mcp-use@latest` selects v2 and requires migration.
+The patched v1 CLI checks `legacy-v1` for installed v1 projects and recommends
+that channel in interactive update notices. Notices are suppressed in piped
+output, and caches from other channels or older untagged caches are refreshed.
