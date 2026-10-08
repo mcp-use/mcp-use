@@ -192,6 +192,42 @@ describe("streamResponsesTurn function-call argument events", () => {
     expect(ready!.toolCallId).toBe("call_abc");
     expect(ready!.args).toEqual({ city: "Paris" });
   });
+
+  it("falls back to call_id when item_id is an empty string", async () => {
+    const sseLines = [
+      'data: {"type":"response.output_item.added","item":{"id":"","type":"function_call","call_id":"call_xyz","name":"get_weather","arguments":""}}',
+      'data: {"type":"response.function_call_arguments.delta","item_id":"","call_id":"call_xyz","output_index":0,"delta":"{\\"city\\":\\"Rome\\"}"}',
+      'data: {"type":"response.function_call_arguments.done","item_id":"","call_id":"call_xyz","output_index":0,"arguments":"{\\"city\\":\\"Rome\\"}"}',
+      "data: [DONE]",
+    ].join("\n\n") + "\n\n";
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(sseLines, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      })
+    );
+
+    const events: Array<Record<string, unknown>> = [];
+    const turn = streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-5", apiKey: "k" },
+      input: [],
+      tools: [],
+    });
+    for (;;) {
+      const next = await turn.next();
+      if (next.done) break;
+      events.push(next.value as Record<string, unknown>);
+    }
+
+    const deltas = events.filter((e) => e.type === "tool-call-args-delta");
+    expect(deltas).toHaveLength(1);
+    const ready = events.find((e) => e.type === "tool-call-ready") as
+      | { toolCallId: string; args: Record<string, unknown> }
+      | undefined;
+    expect(ready).toBeDefined();
+    expect(ready!.toolCallId).toBe("call_xyz");
+    expect(ready!.args).toEqual({ city: "Rome" });
+  });
 });
 
 describe("OpenAIResponsesDriver.runToolLoopNonStreaming", () => {

@@ -335,9 +335,9 @@ export async function* streamResponsesTurn(
 
     if (type === "response.function_call_arguments.delta") {
       const itemId =
-        typeof parsed.item_id === "string"
+        typeof parsed.item_id === "string" && parsed.item_id
           ? parsed.item_id
-          : typeof parsed.call_id === "string"
+          : typeof parsed.call_id === "string" && parsed.call_id
             ? parsed.call_id
             : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
@@ -357,9 +357,9 @@ export async function* streamResponsesTurn(
 
     if (type === "response.function_call_arguments.done") {
       const itemId =
-        typeof parsed.item_id === "string"
+        typeof parsed.item_id === "string" && parsed.item_id
           ? parsed.item_id
-          : typeof parsed.call_id === "string"
+          : typeof parsed.call_id === "string" && parsed.call_id
             ? parsed.call_id
             : "";
       const argsRaw =
