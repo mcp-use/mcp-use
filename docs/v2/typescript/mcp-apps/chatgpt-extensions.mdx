@@ -490,7 +490,8 @@ export default function NoteEditor() {
     const data = file.data;
     if (data && "text" in data && data.etag) {
       // Keep this draft's base token when subscriptions deliver newer contents.
-      setDraft((previous) => previous ?? { text: data.text, etag: data.etag });
+      const initial = { text: data.text, etag: data.etag };
+      setDraft((previous) => previous ?? initial);
     }
   }, [file.data]);
 
