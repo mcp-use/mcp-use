@@ -40,6 +40,10 @@ import type { ConnectionManager } from "./connection-manager.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
 import { trackConnectorTelemetry } from "../telemetry/connector-telemetry.js";
 import type { MCPAuthorizationInfo, MCPServerInfo } from "../core/session.js";
+import {
+  buildMcpParamHeaders,
+  sdkMirrorsMcpParamHeaders,
+} from "./mcp-param-headers.js";
 
 /**
  * Handles a notification received from an MCP server.
@@ -696,7 +700,7 @@ export abstract class BaseConnector {
     // add a no-op callback to trigger the SDK to add progressToken to the request.
     // The SDK only adds progressToken when onprogress is present, which is required
     // for the server to send progress notifications that reset the timeout.
-    const enhancedOptions = options ? { ...options } : undefined;
+    let enhancedOptions = options ? { ...options } : undefined;
     if (
       enhancedOptions?.resetTimeoutOnProgress &&
       !enhancedOptions.onprogress
@@ -708,6 +712,22 @@ export abstract class BaseConnector {
       logger.debug(
         `[BaseConnector] Added onprogress callback for tool '${name}' to enable progressToken`
       );
+    }
+
+    // The SDK mirrors x-mcp-header parameters as Mcp-Param-* headers itself,
+    // except in browsers. Fill that gap from the cached tool definition so a
+    // server that requires the header accepts calls from browser clients.
+    if (this.protocolEra === "modern" && !sdkMirrorsMcpParamHeaders()) {
+      const tool = this.toolsCache?.find((t) => t.name === name);
+      const paramHeaders = tool
+        ? buildMcpParamHeaders(tool.inputSchema, args)
+        : {};
+      if (Object.keys(paramHeaders).length > 0) {
+        enhancedOptions = {
+          ...enhancedOptions,
+          headers: { ...enhancedOptions?.headers, ...paramHeaders },
+        };
+      }
     }
 
     logger.debug(`Calling tool '${name}' with args`, args);

@@ -57,15 +57,8 @@ test.describe("v2 conformance coverage", () => {
   test("test_custom_header - x-mcp-header parameter reaches the server", async ({
     page,
   }) => {
-    // Known gap: the Inspector sends x-mcp-header parameters in the JSON body
-    // only. The server rejects the call with "the body carries value=... but
-    // the Mcp-Param-Conformance-Value header is absent". Marked as an expected
-    // failure so the run stays green until the client forwards these params
-    // as Mcp-Param-* headers; Playwright flags it when it starts passing.
-    test.fail(
-      true,
-      "Inspector does not yet send x-mcp-header params as Mcp-Param-* headers"
-    );
+    // The server rejects the call unless the client mirrors the x-mcp-header
+    // parameter as an Mcp-Param-Conformance-Value header.
     const result = await runTool(page, "test_custom_header", {
       value: "conformance-e2e",
     });
