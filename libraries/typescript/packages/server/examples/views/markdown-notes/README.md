@@ -17,17 +17,14 @@ Use Node 22.22.2 or newer and pnpm. From the repository root:
 ```sh
 cd libraries/typescript
 pnpm install --frozen-lockfile
-pnpm build
+pnpm --filter @mcp-use/client build
+pnpm --filter @mcp-use/tunnel build
+pnpm --filter mcp-use build
+pnpm --filter @mcp-use/cli build
 pnpm --filter mcp-use-example-markdown-notes typecheck
 pnpm --filter mcp-use-example-markdown-notes test
 pnpm --filter mcp-use-example-markdown-notes build
 pnpm --filter mcp-use-example-markdown-notes start
-```
-
-For development after building the workspace packages:
-
-```sh
-pnpm --filter mcp-use-example-markdown-notes dev
 ```
 
 The MCP endpoint is `http://127.0.0.1:3000/mcp`. Call `open-notes`, or choose
