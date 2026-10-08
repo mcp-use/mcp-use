@@ -60,12 +60,9 @@ server, not on your laptop. Run the server in the execution environment whose
 files the host can open. The example does not synthesize browser `file://` URLs
 or translate cloud paths into local desktop paths.
 
-The inspector can verify catalog rendering and MCP tool/resource calls. It
-also provides **Preview mentions** in the Tools tab for `search-notes`; try an
-empty query, `pack`, and a query with no matches. The preview displays returned
-resource names, titles, and URIs.
-The inspector does not establish native file-opening or desktop composer
-behavior. Native desktop end-to-end verification has not been performed.
+Native desktop end-to-end verification has not been performed. Use a supporting
+native host for file opening, editing, and composer mention suggestions; the
+cloud checks below verify the app's server contracts and mocked editor behavior.
 
 The wire tests use the real server and MCP HTTP handler with mocked empty View
 assets and host-injected path metadata. Filesystem tests create real temporary
