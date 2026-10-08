@@ -78,3 +78,14 @@ export type {
   ModelContextPresentation,
   ModelContextOperationResult,
 } from "./types/model-context.js";
+
+export { useHostFile } from "./hooks/use-host-file.js";
+export { useOpenFile } from "./hooks/use-open-file.js";
+export type {
+  ResourceRepresentation,
+  HostFileContent,
+  HostFileData,
+  ResourceWriteResult,
+  HostFileOptions,
+  HostFileHandle,
+} from "./types/host-file.js";
