@@ -1,4 +1,5 @@
 import type {
+  CallToolRequestOptions,
   CallToolResult,
   CompleteRequestParams,
   CompleteResult,
@@ -448,7 +449,7 @@ export class MCPConnection {
   async callTool(
     name: string,
     args: Record<string, any> = {},
-    options?: RequestOptions
+    options?: CallToolRequestOptions
   ): Promise<CallToolResult> {
     return this.connector.callTool(name, args, options);
   }

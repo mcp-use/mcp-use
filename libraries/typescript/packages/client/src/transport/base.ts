@@ -1,4 +1,5 @@
 import type {
+  CallToolRequestOptions,
   CallToolResult,
   Client,
   ClientOptions,
@@ -41,6 +42,37 @@ import type { ConnectionManager } from "./connection-manager.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
 import { trackConnectorTelemetry } from "../telemetry/connector-telemetry.js";
 import type { MCPAuthorizationInfo, MCPServerInfo } from "../core/session.js";
+
+/**
+ * Scan a tool's JSON Schema `inputSchema` for properties annotated with
+ * `"x-mcp-header"` and build the corresponding `Mcp-Param-*` HTTP headers
+ * (SEP-2243). Only top-level `properties` of an `object` schema are scanned.
+ * Properties whose argument value is `null` or `undefined` are skipped.
+ *
+ * @param inputSchema - The JSON Schema describing the tool's parameters.
+ * @param args - The argument values being passed to the tool.
+ * @returns A plain object mapping header names to string values, ready to
+ *   merge into `RequestOptions.headers`.
+ */
+function buildMcpParamHeaders(
+  inputSchema: Record<string, unknown>,
+  args: Record<string, unknown>
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const properties = inputSchema?.properties;
+  if (!properties || typeof properties !== "object") return headers;
+  for (const [paramName, propSchema] of Object.entries(
+    properties as Record<string, unknown>
+  )) {
+    if (!propSchema || typeof propSchema !== "object") continue;
+    const headerName = (propSchema as Record<string, unknown>)["x-mcp-header"];
+    if (typeof headerName !== "string" || headerName.length === 0) continue;
+    const value = args[paramName];
+    if (value === null || value === undefined) continue;
+    headers[`Mcp-Param-${headerName}`] = String(value);
+  }
+  return headers;
+}
 
 /**
  * Handles a notification received from an MCP server.
@@ -635,6 +667,14 @@ export abstract class BaseConnector {
   /**
    * Calls a tool on the connected server.
    *
+   * Parameters marked with `x-mcp-header` in the tool's input schema are
+   * forwarded as `Mcp-Param-<HeaderName>` HTTP request headers (SEP-2243) in
+   * addition to being included in the JSON-RPC body. This connector layer
+   * handles the header injection explicitly so it works in every environment
+   * (including browser contexts where the SDK's built-in mirroring is
+   * disabled). The tool definition is also supplied via `toolDefinition` so
+   * the SDK's own mirroring path fires on Node.js without an extra round trip.
+   *
    * @param name - Tool name.
    * @param args - Tool arguments.
    * @param options - Per-request timeout, cancellation, and progress options.
@@ -644,7 +684,7 @@ export abstract class BaseConnector {
   async callTool(
     name: string,
     args: Record<string, any>,
-    options?: RequestOptions
+    options?: CallToolRequestOptions
   ): Promise<CallToolResult> {
     if (!this.client) {
       throw new Error("MCP client is not connected");
@@ -654,7 +694,9 @@ export abstract class BaseConnector {
     // add a no-op callback to trigger the SDK to add progressToken to the request.
     // The SDK only adds progressToken when onprogress is present, which is required
     // for the server to send progress notifications that reset the timeout.
-    const enhancedOptions = options ? { ...options } : undefined;
+    const enhancedOptions: CallToolRequestOptions = options
+      ? { ...options }
+      : {};
     if (
       enhancedOptions?.resetTimeoutOnProgress &&
       !enhancedOptions.onprogress
@@ -666,6 +708,37 @@ export abstract class BaseConnector {
       logger.debug(
         `[BaseConnector] Added onprogress callback for tool '${name}' to enable progressToken`
       );
+    }
+
+    // Resolve the tool definition from the cache when the caller did not
+    // supply one. Passing it via toolDefinition lets the SDK mirror
+    // x-mcp-header parameters as Mcp-Param-* headers on Node.js. We also
+    // inject those headers ourselves (see below) so the mirroring works
+    // unconditionally in browser environments too.
+    const toolDef =
+      enhancedOptions.toolDefinition ??
+      this.toolsCache?.find((t) => t.name === name);
+    if (toolDef && !enhancedOptions.toolDefinition) {
+      enhancedOptions.toolDefinition = toolDef;
+    }
+
+    // SEP-2243: inject Mcp-Param-<HeaderName> headers for every tool
+    // parameter whose JSON Schema property carries an "x-mcp-header"
+    // annotation. The SDK does this on its own in Node environments, but
+    // skips it in browsers. Doing it here ensures conformance on all
+    // platforms without duplicating the header (the SDK deduplicates via
+    // Headers.set on the transport level).
+    if (toolDef) {
+      const mcpParamHeaders = buildMcpParamHeaders(
+        toolDef.inputSchema as Record<string, unknown>,
+        args
+      );
+      if (Object.keys(mcpParamHeaders).length > 0) {
+        enhancedOptions.headers = {
+          ...enhancedOptions.headers,
+          ...mcpParamHeaders,
+        };
+      }
     }
 
     logger.debug(`Calling tool '${name}' with args`, args);

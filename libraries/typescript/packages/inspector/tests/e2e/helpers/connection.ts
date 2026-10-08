@@ -1,9 +1,69 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 import { getTestMatrix } from "./test-matrix";
 
 // CI environments (Docker/xvfb) need longer timeouts due to slower rendering
 const CI_MULTIPLIER = process.env.CI ? 3 : 1;
+
+/** Inspector tab ids (see src/client/components/layout/layoutTabs.ts). */
+export type InspectorTabId =
+  | "server-metadata"
+  | "chat"
+  | "tools"
+  | "prompts"
+  | "resources"
+  | "skills"
+  | "sampling"
+  | "elicitation"
+  | "notifications"
+  | "connection-settings";
+
+/**
+ * The visible tab control for a tab id.
+ *
+ * On desktop the tabs are plain buttons in the left sidebar; the header tab
+ * bar with role="tab" only renders below the lg breakpoint. Both carry
+ * data-testid="tab-<id>", so select by test id and keep only the visible one.
+ */
+export function tabLocator(page: Page, id: InspectorTabId): Locator {
+  return page.locator(`[data-testid="tab-${id}"]:visible`);
+}
+
+/** Click a tab and wait for its content heading. */
+export async function openTab(
+  page: Page,
+  id: InspectorTabId,
+  heading?: string | RegExp
+): Promise<void> {
+  await tabLocator(page, id).click();
+  if (heading) {
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  }
+}
+
+/** Turn the sidebar RPC panel on if it is not already open. */
+export async function openRpcPanel(page: Page): Promise<void> {
+  const toggle = page.getByRole("switch", { name: "RPC Panel" }).first();
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-checked")) !== "true") {
+    await toggle.click();
+  }
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+}
+
+/**
+ * Number of JSON-RPC messages represented by the given RPC panel rows.
+ *
+ * The panel coalesces consecutive notifications with the same method into one
+ * row labelled "×N", so counting rows undercounts. Sum the repeat suffixes.
+ */
+export async function countRpcMessages(rows: Locator): Promise<number> {
+  const texts = await rows.allTextContents();
+  return texts.reduce((total, text) => {
+    const match = text.match(/×(\d+)/);
+    return total + (match ? Number(match[1]) : 1);
+  }, 0);
+}
 
 /**
  * Wait for HMR reload to propagate. Use after modifying server or view files.
