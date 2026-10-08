@@ -756,7 +756,6 @@ export function ToolsTab({
                 className="absolute inset-0 bg-background z-10"
               >
                 <ToolExecutionPanel
-                  callTool={callTool}
                   selectedTool={selectedTool}
                   toolArgs={toolArgs}
                   payloadToSend={payloadToSend}
@@ -960,7 +959,6 @@ export function ToolsTab({
             panelRef={toolParamsPanelRef}
           >
             <ToolExecutionPanel
-              callTool={callTool}
               selectedTool={selectedTool}
               toolArgs={toolArgs}
               payloadToSend={payloadToSend}
