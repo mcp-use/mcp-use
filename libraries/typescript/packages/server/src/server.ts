@@ -34,6 +34,7 @@ import { toNodeHandler } from "./node-bridge.js";
 import {
   requestClientInfo,
   toAuthenticatedRequestContext,
+  toOAuthAuth,
   toRequestContext,
   type DefinitionSecuritySchemes,
   type RequestContext,
@@ -1982,7 +1983,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       ...(ctx.sessionId !== undefined && {
         session: { sessionId: ctx.sessionId },
       }),
-      ...(ctx.http?.authInfo !== undefined && { auth: ctx.http.authInfo }),
+      ...(ctx.http?.authInfo !== undefined && {
+        auth: toOAuthAuth<TUser>(ctx.http.authInfo),
+      }),
       state: new Map(),
     }) as unknown as MiddlewareContext<M, TEnv>;
   }
