@@ -27,7 +27,8 @@ export function deriveIsThinking(
       const lastPart = last.parts[last.parts.length - 1];
       return (
         lastPart?.type === "tool-invocation" &&
-        lastPart.toolInvocation?.state === "result"
+        (lastPart.toolInvocation?.state === "result" ||
+          lastPart.toolInvocation?.state === "error")
       );
     }
 

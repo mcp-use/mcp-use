@@ -126,4 +126,25 @@ describe("deriveIsThinking", () => {
       deriveIsThinking(true, [{ role: "assistant", content: "   " }])
     ).toBe(true);
   });
+
+  it("is true after a tool error while still loading (model continues after failed tool call)", () => {
+    expect(
+      deriveIsThinking(true, [
+        {
+          role: "assistant",
+          content: "",
+          parts: [
+            {
+              type: "tool-invocation",
+              toolInvocation: {
+                toolName: "search",
+                args: {},
+                state: "error",
+              },
+            },
+          ],
+        },
+      ])
+    ).toBe(true);
+  });
 });
