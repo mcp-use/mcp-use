@@ -83,6 +83,23 @@ describe("HTTP middleware registration", () => {
         await next();
       },
     ],
+    [
+      "destructured Context parameter",
+      async ({ req, header }: Context, next: Next) => {
+        header("x-query", req.query("q"));
+        header("x-session", req.header("mcp-session-id"));
+        await next();
+      },
+    ],
+    [
+      "destructured Context in the body",
+      async (context: Context, next: Next) => {
+        const { req, header } = context;
+        header("x-query", req.query("q"));
+        header("x-session", req.header("mcp-session-id"));
+        await next();
+      },
+    ],
   ];
 
   it.each(honoHandlers)(
@@ -92,12 +109,41 @@ describe("HTTP middleware registration", () => {
     }
   );
 
+  it("runs middleware taking only destructured req through public use()", async () => {
+    const { app, server, errors } = makeServer();
+    let observed: unknown;
+    await server.use("*", async ({ req }: Context, next: Next) => {
+      observed = {
+        query: req.query("q"),
+        sessionId: req.header("mcp-session-id"),
+      };
+      await next();
+    });
+    app.get("/mcp", (c) => c.json(observed));
+
+    const response = await withoutHanging(
+      Promise.resolve(
+        app.request("/mcp?q=expected", {
+          headers: { "mcp-session-id": "local-session" },
+        })
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      query: "expected",
+      sessionId: "local-session",
+    });
+    expect(errors).toEqual([]);
+  });
+
   it.each(honoHandlers)(
     "runs Hono query/header middleware using %s through public use()",
     async (_, handler) => {
       const { app, server, errors } = makeServer();
       await server.use("*", handler);
-      app.get("/mcp", (c) => c.text("downstream"));
+      const downstream = vi.fn((c: Context) => c.text("downstream"));
+      app.get("/mcp", downstream);
 
       const response = await withoutHanging(
         Promise.resolve(
@@ -111,6 +157,7 @@ describe("HTTP middleware registration", () => {
       expect(await response.text()).toBe("downstream");
       expect(response.headers.get("x-query")).toBe("expected");
       expect(response.headers.get("x-session")).toBe("local-session");
+      expect(downstream).toHaveBeenCalledOnce();
       expect(errors).toEqual([]);
     }
   );
@@ -143,6 +190,25 @@ describe("HTTP middleware registration", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("downstream");
     expect(response.headers.get("x-connect")).toBe("passed");
+    expect(errors).toEqual([]);
+  });
+
+  it("adapts request-only three-argument Connect middleware", async () => {
+    const { app, server, errors } = makeServer();
+    let observed: unknown;
+    const connect = (req: any, _res: any, next: () => void) => {
+      observed = req.query;
+      next();
+    };
+    await server.use("*", connect);
+    app.get("/mcp", (c) => c.json(observed));
+
+    const response = await withoutHanging(
+      Promise.resolve(app.request("/mcp?q=expected"))
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ q: "expected" });
     expect(errors).toEqual([]);
   });
 

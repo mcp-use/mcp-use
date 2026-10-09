@@ -22,19 +22,17 @@ export function isExpressMiddleware(middleware: any): boolean {
   // Get function string for pattern matching
   const fnString = middleware.toString();
 
-  // Look for Express-specific patterns in the function body
-  // Common Express patterns: res.send, res.json, res.status, req.body, req.params, etc.
-  // Only match standalone req/res identifiers, not properties such as c.req.query.
-  const expressPatterns = [
+  // Two-argument handlers need an Express response signal. Request access alone
+  // is ambiguous: Hono handlers can destructure req from their Context too.
+  // Only match standalone res identifiers, not Context members like c.res.status.
+  const expressResponsePatterns = [
     /(?<![\w$.])res\.(send|json|status|end|redirect|render|sendFile|download)\b/,
-    /(?<![\w$.])req\.(body|params|query|cookies|session)\b/,
-    /(?<![\w$.])req\.get\s*\(/,
     /(?<![\w$.])res\.set\s*\(/,
     /(?<![\w$.])res\.statusCode\s*=/,
     /(?<![\w$.])res\.writeHead\s*\(/,
   ];
 
-  const hasExpressPattern = expressPatterns.some((pattern) =>
+  const hasExpressResponsePattern = expressResponsePatterns.some((pattern) =>
     pattern.test(fnString)
   );
 
@@ -64,7 +62,7 @@ export function isExpressMiddleware(middleware: any): boolean {
 
     // Two-argument Express terminal handlers still need adaptation. Otherwise
     // default to Hono, the native middleware format.
-    return hasExpressPattern;
+    return hasExpressResponsePattern;
   }
 
   // For other parameter counts (0, 1, 5+), default to Hono

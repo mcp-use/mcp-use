@@ -15,10 +15,13 @@ const CLI_PATH = join(__dirname, "../dist/index.cjs");
 const isWindows = process.platform === "win32";
 
 type StartOptions = {
-  childMode?: "7" | "0" | "wait" | "signal" | "spawn-error";
+  childMode?: "7" | "0" | "wait" | "bare-wait" | "signal" | "spawn-error";
+  childSignal?: NodeJS.Signals;
   tunnel?: boolean;
   signal?: NodeJS.Signals;
   signalDuringFailure?: boolean;
+  signalGroup?: boolean;
+  signalOnChildExit?: boolean;
   tunnelAlreadyExited?: boolean;
   ignoreShutdown?: boolean;
   stallRelease?: boolean;
@@ -73,7 +76,17 @@ childProcess.spawn = (command, args, options) => {
     const executable = process.env.CLI_START_MODE === "spawn-error"
       ? join(process.env.CLI_START_PROJECT, "missing-node-executable")
       : process.execPath;
-    return originalSpawn(executable, args, options);
+    const server = originalSpawn(executable, args, options);
+    server.once("exit", (code, signal) => {
+      event("server-exit-event:" + (signal ?? code));
+      if (process.env.CLI_START_SIGNAL_ON_CHILD_EXIT === "1" && (signal === "SIGINT" || signal === "SIGTERM")) {
+        // Queue a real parent signal in the same child-exit callback dispatch.
+        // The CLI must let that signal run after its synchronous exit handler.
+        event("parent-signal-queued:" + signal);
+        process.kill(process.pid, signal);
+      }
+    });
+    return server;
   }
   throw new Error("Unexpected subprocess in CLI start regression test: " + command);
 };
@@ -85,19 +98,21 @@ const SERVER_FIXTURE = `
 import { appendFileSync } from "node:fs";
 const event = (value) => appendFileSync(process.env.CLI_START_EVENTS, value + "\\n");
 event("server-pid:" + process.pid);
-if (process.env.CLI_START_MODE === "wait") {
-  process.on("SIGTERM", () => {
-    event("server-signal");
-    if (process.env.CLI_START_IGNORE_SHUTDOWN === "1") return;
-    setTimeout(() => {
-      event("server-stopped");
-      process.exit(7);
-    }, 20);
-  });
+if (process.env.CLI_START_MODE === "wait" || process.env.CLI_START_MODE === "bare-wait") {
+  if (process.env.CLI_START_MODE === "wait") {
+    process.on("SIGTERM", () => {
+      event("server-signal");
+      if (process.env.CLI_START_IGNORE_SHUTDOWN === "1") return;
+      setTimeout(() => {
+        event("server-stopped");
+        process.exit(7);
+      }, 20);
+    });
+  }
   console.log("SERVER_READY");
   setInterval(() => {}, 1000);
 } else if (process.env.CLI_START_MODE === "signal") {
-  process.kill(process.pid, "SIGTERM");
+  process.kill(process.pid, process.env.CLI_START_CHILD_SIGNAL || "SIGTERM");
 } else {
   setTimeout(() => process.exit(Number(process.env.CLI_START_MODE)), 80);
 }
@@ -129,6 +144,7 @@ describe("mcp-use start child exit and shutdown", () => {
   let guardPath: string;
   let tunnelPath: string;
   let cli: ChildProcess | undefined;
+  let isolatedGroup = false;
 
   beforeEach(() => {
     projectDir = mkdtempSync(join(tmpdir(), "mcp-cli-start-"));
@@ -163,6 +179,15 @@ describe("mcp-use start child exit and shutdown", () => {
   // If an assertion or timeout fails, terminate only the fixture children whose
   // PIDs were recorded in this temporary directory and have no recorded exit.
   const terminateFixtures = () => {
+    if (isolatedGroup && cli?.pid) {
+      try {
+        // Detached Unix CLI groups contain only this test and its children.
+        process.kill(-cli.pid, "SIGKILL");
+      } catch {
+        // The entire fixture group may already have exited.
+      }
+      return;
+    }
     const entries = events();
     for (const entry of entries) {
       const match = /^(?:server|tunnel)-pid:(\d+)$/.exec(entry);
@@ -180,8 +205,15 @@ describe("mcp-use start child exit and shutdown", () => {
 
   afterEach(() => {
     terminateFixtures();
-    rmSync(projectDir, { recursive: true, force: true });
+    // Windows can keep the child cwd locked briefly after process termination.
+    rmSync(projectDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
     cli = undefined;
+    isolatedGroup = false;
   });
 
   async function runStart(options: StartOptions = {}) {
@@ -189,8 +221,10 @@ describe("mcp-use start child exit and shutdown", () => {
       (resolve, reject) => {
         const args = [CLI_PATH, "start", "--path", projectDir, "--port", "0"];
         if (options.tunnel) args.push("--tunnel");
+        isolatedGroup = Boolean(options.signalGroup && !isWindows);
         cli = spawn(process.execPath, args, {
           cwd: projectDir,
+          detached: isolatedGroup,
           // Do not inherit credentials or local configuration from the test host.
           env: {
             PATH: process.env.PATH,
@@ -207,6 +241,10 @@ describe("mcp-use start child exit and shutdown", () => {
             CLI_START_TUNNEL_FILE: tunnelPath,
             CLI_START_PROJECT: projectDir,
             CLI_START_MODE: options.childMode ?? "7",
+            CLI_START_CHILD_SIGNAL: options.childSignal ?? "SIGTERM",
+            CLI_START_SIGNAL_ON_CHILD_EXIT: options.signalOnChildExit
+              ? "1"
+              : "0",
             CLI_START_IGNORE_SHUTDOWN: options.ignoreShutdown ? "1" : "0",
             CLI_START_TUNNEL_ALREADY_EXITED: options.tunnelAlreadyExited
               ? "1"
@@ -223,7 +261,11 @@ describe("mcp-use start child exit and shutdown", () => {
             : "SERVER_READY";
           if (options.signal && !signalSent && output.includes(signalMarker)) {
             signalSent = true;
-            cli!.kill(options.signal);
+            if (isolatedGroup) {
+              process.kill(-cli!.pid!, options.signal);
+            } else {
+              cli!.kill(options.signal);
+            }
           }
         };
         cli.stdout?.on("data", onData);
@@ -275,16 +317,90 @@ describe("mcp-use start child exit and shutdown", () => {
         }
       );
     }
+    for (const tunnel of [false, true]) {
+      it.skipIf(isWindows)(
+        `process-group ${signal} exits cleanly${tunnel ? " with a tunnel" : ""}`,
+        async () => {
+          const result = await runStart({
+            childMode: "bare-wait",
+            tunnel,
+            signal,
+            signalGroup: true,
+          });
+          expect(result.code, result.output).toBe(0);
+          const childExit = events().find((event) =>
+            /^server-exit-event:SIG(INT|TERM)$/.test(event)
+          );
+          expect(childExit, "Child must terminate from a signal").toBeDefined();
+          expectBeforeCliExit(childExit!);
+          expect(events()).not.toContain("unexpected-network");
+        }
+      );
+    }
+    it.skipIf(isWindows)(
+      `parent ${signal} overrides the matching child signal received first`,
+      async () => {
+        const result = await runStart({
+          childMode: "signal",
+          childSignal: signal,
+          tunnel: true,
+          signal,
+          signalDuringFailure: true,
+        });
+        expect(result.code, result.output).toBe(0);
+        expectBeforeCliExit(`server-exit-event:${signal}`);
+        expectBeforeCliExit("tunnel-stopped");
+        expect(events()).not.toContain("unexpected-network");
+      }
+    );
+    it.skipIf(isWindows)(
+      `queued parent ${signal} wins a matching child signal without a tunnel`,
+      async () => {
+        const result = await runStart({
+          childMode: "signal",
+          childSignal: signal,
+          signalOnChildExit: true,
+        });
+        expect(result.code, result.output).toBe(0);
+        expectBeforeCliExit(`server-exit-event:${signal}`);
+        expectBeforeCliExit(`parent-signal-queued:${signal}`);
+        expect(events()).not.toContain("unexpected-network");
+      }
+    );
   }
 
   it.skipIf(isWindows)(
-    "propagates unexpected child signal termination as failure",
+    "does not mask child SIGKILL when a later parent signal arrives",
     async () => {
-      const result = await runStart({ childMode: "signal" });
-      expect(result.code, result.output).toBe(143);
+      const result = await runStart({
+        childMode: "signal",
+        childSignal: "SIGKILL",
+        tunnel: true,
+        signal: "SIGTERM",
+        signalDuringFailure: true,
+      });
+      expect(result.code, result.output).toBe(137);
+      expectBeforeCliExit("tunnel-stopped");
       expect(events()).not.toContain("unexpected-network");
     }
   );
+
+  for (const [signal, code] of [
+    ["SIGINT", 130],
+    ["SIGTERM", 143],
+  ] as const) {
+    it.skipIf(isWindows)(
+      `propagates unexpected child ${signal} termination as failure`,
+      async () => {
+        const result = await runStart({
+          childMode: "signal",
+          childSignal: signal,
+        });
+        expect(result.code, result.output).toBe(code);
+        expect(events()).not.toContain("unexpected-network");
+      }
+    );
+  }
 
   it("handles an established tunnel that already exited", async () => {
     const result = await runStart({ tunnel: true, tunnelAlreadyExited: true });

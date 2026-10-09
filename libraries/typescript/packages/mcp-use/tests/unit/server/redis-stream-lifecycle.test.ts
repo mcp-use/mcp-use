@@ -2,25 +2,40 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RedisStreamManager } from "../../../src/server/sessions/streams/redis.js";
 import type { RedisClient } from "../../../src/server/sessions/stores/redis.js";
 
-function mockRedis() {
-  const values = new Map<string, string>();
-  const members = new Set<string>();
+function mockRedis(shared?: {
+  values: Map<string, string>;
+  members: Set<string>;
+  expiries: Map<string, number>;
+}) {
+  const values = shared?.values ?? new Map<string, string>();
+  const members = shared?.members ?? new Set<string>();
+  const expiries = shared?.expiries ?? new Map<string, number>();
+  const isAvailable = (key: string) => {
+    if ((expiries.get(key) ?? Infinity) <= Date.now()) values.delete(key);
+    return values.has(key);
+  };
   const callbacks = new Map<string, (message: string) => void>();
   const client = {
     get: vi.fn(async (key: string) => values.get(key) ?? null),
-    set: vi.fn(async (key: string, value: string) => {
-      values.set(key, value);
-      return "OK";
-    }),
+    set: vi.fn(
+      async (key: string, value: string, options?: { EX?: number }) => {
+        values.set(key, value);
+        if (options?.EX) expiries.set(key, Date.now() + options.EX * 1000);
+        return "OK";
+      }
+    ),
     del: vi.fn(async (key: string | string[]) => {
       for (const item of Array.isArray(key) ? key : [key]) values.delete(item);
       return 1;
     }),
     exists: vi.fn(async (key: string | string[]) =>
-      values.has(String(key)) ? 1 : 0
+      isAvailable(String(key)) ? 1 : 0
     ),
     keys: vi.fn(async () => [...values.keys()]),
-    expire: vi.fn(async () => true),
+    expire: vi.fn(async (key: string, seconds: number) => {
+      expiries.set(key, Date.now() + seconds * 1000);
+      return true;
+    }),
     sAdd: vi.fn(async (_key: string, sessionId: string) => {
       members.add(sessionId);
       return 1;
@@ -49,7 +64,7 @@ function mockRedis() {
       return 1;
     }),
   } satisfies RedisClient;
-  return { client, pubSubClient, callbacks, values, members };
+  return { client, pubSubClient, callbacks, values, members, expiries };
 }
 function controller() {
   return {
@@ -70,8 +85,8 @@ function deferred() {
 describe("Redis stream lifecycle", () => {
   const managers: RedisStreamManager[] = [];
   const failure = new Error("Redis unavailable");
-  function setup() {
-    const redis = mockRedis();
+  function setup(shared?: Parameters<typeof mockRedis>[0]) {
+    const redis = mockRedis(shared);
     const manager = new RedisStreamManager({
       client: redis.client,
       pubSubClient: redis.pubSubClient,
@@ -131,7 +146,8 @@ describe("Redis stream lifecycle", () => {
       expect(vi.getTimerCount()).toBe(0);
       expect(stream.close).toHaveBeenCalledOnce();
       expect(callbacks.size).toBe(0);
-      expect(values.has("available:lifecycle:failed")).toBe(false);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(await client.exists("available:lifecycle:failed")).toBe(0);
       expect(members.has("failed")).toBe(false);
     }
   );
@@ -177,10 +193,169 @@ describe("Redis stream lifecycle", () => {
       );
       expect(client.del).toHaveBeenCalledWith("available:lifecycle:session");
       expect(client.sRem).toHaveBeenCalledWith("lifecycle:active", "session");
-      if (method === "unsubscribe")
-        expect(client.publish).not.toHaveBeenCalled();
+      expect(client.publish).toHaveBeenCalledWith(
+        "delete:lifecycle:session",
+        ""
+      );
     }
   );
+  it.each(["subscribe", "sAdd"] as const)(
+    "preserves a peer's shared availability after failed %s registration",
+    async (method) => {
+      const owner = setup();
+      const failing = setup(owner);
+      const live = controller();
+      await owner.manager.create("shared", live);
+      if (method === "subscribe")
+        failing.pubSubClient.subscribe.mockRejectedValueOnce(failure);
+      else failing.client.sAdd.mockRejectedValueOnce(failure);
+      await expect(failing.manager.create("shared", controller())).rejects.toBe(
+        failure
+      );
+      await failing.manager.close();
+      expect(await owner.manager.has("shared")).toBe(true);
+      expect(owner.members.has("shared")).toBe(true);
+      await owner.manager.send(undefined, "still-active");
+      expect(live.enqueue).toHaveBeenCalledOnce();
+      expect(failing.client.del).not.toHaveBeenCalled();
+      expect(failing.client.sRem).not.toHaveBeenCalled();
+    }
+  );
+
+  it("keeps a peer available when another manager of the same session closes", async () => {
+    const owner = setup();
+    const closing = setup(owner);
+    const live = controller();
+    await owner.manager.create("shared", live);
+    await closing.manager.create("shared", controller());
+    await closing.manager.close();
+    expect(await owner.manager.has("shared")).toBe(true);
+    expect(owner.members.has("shared")).toBe(true);
+    await owner.manager.send(undefined, "still-active");
+    expect(live.enqueue).toHaveBeenCalledOnce();
+  });
+
+  it("prunes expired broadcast members while another stream keeps the index alive", async () => {
+    const { manager, client, members } = setup();
+    const stale = controller();
+    const active = controller();
+    await manager.create("stale", stale);
+    await manager.create("active", active);
+    vi.mocked(stale.enqueue).mockImplementation(() => {
+      throw failure;
+    });
+    await manager.send(["stale"], "disconnect");
+    client.publish.mockClear();
+    await vi.advanceTimersByTimeAsync(2100);
+    await manager.send(undefined, "broadcast");
+    expect(active.enqueue).toHaveBeenCalledOnce();
+    expect(members.has("stale")).toBe(false);
+    expect(members.has("active")).toBe(true);
+    expect(client.publish).toHaveBeenCalledExactlyOnceWith(
+      "lifecycle:active",
+      "broadcast"
+    );
+  });
+
+  it("restores the broadcast index if a reconnect races with pruning", async () => {
+    const { manager, client, values, members } = setup();
+    members.add("racing");
+    client.sRem.mockImplementationOnce(async (_key, sessionId) => {
+      members.delete(sessionId);
+      values.set("available:lifecycle:racing", "active");
+      members.add(sessionId);
+      members.delete(sessionId); // The prune completed after reconnect's sAdd.
+      return 1;
+    });
+    await manager.send(undefined, "broadcast");
+    expect(members.has("racing")).toBe(true);
+    expect(client.publish).toHaveBeenCalledExactlyOnceWith(
+      "lifecycle:racing",
+      "broadcast"
+    );
+  });
+
+  it("preserves broadcast membership when the availability read fails", async () => {
+    const { manager, client, members } = setup();
+    await manager.create("active", controller());
+    client.exists.mockRejectedValueOnce(failure);
+    await expect(manager.send(undefined, "broadcast")).rejects.toBe(failure);
+    expect(members.has("active")).toBe(true);
+    expect(client.sRem).not.toHaveBeenCalled();
+    expect(client.publish).not.toHaveBeenCalled();
+  });
+
+  it("restores pruned membership when the reconnect availability read fails", async () => {
+    const { manager, client, members } = setup();
+    members.add("racing");
+    client.exists.mockResolvedValueOnce(0).mockRejectedValueOnce(failure);
+    await expect(manager.send(undefined, "broadcast")).rejects.toBe(failure);
+    expect(members.has("racing")).toBe(true);
+    expect(client.publish).not.toHaveBeenCalled();
+  });
+
+  it.each(["setEx", "setex"] as const)(
+    "uses atomic %s expiry so later Redis failures cannot leave immortal availability",
+    async (method) => {
+      const redis = mockRedis();
+      const client = {
+        ...redis.client,
+        [method]: vi.fn(async (key: string, ttl: number, value: string) => {
+          redis.values.set(key, value);
+          redis.expiries.set(key, Date.now() + ttl * 1000);
+          return "OK";
+        }),
+      };
+      client.expire.mockRejectedValue(failure);
+      const manager = new RedisStreamManager({
+        client,
+        pubSubClient: redis.pubSubClient,
+        prefix: "lifecycle:",
+        heartbeatInterval: 1,
+      });
+      managers.push(manager);
+      await expect(manager.create("failed", controller())).rejects.toBe(
+        failure
+      );
+      expect(manager.localSize).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(await client.exists("available:lifecycle:failed")).toBe(0);
+    }
+  );
+
+  it("notifies another manager of deletion even if local unsubscribe fails", async () => {
+    const local = setup();
+    const peer = setup();
+    const localStream = controller();
+    const peerStream = controller();
+    await local.manager.create("shared", localStream);
+    await peer.manager.create("shared", peerStream);
+    local.client.publish.mockImplementation(async (channel, data) => {
+      local.callbacks.get(channel)?.(data);
+      peer.callbacks.get(channel)?.(data);
+      return 2;
+    });
+    // Leave the local delete callback subscribed: it must not recurse after
+    // its generation is invalidated, while the peer still sees the message.
+    local.pubSubClient.unsubscribe.mockImplementation(async (channel) => {
+      if (channel === "delete:lifecycle:shared") throw failure;
+      local.callbacks.delete(channel);
+      return 1;
+    });
+    await expect(local.manager.delete("shared")).rejects.toBe(failure);
+    expect(local.client.publish).toHaveBeenCalledExactlyOnceWith(
+      "delete:lifecycle:shared",
+      ""
+    );
+    expect(local.manager.localSize).toBe(0);
+    expect(peer.manager.localSize).toBe(0);
+    expect(localStream.close).toHaveBeenCalledOnce();
+    expect(peerStream.close).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(peer.client.publish).not.toHaveBeenCalled();
+  });
+
   it("preserves an identical live controller on duplicate registration", async () => {
     const { manager, callbacks } = setup();
     const stream = controller();
@@ -252,7 +427,7 @@ describe("Redis stream lifecycle", () => {
     expect(second.enqueue).toHaveBeenCalledOnce();
   });
   it("closes all owned streams and the response channel after a Redis cleanup failure", async () => {
-    const { manager, client, callbacks, values } = setup();
+    const { manager, client, pubSubClient, callbacks, values } = setup();
     const first = controller();
     const second = controller();
     await manager.create("one", first);
@@ -261,15 +436,19 @@ describe("Redis stream lifecycle", () => {
     await Promise.resolve();
     await Promise.resolve();
     values.set("available:lifecycle:foreign", "active");
-    client.del.mockRejectedValueOnce(failure);
+    pubSubClient.unsubscribe.mockRejectedValueOnce(failure);
     await expect(manager.close()).rejects.toBe(failure);
     expect(manager.localSize).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
     expect(first.close).toHaveBeenCalledOnce();
     expect(second.close).toHaveBeenCalledOnce();
+    expect(callbacks.size).toBe(1);
+    await manager.close();
     expect(callbacks.size).toBe(0);
-    expect(values.has("available:lifecycle:two")).toBe(false);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await client.exists("available:lifecycle:two")).toBe(0);
     expect(values.has("available:lifecycle:foreign")).toBe(true);
+    expect(client.del).not.toHaveBeenCalled();
     expect(client.publish).not.toHaveBeenCalled();
     await expect(manager.create("late", controller())).rejects.toThrow(
       "closed"

@@ -2951,24 +2951,49 @@ program
         ]);
       };
 
-      // The first shutdown reason selects the CLI's status. Child exits during
-      // an intentional signal shutdown must not bypass tunnel/server cleanup.
+      // A process-group signal can reap the child before the parent's signal
+      // callback runs. Only a matching parent signal may replace that status;
+      // concrete child failure codes must survive later shutdown signals.
       let shutdownPromise: Promise<void> | undefined;
-      const shutdown = (exitCode: number): Promise<void> => {
-        shutdownPromise ??= (async () => {
-          process.exitCode = exitCode;
-          try {
-            await cleanup();
-          } catch (error) {
-            console.error("Shutdown failed:", error);
-          }
-          process.exit(exitCode);
-        })();
+      let selectedExitCode = 0;
+      let childExitSignal: NodeJS.Signals | undefined;
+      const shutdown = (
+        exitCode: number,
+        signal?: NodeJS.Signals | null
+      ): Promise<void> => {
+        if (!shutdownPromise) {
+          selectedExitCode = exitCode;
+          childExitSignal = signal ?? undefined;
+          shutdownPromise = (async () => {
+            process.exitCode = selectedExitCode;
+            try {
+              await cleanup();
+            } catch (error) {
+              console.error("Shutdown failed:", error);
+            }
+            if (childExitSignal === "SIGINT" || childExitSignal === "SIGTERM") {
+              // Allow a full poll turn for the queued native parent signal;
+              // one immediate can still run in the child's current loop turn.
+              await new Promise<void>((resolve) =>
+                setImmediate(() => setImmediate(resolve))
+              );
+            }
+            process.exit(selectedExitCode);
+          })();
+        }
         return shutdownPromise;
       };
 
-      process.on("SIGINT", () => void shutdown(0));
-      process.on("SIGTERM", () => void shutdown(0));
+      const onShutdownSignal = (signal: "SIGINT" | "SIGTERM") => {
+        if (childExitSignal === signal) {
+          selectedExitCode = 0;
+          childExitSignal = undefined;
+          process.exitCode = 0;
+        }
+        void shutdown(0);
+      };
+      process.on("SIGINT", () => onShutdownSignal("SIGINT"));
+      process.on("SIGTERM", () => onShutdownSignal("SIGTERM"));
 
       serverProc.once("error", (error) => {
         console.error("Server failed:", error);
@@ -2976,7 +3001,8 @@ program
       });
       serverProc.once("exit", (code, signal) => {
         void shutdown(
-          code ?? (signal ? 128 + (osConstants.signals[signal] ?? 0) : 1)
+          code ?? (signal ? 128 + (osConstants.signals[signal] ?? 0) : 1),
+          code === null ? signal : undefined
         );
       });
     } catch (error) {
