@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 3.6.9
+
+### Patch Changes
+
+- da6a1cc: Preserve the server child's exit status in `mcp-use start` after bounded server and tunnel cleanup. Unexpected failures remain nonzero so process supervisors can restart the server; intentional SIGINT and SIGTERM shutdowns still exit successfully.
+- Updated dependencies [da6a1cc]
+  - mcp-use@1.34.8
+  - @mcp-use/inspector@12.0.8
+
 ## 3.6.8
 
 ### Patch Changes
