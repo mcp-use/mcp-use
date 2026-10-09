@@ -8,9 +8,40 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+from mcp.types import Tool
 
 from mcp_use.client.client import MCPClient
 from mcp_use.client.code_executor import CodeExecutor
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("detail_level", ["full", "descriptions"])
+@pytest.mark.parametrize(
+    ("query", "expected_names"),
+    [
+        ("wEaThEr", ["weather"]),
+        ("dEmO", ["weather", "forecast"]),
+        ("RAIN", ["forecast"]),
+        ("absent", []),
+        ("", ["weather", "forecast"]),
+    ],
+)
+async def test_search_tools_without_description(mock_client, code_executor, detail_level, query, expected_names):
+    tools = [
+        Tool(name="weather", inputSchema={"type": "object"}),
+        Tool(name="forecast", description="Predict rain", inputSchema={"type": "object"}),
+    ]
+    mock_client.sessions = {"demo": AsyncMock(list_tools=AsyncMock(return_value=tools))}
+    mock_client.get_server_names.return_value = []
+
+    execution = await code_executor.execute(f"return await search_tools({query!r}, {detail_level!r})")
+
+    assert execution["error"] is None
+    result = execution["result"]
+    assert [tool["name"] for tool in result["results"]] == expected_names
+    assert result["meta"] == {"total_tools": 2, "namespaces": ["demo"], "result_count": len(expected_names)}
+    for tool in result["results"]:
+        assert tool["description"] == (None if tool["name"] == "weather" else "Predict rain")
 
 
 @pytest.fixture

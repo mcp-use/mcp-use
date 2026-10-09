@@ -334,7 +334,7 @@ class CodeExecutor:
                 filtered_tools = []
                 for tool_info in all_tools:
                     tool_name_match = query_lower in tool_info["name"].lower()
-                    desc_match = query_lower in tool_info.get("description", "").lower()
+                    desc_match = query_lower in (tool_info.get("description") or "").lower()
                     server_match = query_lower in tool_info["server"].lower()
                     if tool_name_match or desc_match or server_match:
                         filtered_tools.append(tool_info)

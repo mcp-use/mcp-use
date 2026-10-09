@@ -8,10 +8,39 @@ import tempfile
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
+from mcp.types import Tool
 
 from mcp_use.client import MCPClient
 from mcp_use.client.middleware.logging import default_logging_middleware
 from mcp_use.client.session import MCPSession
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("detail_level", ["full", "descriptions"])
+@pytest.mark.parametrize(
+    ("query", "expected_names"),
+    [
+        ("wEaThEr", ["weather"]),
+        ("dEmO", ["weather", "forecast"]),
+        ("RAIN", ["forecast"]),
+        ("absent", []),
+        ("", ["weather", "forecast"]),
+    ],
+)
+async def test_search_tools_without_description(detail_level, query, expected_names):
+    client = MCPClient()
+    tools = [
+        Tool(name="weather", inputSchema={"type": "object"}),
+        Tool(name="forecast", description="Predict rain", inputSchema={"type": "object"}),
+    ]
+    client.sessions = {"demo": AsyncMock(list_tools=AsyncMock(return_value=tools))}
+
+    result = await client.search_tools(query, detail_level)
+
+    assert [tool["name"] for tool in result["results"]] == expected_names
+    assert result["meta"] == {"total_tools": 2, "namespaces": ["demo"], "result_count": len(expected_names)}
+    for tool in result["results"]:
+        assert tool["description"] == (None if tool["name"] == "weather" else "Predict rain")
 
 
 class TestMCPClientInitialization:
