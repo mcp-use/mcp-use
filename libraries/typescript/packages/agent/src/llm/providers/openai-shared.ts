@@ -1,4 +1,4 @@
-import type { ProviderConfig } from "../types.js";
+import type { ContentPart, ProviderConfig } from "../types.js";
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
@@ -20,6 +20,17 @@ export class LlmRequestError extends Error {
     this.status = status;
     this.body = body;
   }
+}
+
+export function toPlainText(content: string | ContentPart[]): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter(
+      (part): part is Extract<ContentPart, { type: "text" }> =>
+        part.type === "text"
+    )
+    .map((part) => part.text)
+    .join("\n");
 }
 
 export function buildEndpoint(config: ProviderConfig, path: string): string {
