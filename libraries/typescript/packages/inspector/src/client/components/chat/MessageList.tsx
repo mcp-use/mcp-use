@@ -9,6 +9,7 @@ import type { LLMConfig, MessageAttachment } from "./types";
 import { isViewTool } from "@mcp-use/client/react";
 import { buildMessageTokenMap, type InspectorTraceEvent } from "./trace";
 import { normalizeWidgetMessage } from "./widget-message";
+import { deriveIsThinking } from "./thinking-state";
 
 interface Message {
   id: string;
@@ -136,42 +137,7 @@ export const MessageList = memo(
     );
 
     // Determine if we're in "thinking" state vs "streaming" state
-    const isThinking =
-      isLoading &&
-      (() => {
-        if (messages.length === 0) return true;
-
-        const lastMessage = messages[messages.length - 1];
-        // If last message is from user, we're thinking
-        if (lastMessage.role === "user") return true;
-
-        // If last message is from assistant but empty/minimal content, we're thinking
-        if (lastMessage.role === "assistant") {
-          // Check parts array first — streaming delivers content via parts
-          // while content may remain "" until after the stream reader closes
-          if (lastMessage.parts && lastMessage.parts.length > 0) {
-            return false;
-          }
-
-          const contentStr =
-            typeof lastMessage.content === "string"
-              ? lastMessage.content
-              : Array.isArray(lastMessage.content)
-                ? lastMessage.content
-                    .map((item) =>
-                      typeof item === "string"
-                        ? item
-                        : item.text || JSON.stringify(item)
-                    )
-                    .join("")
-                : JSON.stringify(lastMessage.content);
-
-          const hasContent = contentStr && contentStr.trim().length > 0;
-          return !hasContent;
-        }
-
-        return false;
-      })();
+    const isThinking = deriveIsThinking(isLoading, messages);
 
     // Determine if a message is currently streaming
     const lastMessage = messages[messages.length - 1];
