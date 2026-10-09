@@ -65,7 +65,7 @@ function toAnthropicToolResultContent(
   content: string | ContentPart[]
 ): unknown {
   if (typeof content === "string") {
-    return content;
+    return content || "[no content]";
   }
   const blocks: unknown[] = [];
   for (const p of content) {
