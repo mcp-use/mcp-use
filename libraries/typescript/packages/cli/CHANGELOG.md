@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 3.6.8
+
+### Patch Changes
+
+- 6dc5fad: Use the v1-legacy npm channel when checking for updates to an installed mcp-use v1 SDK, including channel-aware cache validation and install instructions. Suppress update notices in piped output so scripted command results remain clean.
+- Updated dependencies [6dc5fad]
+  - mcp-use@1.34.7
+  - @mcp-use/inspector@12.0.7
+
 ## 3.6.7
 
 ### Patch Changes
