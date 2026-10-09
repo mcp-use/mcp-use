@@ -10,7 +10,7 @@ const CACHE_FILE = path.join(CACHE_DIR, "update-check.json");
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FETCH_TIMEOUT_MS = 3000;
 const PACKAGE_NAME = "mcp-use";
-type ReleaseTag = "legacy-v1" | "latest";
+type ReleaseTag = "v1-legacy" | "latest";
 
 interface UpdateCache {
   lastChecked: string;
@@ -156,7 +156,7 @@ export async function notifyIfUpdateAvailable(
     if (!installed) return;
 
     const distTag: ReleaseTag =
-      parseSemver(installed)?.[0] === 1 ? "legacy-v1" : "latest";
+      parseSemver(installed)?.[0] === 1 ? "v1-legacy" : "latest";
     const latest = await getLatestVersion(distTag);
     if (!latest) return;
 

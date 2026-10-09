@@ -29,7 +29,7 @@ runs on pushes to `v1` affecting the TypeScript tree or that workflow:
 3. The next run invokes `scripts/v1-release.mjs plan` and `publish` once there
    are no pending changesets. It publishes the packages changed by the latest
    v1 version commit using npm trusted publishing and provenance.
-4. Publication uses **`legacy-v1`**, verifies the published version and tag,
+4. Publication uses **`v1-legacy`**, verifies the published version and tag,
    checks that other npm tags did not change, and pushes package Git tags.
 
 The allowed package lines are `mcp-use@1.x`, `@mcp-use/cli@3.x`,
@@ -56,7 +56,7 @@ npm view mcp-use@1.34.7 version dist.tarball --json
 npm view mcp-use dist-tags --json
 ```
 
-Expect `legacy-v1` to point to the new 1.x release and `latest` to remain on
+Expect `v1-legacy` to point to the new 1.x release and `latest` to remain on
 the current v2 release. Inspect the published artifact and test a clean v1
 consumer before upgrading deployed applications. Source tests passing and npm
 publication are separate from validation under the deployed workload.
@@ -64,7 +64,7 @@ publication are separate from validation under the deployed workload.
 Install the maintenance channel or pin the verified release:
 
 ```sh
-npm install mcp-use@legacy-v1
+npm install mcp-use@v1-legacy
 # Once this patch is published:
 npm install mcp-use@1.34.7
 ```
@@ -72,6 +72,6 @@ npm install mcp-use@1.34.7
 An existing `^1.x` range can resolve a new 1.x patch when its lockfile is
 updated. An exact version or unchanged lockfile requires an explicit update
 and rebuild. Installing `mcp-use@latest` selects v2 and requires migration.
-The patched v1 CLI checks `legacy-v1` for installed v1 projects and recommends
+The patched v1 CLI checks `v1-legacy` for installed v1 projects and recommends
 that channel in interactive update notices. Notices are suppressed in piped
 output, and caches from other channels or older untagged caches are refreshed.
