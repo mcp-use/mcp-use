@@ -55,6 +55,18 @@ class TestClient extends BaseMCPClient {
   });
 }
 
+function rejectFirstConnection(client: TestClient): () => number {
+  const unauthorized = Object.assign(new Error("Unauthorized"), { code: 401 });
+  let attempts = 0;
+  client.createConnectorFromConfig.mockImplementation(() =>
+    makeConnector(async () => {
+      attempts += 1;
+      if (attempts === 1) throw unauthorized;
+    })
+  );
+  return () => attempts;
+}
+
 describe("shouldAutoProvisionOAuth", () => {
   it("returns true for plain HTTP url configs", () => {
     expect(shouldAutoProvisionOAuth({ url: "https://example.com/mcp" })).toBe(
@@ -178,16 +190,7 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
     } as unknown as OAuthClientProvider;
     client.createDefaultOAuthProvider.mockResolvedValue(provider);
 
-    const unauthorized = Object.assign(new Error("Unauthorized"), {
-      code: 401,
-    });
-    let attempts = 0;
-    client.createConnectorFromConfig.mockImplementation(() =>
-      makeConnector(async () => {
-        attempts += 1;
-        if (attempts === 1) throw unauthorized;
-      })
-    );
+    const connectionAttempts = rejectFirstConnection(client);
 
     await client.createSession("demo");
 
@@ -195,7 +198,65 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
       provider,
       "https://example.com/mcp"
     );
-    expect(attempts).toBe(2);
+    expect(connectionAttempts()).toBe(2);
+  });
+
+  it("uses the provider-scoped configured fetch on 401", async () => {
+    const baseFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const scopedFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const getProxyFetch = vi.fn(() => scopedFetch);
+    const client = new TestClient({
+      mcpServers: {
+        demo: { url: "https://example.com/mcp", fetch: baseFetch },
+      },
+    });
+    const provider = {
+      getAuthorizationCode: vi.fn(async () => "code"),
+      getProxyFetch,
+    } as unknown as OAuthClientProvider;
+    client.createDefaultOAuthProvider.mockResolvedValue(provider);
+
+    const connectionAttempts = rejectFirstConnection(client);
+
+    await client.createSession("demo");
+
+    expect(getProxyFetch).toHaveBeenCalledWith(baseFetch);
+    expect(flow.completeOAuthFlow).toHaveBeenCalledWith(
+      provider,
+      "https://example.com/mcp",
+      { fetchFn: scopedFetch }
+    );
+    expect(connectionAttempts()).toBe(2);
+  });
+
+  it("falls back to the configured fetch when the provider has no wrapper", async () => {
+    const baseFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const client = new TestClient({
+      mcpServers: {
+        demo: { url: "https://example.com/mcp", fetch: baseFetch },
+      },
+    });
+    const provider = {
+      getAuthorizationCode: vi.fn(async () => "code"),
+    } as unknown as OAuthClientProvider;
+    client.createDefaultOAuthProvider.mockResolvedValue(provider);
+
+    const connectionAttempts = rejectFirstConnection(client);
+
+    await client.createSession("demo");
+
+    expect(flow.completeOAuthFlow).toHaveBeenCalledWith(
+      provider,
+      "https://example.com/mcp",
+      { fetchFn: baseFetch }
+    );
+    expect(connectionAttempts()).toBe(2);
   });
 
   it("does not retry non-401 errors", async () => {
@@ -213,5 +274,35 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
 
     await expect(client.createSession("demo")).rejects.toThrow("boom");
     expect(flow.completeOAuthFlow).not.toHaveBeenCalled();
+  });
+});
+
+describe("BrowserMCPClient OAuth fetch", () => {
+  it("uses the provider-scoped fetch for connector requests", async () => {
+    const { BrowserMCPClient } = await import("../../../src/core/browser.js");
+    class TestBrowserClient extends BrowserMCPClient {
+      connector(config: Record<string, unknown>): BaseConnector {
+        return this.createConnectorFromConfig(config);
+      }
+    }
+
+    const baseFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const scopedFetch = vi.fn(
+      async () => new Response()
+    ) as unknown as typeof fetch;
+    const getProxyFetch = vi.fn(() => scopedFetch);
+    const client = new TestBrowserClient({ mcpServers: {} });
+    const connector = client.connector({
+      url: "https://example.com/mcp",
+      fetch: baseFetch,
+      authProvider: { getProxyFetch },
+    });
+
+    expect(getProxyFetch).toHaveBeenCalledWith(baseFetch);
+    expect(
+      (connector as unknown as { customFetch?: typeof fetch }).customFetch
+    ).toBe(scopedFetch);
   });
 });
