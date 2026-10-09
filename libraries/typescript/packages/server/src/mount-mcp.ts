@@ -1,13 +1,13 @@
-import {
-  createMcpHandler,
-  type AuthInfo,
-  type CreateMcpHandlerOptions,
-  type McpHttpHandler,
-  type McpServerFactory,
+import type {
+  AuthInfo,
+  CreateMcpHandlerOptions,
+  McpHttpHandler,
+  McpServerFactory,
 } from "@modelcontextprotocol/server";
 
 import { trackBufferedResponse } from "./buffered-response.js";
 import { getRequestBag, matchesPath, type FetchHandler } from "./fetch-app.js";
+import { createManagedMcpHandler } from "./managed-handler.js";
 import {
   extractClientCapabilitiesFromBody,
   stashClientCapabilities,
@@ -24,6 +24,8 @@ export interface MountMcpOptions {
    * served by a fresh instance over a session-less streamable HTTP transport.
    * Pass `legacy: "reject"` for modern-only strict serving, where
    * legacy-classified requests get the unsupported-protocol-version error.
+   * Caller-supplied buses are wrapped to release stream listeners even when
+   * backend unsubscribe fails; a subsequent `close()` retries failed cleanup.
    */
   handler?: CreateMcpHandlerOptions;
   /**
@@ -35,7 +37,10 @@ export interface MountMcpOptions {
 
 /** Result of {@link createMcpMount}. */
 export interface McpMount {
-  /** Underlying SDK handler (`close`, `notify`, `bus`). */
+  /**
+   * Managed SDK handler (`close`, `notify`, `bus`). Closing it aborts both
+   * protocol eras and cancels pending factory requests without awaiting them.
+   */
   handler: McpHttpHandler;
   /** Fetch handler for the MCP path only (compose into a larger app). */
   fetch: FetchHandler;
@@ -44,9 +49,12 @@ export interface McpMount {
 /**
  * Create the MCP Streamable HTTP endpoint as a fetch handler.
  *
- * Returns the underlying `McpHttpHandler` so callers can call `close()` on
- * shutdown to abort in-flight exchanges, and use `notify`/`bus` for
- * list-changed notifications.
+ * Returns a managed `McpHttpHandler` so callers can call `close()` on shutdown
+ * to abort in-flight exchanges in either protocol era, and use `notify`/`bus`
+ * for list-changed notifications. Shutdown is terminal: later factory results
+ * are disposed, and pending requests settle with status 499. Caller-supplied
+ * buses remain usable by other handlers; this handler only removes listeners
+ * registered through its own bus facade.
  *
  * Compose the returned `fetch` into a larger app with {@link composeFetch}
  * from `mcp-use`, and put Host/Origin validation in front when binding
@@ -68,7 +76,7 @@ export function createMcpMount(
     authInfo: getAuthInfo,
   } = options;
   const legacyMode = handlerOptions?.legacy ?? "stateless";
-  const handler = createMcpHandler(factory, {
+  const handler = createManagedMcpHandler(factory, {
     legacy: "stateless",
     ...handlerOptions,
   });
