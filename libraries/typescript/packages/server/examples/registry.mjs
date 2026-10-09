@@ -75,6 +75,22 @@ export const examples = [
   local("views/basic", { tools: ["search-fruits"], view: true }),
   local("views/excalidraw", { view: true }),
   local("views/file-upload", { view: true }),
+  local("views/markdown-notes", {
+    tools: [
+      "open-notes",
+      "open-note-file",
+      "create-demo-file",
+      "check-demo-file",
+      "search-notes",
+    ],
+    resources: [
+      "notes://catalog/welcome",
+      "notes://catalog/packing-list",
+      "notes://catalog/meeting-notes",
+    ],
+    scenario: "markdown-notes",
+    view: true,
+  }),
   local("views/story-writer", { view: true }),
   local("views/tic-tac-toe", { view: true }),
 
