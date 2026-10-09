@@ -200,8 +200,8 @@ export type {
  * ```typescript
  * // Basic usage with config file
  * const client = new MCPClient('./mcp-config.json');
- * const session = await client.createSession('my-server');
- * const tools = await session.listTools();
+ * const connection = await client.connect('my-server');
+ * const tools = await connection.listTools();
  * ```
  *
  * @example
@@ -231,7 +231,7 @@ export type {
  * const result = await client.executeCode('console.log("Hello!")');
  * ```
  *
- * @see {@link MCPSession} for session management
+ * @see {@link MCPConnection} for connection methods
  */
 export class MCPClient extends BaseMCPClient {
   /**

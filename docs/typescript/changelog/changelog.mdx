@@ -6,6 +6,16 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.8.2" description="October 2026">
+  ## Tunnel cancellation & API reference navigation
+  Patch release keeping development tunnels connected when a cancellation arrives after its request has finished, with clearer API reference navigation.
+
+- **Fix** (@mcp-use/tunnel, @mcp-use/cli): ignore valid late or duplicate request cancellations so they no longer close the tunnel or interrupt unrelated requests; active requests still cancel normally (`#2664`)
+- **Documentation**: improve generated API reference navigation and clarify client and React hook documentation (`#2791`)
+- **Update**: Updated @mcp-use/tunnel to v0.2.2 and @mcp-use/cli to v4.3.2
+- **Update**: Updated @mcp-use/inspector to v20.3.18; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.8.1" description="October 2026">
   ## Streaming, code mode & deployment fixes
   Patch release fixing streamed tool notifications, code-mode discovery, CLI deployment links and remote validation, Windows scaffolding, and Inspector tool timeouts.
