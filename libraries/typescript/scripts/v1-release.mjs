@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const planFile = join(root, "v1-release-plan.json");
-const distTag = "legacy-v1";
+const distTag = "v1-legacy";
 const packageDirectory = join(root, "packages");
 const allowedLines = new Map([
   ["mcp-use", /^1\./],

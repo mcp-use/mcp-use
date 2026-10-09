@@ -10,10 +10,12 @@ const CACHE_FILE = path.join(CACHE_DIR, "update-check.json");
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FETCH_TIMEOUT_MS = 3000;
 const PACKAGE_NAME = "mcp-use";
+type ReleaseTag = "v1-legacy" | "latest";
 
 interface UpdateCache {
   lastChecked: string;
   latestVersion: string;
+  distTag: ReleaseTag;
 }
 
 /**
@@ -51,12 +53,16 @@ async function readCache(): Promise<UpdateCache | null> {
   }
 }
 
-async function writeCache(latestVersion: string): Promise<void> {
+async function writeCache(
+  latestVersion: string,
+  distTag: ReleaseTag
+): Promise<void> {
   try {
     await mkdir(CACHE_DIR, { recursive: true });
     const cache: UpdateCache = {
       lastChecked: new Date().toISOString(),
       latestVersion,
+      distTag,
     };
     await writeFile(CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
   } catch {
@@ -64,13 +70,13 @@ async function writeCache(latestVersion: string): Promise<void> {
   }
 }
 
-async function fetchLatestVersion(): Promise<string | null> {
+async function fetchLatestVersion(distTag: ReleaseTag): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
       const res = await fetch(
-        `https://registry.npmjs.org/${PACKAGE_NAME}/latest`,
+        `https://registry.npmjs.org/${PACKAGE_NAME}/${distTag}`,
         {
           signal: controller.signal,
           headers: { Accept: "application/json" },
@@ -87,17 +93,17 @@ async function fetchLatestVersion(): Promise<string | null> {
   }
 }
 
-async function getLatestVersion(): Promise<string | null> {
+async function getLatestVersion(distTag: ReleaseTag): Promise<string | null> {
   const cache = await readCache();
-  if (cache) {
+  if (cache?.distTag === distTag) {
     const age = Date.now() - new Date(cache.lastChecked).getTime();
     if (age < CACHE_TTL_MS) {
       return cache.latestVersion;
     }
   }
-  const latest = await fetchLatestVersion();
+  const latest = await fetchLatestVersion(distTag);
   if (latest) {
-    await writeCache(latest);
+    await writeCache(latest, distTag);
   }
   return latest;
 }
@@ -142,11 +148,16 @@ function resolveInstalledVersion(
 export async function notifyIfUpdateAvailable(
   projectPath: string | undefined
 ): Promise<void> {
+  // Keep piped command output usable by scripts and agents.
+  if (!process.stdout.isTTY) return;
+
   try {
     const installed = resolveInstalledVersion(projectPath);
     if (!installed) return;
 
-    const latest = await getLatestVersion();
+    const distTag: ReleaseTag =
+      parseSemver(installed)?.[0] === 1 ? "v1-legacy" : "latest";
+    const latest = await getLatestVersion(distTag);
     if (!latest) return;
 
     if (isNewer(installed, latest)) {
@@ -158,7 +169,7 @@ export async function notifyIfUpdateAvailable(
       );
       console.log(
         chalk.gray(
-          `Run ${chalk.white(`npm install ${PACKAGE_NAME}@latest`)} to update\n`
+          `Run ${chalk.white(`npm install ${PACKAGE_NAME}@${distTag}`)} to update\n`
         )
       );
     }
