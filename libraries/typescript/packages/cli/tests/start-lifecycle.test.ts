@@ -1,15 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
-import {
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
 
 const CLI_PATH = join(__dirname, "../dist/index.cjs");
 const isWindows = process.platform === "win32";
@@ -70,7 +66,15 @@ globalThis.fetch = async (input, options) => {
 const originalSpawn = childProcess.spawn;
 childProcess.spawn = (command, args, options) => {
   if (command === "npx" && args[0] === "--yes" && args[1] === "@mcp-use/tunnel") {
-    return originalSpawn(process.execPath, [process.env.CLI_START_TUNNEL_FILE], options);
+    // npx needs a Windows shell; the direct Node fixture does not. The CLI's
+    // child handle must refer to the fixture, not to a cmd.exe wrapper whose
+    // termination can leave the fixture alive and its cwd locked.
+    const tunnel = originalSpawn(process.execPath, [process.env.CLI_START_TUNNEL_FILE], {
+      ...options,
+      shell: false,
+    });
+    event("tunnel-spawn-pid:" + tunnel.pid);
+    return tunnel;
   }
   if (command === "node" && args.length === 1 && args[0] === "dist/index.js") {
     const executable = process.env.CLI_START_MODE === "spawn-error"
@@ -203,10 +207,39 @@ describe("mcp-use start child exit and shutdown", () => {
     }
   };
 
-  afterEach(() => {
+  const waitForFixturesToExit = async () => {
+    const fixturePids = events().flatMap((entry) => {
+      const match = /^(?:server|tunnel)-pid:(\d+)$/.exec(entry);
+      return match ? [Number(match[1])] : [];
+    });
+    if (cli?.pid) fixturePids.push(cli.pid);
+    const deadline = Date.now() + 2000;
+    while (true) {
+      const running = fixturePids.filter((pid) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+          throw error;
+        }
+      });
+      if (running.length === 0) return;
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `Fixture processes did not exit: ${running.join(", ")}`
+        );
+      }
+      await delay(20);
+    }
+  };
+
+  afterEach(async () => {
     terminateFixtures();
+    await waitForFixturesToExit();
     // Windows can keep the child cwd locked briefly after process termination.
-    rmSync(projectDir, {
+    // Async retries let pending process/stdio close callbacks run as well.
+    await rm(projectDir, {
       recursive: true,
       force: true,
       maxRetries: 10,
@@ -217,7 +250,7 @@ describe("mcp-use start child exit and shutdown", () => {
   });
 
   async function runStart(options: StartOptions = {}) {
-    return new Promise<{ code: number | null; output: string }>(
+    const result = await new Promise<{ code: number | null; output: string }>(
       (resolve, reject) => {
         const args = [CLI_PATH, "start", "--path", projectDir, "--port", "0"];
         if (options.tunnel) args.push("--tunnel");
@@ -284,6 +317,19 @@ describe("mcp-use start child exit and shutdown", () => {
         });
       }
     );
+    if (options.tunnel) {
+      const entries = events();
+      const spawnedPid = entries.find((entry) =>
+        entry.startsWith("tunnel-spawn-pid:")
+      );
+      const fixturePid = entries.find((entry) =>
+        entry.startsWith("tunnel-pid:")
+      );
+      expect(spawnedPid, "Missing direct tunnel child handle").toBeDefined();
+      expect(fixturePid, "Missing tunnel fixture PID").toBeDefined();
+      expect(spawnedPid!.split(":")[1]).toBe(fixturePid!.split(":")[1]);
+    }
+    return result;
   }
 
   for (const tunnel of [false, true]) {
