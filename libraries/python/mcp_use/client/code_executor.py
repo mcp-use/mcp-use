@@ -1,14 +1,24 @@
 """
 Code execution engine for MCP tools.
 
-This module provides secure code execution capabilities for MCP clients,
-allowing agents to interact with tools through Python code instead of
-direct tool calls.
+This module lets MCP clients execute agent-written Python code with access
+to MCP tools, instead of calling tools directly.
+
+Security: executed code runs in the host process with full privileges —
+there is no sandbox here. The ``__builtins__`` allowlist is a
+defense-in-depth convenience guard against accidental misuse (for example
+calling ``open`` or ``eval`` by name); it is not a security boundary and
+cannot contain hostile or prompt-injected code, because plain attribute
+access alone reaches the interpreter's live class graph
+(``().__class__.__bases__[0].__subclasses__()``). Enable ``code_mode`` only
+with agents and inputs you trust. Real isolation requires OS-level
+sandboxing.
 """
 
 import asyncio
 import io
 import re
+import warnings
 from contextlib import redirect_stderr, redirect_stdout
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
@@ -18,12 +28,35 @@ from mcp_use.logging import logger
 if TYPE_CHECKING:
     from mcp_use.client.client import MCPClient
 
+_CODE_MODE_SECURITY_WARNING = (
+    "mcp_use code mode: CodeExecutor runs code in the host process with full privileges — "
+    "the __builtins__ allowlist is not a sandbox or security boundary. "
+    "Only enable code_mode with trusted agents and trusted input."
+)
+
+_code_mode_security_warning_emitted = False
+
+
+def _warn_once_code_mode_security() -> None:
+    """Emit the code-mode security warning once per process."""
+    global _code_mode_security_warning_emitted
+    if _code_mode_security_warning_emitted:
+        return
+    _code_mode_security_warning_emitted = True
+    logger.warning(_CODE_MODE_SECURITY_WARNING)
+    warnings.warn(_CODE_MODE_SECURITY_WARNING, RuntimeWarning, stacklevel=3)
+
 
 class CodeExecutor:
-    """Executes Python code with access to MCP tools in a restricted namespace.
+    """Executes agent-written Python code with access to MCP tools.
 
-    This class provides a secure execution environment where agent-written code
-    can call MCP tools through dynamically generated wrapper functions.
+    Code runs in-process with the full privileges of the host process.
+    The execution namespace restricts ``__builtins__`` to a small allowlist
+    as a defense-in-depth measure against accidental misuse; it is not a
+    security boundary and must not be treated as one.
+
+    Only enable ``code_mode`` in trusted contexts: executed code typically
+    originates from an LLM and can be steered by prompt injection.
     """
 
     def __init__(self, client: "MCPClient"):
@@ -34,6 +67,7 @@ class CodeExecutor:
         """
         self.client = client
         self._tool_cache: dict[str, dict[str, Any]] = {}
+        _warn_once_code_mode_security()
 
     async def execute(self, code: str, timeout: float = 30.0) -> dict[str, Any]:
         """Execute Python code with access to MCP tools.
@@ -127,12 +161,20 @@ class CodeExecutor:
         return await namespace["__execute_wrapper__"]()
 
     async def _build_namespace(self) -> dict[str, Any]:
-        """Build restricted namespace with tool wrappers.
+        """Build the execution namespace with tool wrappers.
+
+        The ``__builtins__`` allowlist below is a defense-in-depth measure
+        against accidental misuse (e.g. invoking ``open`` or ``eval`` by
+        name); it is not a security boundary — code runs in-process with
+        full host privileges.
 
         Returns:
-            Dictionary containing safe builtins and tool wrappers.
+            Dictionary containing restricted builtins and tool wrappers.
         """
-        # Start with safe builtins
+        # Start with the builtin allowlist. Defense-in-depth only: it blocks
+        # calling excluded builtins *by name*, but plain attribute access on
+        # any reachable object (e.g. ``().__class__.__bases__[0]``) is always
+        # permitted by the interpreter, so this cannot contain hostile code.
         safe_builtins = {
             "print": print,
             "len": len,

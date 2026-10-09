@@ -5,6 +5,8 @@ Tests the code execution functionality for MCP code mode.
 """
 
 import asyncio
+import subprocess  # noqa: F401  (loaded so the advisory PoC can find Popen in the class graph)
+import warnings
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -425,3 +427,62 @@ return a + b
 
         assert result["error"] is None
         assert result["result"] == 3
+
+
+class TestCodeExecutorSecurityDisclosure:
+    """Honest security disclosure for code mode (GHSA-j72j-pww4-gg46 / #2816).
+
+    The ``__builtins__`` allowlist is a defense-in-depth guard against
+    accidental misuse, not a security sandbox: restricting builtins only
+    blocks calling excluded builtins *by name*, while plain attribute
+    access always reaches the interpreter's live class graph. These tests
+    pin the documented semantics so the sandbox pretense cannot silently
+    return.
+    """
+
+    def test_no_secure_sandbox_claims(self):
+        """The module/class docstrings must not advertise secure execution."""
+        import mcp_use.client.code_executor as module
+
+        for doc in (module.__doc__, CodeExecutor.__doc__):
+            lowered = doc.lower()
+            assert "secure execution environment" not in lowered
+            assert "secure code execution" not in lowered
+        # ...and must honestly disclose the actual trust model instead.
+        assert "full privileges" in module.__doc__
+        assert "no sandbox" in module.__doc__.lower()
+
+    def test_security_warning_emitted_once_on_first_use(self, mock_client, monkeypatch, caplog):
+        """A loud warning fires once per process when code mode is first used."""
+        import mcp_use.client.code_executor as module
+
+        monkeypatch.setattr(module, "_code_mode_security_warning_emitted", False)
+
+        with caplog.at_level("WARNING", logger="mcp_use"), pytest.warns(RuntimeWarning, match="code mode"):
+            CodeExecutor(mock_client)
+        assert "not a sandbox" in caplog.text
+
+        # Second construction stays silent — the warning was already emitted once.
+        with warnings.catch_warnings(record=True) as records:
+            warnings.simplefilter("always")
+            CodeExecutor(mock_client)
+        assert not [w for w in records if issubclass(w.category, RuntimeWarning) and "code mode" in str(w.message)]
+
+    @pytest.mark.asyncio
+    async def test_builtins_allowlist_is_not_a_security_boundary(self, code_executor):
+        """Attribute access alone reaches live classes (advisory PoC).
+
+        No builtin is called by name here — only ``.`` attribute access and
+        subscripting — so the ``__builtins__`` allowlist cannot block this.
+        The escape succeeds by design; the allowlist only guards against
+        naive misuse, which is what the docstrings now say.
+        """
+        code = """
+reached = [cls for cls in ().__class__.__bases__[0].__subclasses__() if cls.__name__ == 'Popen']
+return len(reached) > 0
+"""
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] is True
