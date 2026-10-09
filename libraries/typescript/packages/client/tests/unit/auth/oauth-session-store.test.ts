@@ -5,7 +5,7 @@
  *   pnpm --filter mcp-use test:unit -- tests/unit/auth/session-store.test.ts
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   OAuthSessionStore,
   type OAuthSessionStoreOptions,
@@ -114,19 +114,86 @@ describe("OAuthSessionStore", () => {
   });
 
   describe("saveTokens()", () => {
-    it("persists tokens and clears code_verifier + last_auth_url", async () => {
+    it("preserves the token receipt time through storage and tokens()", async () => {
+      const { session } = createStore();
+      const receivedAt = Date.parse("2026-01-01T21:12:00Z");
+      const tokens = {
+        access_token: "abc",
+        refresh_token: "ref",
+        _mcp_use_received_at: receivedAt,
+      };
+
+      await session.saveTokens(tokens);
+
+      const savedTokens = await session.tokens();
+      expect(savedTokens).toMatchObject({
+        _mcp_use_received_at: receivedAt,
+      });
+    });
+
+    it("clamps future receipt times to now", async () => {
+      const { session } = createStore();
+      const now = Date.parse("2026-01-01T21:42:00Z");
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+      try {
+        await session.saveTokens({
+          access_token: "abc",
+          expires_in: 3600,
+          _mcp_use_received_at: now + 24 * 60 * 60 * 1000,
+        });
+
+        expect(await session.tokens()).toMatchObject({
+          _mcp_use_received_at: now,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("bounds stale receipt times so an expired token stays expired", async () => {
+      const { session } = createStore();
+      const now = Date.parse("2026-01-01T21:42:00Z");
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+      try {
+        await session.saveTokens({
+          access_token: "abc",
+          expires_in: 3600,
+          _mcp_use_received_at: now - 2 * 60 * 60 * 1000,
+        });
+
+        expect(await session.tokens()).toMatchObject({
+          _mcp_use_received_at: now - 3_600_000,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("persists the token receipt time and clears auth flow state", async () => {
       const { session, kv } = createStore();
       kv.set(session.getKey("code_verifier"), "verifier");
       kv.set(session.getKey("last_auth_url"), "https://example.com/auth");
       kv.set(session.getKey("last_auth_callback_url"), session.redirectUrl);
 
       const tokens = { access_token: "abc", refresh_token: "ref" };
-      await session.saveTokens(tokens);
+      const receivedAt = Date.parse("2026-01-01T00:00:00Z");
+      vi.useFakeTimers();
+      vi.setSystemTime(receivedAt);
+      try {
+        await session.saveTokens(tokens);
 
-      expect(kv.get(session.getKey("tokens"))).toBe(JSON.stringify(tokens));
-      expect(kv.get(session.getKey("code_verifier"))).toBeNull();
-      expect(kv.get(session.getKey("last_auth_url"))).toBeNull();
-      expect(kv.get(session.getKey("last_auth_callback_url"))).toBeNull();
+        expect(JSON.parse(kv.get(session.getKey("tokens"))!)).toEqual({
+          ...tokens,
+          _mcp_use_received_at: receivedAt,
+        });
+        expect(kv.get(session.getKey("code_verifier"))).toBeNull();
+        expect(kv.get(session.getKey("last_auth_url"))).toBeNull();
+        expect(kv.get(session.getKey("last_auth_callback_url"))).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
