@@ -127,6 +127,21 @@ export interface RequestClientContext {
    */
   user(): UserContext | undefined;
   /**
+   * Return this request's opened-resource path from `_meta["openai/resource"]`.
+   *
+   * Performs no I/O or URI conversion. The host injects this path into tool calls
+   * from a file-entrypoint View. Only trust it within a trusted host connection;
+   * arbitrary client metadata cannot attest authorization. Authorize server-side
+   * access before processing the path or intentionally disclosing it to a View.
+   *
+   * @returns A fresh path object, or undefined for absent/malformed metadata.
+   */
+  resource():
+    | {
+        /** Absolute execution-host path reported by the client. */ path: string;
+      }
+    | undefined;
+  /**
    * Whether this request's client advertises MCP Apps / UI support.
    *
    * True when the client declares the `io.modelcontextprotocol/ui` extension
@@ -449,6 +464,17 @@ function toClientContext(ctx: ServerContext): RequestClientContext {
               location: { ...user.location },
             }),
           };
+    },
+    resource(): { path: string } | undefined {
+      const resource = ctx.mcpReq._meta?.["openai/resource"];
+      if (
+        resource === null ||
+        typeof resource !== "object" ||
+        Array.isArray(resource)
+      )
+        return undefined;
+      const path = (resource as Record<string, unknown>).path;
+      return typeof path === "string" && path.trim() ? { path } : undefined;
     },
     supportsViews(): boolean {
       return supportsViews(capabilities);

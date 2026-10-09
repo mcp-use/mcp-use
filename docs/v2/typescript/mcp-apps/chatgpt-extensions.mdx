@@ -1,6 +1,6 @@
 ---
 title: "ChatGPT Plugin Extensions"
-description: "Add selected model context, app entrypoints, deep links, structured settings, and display modes with the TypeScript SDK."
+description: "Add selected model context, app entrypoints, host file editing, file opening, deep links, structured settings, and display modes with the TypeScript SDK."
 icon: "/images/icons/openai.svg"
 ---
 
@@ -17,6 +17,8 @@ The examples below use the v2 TypeScript API.
 | ----------------------------------------------- | ------------------------------------------------- |
 | Open an app from navigation or a conversation   | `tool.view.entrypoints` with `global` or `thread` |
 | Open a file in a custom viewer                  | `tool.view.entrypoints` with `file`               |
+| Read or save the file that opened the View      | `useHostFile()`                                   |
+| Open an execution-host file returned by a tool  | `useOpenFile()`                                   |
 | Read an incoming app route                      | `useDeepLink()`                                   |
 | Add native settings and action buttons          | `server.settings()`                               |
 | Attach selected evidence to the next model turn | `useModelContext()`                               |
@@ -28,13 +30,14 @@ The [OpenAI platform support table](https://github.com/openai/mcp-extensions/blo
 Its web column refers to the ChatGPT Work browser and excludes classic ChatGPT.
 Availability depends on the host release.
 
-| Extension                     | Desktop | Work web | iOS | Android |
-| ----------------------------- | ------- | -------- | --- | ------- |
-| Global and thread entrypoints | Yes     | Yes      | Yes | Yes     |
-| File entrypoints              | Yes     | No       | No  | No      |
-| Deep links                    | Yes     | Yes      | Yes | No      |
-| Structured settings           | Yes     | Yes      | Yes | Yes     |
-| Resource display modes        | Yes     | Yes      | Yes | Yes     |
+| Extension                       | Desktop | Work web | iOS | Android |
+| ------------------------------- | ------- | -------- | --- | ------- |
+| Global and thread entrypoints   | Yes     | Yes      | Yes | Yes     |
+| File entrypoints                | Yes     | No       | No  | No      |
+| Host file resources and opening | Yes     | No       | No  | No      |
+| Deep links                      | Yes     | Yes      | Yes | No      |
+| Structured settings             | Yes     | Yes      | Yes | Yes     |
+| Resource display modes          | Yes     | Yes      | Yes | Yes     |
 
 ChatGPT supports `inline` and `fullscreen` display modes.
 Other MCP Apps hosts can support `pip`.
@@ -462,6 +465,190 @@ The CSV tool advertises these metadata fields:
 These fields appear inside the tool's `_meta` object.
 Typed `view.entrypoints` takes precedence over raw `_meta["openai/ui"].entrypoints`.
 If you omit the typed field, existing raw entrypoint declarations pass through.
+
+## Read and edit the opened file
+
+`useHostFile()` binds to the complete file input that opened this View. It has no
+URI argument. It uses the existing App connection and requires
+`hostCapabilities.experimental["openai/resource"]`. Before the handshake and
+complete input it is `pending`; an unsupported host or complete non-file input
+is `unsupported`. Invalid complete input and read failures produce `error`.
+Later ambient tool calls cannot replace the opening file. Remount the View to
+establish a new opening lifetime.
+
+```tsx
+import { useEffect, useState } from "react";
+import { useHostFile } from "mcp-use/react";
+
+export default function NoteEditor() {
+  const file = useHostFile({ representation: "text" });
+  const [draft, setDraft] = useState<{ text: string; etag: string }>();
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const data = file.data;
+    if (data && "text" in data && data.etag) {
+      // Keep this draft's base token when subscriptions deliver newer contents.
+      const initial = { text: data.text, etag: data.etag };
+      setDraft((previous) => previous ?? initial);
+    }
+  }, [file.data]);
+
+  async function save() {
+    if (!draft || !file.canWrite) return;
+    setSaving(true);
+    try {
+      const result = await file.write(
+        { text: draft.text },
+        { ifMatch: draft.etag },
+      );
+      if (result.outcome === "saved") {
+        setDraft({ ...draft, etag: result.etag });
+        setMessage("Saved.");
+      } else if (result.outcome === "conflict") {
+        setMessage("File changed. Keep your draft and reload to review.");
+      } else {
+        setMessage(`Not saved. Maximum size: ${result.maxBytes} bytes.`);
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (file.status === "unsupported")
+    return <p>Open a file in ChatGPT desktop.</p>;
+  if (!file.data) return <p>{file.error?.message ?? "Loading…"}</p>;
+  if (!("text" in file.data)) return <p>The host returned a blob.</p>;
+  if (!draft) return <pre>{file.data.text}</pre>; // No ETag: readable, no guarded save.
+  return (
+    <main>
+      <textarea
+        disabled={saving}
+        value={draft.text}
+        onChange={(event) => setDraft({ ...draft, text: event.target.value })}
+      />
+      <button disabled={saving || !file.canWrite} onClick={() => void save()}>
+        Save
+      </button>
+      <p>{message || file.error?.message}</p>
+    </main>
+  );
+}
+```
+
+For conflict reconciliation, call `await file.refresh()` to obtain the current
+contents and ETag, then explicitly review or merge them with your retained draft.
+The SDK does not attach a conflict token to old contents or automatically retry
+a save. `saved` adopts the submitted contents and returned ETag unless a newer
+read or host invalidation arrived while that save was in flight. In that case the
+newer snapshot or pending invalidation is retained, while the promise still
+returns the host outcome for the submitted contents. `conflict` and
+`too-large` retain the previous contents and token. After a conflict or failed
+read/write, refresh successfully before saving again.
+
+`representation` is a preference: handle either `text` or base64 `blob` in the
+result. The SDK preserves contents without conversion and selects the content
+item matching the exact opened opaque URI. Matching-item
+`_meta["openai/resource"]` supplies `writable` and the opaque `etag`.
+`writable` defaults to false; `canWrite` requires a valid read, explicit write
+permission, and a non-empty ETag. The SDK requires explicit non-empty `ifMatch`
+even though the host protocol permits unguarded writes.
+
+Subscriptions default to enabled. `{ subscribe: false }` disables automatic
+updates for that consumer. Consumers share a host subscription to the opening
+URI; the last consumer leaving releases it. `isSubscribed` reports an established
+subscription and `subscriptionError` reports failures separately from read
+errors. Manual `refresh()` remains available. Refreshes retain previous data;
+resource updates trigger reads and never replace contents directly.
+
+This flow requires the dedicated `openai/resource` advertisement. Generic
+`serverResources` support and file-opening support do not authorize host file
+reads or writes. It does not expose a filesystem browser or add files to model
+context. The existing `useFiles()` upload/download-URL helpers remain separate.
+
+### Process the opened file on the server
+
+For work that needs the execution-host path, call a server tool through
+`useCallTool`. ChatGPT adds `_meta["openai/resource"].path` to tool calls from the
+file-entrypoint View. The request-scoped accessor performs no I/O or URI-to-path
+conversion and returns undefined for absent or malformed metadata.
+
+```typescript
+server.tool(
+  { name: "process_opened_file", visibility: "app" },
+  async (_args, ctx) => {
+    const resource = ctx.client.resource();
+    if (!resource) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Open a file first." }],
+      };
+    }
+    // Authorize access before using resource.path in your server-owned processing.
+    // Return only the result your View needs; a raw path is not disclosed by default.
+    return {
+      content: [
+        { type: "text", text: "Opened resource metadata is available." },
+      ],
+    };
+  },
+);
+```
+
+Trust the injected path only within a trusted host connection. This accessor
+cannot attest arbitrary client metadata; authorization and file I/O remain
+server-owned.
+
+### Open a server-generated file
+
+`useOpenFile()` asks ChatGPT to open an absolute path returned by a server tool.
+Pass an execution-host path, rather than a resource URI or download URL. The
+host resolves the path and chooses the viewer. A successful request does not
+promise a particular viewer or tab layout. If it selects your registered file
+View, that View uses `useHostFile()` to read the opened file.
+
+```tsx
+import { useState } from "react";
+import { useOpenFile } from "mcp-use/react";
+
+export function OpenGeneratedFile({
+  generatedFile,
+}: {
+  generatedFile: { path: string };
+}) {
+  const openFile = useOpenFile();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function open() {
+    setPending(true);
+    setError(null);
+    try {
+      await openFile({ path: generatedFile.path });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not open file.");
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <div>
+      <button disabled={pending} onClick={() => void open()}>
+        {pending ? "Opening…" : "Open generated STL"}
+      </button>
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+```
+
+Opening uses the independent `experimental["openai/files"]` capability and
+`openai/files/open` request with `{ path }`. Unsupported hosts and request
+failures reject the promise. The SDK checks non-blank input without guessing the
+execution host's operating system. Both file entrypoints and file opening are
+currently ChatGPT desktop features.
 
 ## Read incoming deep links
 
