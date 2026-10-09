@@ -179,6 +179,32 @@ export async function mountMcp(
   // Map to store transports by session ID (following official Hono example from PR #1209)
   const transports = new Map<string, any>();
 
+  const cleanupClosedSession = async (sid: string): Promise<void> => {
+    if (getDebugLevel() !== "info") {
+      console.log(`[MCP] Session closed: ${sid}`);
+    }
+    transports.delete(sid);
+    sessions.delete(sid);
+    // Release registrations even if a remote store is unavailable, and attempt
+    // both remote cleanups independently so one failure cannot skip the other.
+    const cleanups = await Promise.allSettled([
+      Promise.resolve().then(() =>
+        mcpServerInstance.cleanupSessionSubscriptions?.(sid)
+      ),
+      Promise.resolve().then(() => mcpServerInstance.cleanupSessionRefs?.(sid)),
+      Promise.resolve().then(() => streamManager.delete(sid)),
+      Promise.resolve().then(() => sessionStore.delete(sid)),
+    ]);
+    for (const cleanup of cleanups) {
+      if (cleanup.status === "rejected") {
+        console.warn(
+          `[MCP] Error cleaning up closed session ${sid}:`,
+          cleanup.reason
+        );
+      }
+    }
+  };
+
   // Set up distributed response forwarding: when another server forwards a
   // JSON-RPC response (e.g. a sampling result) to us via Redis Pub/Sub, feed
   // it into the local transport so the SDK Protocol resolves the pending Promise.
@@ -409,17 +435,7 @@ export async function mountMcp(
             }
           },
 
-          onsessionclosed: async (sid: string) => {
-            if (getDebugLevel() !== "info") {
-              console.log(`[MCP] Session closed: ${sid}`);
-            }
-            transports.delete(sid);
-            await streamManager.delete(sid);
-            await sessionStore.delete(sid);
-            sessions.delete(sid);
-            mcpServerInstance.cleanupSessionSubscriptions?.(sid);
-            mcpServerInstance.cleanupSessionRefs?.(sid);
-          },
+          onsessionclosed: cleanupClosedSession,
         });
 
         wrapTransportForStreamManager(transport, sessionId, streamManager);
@@ -599,25 +615,7 @@ export async function mountMcp(
             };
           },
 
-          onsessionclosed: async (sid: string) => {
-            if (getDebugLevel() !== "info") {
-              console.log(`[MCP] Session closed: ${sid}`);
-            }
-            transports.delete(sid);
-
-            // Clean up stream manager
-            await streamManager.delete(sid);
-
-            // Clean up session metadata
-            await sessionStore.delete(sid);
-            sessions.delete(sid);
-
-            // Clean up resource subscriptions for this session
-            mcpServerInstance.cleanupSessionSubscriptions?.(sid);
-
-            // Clean up registered refs for hot reload support
-            mcpServerInstance.cleanupSessionRefs?.(sid);
-          },
+          onsessionclosed: cleanupClosedSession,
         });
 
         allocatedTransport = transport;

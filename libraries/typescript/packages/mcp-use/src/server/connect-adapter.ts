@@ -24,13 +24,14 @@ export function isExpressMiddleware(middleware: any): boolean {
 
   // Look for Express-specific patterns in the function body
   // Common Express patterns: res.send, res.json, res.status, req.body, req.params, etc.
+  // Only match standalone req/res identifiers, not properties such as c.req.query.
   const expressPatterns = [
-    /\bres\.(send|json|status|end|redirect|render|sendFile|download)\b/,
-    /\breq\.(body|params|query|cookies|session)\b/,
-    /\breq\.get\s*\(/,
-    /\bres\.set\s*\(/,
-    /\bres\.statusCode\s*=/,
-    /\bres\.writeHead\s*\(/,
+    /(?<![\w$.])res\.(send|json|status|end|redirect|render|sendFile|download)\b/,
+    /(?<![\w$.])req\.(body|params|query|cookies|session)\b/,
+    /(?<![\w$.])req\.get\s*\(/,
+    /(?<![\w$.])res\.set\s*\(/,
+    /(?<![\w$.])res\.statusCode\s*=/,
+    /(?<![\w$.])res\.writeHead\s*\(/,
   ];
 
   const hasExpressPattern = expressPatterns.some((pattern) =>
@@ -39,24 +40,12 @@ export function isExpressMiddleware(middleware: any): boolean {
 
   // Express/Connect middleware has 3 or 4 parameters
   if (paramCount === 3 || paramCount === 4) {
-    // For 3-4 params, verify it uses Express patterns to be more robust
-    // This handles edge cases where someone might write a Hono middleware with 3 params
-    if (hasExpressPattern) {
-      return true;
-    }
-    // If it has 3-4 params but no Express patterns, still assume Express
-    // (most Express middleware will have these patterns, but some simple ones might not)
     return true;
   }
 
   // Hono middleware has 2 parameters
   if (paramCount === 2) {
-    // Check if it uses Express-specific patterns (unlikely but possible)
-    if (hasExpressPattern) {
-      return true;
-    }
-
-    // Check for Hono-specific patterns
+    // Prefer explicit Hono Context access before ambiguous request aliases.
     const honoPatterns = [
       /\bc\.(req|res|json|text|html|status|header)\b/,
       /\bc\.get\s*\(/,
@@ -73,9 +62,9 @@ export function isExpressMiddleware(middleware: any): boolean {
       return false;
     }
 
-    // If it has 2 parameters and no clear patterns, assume it's Hono
-    // (default assumption since Hono is the native middleware format)
-    return false;
+    // Two-argument Express terminal handlers still need adaptation. Otherwise
+    // default to Hono, the native middleware format.
+    return hasExpressPattern;
   }
 
   // For other parameter counts (0, 1, 5+), default to Hono
@@ -165,46 +154,70 @@ export async function adaptConnectMiddleware(
     const mockResponse = createResponse();
 
     // Intercept response.end to capture the response
-    let responseResolved = false;
-    const res = await new Promise<Response | undefined>((resolve) => {
+    const res = await new Promise<Response | undefined>((resolve, reject) => {
+      let responseSettled = false;
+      const resolveResponse = (response: Response | undefined) => {
+        if (responseSettled) return;
+        responseSettled = true;
+        resolve(response);
+      };
+      const rejectResponse = (error: unknown) => {
+        if (responseSettled) return;
+        responseSettled = true;
+        reject(error);
+      };
       const originalEnd = mockResponse.end.bind(mockResponse);
 
       (mockResponse as any).end = (...args: Parameters<typeof originalEnd>) => {
-        const result = originalEnd(...args);
+        try {
+          const result = originalEnd(...args);
 
-        if (!responseResolved && mockResponse.writableEnded) {
-          responseResolved = true;
-          // Transform mock response to Web Response
-          // Status codes 204 (No Content) and 304 (Not Modified) must not have a body
-          const statusCode = mockResponse.statusCode;
-          const noBodyStatuses = [204, 304];
-          const responseBody = noBodyStatuses.includes(statusCode)
-            ? null
-            : mockResponse._getData() || mockResponse._getBuffer() || null;
+          if (!responseSettled && mockResponse.writableEnded) {
+            // Transform mock response to Web Response
+            // Status codes 204 (No Content) and 304 (Not Modified) must not have a body
+            const statusCode = mockResponse.statusCode;
+            const noBodyStatuses = [204, 304];
+            const responseBody = noBodyStatuses.includes(statusCode)
+              ? null
+              : mockResponse._getData() || mockResponse._getBuffer() || null;
 
-          const connectResponse = new Response(responseBody, {
-            status: statusCode,
-            statusText: mockResponse.statusMessage,
-            headers: mockResponse.getHeaders() as HeadersInit,
-          });
-          resolve(connectResponse);
+            const connectResponse = new Response(responseBody, {
+              status: statusCode,
+              statusText: mockResponse.statusMessage,
+              headers: mockResponse.getHeaders() as HeadersInit,
+            });
+            resolveResponse(connectResponse);
+          }
+
+          return result;
+        } catch (error) {
+          // end() may run in a callback after the handler has returned. Reject
+          // the request rather than throwing outside Hono's error boundary.
+          rejectResponse(error);
+          return mockResponse;
         }
-
-        return result;
       };
 
-      // Handle Connect middleware
-      connectMiddleware(mockRequest, mockResponse, () => {
+      const connectNext = (error?: unknown) => {
+        if (responseSettled) return;
+        if (error) {
+          rejectResponse(error);
+          return;
+        }
         // Middleware called next(), check if response was already handled
-        if (!responseResolved && !mockResponse.writableEnded) {
-          responseResolved = true;
+        if (mockResponse.writableEnded) return;
+
+        try {
           // Update Hono context with Connect response headers and status
           const statusCode = mockResponse.statusCode;
           // Status codes 204 (No Content) and 304 (Not Modified) must not have a body
           const noBodyStatuses = [204, 304];
+          // node-mocks-http returns a truthy empty Buffer even before any write.
+          // Treat it as no body so ordinary next() continues to downstream Hono.
+          const buffer = mockResponse._getBuffer();
           const responseBody = noBodyStatuses.includes(statusCode)
             ? null
-            : mockResponse._getData() || mockResponse._getBuffer() || null;
+            : mockResponse._getData() || (buffer.length > 0 ? buffer : null);
 
           // Clear existing headers properly
           // Fix for header clearing: use separate if statements, not else-if
@@ -236,14 +249,26 @@ export async function adaptConnectMiddleware(
 
           if (noBodyStatuses.includes(statusCode)) {
             // For no-body status codes, return a response without body
-            resolve(c.newResponse(null, statusCode as any));
+            resolveResponse(c.newResponse(null, statusCode as any));
           } else if (responseBody) {
-            resolve(c.body(responseBody));
+            resolveResponse(c.body(responseBody));
           } else {
-            resolve(undefined);
+            resolveResponse(undefined);
           }
+        } catch (error) {
+          rejectResponse(error);
         }
-      });
+      };
+
+      // Observe returned promises even when next()/end() has already settled
+      // the response, so late async failures cannot become unhandled rejections.
+      try {
+        Promise.resolve(
+          connectMiddleware(mockRequest, mockResponse, connectNext)
+        ).catch(rejectResponse);
+      } catch (error) {
+        rejectResponse(error);
+      }
     });
 
     if (res) {
