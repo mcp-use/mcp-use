@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.34.7
+
+### Patch Changes
+
+- 6dc5fad: Fix memory retention in v1 HTTP session handling. DELETE requests carrying a session ID now use the original stateful transport even without an SSE Accept header, so teardown actually releases the session. Rejected or interrupted initialization also releases registered references, closes allocated servers/transports, and removes partial session and stream state.
+- Updated dependencies [6dc5fad]
+  - @mcp-use/cli@3.6.8
+  - @mcp-use/inspector@12.0.7
+
 ## 1.34.6
 
 ### Patch Changes
