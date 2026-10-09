@@ -69,6 +69,29 @@ describe("response helpers", () => {
       _meta: { mimeType: "application/json" },
     });
   });
+
+  it.each([
+    { results: [error("boom")] },
+    { results: [error("boom"), text("context")] },
+    { results: [text("context"), error("boom")] },
+    { results: [error("boom"), { ...text("ok"), isError: false }] },
+  ])("mix preserves a failure from any result ($results)", ({ results }) => {
+    expect(mix(...results)).toMatchObject({
+      content: results.flatMap((result) => result.content),
+      isError: true,
+    });
+  });
+
+  it("mix leaves the error flag absent when all results succeed", () => {
+    expect(mix({ ...text("ok"), isError: false }, text("context"))).toEqual({
+      content: [
+        { type: "text", text: "ok" },
+        { type: "text", text: "context" },
+      ],
+      _meta: { mimeType: "text/plain" },
+    });
+    expect(mix()).toEqual({ content: [] });
+  });
 });
 
 describe("toResourceResult", () => {
