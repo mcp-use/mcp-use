@@ -2,10 +2,11 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import "dotenv/config";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { constants as osConstants } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import open from "open";
@@ -2873,14 +2874,46 @@ program
         env,
       });
 
-      // Handle cleanup
-      let cleanupInProgress = false;
-      const cleanup = async () => {
-        if (cleanupInProgress) {
-          return; // Prevent double cleanup
+      // Wait for live children only: the server may already have exited when
+      // cleanup begins, and an established tunnel can exit independently.
+      const stopProcess = (
+        proc: ChildProcess | undefined,
+        signal: NodeJS.Signals
+      ): Promise<void> => {
+        if (
+          !proc ||
+          !proc.pid ||
+          proc.exitCode !== null ||
+          proc.signalCode !== null
+        ) {
+          return Promise.resolve();
         }
-        cleanupInProgress = true;
 
+        return new Promise((resolve) => {
+          const done = () => {
+            clearTimeout(timeout);
+            proc.removeListener("exit", done);
+            resolve();
+          };
+          const timeout = setTimeout(() => {
+            try {
+              proc.kill("SIGKILL");
+            } catch {
+              // The child may have exited just before the timeout.
+            }
+            done();
+          }, 2000);
+
+          proc.once("exit", done);
+          try {
+            proc.kill(signal);
+          } catch {
+            // Keep the fallback active if graceful shutdown could not be sent.
+          }
+        });
+      };
+
+      const cleanup = async () => {
         console.log(chalk.gray("\n\nShutting down..."));
 
         // Mark tunnel as shutting down to suppress output
@@ -2891,63 +2924,86 @@ program
           (tunnelProcess as any).markShutdown();
         }
 
-        // Clean up tunnel via API if subdomain is available
-        if (tunnelSubdomain) {
-          try {
-            const apiBase =
-              process.env.MCP_USE_API || "https://local.mcp-use.run";
-            await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
-              method: "DELETE",
-            });
-          } catch (err) {
-            // Ignore cleanup errors
-          }
-        }
-
-        const processesToKill = 1 + (tunnelProcess ? 1 : 0);
-        let killedCount = 0;
-
-        const checkAndExit = () => {
-          killedCount++;
-          if (killedCount >= processesToKill) {
-            process.exit(0);
+        const releaseTunnel = async () => {
+          if (tunnelSubdomain) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 2000);
+            try {
+              const apiBase =
+                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+                method: "DELETE",
+                signal: controller.signal,
+              });
+            } catch {
+              // Tunnel release is best-effort, including network timeouts.
+            } finally {
+              clearTimeout(timeout);
+            }
           }
         };
 
-        // Handle server process
-        serverProc.on("exit", checkAndExit);
-        serverProc.kill("SIGTERM");
-
-        // Handle tunnel process if it exists
-        if (tunnelProcess && typeof tunnelProcess.kill === "function") {
-          tunnelProcess.on("exit", checkAndExit);
-          // Use SIGINT for better cleanup of npx/node processes
-          tunnelProcess.kill("SIGINT");
-        } else {
-          checkAndExit();
-        }
-
-        // Fallback timeout in case processes don't exit
-        setTimeout(() => {
-          if (serverProc.exitCode === null) {
-            serverProc.kill("SIGKILL");
-          }
-          if (tunnelProcess && tunnelProcess.exitCode === null) {
-            tunnelProcess.kill("SIGKILL");
-          }
-          process.exit(0);
-        }, 2000); // Increase timeout to 2 seconds to allow graceful shutdown
+        await Promise.all([
+          stopProcess(serverProc, "SIGTERM"),
+          // SIGINT allows npx/node tunnel processes to shut down gracefully.
+          stopProcess(tunnelProcess, "SIGINT"),
+          releaseTunnel(),
+        ]);
       };
 
-      process.on("SIGINT", cleanup);
-      process.on("SIGTERM", cleanup);
-
-      serverProc.on("exit", async (code) => {
-        // Server exited - cleanup tunnel before exiting CLI
-        if (!cleanupInProgress) {
-          await cleanup();
+      // A process-group signal can reap the child before the parent's signal
+      // callback runs. Only a matching parent signal may replace that status;
+      // concrete child failure codes must survive later shutdown signals.
+      let shutdownPromise: Promise<void> | undefined;
+      let selectedExitCode = 0;
+      let childExitSignal: NodeJS.Signals | undefined;
+      const shutdown = (
+        exitCode: number,
+        signal?: NodeJS.Signals | null
+      ): Promise<void> => {
+        if (!shutdownPromise) {
+          selectedExitCode = exitCode;
+          childExitSignal = signal ?? undefined;
+          shutdownPromise = (async () => {
+            process.exitCode = selectedExitCode;
+            try {
+              await cleanup();
+            } catch (error) {
+              console.error("Shutdown failed:", error);
+            }
+            if (childExitSignal === "SIGINT" || childExitSignal === "SIGTERM") {
+              // Allow a full poll turn for the queued native parent signal;
+              // one immediate can still run in the child's current loop turn.
+              await new Promise<void>((resolve) =>
+                setImmediate(() => setImmediate(resolve))
+              );
+            }
+            process.exit(selectedExitCode);
+          })();
         }
-        process.exit(code || 0);
+        return shutdownPromise;
+      };
+
+      const onShutdownSignal = (signal: "SIGINT" | "SIGTERM") => {
+        if (childExitSignal === signal) {
+          selectedExitCode = 0;
+          childExitSignal = undefined;
+          process.exitCode = 0;
+        }
+        void shutdown(0);
+      };
+      process.on("SIGINT", () => onShutdownSignal("SIGINT"));
+      process.on("SIGTERM", () => onShutdownSignal("SIGTERM"));
+
+      serverProc.once("error", (error) => {
+        console.error("Server failed:", error);
+        void shutdown(1);
+      });
+      serverProc.once("exit", (code, signal) => {
+        void shutdown(
+          code ?? (signal ? 128 + (osConstants.signals[signal] ?? 0) : 1),
+          code === null ? signal : undefined
+        );
       });
     } catch (error) {
       console.error("Start failed:", error);

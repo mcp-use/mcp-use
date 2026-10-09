@@ -8,7 +8,7 @@ import { getEnv } from "./utils/runtime.js";
  *
  * - `info`: one compact line per request (default)
  * - `debug`: adds `args=<json>` for `tools/call` requests
- * - `trace`: includes full request/response headers and bodies (legacy DEBUG=1)
+ * - `trace`: includes headers and bodies, except SSE response bodies (legacy DEBUG=1)
  */
 type McpDebugLevel = "info" | "debug" | "trace";
 
@@ -88,8 +88,9 @@ function shortSessionId(sid: string | null | undefined): string | null {
  *  - JSON-RPC error envelope: `{ error: { message } }`
  *  - Tool call errors:        `{ result: { isError: true, content: [{ text }] } }`
  *
- * Handles both `application/json` and `text/event-stream` (SSE) payloads,
- * and JSON-RPC batches (arrays of messages).
+ * Handles finite JSON responses and JSON-RPC batches (arrays of messages).
+ * SSE bodies must not be passed here: reading them would delay delivery
+ * until EOF and buffer the stream in memory.
  */
 async function extractResponseError(res: Response): Promise<string | null> {
   if (!res.body) return null;
@@ -102,43 +103,24 @@ async function extractResponseError(res: Response): Promise<string | null> {
   }
   if (!text) return null;
 
-  // Collect candidate JSON payloads. SSE responses are framed as
-  // `event: message\ndata: <json>\n\n` — extract each `data:` line.
-  const isSse = (res.headers.get("content-type") || "").includes(
-    "text/event-stream"
-  );
-  const payloads: unknown[] = [];
-  const tryParse = (raw: string) => {
-    try {
-      payloads.push(JSON.parse(raw));
-    } catch {
-      // not JSON — skip
-    }
-  };
-  if (isSse) {
-    for (const line of text.split(/\r?\n/)) {
-      if (line.startsWith("data:")) {
-        const data = line.slice(5).trim();
-        if (data) tryParse(data);
-      }
-    }
-  } else {
-    tryParse(text);
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return null;
   }
 
-  for (const payload of payloads) {
-    for (const msg of Array.isArray(payload) ? payload : [payload]) {
-      if (!msg || typeof msg !== "object") continue;
-      const m = msg as any;
-      if (typeof m.error?.message === "string") return m.error.message;
-      if (m.result?.isError === true) {
-        const textBlock = Array.isArray(m.result.content)
-          ? m.result.content.find(
-              (b: any) => b?.type === "text" && typeof b.text === "string"
-            )
-          : null;
-        return textBlock ? String(textBlock.text) : "tool error";
-      }
+  for (const msg of Array.isArray(payload) ? payload : [payload]) {
+    if (!msg || typeof msg !== "object") continue;
+    const m = msg as any;
+    if (typeof m.error?.message === "string") return m.error.message;
+    if (m.result?.isError === true) {
+      const textBlock = Array.isArray(m.result.content)
+        ? m.result.content.find(
+            (b: any) => b?.type === "text" && typeof b.text === "string"
+          )
+        : null;
+      return textBlock ? String(textBlock.text) : "tool error";
     }
   }
   return null;
@@ -150,6 +132,7 @@ async function extractResponseError(res: Response): Promise<string | null> {
  *
  * Skips logging for inspector telemetry/RPC endpoints, dev widget assets, and
  * polling GETs against `/mcp` and `/inspector/api/*`.
+ * SSE response bodies are never cloned or read, at any verbosity level.
  */
 export async function requestLogger(c: Context, next: Next): Promise<void> {
   const startedAt = Date.now();
@@ -205,6 +188,12 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
 
   const durationMs = Date.now() - startedAt;
   const statusCode = c.res.status;
+  const isStreaming =
+    c.res.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      ?.trim()
+      .toLowerCase() === "text/event-stream";
 
   // Session ID: incoming header for established sessions, response header for
   // initialize requests (the SDK transport stamps it on the response).
@@ -260,10 +249,11 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   }
 
   // Outcome:
-  //  - MCP requests: OK / ERROR <message> based on JSON-RPC error parsing.
+  //  - Finite MCP responses: OK / ERROR <message> based on JSON-RPC error parsing.
+  //  - Streaming MCP responses: use HTTP status without consuming the body.
   //  - Plain HTTP (HEAD, etc.): the raw status code, colored by class.
   let outcomePart: string;
-  const errMsg = await extractResponseError(c.res);
+  const errMsg = isStreaming ? null : await extractResponseError(c.res);
   if (errMsg) {
     outcomePart = chalk.red(`ERROR ${errMsg}`);
   } else if (mcpMethod) {
@@ -287,7 +277,7 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   console.log(parts.join(" "));
 
   // Trace mode preserves the legacy DEBUG=1 behavior: detailed request and
-  // response dumps follow the summary line.
+  // response dumps follow the summary line. Open SSE bodies are skipped.
   if (level !== "trace") return;
 
   console.log("\n" + chalk.cyan("=".repeat(80)));
@@ -318,7 +308,9 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   }
 
   try {
-    if (c.res.body !== null && c.res.body !== undefined) {
+    if (isStreaming) {
+      console.log(chalk.yellow("Response Body:") + " (streaming; skipped)");
+    } else if (c.res.body !== null && c.res.body !== undefined) {
       try {
         const clonedResponse = c.res.clone();
         const responseBody = await clonedResponse.text().catch(() => null);

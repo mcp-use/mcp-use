@@ -96,12 +96,19 @@ export class RedisStreamManager implements StreamManager {
    * Key: sessionId, Value: controller
    */
   private localControllers = new Map<string, ReadableStreamDefaultController>();
+  private streamGenerations = new Map<string, symbol>();
 
   /**
    * Map of heartbeat intervals for keeping sessions alive
    * Key: sessionId, Value: interval timer
    */
   private heartbeats = new Map<string, NodeJS.Timeout>();
+
+  // Track attempted subscriptions separately from controllers: a disconnected
+  // controller or a rejected subscribe() must not lose its cleanup ownership.
+  private sessionSubscriptions = new Map<string, Set<string>>();
+  private sessionOperations = new Map<string, Promise<void>>();
+  private closing = false;
 
   /**
    * Unique identifier for this server instance, used for request/response routing.
@@ -120,6 +127,7 @@ export class RedisStreamManager implements StreamManager {
    * Whether the server-level response channel subscription is active.
    */
   private serverChannelSubscribed = false;
+  private serverChannelSubscription?: Promise<void>;
 
   constructor(config: RedisStreamManagerConfig) {
     this.pubSubClient = config.pubSubClient;
@@ -149,6 +157,218 @@ export class RedisStreamManager implements StreamManager {
     return `${this.prefix}active`;
   }
 
+  private withSessionOperation<T>(
+    sessionId: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const previous = this.sessionOperations.get(sessionId) ?? Promise.resolve();
+    const result = previous.then(operation);
+    const settled = result.then(
+      () => {},
+      () => {}
+    );
+    this.sessionOperations.set(sessionId, settled);
+    void settled.then(() => {
+      if (this.sessionOperations.get(sessionId) === settled) {
+        this.sessionOperations.delete(sessionId);
+      }
+    });
+    return result;
+  }
+
+  private clearLocalStream(sessionId: string): void {
+    const heartbeat = this.heartbeats.get(sessionId);
+    if (heartbeat) clearInterval(heartbeat);
+    this.heartbeats.delete(sessionId);
+
+    const controller = this.localControllers.get(sessionId);
+    this.localControllers.delete(sessionId);
+    this.streamGenerations.delete(sessionId);
+    this.closeController(controller);
+  }
+
+  private closeController(
+    controller: ReadableStreamDefaultController | undefined
+  ): void {
+    try {
+      controller?.close();
+    } catch {
+      // The client may already have closed the stream.
+    }
+  }
+
+  private async unsubscribeSession(sessionId: string): Promise<void> {
+    const channels = this.sessionSubscriptions.get(sessionId);
+    if (!channels?.size) return;
+    if (!this.pubSubClient.unsubscribe) {
+      throw new Error(
+        "[RedisStreamManager] Redis client does not support unsubscribe method"
+      );
+    }
+    const results = await Promise.allSettled(
+      Array.from(channels, async (channel) => {
+        await this.pubSubClient.unsubscribe!(channel);
+        channels.delete(channel);
+      })
+    );
+    if (!channels.size) this.sessionSubscriptions.delete(sessionId);
+    this.throwCleanupError(results);
+  }
+
+  private throwCleanupError(results: PromiseSettledResult<unknown>[]): void {
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
+  }
+
+  private async markAvailable(sessionId: string): Promise<void> {
+    const key = this.getAvailableKey(sessionId);
+    const ttl = this.heartbeatInterval * 2;
+    // Atomic expiry avoids persistent availability if a later setup step fails.
+    if (this.client.setEx) {
+      await this.client.setEx(key, ttl, "active");
+    } else if (this.client.setex) {
+      await this.client.setex(key, ttl, "active");
+    } else {
+      await this.client.set(key, "active", { EX: ttl });
+      if (this.client.expire) await this.client.expire(key, ttl);
+    }
+    if (this.client.sAdd) {
+      await this.client.sAdd(this.getActiveSessionsKey(), sessionId);
+      await this.client.expire?.(this.getActiveSessionsKey(), ttl);
+    }
+  }
+
+  private async removeAvailability(sessionId: string): Promise<void> {
+    const results = await Promise.allSettled([
+      Promise.resolve().then(() =>
+        this.client.del(this.getAvailableKey(sessionId))
+      ),
+      Promise.resolve().then(() =>
+        this.client.sRem?.(this.getActiveSessionsKey(), sessionId)
+      ),
+    ]);
+    this.throwCleanupError(results);
+  }
+
+  private async removeStream(
+    sessionId: string,
+    notifyOtherServers: boolean,
+    cleanupAvailability = true
+  ): Promise<void> {
+    // Always release local resources before any fallible Redis operation.
+    this.clearLocalStream(sessionId);
+    const results: PromiseSettledResult<unknown>[] = await Promise.allSettled([
+      this.unsubscribeSession(sessionId),
+      cleanupAvailability
+        ? this.removeAvailability(sessionId)
+        : Promise.resolve(),
+    ]);
+    // A received deletion must not be broadcast again. Local controller and
+    // generation removal already invalidated our callback, so notify peers
+    // even if Redis could not unsubscribe it. Report cleanup errors afterward.
+    if (notifyOtherServers) {
+      results.push(
+        ...(await Promise.allSettled([
+          Promise.resolve().then(() => {
+            if (!this.client.publish) {
+              throw new Error(
+                "[RedisStreamManager] Redis client does not support publish method"
+              );
+            }
+            return this.client.publish(
+              `delete:${this.getChannel(sessionId)}`,
+              ""
+            );
+          }),
+        ]))
+      );
+    }
+    this.throwCleanupError(results);
+  }
+
+  // These factories have no enclosing controller or handler argument. Redis
+  // may retain their callbacks after a failed unsubscribe, so the callbacks
+  // must resolve controllers/handlers through the manager rather than capture
+  // a registration operation's context.
+  private createMessageCallback(sessionId: string, generation: symbol) {
+    return (message: string): void => {
+      if (this.streamGenerations.get(sessionId) !== generation) return;
+      const controller = this.localControllers.get(sessionId);
+      if (!controller) return;
+      try {
+        controller.enqueue(this.textEncoder.encode(message));
+      } catch {
+        this.clearLocalStream(sessionId);
+        this.cleanupDisconnectedStream(sessionId);
+      }
+    };
+  }
+
+  private cleanupDisconnectedStream(sessionId: string): void {
+    // A disconnected SSE connection does not delete the MCP session on other
+    // servers. Its availability expires without a heartbeat.
+    void this.withSessionOperation(sessionId, async () => {
+      if (!this.localControllers.has(sessionId)) {
+        await this.unsubscribeSession(sessionId);
+      }
+    }).catch((error) => {
+      console.warn(
+        `[RedisStreamManager] Failed to unsubscribe disconnected stream ${sessionId}:`,
+        error
+      );
+    });
+  }
+
+  private createDeleteCallback(sessionId: string, generation: symbol) {
+    return (): void => {
+      if (this.streamGenerations.get(sessionId) !== generation) return;
+      void this.withSessionOperation(sessionId, () =>
+        this.removeStream(sessionId, false)
+      ).catch((error) => {
+        console.warn(
+          `[RedisStreamManager] Failed to clean up deleted stream ${sessionId}:`,
+          error
+        );
+      });
+    };
+  }
+
+  private startHeartbeat(sessionId: string): void {
+    const availableKey = this.getAvailableKey(sessionId);
+    const activeSessionsKey = this.getActiveSessionsKey();
+    const heartbeat = setInterval(async () => {
+      try {
+        if (this.client.expire) {
+          await this.client.expire(availableKey, this.heartbeatInterval * 2);
+          await this.client.expire(
+            activeSessionsKey,
+            this.heartbeatInterval * 2
+          );
+        }
+      } catch (error) {
+        console.warn(
+          `[RedisStreamManager] Heartbeat failed for session ${sessionId}:`,
+          error
+        );
+      }
+    }, this.heartbeatInterval * 1000);
+    this.heartbeats.set(sessionId, heartbeat);
+  }
+
+  private createForwardedResponseCallback() {
+    return (raw: string): void => {
+      try {
+        const { response, sessionId } = JSON.parse(raw);
+        this.forwardedResponseHandler?.(response, sessionId);
+      } catch (error) {
+        console.warn(
+          `[RedisStreamManager] Failed to parse forwarded response:`,
+          error
+        );
+      }
+    };
+  }
+
   /**
    * Register an active SSE stream and subscribe to Redis channel.
    * Idempotent: if the session already has a subscription, it is cleaned up first.
@@ -157,107 +377,97 @@ export class RedisStreamManager implements StreamManager {
     sessionId: string,
     controller: ReadableStreamDefaultController
   ): Promise<void> {
-    try {
-      // Clean up any existing subscription for this session to avoid duplicates
-      // (e.g., client reconnects their SSE stream).
-      if (this.localControllers.has(sessionId)) {
-        const oldHeartbeat = this.heartbeats.get(sessionId);
-        if (oldHeartbeat) {
-          clearInterval(oldHeartbeat);
-          this.heartbeats.delete(sessionId);
-        }
-        const channel = this.getChannel(sessionId);
-        const deleteChannel = `delete:${channel}`;
-        try {
-          await this.pubSubClient.unsubscribe?.(channel);
-          await this.pubSubClient.unsubscribe?.(deleteChannel);
-        } catch {
-          // May fail if not subscribed yet — safe to ignore
-        }
+    return this.withSessionOperation(sessionId, async () => {
+      if (this.closing) {
+        this.closeController(controller);
+        throw new Error("[RedisStreamManager] Stream manager is closed");
       }
+      // The SDK can expose the same live controller after a duplicate GET.
+      // Re-registering it must not close the stream it is already serving.
+      if (this.localControllers.get(sessionId) === controller) return;
+      this.clearLocalStream(sessionId);
+      let controllerRegistered = false;
+      try {
+        // Serialize reconnects with unsubscribe so an older operation cannot
+        // remove the new connection's subscriptions or overwrite its timer.
+        await this.unsubscribeSession(sessionId);
+        if (this.closing) {
+          throw new Error("[RedisStreamManager] Stream manager is closed");
+        }
+        this.localControllers.set(sessionId, controller);
+        controllerRegistered = true;
+        const generation = Symbol(sessionId);
+        this.streamGenerations.set(sessionId, generation);
 
-      // Store controller locally
-      this.localControllers.set(sessionId, controller);
-
-      // Mark session as available in Redis
-      const availableKey = this.getAvailableKey(sessionId);
-      await this.client.set(availableKey, "active");
-
-      // Set expiry - support both node-redis v5+ and ioredis
-      if (this.client.expire) {
-        await this.client.expire(availableKey, this.heartbeatInterval * 2);
-      }
-
-      // Add sessionId to active sessions SET for efficient broadcast
-      const activeSessionsKey = this.getActiveSessionsKey();
-      if (this.client.sAdd) {
-        await this.client.sAdd(activeSessionsKey, sessionId);
-        // Set expiry on the SET key to match session TTL
-        if (this.client.expire) {
-          await this.client.expire(
-            activeSessionsKey,
-            this.heartbeatInterval * 2
+        if (!this.pubSubClient.subscribe) {
+          throw new Error(
+            "[RedisStreamManager] Redis client does not support subscribe method"
           );
         }
-      }
+        const channels = new Set<string>();
+        this.sessionSubscriptions.set(sessionId, channels);
+        const channel = this.getChannel(sessionId);
+        // subscribe() can register its callback and then reject. Record the
+        // attempt first so rollback also removes partial subscriptions.
+        channels.add(channel);
+        await this.pubSubClient.subscribe(
+          channel,
+          this.createMessageCallback(sessionId, generation)
+        );
+        const deleteChannel = `delete:${channel}`;
+        channels.add(deleteChannel);
+        await this.pubSubClient.subscribe(
+          deleteChannel,
+          this.createDeleteCallback(sessionId, generation)
+        );
 
-      // Set up heartbeat to keep session alive
-      const heartbeat = setInterval(async () => {
-        try {
-          if (this.client.expire) {
-            await this.client.expire(availableKey, this.heartbeatInterval * 2);
-            // Also refresh the active sessions SET expiry
-            const activeSessionsKey = this.getActiveSessionsKey();
-            await this.client.expire(
-              activeSessionsKey,
-              this.heartbeatInterval * 2
+        // close() or a message delivered during subscription may already have
+        // released this controller. Never allocate a late heartbeat for it.
+        if (
+          this.closing ||
+          this.streamGenerations.get(sessionId) !== generation
+        ) {
+          throw new Error(
+            "[RedisStreamManager] Stream closed during registration"
+          );
+        }
+        await this.markAvailable(sessionId);
+        if (
+          this.closing ||
+          this.streamGenerations.get(sessionId) !== generation
+        ) {
+          throw new Error(
+            "[RedisStreamManager] Stream closed during registration"
+          );
+        }
+        this.startHeartbeat(sessionId);
+        console.log(
+          `[RedisStreamManager] Created stream for session ${sessionId}`
+        );
+      } catch (error) {
+        this.clearLocalStream(sessionId);
+        if (!controllerRegistered) this.closeController(controller);
+        // Availability is shared with other managers. Registration rollback
+        // must not delete it or remove a live peer's broadcast membership.
+        // Any key written by this attempt expires without a heartbeat.
+        const cleanups = await Promise.allSettled([
+          this.unsubscribeSession(sessionId),
+        ]);
+        for (const cleanup of cleanups) {
+          if (cleanup.status === "rejected") {
+            console.warn(
+              `[RedisStreamManager] Failed to roll back stream ${sessionId}:`,
+              cleanup.reason
             );
           }
-        } catch (error) {
-          console.warn(
-            `[RedisStreamManager] Heartbeat failed for session ${sessionId}:`,
-            error
-          );
         }
-      }, this.heartbeatInterval * 1000);
-
-      this.heartbeats.set(sessionId, heartbeat);
-
-      // Subscribe to Redis Pub/Sub channel for this session
-      const channel = this.getChannel(sessionId);
-      if (!this.pubSubClient.subscribe) {
-        throw new Error(
-          "[RedisStreamManager] Redis client does not support subscribe method"
+        console.error(
+          `[RedisStreamManager] Error creating stream for ${sessionId}:`,
+          error
         );
+        throw error;
       }
-      await this.pubSubClient.subscribe(channel, (message: string) => {
-        const localController = this.localControllers.get(sessionId);
-        if (localController) {
-          try {
-            localController.enqueue(this.textEncoder.encode(message));
-          } catch {
-            // Client disconnected or stream closed - remove stale entry
-            this.localControllers.delete(sessionId);
-          }
-        }
-      });
-
-      // Also subscribe to delete channel
-      const deleteChannel = `delete:${this.getChannel(sessionId)}`;
-      await this.pubSubClient.subscribe(deleteChannel, async () => {
-        await this.delete(sessionId);
-      });
-
-      console.log(
-        `[RedisStreamManager] Created stream for session ${sessionId}`
-      );
-    } catch (error) {
-      console.error(
-        `[RedisStreamManager] Error creating stream for ${sessionId}:`,
-        error
-      );
-      throw error;
-    }
+    });
   }
 
   /**
@@ -278,6 +488,28 @@ export class RedisStreamManager implements StreamManager {
         if (this.client.sMembers) {
           const sessionIds = await this.client.sMembers(activeSessionsKey);
           for (const sessionId of sessionIds) {
+            const availableKey = this.getAvailableKey(sessionId);
+            // Redis read failures are not evidence that a stream expired.
+            if ((await this.client.exists(availableKey)) !== 1) {
+              await this.client.sRem?.(activeSessionsKey, sessionId);
+              // A reconnect can register between the liveness check and prune.
+              // Restore its index entry if it became available in that window.
+              let available: number;
+              try {
+                available = await this.client.exists(availableKey);
+              } catch (error) {
+                // Preserve membership conservatively if the second read fails.
+                // A later successful broadcast can prune an expired entry.
+                try {
+                  await this.client.sAdd?.(activeSessionsKey, sessionId);
+                } catch {
+                  // Report the original availability failure below.
+                }
+                throw error;
+              }
+              if (available !== 1) continue;
+              await this.client.sAdd?.(activeSessionsKey, sessionId);
+            }
             const channel = this.getChannel(sessionId);
             // Use regular client for publishing (pubSubClient is in subscriber mode)
             if (!this.client.publish) {
@@ -325,66 +557,20 @@ export class RedisStreamManager implements StreamManager {
    * Remove an active SSE stream
    */
   async delete(sessionId: string): Promise<void> {
-    try {
-      // Stop heartbeat
-      const heartbeat = this.heartbeats.get(sessionId);
-      if (heartbeat) {
-        clearInterval(heartbeat);
-        this.heartbeats.delete(sessionId);
-      }
-
-      // Unsubscribe from Redis channels
-      const channel = this.getChannel(sessionId);
-      const deleteChannel = `delete:${channel}`;
-
-      if (!this.pubSubClient.unsubscribe) {
-        throw new Error(
-          "[RedisStreamManager] Redis client does not support unsubscribe method"
+    return this.withSessionOperation(sessionId, async () => {
+      try {
+        await this.removeStream(sessionId, true);
+        console.log(
+          `[RedisStreamManager] Deleted stream for session ${sessionId}`
         );
-      }
-      await this.pubSubClient.unsubscribe(channel);
-      await this.pubSubClient.unsubscribe(deleteChannel);
-
-      // Publish delete message to notify other servers (use regular client for publishing)
-      if (!this.client.publish) {
-        throw new Error(
-          "[RedisStreamManager] Redis client does not support publish method"
+      } catch (error) {
+        console.error(
+          `[RedisStreamManager] Error deleting stream for ${sessionId}:`,
+          error
         );
+        throw error;
       }
-      await this.client.publish(deleteChannel, "");
-
-      // Delete availability key
-      await this.client.del(this.getAvailableKey(sessionId));
-
-      // Remove sessionId from active sessions SET
-      const activeSessionsKey = this.getActiveSessionsKey();
-      if (this.client.sRem) {
-        await this.client.sRem(activeSessionsKey, sessionId);
-      }
-
-      // Close local controller if exists
-      const controller = this.localControllers.get(sessionId);
-      if (controller) {
-        try {
-          controller.close();
-        } catch (error) {
-          console.debug(
-            `[RedisStreamManager] Controller already closed for ${sessionId}`
-          );
-        }
-        this.localControllers.delete(sessionId);
-      }
-
-      console.log(
-        `[RedisStreamManager] Deleted stream for session ${sessionId}`
-      );
-    } catch (error) {
-      console.error(
-        `[RedisStreamManager] Error deleting stream for ${sessionId}:`,
-        error
-      );
-      throw error;
-    }
+    });
   }
 
   /**
@@ -408,43 +594,39 @@ export class RedisStreamManager implements StreamManager {
    * Close all connections and cleanup
    */
   async close(): Promise<void> {
-    try {
-      // Clear all heartbeats
-      for (const heartbeat of this.heartbeats.values()) {
-        clearInterval(heartbeat);
-      }
-      this.heartbeats.clear();
+    this.closing = true;
+    this.forwardedResponseHandler = undefined;
+    const sessionIds = new Set([
+      ...this.localControllers.keys(),
+      ...this.heartbeats.keys(),
+      ...this.sessionSubscriptions.keys(),
+      ...this.sessionOperations.keys(),
+    ]);
+    for (const sessionId of sessionIds) this.clearLocalStream(sessionId);
 
-      // Delete only availability keys for sessions owned by THIS server instance
-      // This is important when multiple servers share the same Redis instance
-      const activeSessionsKey = this.getActiveSessionsKey();
-      const sessionIdsToCleanup = Array.from(this.localControllers.keys());
-
-      for (const sessionId of sessionIdsToCleanup) {
-        // Delete availability key
-        await this.client.del(this.getAvailableKey(sessionId));
-
-        // Remove from active sessions SET
-        if (this.client.sRem) {
-          await this.client.sRem(activeSessionsKey, sessionId);
+    const results = await Promise.allSettled([
+      ...Array.from(sessionIds, (sessionId) =>
+        this.withSessionOperation(sessionId, () =>
+          // Shared availability expires after shutdown; deleting it here
+          // could invalidate another manager serving the same session.
+          this.removeStream(sessionId, false, false)
+        )
+      ),
+      Promise.resolve().then(async () => {
+        await this.serverChannelSubscription;
+        if (this.serverChannelSubscribed) {
+          if (!this.pubSubClient.unsubscribe) {
+            throw new Error(
+              "[RedisStreamManager] Redis client does not support unsubscribe method"
+            );
+          }
+          await this.pubSubClient.unsubscribe(this.getServerChannel());
+          this.serverChannelSubscribed = false;
         }
-      }
-
-      // Close all local controllers
-      for (const controller of this.localControllers.values()) {
-        try {
-          controller.close();
-        } catch (error) {
-          // Ignore
-        }
-      }
-      this.localControllers.clear();
-
-      console.log(`[RedisStreamManager] Closed all streams`);
-    } catch (error) {
-      console.error(`[RedisStreamManager] Error during close:`, error);
-      throw error;
-    }
+      }),
+    ]);
+    this.throwCleanupError(results);
+    console.log(`[RedisStreamManager] Closed all streams`);
   }
 
   /**
@@ -534,11 +716,10 @@ export class RedisStreamManager implements StreamManager {
   onForwardedResponse(
     handler: (message: unknown, sessionId: string) => void
   ): void {
+    if (this.closing) return;
     this.forwardedResponseHandler = handler;
 
     if (this.serverChannelSubscribed) return;
-    this.serverChannelSubscribed = true;
-
     const serverChannel = this.getServerChannel();
     if (!this.pubSubClient.subscribe) {
       console.warn(
@@ -546,19 +727,24 @@ export class RedisStreamManager implements StreamManager {
       );
       return;
     }
-    this.pubSubClient
-      .subscribe(serverChannel, (raw: string) => {
+    this.serverChannelSubscribed = true;
+    this.serverChannelSubscription = Promise.resolve()
+      .then(() =>
+        this.pubSubClient.subscribe!(
+          serverChannel,
+          this.createForwardedResponseCallback()
+        )
+      )
+      .then(() => {})
+      .catch(async (error) => {
         try {
-          const { response, sessionId } = JSON.parse(raw);
-          this.forwardedResponseHandler?.(response, sessionId);
-        } catch (error) {
-          console.warn(
-            `[RedisStreamManager] Failed to parse forwarded response:`,
-            error
-          );
+          if (this.pubSubClient.unsubscribe) {
+            await this.pubSubClient.unsubscribe(serverChannel);
+            this.serverChannelSubscribed = false;
+          }
+        } catch {
+          // Keep ownership so close() can retry the partial subscription.
         }
-      })
-      .catch((error) => {
         console.error(
           `[RedisStreamManager] Failed to subscribe to server channel:`,
           error

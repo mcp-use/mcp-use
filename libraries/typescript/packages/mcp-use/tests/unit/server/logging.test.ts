@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Hono } from "hono";
 import type { Context, Next } from "hono";
 
 import { getDebugLevel, requestLogger } from "../../../src/server/logging.js";
@@ -84,6 +85,23 @@ function makeContext(opts: MockOptions = {}): {
   };
 
   return { ctx, next, state };
+}
+
+async function beforeStreamEnds<T>(pending: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Logger blocked on an open SSE stream")),
+          1000
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -374,7 +392,7 @@ describe("requestLogger", () => {
     expect(line).toContain("ERROR cannot divide by zero");
   });
 
-  it("parses errors from text/event-stream (SSE) responses", async () => {
+  it("does not inspect errors inside streaming response bodies", async () => {
     process.env.MCP_DEBUG_LEVEL = "info";
     const sseBody =
       `event: message\n` +
@@ -395,8 +413,102 @@ describe("requestLogger", () => {
     await requestLogger(ctx, next);
 
     const line = logLines()[0];
-    expect(line).toContain("ERROR Method not found");
+    expect(line).toContain("[tools/list] OK");
+    expect(line).not.toContain("Method not found");
   });
+
+  describe.each(["info", "debug", "trace", "legacy DEBUG"])(
+    "SSE responses at %s",
+    (level) => {
+      it.each(["GET", "POST"])(
+        "returns an open %s response and its first event before EOF",
+        async (method) => {
+          delete process.env.DEBUG;
+          if (level === "legacy DEBUG") {
+            delete process.env.MCP_DEBUG_LEVEL;
+            process.env.DEBUG = "1";
+          } else {
+            process.env.MCP_DEBUG_LEVEL = level;
+          }
+
+          const path = method === "GET" ? "/sse" : "/mcp";
+          const firstEvent =
+            method === "GET"
+              ? "event: endpoint\ndata: /messages?sessionId=test\n\n"
+              : 'event: message\ndata: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":"test","progress":1}}\n\n';
+          let controller!: ReadableStreamDefaultController<Uint8Array>;
+          let streamEnded = false;
+          const stream = new ReadableStream<Uint8Array>({
+            start(source) {
+              controller = source;
+              source.enqueue(new TextEncoder().encode(firstEvent));
+            },
+          });
+          const cloneSpy = vi.spyOn(Response.prototype, "clone");
+          const app = new Hono();
+          app.use("*", requestLogger);
+          app.on(method, path, () => {
+            return new Response(stream, {
+              headers: {
+                "content-type": "Text/Event-Stream; charset=utf-8",
+              },
+            });
+          });
+          const pending = Promise.resolve(
+            app.request(path, {
+              method,
+              ...(method === "POST" && {
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                  jsonrpc: "2.0",
+                  id: 1,
+                  method: "tools/call",
+                  params: { name: "slow-tool", arguments: {} },
+                }),
+              }),
+            })
+          );
+
+          try {
+            const response = await beforeStreamEnds(pending);
+            expect(response.status).toBe(200);
+            expect(streamEnded).toBe(false);
+            expect(cloneSpy).not.toHaveBeenCalled();
+            const reader = response.body!.getReader();
+            try {
+              const first = await beforeStreamEnds(reader.read());
+              expect(first.done).toBe(false);
+              expect(new TextDecoder().decode(first.value)).toBe(firstEvent);
+              expect(streamEnded).toBe(false);
+            } finally {
+              reader.releaseLock();
+            }
+
+            expect(logLines()[0]).toContain(`${method} ${path}`);
+            if (method === "POST") {
+              expect(logLines()[0]).toContain("[tools/call: slow-tool]");
+            }
+            if (level === "trace" || level === "legacy DEBUG") {
+              expect(logLines().some((line) => line.includes("TRACE"))).toBe(
+                true
+              );
+              expect(
+                logLines().some((line) => line.includes("streaming; skipped"))
+              ).toBe(true);
+              expect(logLines().some((line) => line.includes(firstEvent))).toBe(
+                false
+              );
+            }
+          } finally {
+            streamEnded = true;
+            controller.close();
+            await pending;
+            cloneSpy.mockRestore();
+          }
+        }
+      );
+    }
+  );
 
   it("skips noisy paths (no log line emitted)", async () => {
     process.env.MCP_DEBUG_LEVEL = "info";
