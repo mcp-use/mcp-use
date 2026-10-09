@@ -1,6 +1,7 @@
 import type { MCPClient } from "@mcp-use/client";
 import type { BaseConnector } from "@mcp-use/client";
 import { logger } from "@mcp-use/client";
+import type { ToolPruner } from "tool-prune";
 import type { ZodSchema } from "zod";
 import { NativeAdapter } from "../adapters/native_adapter.js";
 import { createLlmDriver, type LlmDriver } from "../llm/driver.js";
@@ -27,6 +28,7 @@ import type {
   MCPAgentOptions,
   McpConnectionLike,
   McpServersInput,
+  ToolPruneOptions,
 } from "./agent_options.js";
 import { normalizeRunOptions } from "./normalize_run_options.js";
 import type { RunOptions } from "./run_options.js";
@@ -44,6 +46,7 @@ export type {
   MCPAgentOptions,
   McpConnectionLike,
   McpServersInput,
+  ToolPruneOptions,
 } from "./agent_options.js";
 export type { RunOptions } from "./run_options.js";
 
@@ -71,9 +74,32 @@ type ResolvedRunOptions = {
   manageConnector?: boolean;
   externalHistory?: BaseMessage[];
   messages?: ProviderMessage[];
+  pruneTools?: boolean | ToolPruneOptions;
   schema?: ZodSchema<unknown>;
   signal?: AbortSignal;
 };
+
+function buildToolCriteria(
+  tool: import("../llm/types.js").ProviderTool
+): string {
+  const parts: string[] = [];
+  if (tool.description) parts.push(tool.description);
+  const props = tool.inputSchema?.properties;
+  if (props && typeof props === "object") {
+    for (const [key, prop] of Object.entries(props)) {
+      parts.push(key);
+      if (
+        prop &&
+        typeof prop === "object" &&
+        "description" in prop &&
+        typeof (prop as { description?: unknown }).description === "string"
+      ) {
+        parts.push((prop as { description: string }).description);
+      }
+    }
+  }
+  return parts.join(" ") || tool.name;
+}
 
 /** Runs provider-neutral LLM tool loops against one or more MCP servers. */
 export class MCPAgent {
@@ -96,6 +122,8 @@ export class MCPAgent {
   private autoInitialize: boolean;
   private systemPrompt: string;
   private disallowedTools: string[];
+  private pruneTools?: boolean | ToolPruneOptions;
+  private toolPruner?: ToolPruner;
   private exposeResourcesAsTools: boolean;
   private exposePromptsAsTools: boolean;
   private initialized = false;
@@ -121,6 +149,9 @@ export class MCPAgent {
    */
   constructor(options: MCPAgentOptions) {
     if (options.agentId) {
+      if (options.pruneTools) {
+        throw new Error("pruneTools is not supported for remote agents.");
+      }
       this.isRemote = true;
       this.remoteAgent = new RemoteAgent({
         agentId: options.agentId,
@@ -145,6 +176,7 @@ export class MCPAgent {
       options.systemPrompt ??
       "You are a helpful assistant with access to MCP tools.";
     this.disallowedTools = options.disallowedTools ?? [];
+    this.pruneTools = options.pruneTools;
     this.exposeResourcesAsTools = options.exposeResourcesAsTools ?? true;
     this.exposePromptsAsTools = options.exposePromptsAsTools ?? true;
     this.memoryEnabled = options.memoryEnabled ?? true;
@@ -309,6 +341,7 @@ export class MCPAgent {
     }
 
     this.providerTools = this.nativeAdapter.toProviderTools(entries);
+    this.toolPruner = undefined;
     this.callTool = this.nativeAdapter.createCallTool();
   }
 
@@ -354,6 +387,7 @@ export class MCPAgent {
     }
 
     this.providerTools = providerTools;
+    this.toolPruner = undefined;
     this.callTool = async (name, args) => {
       const route = routes.get(name);
       if (!route) {
@@ -420,10 +454,131 @@ export class MCPAgent {
     }
   }
 
-  private nativeRunParams(options: ResolvedRunOptions) {
+  private extractPruningQuery(
+    options: ResolvedRunOptions,
+    builtMessages?: ProviderMessage[]
+  ): string {
+    if (options.prompt && options.prompt.trim().length > 0) {
+      return options.prompt.trim();
+    }
+    const candidates = builtMessages ?? [
+      ...(options.externalHistory?.length
+        ? convertExternalHistoryToProvider(options.externalHistory)
+        : []),
+      ...(options.messages ?? []),
+    ];
+    for (let i = candidates.length - 1; i >= 0; i--) {
+      const msg = candidates[i];
+      if (msg?.role === "user") {
+        if (typeof msg.content === "string" && msg.content.trim().length > 0) {
+          return msg.content.trim();
+        }
+        if (Array.isArray(msg.content)) {
+          const text = msg.content
+            .filter(
+              (part): part is { type: "text"; text: string } =>
+                part?.type === "text" && typeof part.text === "string"
+            )
+            .map((part) => part.text)
+            .join(" ")
+            .trim();
+          if (text.length > 0) return text;
+        }
+      }
+    }
+    return "";
+  }
+
+  private async getOrCreateToolPruner(
+    baseOptions?: ToolPruneOptions
+  ): Promise<ToolPruner> {
+    if (!this.toolPruner) {
+      const { ToolPruner } = await import("tool-prune");
+      const defs = this.providerTools.map((tool) => ({
+        name: tool.name,
+        description: tool.description ?? "",
+        criteria: buildToolCriteria(tool),
+      }));
+      this.toolPruner = new ToolPruner(defs, baseOptions);
+    }
+    return this.toolPruner;
+  }
+
+  private async resolveToolsForRun(
+    options: ResolvedRunOptions,
+    builtMessages?: ProviderMessage[]
+  ): Promise<import("../llm/types.js").ProviderTool[]> {
+    const pruneConfig =
+      options.pruneTools !== undefined ? options.pruneTools : this.pruneTools;
+    if (!pruneConfig || this.providerTools.length <= 1) {
+      return this.providerTools;
+    }
+
+    const query = this.extractPruningQuery(options, builtMessages);
+    if (!query) {
+      return this.providerTools;
+    }
+
+    const baseOpts: ToolPruneOptions =
+      typeof this.pruneTools === "object" && this.pruneTools !== null
+        ? this.pruneTools
+        : {};
+    const runOpts: ToolPruneOptions =
+      typeof options.pruneTools === "object" && options.pruneTools !== null
+        ? options.pruneTools
+        : {};
+    const mergedOpts: ToolPruneOptions = { ...baseOpts, ...runOpts };
+
+    try {
+      const pruner = await this.getOrCreateToolPruner(baseOpts);
+      const prunerState = pruner as unknown as {
+        endpoint?: string;
+        apiKey?: string;
+        model?: string;
+        _wasmEngine?: unknown;
+        _tqEngine?: unknown;
+      };
+      prunerState.endpoint =
+        mergedOpts.endpoint || "https://api.typesafe.ai/v1/systemone";
+      if (mergedOpts.apiKey !== undefined) {
+        prunerState.apiKey = mergedOpts.apiKey;
+      }
+      if (mergedOpts.model !== undefined) {
+        prunerState.model = mergedOpts.model;
+      }
+
+      const selected = await pruner.filter(query, mergedOpts);
+      if (prunerState._wasmEngine && !prunerState._tqEngine) {
+        prunerState._tqEngine = prunerState._wasmEngine;
+      }
+
+      const byName = new Map(this.providerTools.map((t) => [t.name, t]));
+      const pruned: import("../llm/types.js").ProviderTool[] = [];
+      for (const item of selected) {
+        const name =
+          typeof item === "string"
+            ? item
+            : (item as { name?: string } | null)?.name;
+        if (name) {
+          const found = byName.get(name);
+          if (found) pruned.push(found);
+        }
+      }
+
+      return pruned.length > 0 ? pruned : this.providerTools;
+    } catch (error) {
+      logger.warn(
+        `Tool pruning failed, falling back to full toolset: ${error}`
+      );
+      return this.providerTools;
+    }
+  }
+
+  private async nativeRunParams(options: ResolvedRunOptions) {
+    const messages = this.buildMessages(options);
     return {
-      messages: this.buildMessages(options),
-      tools: this.providerTools,
+      messages,
+      tools: await this.resolveToolsForRun(options, messages),
       callTool: this.callTool!,
       maxSteps: options.maxSteps ?? this.maxSteps,
       signal: options.signal,
@@ -478,6 +633,9 @@ export class MCPAgent {
       );
     }
     if (this.isRemote && this.remoteAgent) {
+      if (options.pruneTools) {
+        throw new Error("pruneTools is not supported for remote agents.");
+      }
       return this.remoteAgent.run(
         options.prompt ?? "",
         options.maxSteps,
@@ -487,7 +645,7 @@ export class MCPAgent {
     await this.ensureReady(options.manageConnector ?? true);
     const result = await runNativeAgent(
       this.driver!,
-      this.nativeRunParams(options)
+      await this.nativeRunParams(options)
     );
     if (this.memoryEnabled && options.prompt) {
       this.conversationMessages.push({
@@ -538,6 +696,9 @@ export class MCPAgent {
       signal
     );
     if (this.isRemote && this.remoteAgent) {
+      if (options.pruneTools) {
+        throw new Error("pruneTools is not supported for remote agents.");
+      }
       const result = await this.remoteAgent.run(
         options.prompt ?? "",
         options.maxSteps,
@@ -548,7 +709,7 @@ export class MCPAgent {
     await this.ensureReady(options.manageConnector ?? true);
     const result = yield* streamNativeAgentSteps(
       this.driver!,
-      this.nativeRunParams(options)
+      await this.nativeRunParams(options)
     );
     if (this.memoryEnabled && options.prompt) {
       this.conversationMessages.push({
@@ -606,7 +767,7 @@ export class MCPAgent {
       throw new Error("streamEvents is not supported for remote agents.");
     }
     await this.ensureReady(options.manageConnector ?? true);
-    yield* streamNativeAgent(this.driver!, this.nativeRunParams(options));
+    yield* streamNativeAgent(this.driver!, await this.nativeRunParams(options));
   }
 
   /**
@@ -638,6 +799,7 @@ export class MCPAgent {
     if (this.clientOwnedByAgent && this.client) {
       await this.client.closeAllSessions?.();
     }
+    this.toolPruner = undefined;
     this.initialized = false;
   }
 }

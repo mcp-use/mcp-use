@@ -1,5 +1,6 @@
 import type { ZodSchema } from "zod";
 import type { ProviderMessage } from "../llm/types.js";
+import type { ToolPruneOptions } from "./agent_options.js";
 import type { BaseMessage } from "./types.js";
 
 /** Options shared by `run`, `stream`, and `streamEvents`. */
@@ -28,6 +29,16 @@ export interface RunOptions<T = string> {
    * ignores this option; pass prior messages via `externalHistory` instead.
    */
   messages?: ProviderMessage[];
+  /**
+   * Per-run override for pre-flight MCP tool pruning via `tool-prune`.
+   *
+   * Pass `true` or {@link ToolPruneOptions} to prune schemas for this run, or
+   * `false` to disable agent-level pruning for this run.
+   *
+   * Supported by the native local agent only. Remote agents reject this option,
+   * and the LangChain entry point ignores it.
+   */
+  pruneTools?: boolean | ToolPruneOptions;
   /**
    * Zod schema for a typed result.
    *
