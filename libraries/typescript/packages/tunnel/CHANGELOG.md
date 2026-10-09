@@ -1,5 +1,11 @@
 # @mcp-use/tunnel
 
+## 0.2.2-canary.0
+
+### Patch Changes
+
+- abd6eb4: fix(tunnel): ignore a relay `cancel` for a request that already finished instead of closing the tunnel and dropping every other in-flight request
+
 ## 0.2.1
 
 ### Patch Changes
