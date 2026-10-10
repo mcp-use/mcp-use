@@ -27,6 +27,8 @@ export interface StoredState {
     staticClientInfo?: OAuthClientInformation;
     scope?: string;
   };
+  /** Complete the code exchange in the opener so confidential credentials stay in memory. */
+  completeAuthorizationInOpener?: boolean;
   flowType?: "popup" | "redirect";
   returnUrl?: string;
 }
@@ -67,6 +69,7 @@ interface StoreAuthorizationStateOptions {
    * stored state so the callback handler can rebuild the provider.
    */
   extraProviderOptions?: Record<string, unknown>;
+  completeAuthorizationInOpener?: boolean;
   flowType?: "popup" | "redirect";
   returnUrl?: string;
 }
@@ -447,6 +450,9 @@ export class OAuthSessionStore {
           : {}),
         ...(opts.extraProviderOptions ?? {}),
       },
+      ...(opts.completeAuthorizationInOpener
+        ? { completeAuthorizationInOpener: true }
+        : {}),
       flowType: opts.flowType,
       returnUrl: opts.returnUrl,
     };

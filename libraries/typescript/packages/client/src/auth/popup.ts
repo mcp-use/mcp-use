@@ -40,11 +40,15 @@ export interface McpAuthCallbackMessage {
   state?: string;
   /** Hash of the server URL the flow authenticated against. */
   serverUrlHash?: string;
+  /** Authorization code returned for an opener-owned confidential-client exchange. */
+  authorizationCode?: string;
+  /** Authorization-server issuer returned with the authorization response. */
+  issuer?: string;
 }
 
 /** Terminal outcome of an opener-owned popup flow. */
 type AuthPopupResult =
-  | { kind: "success" }
+  | { kind: "success"; authorizationCode?: string; issuer?: string }
   | { kind: "error"; error: string }
   | { kind: "cancelled" }
   | { kind: "timeout" };
@@ -152,7 +156,13 @@ export function runAuthPopup({
       // without a `state` (older callback pages) are accepted for back-compat.
       if (payload.state && state && payload.state !== state) return;
       if (payload.success) {
-        settle({ kind: "success" });
+        settle({
+          kind: "success",
+          ...(payload.authorizationCode
+            ? { authorizationCode: payload.authorizationCode }
+            : {}),
+          ...(payload.issuer ? { issuer: payload.issuer } : {}),
+        });
       } else {
         settle({
           kind: "error",
