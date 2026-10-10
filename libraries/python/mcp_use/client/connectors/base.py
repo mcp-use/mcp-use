@@ -7,8 +7,9 @@ must implement.
 
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypeVar
 
 from mcp import ClientSession, Implementation
 from mcp.client.session import (
@@ -26,6 +27,7 @@ from mcp.types import (
     GetPromptResult,
     InitializeResult,
     ListRootsResult,
+    PaginatedResult,
     Prompt,
     PromptListChangedNotification,
     ReadResourceResult,
@@ -44,6 +46,21 @@ from mcp_use.client.middleware import Middleware, MiddlewareManager
 from mcp_use.client.task_managers import ConnectionManager
 from mcp_use.logging import logger
 from mcp_use.telemetry.telemetry import telemetry
+
+_Page = TypeVar("_Page", bound=PaginatedResult)
+_Item = TypeVar("_Item")
+
+
+async def _list_all_pages(
+    list_page: Callable[..., Awaitable[_Page]],
+    items: Callable[[_Page], list[_Item]],
+) -> list[_Item]:
+    page = await list_page()
+    result = list(items(page))
+    while page.nextCursor is not None:
+        page = await list_page(cursor=page.nextCursor)
+        result.extend(items(page))
+    return result
 
 
 class BaseConnector(ABC):
@@ -267,8 +284,7 @@ class BaseConnector(ABC):
         if self.capabilities.tools:
             # Get available tools directly from client session
             try:
-                tools_result = await self.client_session.list_tools()
-                self._tools = tools_result.tools if tools_result else []
+                self._tools = await _list_all_pages(self.client_session.list_tools, lambda page: page.tools)
             except Exception as e:
                 logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
                 self._tools = []
@@ -278,8 +294,7 @@ class BaseConnector(ABC):
         if self.capabilities.resources:
             # Get available resources directly from client session
             try:
-                resources_result = await self.client_session.list_resources()
-                self._resources = resources_result.resources if resources_result else []
+                self._resources = await _list_all_pages(self.client_session.list_resources, lambda page: page.resources)
             except Exception as e:
                 logger.error(f"Error listing resources for connector {self.public_identifier}: {e}")
                 self._resources = []
@@ -289,8 +304,7 @@ class BaseConnector(ABC):
         if self.capabilities.prompts:
             # Get available prompts directly from client session
             try:
-                prompts_result = await self.client_session.list_prompts()
-                self._prompts = prompts_result.prompts if prompts_result else []
+                self._prompts = await _list_all_pages(self.client_session.list_prompts, lambda page: page.prompts)
             except Exception as e:
                 logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
                 self._prompts = []
@@ -490,9 +504,8 @@ class BaseConnector(ABC):
 
         logger.debug("Listing tools")
         try:
-            result = await self.client_session.list_tools()
-            self._tools = result.tools
-            return result.tools
+            self._tools = await _list_all_pages(self.client_session.list_tools, lambda page: page.tools)
+            return self._tools
         except McpError as e:
             logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
             return []
@@ -510,9 +523,8 @@ class BaseConnector(ABC):
 
         logger.debug("Listing resources")
         try:
-            result = await self.client_session.list_resources()
-            self._resources = result.resources
-            return result.resources
+            self._resources = await _list_all_pages(self.client_session.list_resources, lambda page: page.resources)
+            return self._resources
         except McpError as e:
             logger.warning(f"Error listing resources for connector {self.public_identifier}: {e}")
             return []
@@ -538,9 +550,8 @@ class BaseConnector(ABC):
 
         logger.debug("Listing prompts")
         try:
-            result = await self.client_session.list_prompts()
-            self._prompts = result.prompts
-            return result.prompts
+            self._prompts = await _list_all_pages(self.client_session.list_prompts, lambda page: page.prompts)
+            return self._prompts
         except McpError as e:
             logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
             return []

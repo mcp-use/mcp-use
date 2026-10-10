@@ -136,11 +136,11 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
 
             # Add mocks for list_tools, list_resources, and list_prompts since HttpConnector calls these
             mock_instance.list_tools = AsyncMock()
-            mock_instance.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
+            mock_instance.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)], nextCursor=None)
             mock_instance.list_resources = AsyncMock()
-            mock_instance.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)])
+            mock_instance.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)], nextCursor=None)
             mock_instance.list_prompts = AsyncMock()
-            mock_instance.list_prompts.return_value = MagicMock(prompts=[MagicMock(spec=Prompt)])
+            mock_instance.list_prompts.return_value = MagicMock(prompts=[MagicMock(spec=Prompt)], nextCursor=None)
 
             return mock_instance
 
@@ -181,11 +181,15 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
 
         # Add mocks for list_tools, list_resources, and list_prompts since HttpConnector calls these
         mock_client_session_instance.list_tools = AsyncMock()
-        mock_client_session_instance.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
+        mock_client_session_instance.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)], nextCursor=None)
         mock_client_session_instance.list_resources = AsyncMock()
-        mock_client_session_instance.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)])
+        mock_client_session_instance.list_resources.return_value = MagicMock(
+            resources=[MagicMock(spec=Resource)], nextCursor=None
+        )
         mock_client_session_instance.list_prompts = AsyncMock()
-        mock_client_session_instance.list_prompts.return_value = MagicMock(prompts=[MagicMock(spec=Prompt)])
+        mock_client_session_instance.list_prompts.return_value = MagicMock(
+            prompts=[MagicMock(spec=Prompt)], nextCursor=None
+        )
 
         mock_client_session_class.return_value = mock_client_session_instance
 
@@ -342,9 +346,13 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.connector.client_session.initialize.return_value = mock_init_result
 
         # Setup mocks for client session methods directly (not connector wrapper methods)
-        self.connector.client_session.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
-        self.connector.client_session.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)])
-        self.connector.client_session.list_prompts.return_value = MagicMock(prompts=[MagicMock(spec=Prompt)])
+        self.connector.client_session.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)], nextCursor=None)
+        self.connector.client_session.list_resources.return_value = MagicMock(
+            resources=[MagicMock(spec=Resource)], nextCursor=None
+        )
+        self.connector.client_session.list_prompts.return_value = MagicMock(
+            prompts=[MagicMock(spec=Prompt)], nextCursor=None
+        )
 
         # Initialize
         result_session_info = await self.connector.initialize()
@@ -395,6 +403,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         # that has a .resources attribute, as expected by the connector.
         mock_client_response = MagicMock()
         mock_client_response.resources = expected_resources_list
+        mock_client_response.nextCursor = None
         self.connector.client_session.list_resources.return_value = mock_client_response
 
         # Call the connector's list_resources method

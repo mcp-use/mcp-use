@@ -194,15 +194,17 @@ class TestStdioConnectorOperations:
         mock_client.initialize = AsyncMock(return_value=mock_init_result)
 
         # Mocks for list_tools, list_resources, list_prompts (already well-structured)
-        mock_tools_response = MagicMock(tools=[MagicMock(spec=Tool)])
+        mock_tools_response = MagicMock(tools=[MagicMock(spec=Tool)], nextCursor=None)
         mock_client.list_tools = AsyncMock(return_value=mock_tools_response)
 
         mock_list_resources_response = MagicMock()
         mock_list_resources_response.resources = []
+        mock_list_resources_response.nextCursor = None
         mock_client.list_resources = AsyncMock(return_value=mock_list_resources_response)
 
         # Mock list_prompts (called by base initialize)
         mock_list_prompts_response = MagicMock()
+        mock_list_prompts_response.nextCursor = None
         mock_list_prompts_response.prompts = []  # Assumes a .prompts attribute
         mock_client.list_prompts = AsyncMock(return_value=mock_list_prompts_response)
 
@@ -303,6 +305,7 @@ class TestStdioConnectorOperations:
         connector = StdioConnector()
         mock_client = Mock()
         mock_result = MagicMock()
+        mock_result.nextCursor = None
         mock_result.resources = [MagicMock()]
         mock_client.list_resources = AsyncMock(return_value=mock_result)
         connector.client_session = mock_client

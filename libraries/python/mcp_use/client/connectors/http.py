@@ -14,7 +14,7 @@ from mcp.shared.exceptions import McpError
 from mcp.types import Root
 
 from mcp_use.client.auth.oauth import BearerAuth, OAuth, OAuthClientProvider
-from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.client.connectors.base import BaseConnector, _list_all_pages
 from mcp_use.client.exceptions import OAuthAuthenticationError, OAuthDiscoveryError
 from mcp_use.client.middleware import CallbackClientSession, Middleware
 from mcp_use.client.task_managers import SseConnectionManager, StreamableHttpConnectionManager
@@ -212,22 +212,21 @@ class HttpConnector(BaseConnector):
 
                 if server_capabilities.tools:
                     # Get available tools directly from client session
-                    tools_result = await self.client_session.list_tools()
-                    self._tools = tools_result.tools if tools_result else []
+                    self._tools = await _list_all_pages(self.client_session.list_tools, lambda page: page.tools)
                 else:
                     self._tools = []
 
                 if server_capabilities.resources:
                     # Get available resources directly from client session
-                    resources_result = await self.client_session.list_resources()
-                    self._resources = resources_result.resources if resources_result else []
+                    self._resources = await _list_all_pages(
+                        self.client_session.list_resources, lambda page: page.resources
+                    )
                 else:
                     self._resources = []
 
                 if server_capabilities.prompts:
                     # Get available prompts directly from client session
-                    prompts_result = await self.client_session.list_prompts()
-                    self._prompts = prompts_result.prompts if prompts_result else []
+                    self._prompts = await _list_all_pages(self.client_session.list_prompts, lambda page: page.prompts)
                 else:
                     self._prompts = []
 
