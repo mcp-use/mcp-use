@@ -16,7 +16,6 @@ from mcp.types import (
     EmbeddedResource,
     ImageContent,
     Prompt,
-    ReadResourceRequestParams,
     Resource,
     TextContent,
     TextResourceContents,
@@ -222,25 +221,20 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
             description: str = (
                 mcp_resource.description or f"Return the content of the resource located at URI {mcp_resource.uri}."
             )
-            args_schema: type[BaseModel] = ReadResourceRequestParams
+            args_schema: type[BaseModel] = create_model("ResourceInputSchema", __base__=BaseModel)
             tool_connector: BaseConnector = connector
             handle_tool_error: bool = True
 
             def _run(self, **kwargs: Any) -> NoReturn:
                 raise NotImplementedError("Resource tools only support async operations")
 
-            async def _arun(self, **kwargs: Any) -> Any:
+            async def _arun(self, **kwargs: Any) -> LangChainToolResult:
                 logger.debug(f'Resource tool: "{self.name}" called')
                 try:
                     result = await self.tool_connector.read_resource(mcp_resource.uri)
-                    for content in result.contents:
-                        # Attempt to decode bytes if necessary
-                        if isinstance(content, bytes):
-                            content_decoded = content.decode()
-                        else:
-                            content_decoded = str(content)
-
-                    return content_decoded
+                    return _mcp_content_to_langchain(
+                        [EmbeddedResource(type="resource", resource=content) for content in result.contents]
+                    )
                 except Exception as e:
                     if self.handle_tool_error:
                         return format_error(e, tool=self.name)  # Format the error to make LLM understand it
