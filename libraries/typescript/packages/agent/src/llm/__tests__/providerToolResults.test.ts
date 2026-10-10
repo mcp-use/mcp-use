@@ -199,6 +199,37 @@ describe("OpenAI: toOpenAIMessages content handling", () => {
       },
     ]);
   });
+
+  it("preserves newline separators when text parts contain empty strings", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "system",
+        content: [
+          { type: "text", text: "" },
+          { type: "text", text: "next" },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "first" },
+          { type: "text", text: "" },
+          { type: "text", text: "third" },
+        ],
+      },
+    ];
+    const out = toOpenAIMessages(messages) as any[];
+    expect(out).toEqual([
+      {
+        role: "system",
+        content: "\nnext",
+      },
+      {
+        role: "assistant",
+        content: "first\n\nthird",
+      },
+    ]);
+  });
 });
 
 describe("Google: functionResponse + follow-up user with inlineData", () => {

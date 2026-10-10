@@ -60,10 +60,12 @@ export function extractTextContent(content: string | ContentPart[]): string {
   if (content.length === 1 && content[0].type === "text")
     return content[0].text;
   let text = "";
+  let hasSeenText = false;
   for (let i = 0; i < content.length; i++) {
     const part = content[i];
     if (part.type === "text") {
-      text += (text.length > 0 ? "\n" : "") + part.text;
+      text += (hasSeenText ? "\n" : "") + part.text;
+      hasSeenText = true;
     }
   }
   return text;
