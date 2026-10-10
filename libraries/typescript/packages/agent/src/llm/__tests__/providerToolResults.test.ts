@@ -100,6 +100,138 @@ describe("OpenAI: tool message + follow-up user with image_url", () => {
   });
 });
 
+describe("OpenAI: toOpenAIMessages content handling", () => {
+  it("normalizes assistant message with ContentPart[] array to string content", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Assistant response" }],
+      },
+    ];
+    const out = toOpenAIMessages(messages) as any[];
+    expect(out).toEqual([
+      {
+        role: "assistant",
+        content: "Assistant response",
+      },
+    ]);
+  });
+
+  it("normalizes assistant message with ContentPart[] and tool calls", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Calling tool" }],
+        toolCalls: [{ id: "c1", name: "foo", args: { bar: 1 } }],
+      },
+    ];
+    const out = toOpenAIMessages(messages) as any[];
+    expect(out).toEqual([
+      {
+        role: "assistant",
+        content: "Calling tool",
+        tool_calls: [
+          {
+            id: "c1",
+            type: "function",
+            function: { name: "foo", arguments: JSON.stringify({ bar: 1 }) },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("preserves empty string assistant content without tool calls", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "assistant",
+        content: "",
+      },
+    ];
+    const out = toOpenAIMessages(messages) as any[];
+    expect(out).toEqual([
+      {
+        role: "assistant",
+        content: "",
+      },
+    ]);
+  });
+
+  it("sets content to null for empty assistant content with tool calls", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [{ id: "c1", name: "foo", args: {} }],
+      },
+    ];
+    const out = toOpenAIMessages(messages) as any[];
+    expect(out).toEqual([
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "c1",
+            type: "function",
+            function: { name: "foo", arguments: "{}" },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("normalizes system message with ContentPart[] array to string content", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "system",
+        content: [
+          { type: "text", text: "Part 1" },
+          { type: "text", text: "Part 2" },
+        ],
+      },
+    ];
+    const out = toOpenAIMessages(messages) as any[];
+    expect(out).toEqual([
+      {
+        role: "system",
+        content: "Part 1\nPart 2",
+      },
+    ]);
+  });
+
+  it("preserves newline separators when text parts contain empty strings", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "system",
+        content: [
+          { type: "text", text: "" },
+          { type: "text", text: "next" },
+        ],
+      },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "first" },
+          { type: "text", text: "" },
+          { type: "text", text: "third" },
+        ],
+      },
+    ];
+    const out = toOpenAIMessages(messages) as any[];
+    expect(out).toEqual([
+      {
+        role: "system",
+        content: "\nnext",
+      },
+      {
+        role: "assistant",
+        content: "first\n\nthird",
+      },
+    ]);
+  });
+});
+
 describe("Google: functionResponse + follow-up user with inlineData", () => {
   it.each([
     { label: "empty array", result: [], response: { result: [] } },
