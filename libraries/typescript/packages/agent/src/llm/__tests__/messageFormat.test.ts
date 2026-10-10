@@ -3,9 +3,41 @@ import { describe, expect, it } from "vitest";
 import {
   convertExternalHistoryToProvider,
   convertMessagesToProvider,
+  type InspectorMessagePart,
 } from "../messageFormat";
 
 describe("convertMessagesToProvider", () => {
+  it("keeps generated tool call ids within provider id limits", () => {
+    // OpenAI rejects tool call ids longer than 40 characters, so the id must
+    // not grow with the tool name. Two assistant turns make sure ids stay
+    // unique across replayed messages, not just within one.
+    const toolName = "search_customer_support_tickets_by_status";
+    const toolCall: InspectorMessagePart = {
+      type: "tool-invocation",
+      toolInvocation: { toolName, args: {}, result: { content: [] } },
+    };
+    const out = convertMessagesToProvider([
+      { role: "user", content: "trigger" },
+      { role: "assistant", content: "", parts: [toolCall, toolCall] },
+      { role: "user", content: "again" },
+      { role: "assistant", content: "", parts: [toolCall, toolCall] },
+    ]);
+    const ids = out
+      .filter((m) => m.role === "assistant")
+      .flatMap((m) => m.toolCalls!.map((call) => call.id));
+    const toolIds = out
+      .filter((m) => m.role === "tool")
+      .map((m) => m.toolCallId);
+
+    expect(ids).toHaveLength(4);
+    expect(new Set(ids).size).toBe(4);
+    expect(toolIds).toEqual(ids);
+    for (const id of ids) {
+      expect(id.length).toBeLessThanOrEqual(40);
+      expect(id).toMatch(/^[a-zA-Z0-9_-]+$/);
+    }
+  });
+
   it("propagates toolIsError when the saved MCP result has isError: true", () => {
     const out = convertMessagesToProvider([
       { role: "user", content: "trigger" },
