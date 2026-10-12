@@ -64,7 +64,15 @@ describe("RemoteAgent.run response handling", () => {
     ]);
 
     await expect(makeAgent().run({ prompt: "hi" })).rejects.toThrow(
-      /Agent exploded/
+      "Remote agent execution failed: Agent exploded"
+    );
+  });
+
+  it("serializes the whole body when status is error without an error payload", async () => {
+    stubFetchResponses([{ id: "chat-1" }, { status: "error" }]);
+
+    await expect(makeAgent().run({ prompt: "hi" })).rejects.toThrow(
+      /Remote agent execution failed: \{"status":"error"\}/
     );
   });
 
