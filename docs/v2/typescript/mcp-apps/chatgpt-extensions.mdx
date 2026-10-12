@@ -1,16 +1,17 @@
 ---
 title: "ChatGPT Plugin Extensions"
-description: "Add selected model context, app entrypoints, deep links, structured settings, and display modes with the TypeScript SDK."
+description: "Add selected model context, app entrypoints, deep links, composer mentions, structured settings, and display modes with the TypeScript SDK."
 icon: "/images/icons/openai.svg"
 ---
 
-Use ChatGPT Plugin Extensions to add app launchers, file viewers, incoming routes, native settings, and selected model context.
+Use ChatGPT Plugin Extensions to add app launchers, file viewers, incoming routes, composer mentions, native settings, and selected model context.
 You can also set an initial display preference.
 The TypeScript SDK converts your declarations to OpenAI extension metadata.
 The host controls which extensions users can access.
 
 Start with a [view-bound MCP App](/v2/typescript/mcp-apps/quickstart).
 Each view needs one bound tool and an `outputSchema`.
+Composer mention search uses a server tool and needs no View.
 The examples below use the v2 TypeScript API.
 
 | Goal                                            | API                                               |
@@ -18,6 +19,7 @@ The examples below use the v2 TypeScript API.
 | Open an app from navigation or a conversation   | `tool.view.entrypoints` with `global` or `thread` |
 | Open a file in a custom viewer                  | `tool.view.entrypoints` with `file`               |
 | Read an incoming app route                      | `useDeepLink()`                                   |
+| Search app-owned items in the composer          | `server.mentions()`                               |
 | Add native settings and action buttons          | `server.settings()`                               |
 | Attach selected evidence to the next model turn | `useModelContext()`                               |
 | Request an initial presentation                 | `viewConfig.preferredDisplayMode`                 |
@@ -529,6 +531,89 @@ Desktop links use `codex://plugins/<plugin-id>/app/<tool-name>?path=<encoded-url
 iOS links use the `chatgpt` scheme.
 Custom marketplace links include `@<marketplace>` after the plugin ID.
 See the [deep-link specification](https://github.com/openai/mcp-extensions/blob/main/docs/spec.md#deep-links) for the native formats.
+
+## Composer mention search
+
+Register one combined search for app-owned people, files, channels, or other
+items with `server.mentions`. It returns a normal typed `ToolRef` and requires
+no View:
+
+```typescript
+import { MCPServer, type ResourceLink } from "mcp-use";
+
+const server = new MCPServer({ name: "workspace", version: "1.0.0" });
+const items: ResourceLink[] = [
+  {
+    type: "resource_link",
+    uri: "workspace://people/u42",
+    name: "andrew",
+    title: "Andrew Khadder",
+  },
+  {
+    type: "resource_link",
+    uri: "workspace://files/f17",
+    name: "roadmap.md",
+    mimeType: "text/markdown",
+  },
+  {
+    type: "resource_link",
+    uri: "workspace://channels/c9",
+    name: "engineering",
+    title: "#engineering",
+  },
+];
+
+export const mentionSearch = server.mentions({
+  name: "workspace.mentions",
+  title: "Search workspace items",
+  search: async ({ query }, ctx) => {
+    // For a downstream search, pass ctx.signal to support cancellation.
+    const needle = query.toLowerCase();
+    return {
+      items: items.filter((item) =>
+        `${item.name} ${item.title ?? ""}`.toLowerCase().includes(needle),
+      ),
+    };
+  },
+});
+```
+
+Register before startup, using a non-blank tool name that does not collide
+with another tool. Prefer one combined search per plugin; the mention
+contract defines no selection rule for multiple providers.
+
+The helper generates an input schema requiring a string `query` and an
+output schema requiring `{ items: ResourceLink[] }`, using the official SDK
+resource-link schema. Queries, including `""` and whitespace, reach your
+callback unchanged. Normalize, rank, and limit results in your application.
+An empty query can return initial suggestions or an empty list.
+
+Supporting ChatGPT desktop hosts discover the tool through
+`_meta["openai/extensions"]["mentions/search"] = {}` and call it with ordinary
+`tools/call`. Success is `{ content: [], structuredContent: { items } }`;
+no matches returns `items: []`. Invalid input or output and callback errors
+use the ordinary tool error pipeline. Other hosts may ignore the marker and
+can still call the tool explicitly. No client capability or iframe handshake
+is required.
+
+`title`, `description`, `icons`, `annotations`, `_meta`, and `visibility` use
+the ordinary tool descriptor conventions. Search is annotated read-only by
+default. Visibility defaults to `["app"]`. If you supply top-level
+`visibility`, it takes precedence over raw `_meta.ui.visibility`; the helper
+adds `"app"` without duplicates. For example, `visibility: "model"` produces
+`["model", "app"]`. Unrelated UI and extension metadata survives without
+mutating your input. The helper has no View option and does not advertise a
+raw View resource URI.
+
+Callbacks receive the same request context, OAuth/sign-in defaults, and
+`ctx.signal` as ordinary tools. Use verified identity and application
+permissions to return only items the caller may access. Apply authorization
+again when resolving or acting on a returned URI: a link identifies an item
+and does not grant access. Register resources or retrieval tools separately
+when readable contents are needed; returned links do not automatically enter
+`resources/list` or guarantee an immediate fetch.
+
+Verify native composer insertion separately in a supporting desktop host.
 
 ## Add structured settings and actions
 
