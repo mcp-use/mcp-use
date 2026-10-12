@@ -18,6 +18,16 @@ npx mcp-use client dev tools list
 npx mcp-use client dev tools call get-weather city=Tokyo
 ```
 
+### Connect to a hosted server
+
+Invokely provides official statistics through a hosted MCP server. Its account-free trial endpoint allows 25 calls per day per IP. Invokely also exposes five workspace operations for a user's private items; saving or updating items requires Pro. This example calls only `search_indicators`.
+
+```bash
+npx mcp-use client connect invokely-trial https://invokely.ai/mcp/trial --no-oauth
+npx mcp-use client invokely-trial tools list
+npx mcp-use client invokely-trial tools call search_indicators query=unemployment geography=Texas
+```
+
 `connect` supports HTTP and HTTPS MCP URLs. It verifies the connection before saving it. The CLI stores saved server metadata under `~/.mcp-use/client/`.
 
 List or remove saved servers with these commands:
