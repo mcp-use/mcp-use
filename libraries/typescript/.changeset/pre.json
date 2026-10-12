@@ -10,5 +10,8 @@
     "mcp-use": "2.8.2",
     "@mcp-use/tunnel": "0.2.2"
   },
-  "changesets": []
+  "changesets": [
+    "composer-mention-search",
+    "propagated-97d5834ab8e9d708"
+  ]
 }
