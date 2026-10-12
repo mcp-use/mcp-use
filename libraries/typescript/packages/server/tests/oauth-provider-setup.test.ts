@@ -396,6 +396,139 @@ describe("OAuth provider setup hook", () => {
   });
 });
 
+describe("OAuth provider setup hook: routes", () => {
+  it("exposes the mount mode", async () => {
+    let mode: string | undefined;
+    await server((host) => {
+      mode = host.mode;
+    }).fetch(post("tools/list", {}, signedIn));
+    expect(mode).toBe("handler");
+  });
+
+  it("serves provider routes ahead of the gate and application routes", async () => {
+    const app = server((host) => {
+      host.route("GET", "/mcp/oauth/ping", (c) => c.text("provider"));
+      host.route("POST", "/mcp/oauth/echo", async (c) =>
+        c.json(await c.req.parseBody())
+      );
+    });
+    app.get("/mcp/oauth/ping", (c) => c.text("application"));
+
+    const ping = await app.fetch(new Request(`${resource}/oauth/ping`));
+    expect(ping.status).toBe(200);
+    expect(await ping.text()).toBe("provider");
+
+    const echo = await app.fetch(
+      new Request(`${resource}/oauth/echo`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "a=1",
+      })
+    );
+    expect(await echo.json()).toEqual({ a: "1" });
+  });
+
+  it("exempts provider routes from the Origin allowlist", async () => {
+    const app = new MCPServer({
+      name: "shop",
+      version: "1.0.0",
+      oauth: provider((host) => {
+        host.route("POST", "/mcp/oauth/token", (c) => c.text("ok"));
+      }),
+      allowedOrigins: ["shop.example.test"],
+      logging: { enabled: false },
+    });
+    const response = await app.fetch(
+      new Request(`${resource}/oauth/token`, {
+        method: "POST",
+        headers: { origin: "https://client.example.test" },
+      })
+    );
+    expect(response.status).toBe(200);
+    const blocked = await app.fetch(
+      new Request(resource, {
+        method: "POST",
+        headers: {
+          origin: "https://client.example.test",
+          "content-type": "application/json",
+        },
+        body: "{}",
+      })
+    );
+    expect(blocked.status).toBe(403);
+  });
+
+  it("refuses provider routes outside the base path or registered twice", async () => {
+    for (const path of [
+      "/oauth/token",
+      "/mcp",
+      "/mcp/",
+      "/mcp/../token",
+      "/mcp/:id",
+    ]) {
+      const app = server((host) => {
+        host.route("GET", path, (c) => c.text(""));
+      });
+      await expect(app.fetch(post("tools/list", {}, signedIn))).rejects.toThrow(
+        "must be a literal pathname under /mcp/"
+      );
+    }
+    const twice = server((host) => {
+      host.route("GET", "/mcp/oauth/a", (c) => c.text(""));
+      host.route("GET", "/mcp/oauth/a", (c) => c.text(""));
+    });
+    await expect(twice.fetch(post("tools/list", {}, signedIn))).rejects.toThrow(
+      "is already registered"
+    );
+  });
+
+  it("computes metadata from the resolved resource", async () => {
+    const computed = vi.fn((boundResource: URL) => ({
+      issuer: boundResource.origin,
+      authorization_endpoint: `${boundResource.href}/oauth/authorize`,
+      token_endpoint: `${boundResource.href}/oauth/token`,
+      response_types_supported: ["code"],
+    }));
+    const app = new MCPServer({
+      name: "shop",
+      version: "1.0.0",
+      oauth: oauthCustomProvider<TestUser, (resource: URL) => OAuthMetadata>({
+        resource,
+        createTokenVerifier: () => ({
+          verifyAccessToken: async () => {
+            throw new Error("unused");
+          },
+        }),
+        oauthMetadata: computed,
+        mapAuthInfo: () => ({
+          user: { id: "u" },
+          payload: {},
+          permissions: [],
+        }),
+      }),
+      logging: { enabled: false },
+    });
+    const metadata = await app.fetch(
+      new Request(
+        "https://shop.example.test/.well-known/oauth-authorization-server"
+      )
+    );
+    expect(await metadata.json()).toMatchObject({
+      issuer: "https://shop.example.test",
+      token_endpoint: "https://shop.example.test/mcp/oauth/token",
+    });
+    const prm = await app.fetch(
+      new Request(
+        "https://shop.example.test/.well-known/oauth-protected-resource/mcp"
+      )
+    );
+    expect(await prm.json()).toMatchObject({
+      authorization_servers: ["https://shop.example.test"],
+    });
+    expect(computed).toHaveBeenCalledOnce();
+  });
+});
+
 describe("OAuth provider setup hook: mixedAuth", () => {
   it("exposes mixedAuth so a provider can require anonymous discovery", async () => {
     const requireMixedAuth = (host: OAuthProviderHost<TestUser>) => {

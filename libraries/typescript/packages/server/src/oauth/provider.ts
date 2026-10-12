@@ -3,6 +3,7 @@ import type {
   OAuthMetadata,
   OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
+import type { Context } from "hono";
 
 import type { DefinitionSecuritySchemes, ToolOAuthMode } from "../context.js";
 import type {
@@ -29,7 +30,11 @@ import type {
   ToolDefinition,
   ToolRef,
 } from "../tools.js";
-import { assertSecureHttpUrl, parseAbsoluteUrl } from "./internal.js";
+import {
+  assertOAuthMetadata,
+  assertSecureHttpUrl,
+  parseAbsoluteUrl,
+} from "./guards.js";
 
 /** Additional verified identity information exposed by mcp-use callbacks. */
 export type OAuthExtra<TUser> = Record<string, unknown> & {
@@ -54,6 +59,18 @@ export interface OAuthResourceOptions {
   /** Documentation URL advertised by protected-resource metadata. */
   serviceDocumentationUrl?: URL;
 }
+
+/**
+ * HTTP handler for a provider-owned route registered through
+ * {@link OAuthProviderHost.route}.
+ *
+ * @param context - Hono context for the request. Use it to read the request,
+ * the query string, form bodies, and cookies.
+ * @returns The response to send.
+ */
+export type OAuthProviderRouteHandler = (
+  context: Context
+) => Response | Promise<Response>;
 
 /**
  * Server surface handed to a provider's {@link CustomOAuthProviderOptions.setup}
@@ -81,6 +98,31 @@ export interface OAuthProviderHost<TUser> {
    * needs anonymous discovery can throw from `setup` when this is `false`.
    */
   readonly mixedAuth: boolean;
+  /**
+   * How the server mounted: `"listen"` when `server.listen()` serves it, and
+   * `"handler"` when a platform calls `server.fetch` (or a framework adapter)
+   * instead. A provider can use it to allow development-only defaults on a
+   * local listener.
+   */
+  readonly mode: "listen" | "handler";
+  /**
+   * Registers a provider-owned HTTP route, such as an authorization
+   * endpoint. The server mounts it ahead of the OAuth gate and of the
+   * application's own routes, so it is public and the application cannot
+   * shadow it.
+   *
+   * @param method - HTTP method to match.
+   * @param path - Absolute pathname. It must sit under the MCP base path, for
+   * example `/mcp/oauth/token`.
+   * @param handler - Handler that produces the response.
+   * @throws If the path is not under the MCP base path, or another provider
+   * route already uses the same method and path.
+   */
+  route(
+    method: "GET" | "POST" | "OPTIONS",
+    path: string,
+    handler: OAuthProviderRouteHandler
+  ): void;
   /**
    * Registers MCP middleware using the same `mcp:` patterns accepted by
    * `server.use()`.
@@ -156,14 +198,34 @@ export interface OAuthProviderHost<TUser> {
   instructions(transform: (current: string | undefined) => string): void;
 }
 
-/** Options for {@link oauthCustomProvider}. */
+/**
+ * Authorization-server metadata, or a function that computes it from the
+ * resolved canonical MCP resource URL.
+ */
+export type OAuthMetadataSource =
+  | OAuthMetadata
+  | ((resource: URL) => OAuthMetadata);
+
+/**
+ * Options for {@link oauthCustomProvider}.
+ *
+ * @typeParam TUser - Application user type exposed to authenticated callbacks.
+ * @typeParam TMetadata - Static metadata (the default), or a metadata function.
+ */
 export interface CustomOAuthProviderOptions<
   TUser,
+  TMetadata extends OAuthMetadataSource = OAuthMetadata,
 > extends OAuthResourceOptions {
   /** Creates a verifier bound to the resolved canonical MCP resource. */
   createTokenVerifier: (resource: URL) => OAuthTokenVerifier;
-  /** RFC 8414 metadata for the external authorization server. */
-  oauthMetadata: OAuthMetadata;
+  /**
+   * RFC 8414 metadata for the authorization server. Pass a function when the
+   * metadata depends on the canonical MCP resource, for example when the
+   * server is its own authorization server. The server calls the function
+   * once at mount time, with the resolved resource URL, and requires an
+   * `https` issuer (or `http` on localhost) in the result.
+   */
+  oauthMetadata: TMetadata;
   /** Maps verified SDK auth information into mcp-use callback identity data. */
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
   /**
@@ -178,13 +240,22 @@ export interface CustomOAuthProviderOptions<
   setup?: (host: OAuthProviderHost<TUser>) => void;
 }
 
-/** OAuth resource-server provider accepted by the mcp-use server constructor. */
-export type OAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
+/**
+ * OAuth resource-server provider accepted by the mcp-use server constructor.
+ *
+ * @typeParam TUser - Application user type exposed to authenticated callbacks.
+ * @typeParam TMetadata - Static metadata (the default), or a metadata function.
+ */
+export type OAuthProvider<
+  TUser,
+  TMetadata extends OAuthMetadataSource = OAuthMetadata,
+> = CustomOAuthProviderOptions<TUser, TMetadata>;
 
 /**
  * Creates an OAuth provider backed by an external authorization server.
  *
  * @typeParam TUser - Application user type exposed to authenticated callbacks.
+ * @typeParam TMetadata - Static metadata (the default), or a metadata function.
  * @param options - Token verification, discovery metadata, and identity mapping.
  * @returns A provider for an OAuth-enabled MCP server.
  * @throws A `TypeError` if provider metadata or resource settings are invalid.
@@ -204,9 +275,12 @@ export type OAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
  * });
  * ```
  */
-export function oauthCustomProvider<TUser>(
-  options: CustomOAuthProviderOptions<TUser>
-): OAuthProvider<TUser> {
+export function oauthCustomProvider<
+  TUser,
+  TMetadata extends OAuthMetadataSource = OAuthMetadata,
+>(
+  options: CustomOAuthProviderOptions<TUser, TMetadata>
+): OAuthProvider<TUser, TMetadata> {
   if (
     options === null ||
     typeof options !== "object" ||
@@ -222,7 +296,9 @@ export function oauthCustomProvider<TUser>(
     throw new TypeError("setup must be a function when provided");
   }
 
-  assertOAuthMetadata(options.oauthMetadata);
+  if (typeof options.oauthMetadata !== "function") {
+    assertOAuthMetadata(options.oauthMetadata);
+  }
   if (options.resource !== undefined) {
     assertResourceUrl(options.resource);
   }
@@ -245,7 +321,7 @@ export function oauthCustomProvider<TUser>(
     );
   }
 
-  const provider: OAuthProvider<TUser> = {
+  const provider: OAuthProvider<TUser, TMetadata> = {
     createTokenVerifier: options.createTokenVerifier,
     oauthMetadata: options.oauthMetadata,
     mapAuthInfo: options.mapAuthInfo,
@@ -265,23 +341,6 @@ export function oauthCustomProvider<TUser>(
     }),
   };
   return provider;
-}
-
-function assertOAuthMetadata(
-  metadata: unknown
-): asserts metadata is OAuthMetadata {
-  if (
-    metadata === null ||
-    typeof metadata !== "object" ||
-    !("issuer" in metadata) ||
-    typeof metadata.issuer !== "string"
-  ) {
-    throw new TypeError("oauthMetadata must include a string issuer");
-  }
-  assertSecureHttpUrl(
-    parseAbsoluteUrl(metadata.issuer, "oauthMetadata.issuer"),
-    "oauthMetadata.issuer"
-  );
 }
 
 function assertResourceUrl(resource: URL | string): void {

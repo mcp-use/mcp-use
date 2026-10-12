@@ -1,16 +1,22 @@
 import type {
   AuthInfo,
+  OAuthMetadata,
   OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
 
 import {
+  assertOAuthMetadata,
   assertSecureHttpUrl,
   isLocalhost,
   isRecord,
   parseAbsoluteUrl,
 } from "./guards.js";
 import { invalidToken } from "./errors.js";
-import type { OAuthExtra, OAuthProvider } from "./provider.js";
+import type {
+  OAuthExtra,
+  OAuthMetadataSource,
+  OAuthProvider,
+} from "./provider.js";
 
 export {
   assertSecureHttpUrl,
@@ -20,7 +26,7 @@ export {
 
 /** @internal Resolves configured resource identity, or undefined when none is configured. */
 export function resolveConfiguredOAuthResource<TUser>(options: {
-  provider: OAuthProvider<TUser>;
+  provider: OAuthProvider<TUser, OAuthMetadataSource>;
   basePath: string;
   mcpUrl?: string | URL;
 }): URL | undefined {
@@ -82,7 +88,7 @@ export function validateOAuthResource(
 
 /** @internal Wraps a provider verifier with mcp-use's verified auth mapping. */
 export function wrapOAuthTokenVerifier<TUser>(
-  provider: OAuthProvider<TUser>,
+  provider: OAuthProvider<TUser, OAuthMetadataSource>,
   expectedResource: URL
 ): OAuthTokenVerifier {
   const canonicalResource = normalizeResourceUrl(expectedResource);
@@ -166,11 +172,28 @@ function normalizeResourceUrl(resource: URL): URL {
   return normalized;
 }
 
+/**
+ * @internal Resolves a provider's authorization-server metadata for one
+ * canonical resource, and validates the issuer of computed metadata.
+ */
+export function resolveOAuthMetadata<TUser>(
+  provider: OAuthProvider<TUser, OAuthMetadataSource>,
+  resource: URL
+): OAuthMetadata {
+  const metadata = provider.oauthMetadata;
+  if (typeof metadata !== "function") {
+    return metadata;
+  }
+  const resolved = metadata(new URL(resource.href));
+  assertOAuthMetadata(resolved);
+  return resolved;
+}
+
 /** @internal Gets immutable provider metadata for Hono adapter wiring. */
 export function getOAuthProviderOptions<TUser>(
-  provider: OAuthProvider<TUser>
+  provider: OAuthProvider<TUser, OAuthMetadataSource>
 ): {
-  oauthMetadata: OAuthProvider<TUser>["oauthMetadata"];
+  oauthMetadata: OAuthMetadataSource;
   requiredScopes?: string[];
   scopesSupported?: string[];
   resourceName?: string;
