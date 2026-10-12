@@ -16,7 +16,9 @@ import type {
   MetaObject,
   ServerConfig,
   StandardSchemaWithJSON,
+  Tool,
 } from "../src/index.js";
+import { oauthCustomProvider, type OAuthMetadata } from "../src/oauth/index.js";
 
 const toolDefinitionMeta: MetaObject = {
   "example.com/tool": {
@@ -982,5 +984,152 @@ describe("MCPServer validation policy", () => {
     await expect(server.listen(0)).rejects.toThrow(
       "Cannot call listen() after the server has closed."
     );
+  });
+
+  it("server.listTools() returns the exact served tools/list items in-process and preserves middleware securitySchemes", async () => {
+    const oauth = oauthCustomProvider({
+      resource: "https://shop.example.test/mcp",
+      requiredScopes: ["read"],
+      createTokenVerifier: (boundResource) => ({
+        verifyAccessToken: async (token) => ({
+          token,
+          clientId: "client-1",
+          scopes: ["read"],
+          expiresAt: Date.now() / 1000 + 600,
+          resource: boundResource,
+        }),
+      }),
+      oauthMetadata: {
+        issuer: "https://issuer.example.test",
+      } as OAuthMetadata,
+      mapAuthInfo: () => ({
+        user: { id: "user-1" },
+        payload: {},
+        permissions: [],
+      }),
+    });
+
+    const server = new MCPServer({
+      name: "list-tools-test",
+      version: "1.0.0",
+      oauth,
+      mixedAuth: true,
+      logging: { enabled: false },
+    });
+
+    server.tool(
+      {
+        name: "union_tool",
+        description: "Discriminated union via schema alias",
+        schema: z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("a"), count: z.number() }),
+          z.object({ kind: z.literal("b"), label: z.string() }),
+        ]),
+        outputSchema: z.object({ ok: z.boolean() }),
+        visibility: "app",
+        _meta: {
+          ui: { resourceUri: "ui://views/should-be-stripped.html" },
+          "custom/tag": "priced",
+        },
+        securitySchemes: [{ type: "noauth" }],
+      },
+      async () => ({
+        content: [{ type: "text", text: "ok" }],
+        structuredContent: { ok: true },
+      })
+    );
+
+    server.tool({ name: "default_auth_tool" }, async () => ({
+      content: [{ type: "text", text: "authed" }],
+    }));
+
+    server.tool(
+      {
+        name: "stripped_schemes_tool",
+        securitySchemes: [{ type: "noauth" }],
+      },
+      async () => ({
+        content: [{ type: "text", text: "stripped" }],
+      })
+    );
+
+    let middlewareObserved: Tool[] = [];
+    server.use("mcp:tools/list", async (_ctx, next) => {
+      const tools = await next();
+      middlewareObserved = structuredClone(tools);
+      return tools.map((tool) => {
+        if (tool.name === "default_auth_tool") {
+          return { ...tool, description: "injected by middleware" };
+        }
+        if (tool.name === "stripped_schemes_tool") {
+          return {
+            ...tool,
+            securitySchemes: undefined,
+          } as Tool;
+        }
+        return tool;
+      });
+    });
+
+    const inProcessTools: Tool[] = await server.listTools();
+
+    const response = await server.fetch(toolsListRequest());
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { result: { tools: Tool[] } };
+
+    expect(inProcessTools).toStrictEqual(body.result.tools);
+    expect(inProcessTools).toHaveLength(3);
+    expect(inProcessTools[0]).toMatchObject({
+      name: "union_tool",
+      inputSchema: expect.objectContaining({
+        type: "object",
+        oneOf: expect.any(Array),
+      }),
+      outputSchema: expect.objectContaining({
+        type: "object",
+      }),
+      _meta: {
+        ui: { visibility: ["app"] },
+        "custom/tag": "priced",
+        securitySchemes: [{ type: "noauth" }],
+      },
+      securitySchemes: [{ type: "noauth" }],
+    });
+    expect(inProcessTools[0]?._meta?.ui).not.toHaveProperty("resourceUri");
+    expect(inProcessTools[1]).toMatchObject({
+      name: "default_auth_tool",
+      description: "injected by middleware",
+      inputSchema: { type: "object", properties: {} },
+      securitySchemes: [{ type: "oauth2", scopes: ["read"] }],
+    });
+    expect(middlewareObserved[1]).toMatchObject({
+      name: "default_auth_tool",
+      securitySchemes: [{ type: "oauth2", scopes: ["read"] }],
+    });
+    expect(middlewareObserved[2]).toMatchObject({
+      name: "stripped_schemes_tool",
+      securitySchemes: [{ type: "noauth" }],
+    });
+    expect(inProcessTools[2]).not.toHaveProperty("securitySchemes");
+
+    await server.close();
+    await expect(server.listTools()).rejects.toThrow(
+      "Cannot call listTools() after the server has closed."
+    );
+  });
+
+  it("server.listTools() before listen() does not block a localhost listen()", async () => {
+    const server = minimalServer();
+    const beforeListen = await server.listTools();
+    expect(beforeListen.map((t) => t.name)).toEqual(["ping"]);
+
+    const { url } = await server.listen(0);
+    try {
+      const afterListen = await server.listTools();
+      expect(afterListen).toStrictEqual(beforeListen);
+      expect(await rawStatus(url, {})).not.toBe(403);
+    } finally {
+      await server.close();
+    }
   });
 });

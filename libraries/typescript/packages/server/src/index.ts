@@ -154,6 +154,7 @@ export type {
   InferToolName,
   InferToolOutput,
   FileEntrypointInput,
+  Tool,
   ToolCallback,
   ToolDefinition,
   ToolRef,

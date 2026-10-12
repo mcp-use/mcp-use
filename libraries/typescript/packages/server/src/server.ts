@@ -116,6 +116,7 @@ import type {
   InferToolInput,
   InferToolName,
   InferToolOutput,
+  Tool,
   ToolCallback,
   ToolDefinition,
   ToolRef,
@@ -639,6 +640,44 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     return Object.freeze({
       name: definition.name,
     }) as ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>>;
+  }
+
+  /**
+   * Return the tool descriptors that `tools/list` serves to clients, after
+   * schema conversion, `_meta.ui` and `securitySchemes` resolution, and any
+   * `mcp:tools/list` middleware.
+   */
+  async listTools(): Promise<Tool[]> {
+    this.#assertOpen("listTools()");
+    await this.#ensureSkillsPrimed();
+    if (this.#oauthResource !== undefined) {
+      this.#runOAuthProviderSetup(this.#oauthResource, this.#basePath());
+    }
+    const sdkServer = this.#buildSdkServer({ era: "modern" });
+    const handler = (
+      sdkServer.server as unknown as {
+        _requestHandlers?: Map<
+          string,
+          (request: unknown, extra: unknown) => Promise<{ tools: Tool[] }>
+        >;
+      }
+    )._requestHandlers?.get("tools/list");
+    if (handler === undefined) {
+      return [];
+    }
+    const { tools } = await handler(
+      { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
+      {
+        mcpReq: {
+          id: 1,
+          method: "tools/list",
+          signal: new AbortController().signal,
+          requestState: () => undefined,
+          notify: async () => {},
+        },
+      }
+    );
+    return tools;
   }
 
   /**
@@ -2125,6 +2164,16 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         ? "resources"
         : "prompts";
 
+    const omitUndefined = <T extends object>(value: T): T => {
+      const normalized: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(value)) {
+        if (item !== undefined) {
+          normalized[key] = item;
+        }
+      }
+      return normalized as T;
+    };
+
     const wrapListMethod = <M extends ListMethod>(
       method: M,
       resultKey: ListResultKey<NoInfer<M>>,
@@ -2169,7 +2218,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
               `[mcp-use] ${method} handler result is missing a ${resultKey} array`
             );
           }
-          return items as McpMiddlewareResult<M>;
+          const typed = items as McpMiddlewareResult<M>;
+          return transform?.(typed) ?? typed;
         };
         const filtered = await this.#runMcpHook(method, mwCtx, innerFn);
         if (!Array.isArray(filtered)) {
@@ -2177,7 +2227,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             `[mcp-use] ${method} middleware must return a ${resultKey} array`
           );
         }
-        const emitted = transform?.(filtered) ?? filtered;
+        const emitted =
+          transform !== undefined
+            ? (filtered.map((item) =>
+                omitUndefined(item as object)
+              ) as McpMiddlewareResult<M>)
+            : filtered;
         return {
           ...originalEnvelope,
           [resultKey]: emitted,
@@ -2194,13 +2249,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     wrapListMethod("tools/list", "tools", (tools) =>
       tools.map((tool) => {
         const entry = this.#tools.get(tool.name);
-        const schemes =
-          entry !== undefined && this.#generatesSecuritySchemes(entry)
-            ? entry.schemes
-            : undefined;
-        return schemes === undefined
-          ? tool
-          : ({ ...tool, securitySchemes: schemes } as typeof tool);
+        const normalized = omitUndefined(tool);
+        if (entry !== undefined && this.#generatesSecuritySchemes(entry)) {
+          (
+            normalized as { securitySchemes?: readonly ToolSecurityScheme[] }
+          ).securitySchemes = entry.schemes;
+        }
+        return normalized;
       })
     );
     wrapListMethod("resources/list", "resources");
