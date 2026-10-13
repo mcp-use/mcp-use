@@ -351,7 +351,6 @@ export class ProxyRuntime {
         verified: client.source !== "dcr",
       },
       redirectHost: redirectHost(redirectUri),
-      isNative: !redirectUri.startsWith("https:"),
       upstream: upstream.name,
       scopes: upstream.kind === "redirect" ? [...upstream.scopes] : [],
       serverHost: this.config.serverHost,

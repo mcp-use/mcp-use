@@ -1164,8 +1164,10 @@ describe("oauthProxy with emulated GitHub", () => {
       })}`
     );
     expect(consent.status).toBe(200);
-    // Any local app can claim a custom scheme, so the page warns.
-    expect(await consent.text()).toContain("This app runs on your computer");
+    // The page names where the sign-in returns to.
+    expect(await consent.text()).toContain(
+      "you return to <b>anysphere.cursor-mcp</b>"
+    );
   });
 
   it("narrows requested scopes instead of failing the sign-in", async () => {
@@ -2218,6 +2220,6 @@ describe("oauthProxy production guards", () => {
     expect(cookie).toContain("Secure");
     expect(cookie).toContain("HttpOnly");
     const html = await response.text();
-    expect(html).toContain("This app runs on your computer");
+    expect(html).toContain("you return to <b>127.0.0.1:7777</b>");
   });
 });

@@ -47,13 +47,6 @@ export interface ConsentPageProps {
   };
   /** Host (or custom scheme) that the browser returns to after sign-in. */
   redirectHost: string;
-  /**
-   * Whether the redirect goes to the user's device: a loopback address or a
-   * custom URL scheme such as `cursor://`. Any local program can listen
-   * there, so the page should warn the user to approve only a sign-in they
-   * started.
-   */
-  isNative: boolean;
   /** Name of the upstream identity provider, for example `GitHub`. */
   upstream: string;
   /** Scopes that the server requests from the upstream provider. */
@@ -125,9 +118,6 @@ export function renderDefaultConsentPage(props: ConsentPageProps): string {
       ? `<p class="meta">Published at <b>${escapeHtml(props.client.host)}</b></p>`
       : ""
     : `<p class="meta warn">Unverified: the app named itself.</p>`;
-  const loopback = props.isNative
-    ? `<p class="note">This app runs on your computer. Approve only if you started this sign-in just now.</p>`
-    : "";
   const scopes =
     props.scopes.length === 0
       ? ""
@@ -140,8 +130,7 @@ export function renderDefaultConsentPage(props: ConsentPageProps): string {
     `<h1>Allow <span>${escapeHtml(clientName)}</span> to connect to ${escapeHtml(target)}?</h1>
 ${who}
 <p>You will sign in with ${escapeHtml(props.upstream)}. The app can then use ${escapeHtml(target)} as you. The app never sees your ${escapeHtml(props.upstream)} credentials.</p>
-<p class="meta">After sign-in, you return to <b>${escapeHtml(props.redirectHost)}</b>.</p>
-${loopback}
+<p>After sign-in, you return to <b>${escapeHtml(props.redirectHost)}</b>.</p>
 ${scopes}
 <form method="post" action="${escapeHtml(props.form.action)}">
   <input type="hidden" name="csrf" value="${escapeHtml(props.form.csrf)}">
@@ -225,8 +214,7 @@ h1{font-size:20px;line-height:1.3;margin:0 0 12px;text-wrap:balance}
 h1 span{overflow-wrap:anywhere}
 p{margin:0 0 12px}
 .meta{color:var(--muted);font-size:13px}
-.warn,.note{color:var(--warn)}
-.note{font-size:13px;border-left:3px solid var(--warn);padding-left:10px}
+.warn{color:var(--warn)}
 .label{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:16px}
 ul{margin:0 0 16px;padding-left:18px}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
