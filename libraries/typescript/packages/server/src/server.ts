@@ -2258,7 +2258,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         const normalized: Record<string, unknown> = {};
         for (const [key, item] of Object.entries(value)) {
           if (item !== undefined) {
-            normalized[key] = omitUndefined(item);
+            Object.defineProperty(normalized, key, {
+              value: omitUndefined(item),
+              enumerable: true,
+              configurable: true,
+              writable: true,
+            });
           }
         }
         return normalized as T;

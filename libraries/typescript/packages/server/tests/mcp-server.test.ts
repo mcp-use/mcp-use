@@ -1059,9 +1059,20 @@ describe("MCPServer validation policy", () => {
       middlewareObserved = structuredClone(tools);
       return tools.map((tool) => {
         if (tool.name === "default_auth_tool") {
+          const propsWithProto: Record<string, unknown> = {};
+          Object.defineProperty(propsWithProto, "__proto__", {
+            value: { type: "string", omitted: undefined },
+            enumerable: true,
+            configurable: true,
+            writable: true,
+          });
           return {
             ...tool,
             description: "injected by middleware",
+            inputSchema: {
+              ...tool.inputSchema,
+              properties: propsWithProto,
+            },
             _meta: {
               ...tool._meta,
               nested: {
@@ -1110,7 +1121,6 @@ describe("MCPServer validation policy", () => {
     expect(inProcessTools[1]).toMatchObject({
       name: "default_auth_tool",
       description: "injected by middleware",
-      inputSchema: { type: "object", properties: {} },
       _meta: {
         nested: {
           kept: "yes",
@@ -1119,6 +1129,12 @@ describe("MCPServer validation policy", () => {
       },
       securitySchemes: [{ type: "oauth2", scopes: ["read"] }],
     });
+    expect(
+      Object.getOwnPropertyDescriptor(
+        inProcessTools[1]?.inputSchema?.properties ?? {},
+        "__proto__"
+      )?.value
+    ).toStrictEqual({ type: "string" });
     expect(
       (inProcessTools[1]?._meta?.["nested"] as Record<string, unknown>) ?? {}
     ).not.toHaveProperty("omitted");
