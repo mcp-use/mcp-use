@@ -1059,7 +1059,18 @@ describe("MCPServer validation policy", () => {
       middlewareObserved = structuredClone(tools);
       return tools.map((tool) => {
         if (tool.name === "default_auth_tool") {
-          return { ...tool, description: "injected by middleware" };
+          return {
+            ...tool,
+            description: "injected by middleware",
+            _meta: {
+              ...tool._meta,
+              nested: {
+                kept: "yes",
+                omitted: undefined,
+                items: [{ a: 1, b: undefined }],
+              },
+            },
+          } as Tool;
         }
         if (tool.name === "stripped_schemes_tool") {
           return {
@@ -1100,8 +1111,17 @@ describe("MCPServer validation policy", () => {
       name: "default_auth_tool",
       description: "injected by middleware",
       inputSchema: { type: "object", properties: {} },
+      _meta: {
+        nested: {
+          kept: "yes",
+          items: [{ a: 1 }],
+        },
+      },
       securitySchemes: [{ type: "oauth2", scopes: ["read"] }],
     });
+    expect(
+      (inProcessTools[1]?._meta?.["nested"] as Record<string, unknown>) ?? {}
+    ).not.toHaveProperty("omitted");
     expect(middlewareObserved[1]).toMatchObject({
       name: "default_auth_tool",
       securitySchemes: [{ type: "oauth2", scopes: ["read"] }],
@@ -1116,6 +1136,84 @@ describe("MCPServer validation policy", () => {
     await expect(server.listTools()).rejects.toThrow(
       "Cannot call listTools() after the server has closed."
     );
+  });
+
+  it("server.listTools() runs OAuth provider setup before first mount, resolves local public icons with origin, and forwards middleware context", async () => {
+    const oauth = oauthCustomProvider({
+      requiredScopes: ["read"],
+      createTokenVerifier: (boundResource) => ({
+        verifyAccessToken: async (token) => ({
+          token,
+          clientId: "client-1",
+          scopes: ["read"],
+          expiresAt: Date.now() / 1000 + 600,
+          resource: boundResource,
+        }),
+      }),
+      oauthMetadata: {
+        issuer: "https://issuer.example.test",
+      } as OAuthMetadata,
+      mapAuthInfo: () => ({
+        user: { id: "user-1" },
+        payload: {},
+        permissions: [],
+      }),
+      setup(host) {
+        host.tool(
+          {
+            name: "provider_tool",
+            securitySchemes: [{ type: "noauth" }],
+          },
+          async () => ({ content: [{ type: "text", text: "from-provider" }] })
+        );
+      },
+    });
+
+    const server = new MCPServer({
+      name: "list-tools-options-test",
+      version: "1.0.0",
+      oauth,
+      mixedAuth: true,
+      logging: { enabled: false },
+    });
+
+    server.tool(
+      {
+        name: "icon_tool",
+        icons: [{ src: "icons/tool icon.svg", mimeType: "image/svg+xml" }],
+        securitySchemes: [{ type: "noauth" }],
+      },
+      async () => ({ content: [] })
+    );
+
+    let capturedSessionId: string | undefined;
+    let capturedClientId: string | undefined;
+    server.use("mcp:tools/list", async (ctx, next) => {
+      capturedSessionId = ctx.session?.sessionId;
+      capturedClientId = ctx.auth?.clientId;
+      return next();
+    });
+
+    const beforeMount = await server.listTools({
+      origin: "https://shop.example.test",
+      sessionId: "sess-123",
+      authInfo: {
+        token: "tok-1",
+        clientId: "client-xyz",
+        scopes: ["read"],
+      },
+    });
+    expect(beforeMount.map((t) => t.name)).toEqual([
+      "icon_tool",
+      "provider_tool",
+    ]);
+    expect(beforeMount[0]?.icons?.[0]?.src).toBe(
+      "https://shop.example.test/mcp/_mcp-use/public/icons/tool%20icon.svg"
+    );
+    expect(capturedSessionId).toBe("sess-123");
+    expect(capturedClientId).toBe("client-xyz");
+
+    await server.close();
   });
 
   it("server.listTools() before listen() does not block a localhost listen()", async () => {

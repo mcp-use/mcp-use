@@ -6,7 +6,7 @@
  */
 
 export { MCPServer } from "./server.js";
-export type { ListenOptions } from "./server.js";
+export type { ListenOptions, ListToolsOptions } from "./server.js";
 export { createMcpMount } from "./mount-mcp.js";
 export type { MountMcpOptions, McpMount } from "./mount-mcp.js";
 export {
