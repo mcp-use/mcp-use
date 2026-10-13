@@ -317,6 +317,11 @@ async function buildView(
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();
   loadProjectEnv(options.cwd, "production");
+  // Vite's dev server, which evaluates the entry below, sets NODE_ENV to
+  // development when it is unset, and every later build in this process
+  // would then bundle React's development build: views would ship it, and
+  // server JSX would call `jsxDEV`, which production React leaves undefined.
+  process.env["NODE_ENV"] ??= "production";
   const sourceRoot =
     options.mcpDir === undefined
       ? options.cwd

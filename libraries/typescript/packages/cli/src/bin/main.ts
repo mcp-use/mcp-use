@@ -354,8 +354,22 @@ async function cliCommand(
   }
 }
 
+/**
+ * An error's message. Node reports a refused connection as an AggregateError
+ * with an empty message and one inner error per address tried, so an empty
+ * message falls back to the inner errors.
+ */
+function errorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  if (error.message !== "") return error.message;
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    return error.errors.map(errorMessage).join("; ");
+  }
+  return String(error);
+}
+
 function formatRuntimeError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   if (/tunnel/i.test(message)) {
     return [
       "[tunnel_connection_timeout] Public tunnel could not establish a connection.",
