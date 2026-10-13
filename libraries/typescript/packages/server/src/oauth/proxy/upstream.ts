@@ -1,4 +1,6 @@
 import { isLocalhost, isRecord } from "../guards.js";
+import { isBuilding } from "../../build-phase.js";
+import type { ConsentPageProps } from "./consent.js";
 
 /** Tokens that an upstream identity provider issued for one user. */
 export interface UpstreamTokenSet {
@@ -85,53 +87,159 @@ export interface RedirectUpstream {
   ): Promise<UpstreamUser>;
 }
 
-/** Values handed to the page of an {@link InPageUpstream}. */
-export interface InPageProps {
-  /** The client that asks for access. */
-  client: { id: string; name?: string; host?: string };
+/**
+ * Values handed to the consent page when the upstream is an
+ * {@link InPageUpstream} such as `firebase()`: the {@link ConsentPageProps}
+ * plus a script nonce and whether the user is asked to consent.
+ *
+ * The proxy adds the upstream's script to the page, so the page needs no
+ * script of its own. The script signs the user in when they click a submit
+ * button named `decision` with the value `allow`, and then submits the form
+ * with the proof. A custom `consent.page` is typed with
+ * {@link ConsentPageProps}; read these extra fields with
+ * `"consent" in props`.
+ */
+export interface InPageProps extends ConsentPageProps {
   /**
-   * Form to post the sign-in proof to. Post the proof as the `proof` field,
-   * and the `csrf` value as the `csrf` field.
+   * Nonce that the page's Content Security Policy allows. Put it on any
+   * inline `<script>` of a custom page; scripts without it do not run.
    */
-  form: { action: string; csrf: string };
+  nonce: string;
+  /**
+   * Whether the page asks the user to approve the client. `false` when the
+   * consent step was skipped (`consent: false`, or a remembered approval):
+   * the page shows only the sign-in button, because the provider's sign-in
+   * window opens only on a click.
+   */
+  consent: boolean;
 }
 
 /**
  * An identity provider without OAuth endpoints, such as Firebase Auth. The
- * proxy serves a page that signs the user in with the provider's browser SDK
- * and posts a proof (for example an ID token) back for `verify`.
+ * proxy shows its consent page with the upstream's script added. When the
+ * user clicks Allow, the script signs them in with the provider's browser
+ * SDK and posts a proof (for example an ID token) with the decision, and the
+ * proxy checks it with `verify` on the server.
  *
- * The type is public so that presets can target it. `oauthProxy` does not
- * accept in-page upstreams yet.
+ * Use {@link firebase} to create one.
  */
 export interface InPageUpstream {
   /** Discriminator for an in-page upstream. */
   kind: "in-page";
-  /** Short identifier for the provider, used in storage keys. */
+  /** Short identifier for the provider, used in storage keys, for example `firebase`. */
   id: string;
-  /** Provider name shown to the user. */
+  /** Provider name shown on the consent page, for example `Firebase`. */
   name: string;
   /**
-   * React component for the sign-in page. It signs in with the provider and
-   * posts the proof to `props.form.action`.
-   */
-  page: (props: InPageProps) => unknown;
-  /**
-   * Verifies the posted proof.
+   * Returns the HTML that the proxy adds at the end of the consent page's
+   * body: `<script>` elements that carry `nonce`. The script posts the proof
+   * as the `proof` form field.
    *
-   * @param proof - The proof the page posted.
+   * @param nonce - Nonce that the page's Content Security Policy allows.
+   * @returns One or more `<script>` elements.
+   */
+  script(nonce: string): string;
+  /**
+   * Origins the script needs, added to the consent page's Content Security
+   * Policy. Each entry is one CSP source, for example
+   * `https://www.gstatic.com`.
+   */
+  csp?: {
+    /** Origins the page loads scripts from (`script-src`). */
+    script?: readonly string[];
+    /** Origins the page sends requests to (`connect-src`). */
+    connect?: readonly string[];
+    /** Origins the page embeds in frames (`frame-src`). */
+    frame?: readonly string[];
+  };
+  /**
+   * Whether the upstream accepts proofs from a local emulator that are not
+   * signed. `oauthProxy` then refuses to run unless the MCP server is on
+   * localhost.
+   */
+  emulator?: boolean;
+  /**
+   * Checks the proof that the page posted.
+   *
+   * Throw to refuse the sign-in. The error message goes to the server log,
+   * so it must not contain the proof.
+   *
+   * @param proof - The `proof` form field, as the page posted it. It comes
+   * from the browser, so treat it as untrusted input.
+   * @param context - Request settings of the proxy.
    * @returns The signed-in user, and tokens when the provider issues them.
+   * Without tokens, tools get no upstream token.
    */
   verify(
-    proof: unknown
-  ): Promise<{ user: UpstreamUser; tokens?: UpstreamTokenSet }>;
+    proof: string,
+    context: {
+      /** Fetch implementation to use for requests, from the `fetch` option of `oauthProxy`. */
+      fetch: typeof globalThis.fetch;
+    }
+  ): Promise<{
+    /** The signed-in user. */
+    user: UpstreamUser;
+    /** The user's tokens at the provider, when it issues them. */
+    tokens?: UpstreamTokenSet;
+  }>;
   /**
-   * Refreshes upstream tokens.
+   * Refreshes upstream tokens on the server before they expire. Without it,
+   * the user's sign-ins end when the tokens from `verify` expire.
    *
-   * @param tokens - Current tokens.
-   * @returns New tokens.
+   * Throw an {@link UpstreamRefreshError} with `revoked: true` when the
+   * provider refuses the refresh token for good: the proxy then ends every
+   * grant of the user. Any other error counts as temporary.
+   *
+   * @param tokens - Current tokens of the user.
+   * @param context - Request settings of the proxy.
+   * @returns New tokens. A missing `refreshToken` keeps the current one.
    */
-  refresh?(tokens: UpstreamTokenSet): Promise<UpstreamTokenSet>;
+  refresh?(
+    tokens: UpstreamTokenSet,
+    context: {
+      /** Fetch implementation to use for requests, from the `fetch` option of `oauthProxy`. */
+      fetch: typeof globalThis.fetch;
+    }
+  ): Promise<UpstreamTokenSet>;
+}
+
+/**
+ * Error that {@link InPageUpstream.refresh} throws when the provider refuses
+ * a refresh. With `revoked: true`, the proxy ends every grant of the user,
+ * who must sign in again. Otherwise the proxy treats the failure as
+ * temporary and keeps the grants.
+ */
+export class UpstreamRefreshError extends Error {
+  /**
+   * The provider's error code, for example Firebase's `TOKEN_EXPIRED`. It
+   * goes to the server log.
+   */
+  readonly code: string;
+  /** Whether the provider refused the refresh token for good. */
+  readonly revoked: boolean;
+
+  /**
+   * @param code - The provider's error code.
+   * @param options - Whether the refresh token is revoked, and the
+   * underlying error.
+   */
+  constructor(
+    code: string,
+    options: {
+      /** Whether the provider refused the refresh token for good. */
+      revoked: boolean;
+      /** The underlying error. */
+      cause?: unknown;
+    }
+  ) {
+    super(
+      `Upstream refresh failed: ${printable(code, 64)}`,
+      options.cause === undefined ? undefined : { cause: options.cause }
+    );
+    this.name = "UpstreamRefreshError";
+    this.code = code;
+    this.revoked = options.revoked;
+  }
 }
 
 /** Identity provider behind an OAuth proxy. */
@@ -184,7 +292,12 @@ export function assertRedirectUpstream(value: RedirectUpstream): void {
   if (value === null || typeof value !== "object") {
     throw new TypeError("oauthProxy upstream must be an object");
   }
-  for (const field of ["id", "name", "clientId", "clientSecret"] as const) {
+  // `mcp-use build` runs the entry without serving requests, so it needs no
+  // client credentials.
+  const fields = isBuilding()
+    ? (["id", "name"] as const)
+    : (["id", "name", "clientId", "clientSecret"] as const);
+  for (const field of fields) {
     if (typeof value[field] !== "string" || value[field].length === 0) {
       throw new TypeError(
         `oauthProxy upstream.${field} must be a non-empty string`
@@ -214,6 +327,58 @@ export function assertRedirectUpstream(value: RedirectUpstream): void {
   }
 }
 
+/** @internal Validates an in-page upstream. */
+export function assertInPageUpstream(value: InPageUpstream): void {
+  if (value === null || typeof value !== "object") {
+    throw new TypeError("oauthProxy upstream must be an object");
+  }
+  for (const field of ["id", "name"] as const) {
+    if (typeof value[field] !== "string" || value[field].length === 0) {
+      throw new TypeError(
+        `oauthProxy upstream.${field} must be a non-empty string`
+      );
+    }
+  }
+  if (!/^[a-z0-9-]+$/.test(value.id)) {
+    throw new TypeError(
+      "oauthProxy upstream.id must contain only lowercase letters, digits, and hyphens"
+    );
+  }
+  if (typeof value.script !== "function") {
+    throw new TypeError("oauthProxy upstream.script must be a function");
+  }
+  if (typeof value.verify !== "function") {
+    throw new TypeError("oauthProxy upstream.verify must be a function");
+  }
+  if (value.refresh !== undefined && typeof value.refresh !== "function") {
+    throw new TypeError("oauthProxy upstream.refresh must be a function");
+  }
+  if (value.emulator !== undefined && typeof value.emulator !== "boolean") {
+    throw new TypeError("oauthProxy upstream.emulator must be a boolean");
+  }
+  if (value.csp !== undefined) {
+    if (value.csp === null || typeof value.csp !== "object") {
+      throw new TypeError("oauthProxy upstream.csp must be an object");
+    }
+    for (const field of ["script", "connect", "frame"] as const) {
+      const sources = value.csp[field];
+      if (sources === undefined) continue;
+      // A source with a space, `;`, or `,` would add directives or sources
+      // to the page's policy.
+      if (
+        !Array.isArray(sources) ||
+        !sources.every(
+          (source) => typeof source === "string" && /^[^\s;,'"]+$/.test(source)
+        )
+      ) {
+        throw new TypeError(
+          `oauthProxy upstream.csp.${field} must be an array of CSP host sources`
+        );
+      }
+    }
+  }
+}
+
 function assertEndpoint(value: unknown, name: string): void {
   let url: URL;
   try {
@@ -237,30 +402,60 @@ function assertEndpoint(value: unknown, name: string): void {
   }
 }
 
-/** @internal Failure of an upstream token request. */
+/**
+ * @internal Failure of an upstream callback or token request. Its message
+ * and `detail` are safe to log: they never hold token, code, or body values.
+ */
 export class UpstreamError extends Error {
-  /** OAuth error code, for example `invalid_grant`. */
+  /** RFC 6749 error code, for example `invalid_grant`. */
   readonly code: string;
   /** Whether a retry can succeed (network errors, 5xx responses). */
   readonly transient: boolean;
+  /** The provider's own error code, for example GitHub's `bad_verification_code`. */
+  readonly upstreamCode: string | undefined;
+  /** The provider's `error_description`, cleaned for logs. */
+  readonly description: string | undefined;
+  /** Diagnostics for logs, such as the HTTP status and content type. */
+  readonly detail: string | undefined;
 
   /**
-   * @param code - OAuth error code.
+   * @param code - RFC 6749 error code.
    * @param message - Human-readable message.
    * @param transient - Whether a retry can succeed.
-   * @param cause - Underlying error.
+   * @param options - Underlying error and diagnostics.
    */
   constructor(
     code: string,
     message: string,
     transient: boolean,
-    cause?: unknown
+    options: {
+      cause?: unknown;
+      upstreamCode?: string;
+      description?: string;
+      detail?: string;
+    } = {}
   ) {
-    super(message, cause === undefined ? undefined : { cause });
+    super(
+      message,
+      options.cause === undefined ? undefined : { cause: options.cause }
+    );
     this.name = "UpstreamError";
     this.code = code;
     this.transient = transient;
+    this.upstreamCode = options.upstreamCode;
+    this.description = options.description;
+    this.detail = options.detail;
   }
+}
+
+/**
+ * @internal Makes a value from a provider or a browser safe to log: no
+ * control characters, at most `max` characters.
+ */
+export function printable(value: string, max = 200): string {
+  // eslint-disable-next-line no-control-regex -- control characters are what it removes
+  const flat = value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ");
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 }
 
 /** GitHub token errors and their RFC 6749 equivalents. */
@@ -272,10 +467,15 @@ const PROVIDER_ERROR_CODES: Record<string, string> = {
   unverified_user_email: "access_denied",
 };
 
+/** Body field that keeps the provider's own code after a rewrite. */
+const UPSTREAM_CODE_FIELD = "mcp_use_upstream_error";
+/** Header that keeps the provider's HTTP status after a rewrite. */
+const UPSTREAM_STATUS_HEADER = "x-mcp-use-upstream-status";
+
 /**
  * Some providers (GitHub) answer token errors with HTTP 200. Rewrite those
  * to the RFC 6749 shape (HTTP 400, standard code) before oauth4webapi reads
- * them.
+ * them, keeping the original code and status for logs.
  */
 function normalizingFetch(
   base: typeof globalThis.fetch
@@ -301,10 +501,20 @@ function normalizingFetch(
       return response;
     }
     const code = PROVIDER_ERROR_CODES[body["error"]] ?? body["error"];
-    return new Response(JSON.stringify({ ...body, error: code }), {
-      status: 400,
-      headers: { "content-type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        ...body,
+        error: code,
+        [UPSTREAM_CODE_FIELD]: body["error"],
+      }),
+      {
+        status: 400,
+        headers: {
+          "content-type": "application/json",
+          [UPSTREAM_STATUS_HEADER]: String(response.status),
+        },
+      }
+    );
   };
 }
 
@@ -358,13 +568,18 @@ export async function exchangeUpstreamCode(
     provider,
     fetchImpl
   );
-  return runTokenRequest(oauth, provider, async () => {
-    const params = oauth.validateAuthResponse(
+  let params: URLSearchParams;
+  try {
+    params = oauth.validateAuthResponse(
       as,
       client,
       input.callbackParams,
       oauth.skipStateCheck
     );
+  } catch (error) {
+    throw callbackError(oauth, provider, error);
+  }
+  return runTokenRequest(oauth, provider, async () => {
     const response = await oauth.authorizationCodeGrantRequest(
       as,
       client,
@@ -400,6 +615,52 @@ export async function refreshUpstreamTokens(
   });
 }
 
+/**
+ * Describes a callback that failed validation, such as one whose `iss` names
+ * another issuer. The callback parameters hold the authorization code, so
+ * only `iss` is read from them.
+ */
+function callbackError(
+  oauth: typeof import("oauth4webapi"),
+  provider: RedirectUpstream,
+  error: unknown
+): UpstreamError {
+  if (error instanceof oauth.AuthorizationResponseError) {
+    const code = printable(error.error, 64);
+    return new UpstreamError(
+      "server_error",
+      `${provider.name} returned ${code} to the callback`,
+      false,
+      {
+        cause: error,
+        upstreamCode: code,
+        ...(error.error_description !== undefined && {
+          description: printable(error.error_description),
+        }),
+      }
+    );
+  }
+  const facts: string[] = [];
+  if (error instanceof oauth.OperationProcessingError) {
+    const cause: unknown = error.cause;
+    if (isRecord(cause) && typeof cause["expected"] === "string") {
+      facts.push(`expected ${JSON.stringify(cause["expected"])}`);
+      const parameters = cause["parameters"];
+      if (parameters instanceof URLSearchParams && parameters.has("iss")) {
+        facts.push(
+          `got ${JSON.stringify(printable(parameters.get("iss") ?? ""))}`
+        );
+      }
+    }
+  }
+  return new UpstreamError(
+    "server_error",
+    `${provider.name} callback failed validation: ${errorText(error)}`,
+    false,
+    { cause: error, ...(facts.length > 0 && { detail: facts.join(", ") }) }
+  );
+}
+
 async function runTokenRequest(
   oauth: typeof import("oauth4webapi"),
   provider: RedirectUpstream,
@@ -409,36 +670,7 @@ async function runTokenRequest(
   try {
     response = await request();
   } catch (error) {
-    if (error instanceof oauth.ResponseBodyError) {
-      return Promise.reject(
-        new UpstreamError(
-          error.error,
-          `${provider.name} token endpoint returned ${error.error}`,
-          error.status >= 500,
-          error
-        )
-      );
-    }
-    if (error instanceof oauth.OperationProcessingError) {
-      const status =
-        error.cause instanceof Response ? error.cause.status : undefined;
-      return Promise.reject(
-        new UpstreamError(
-          "server_error",
-          `${provider.name} token endpoint returned an invalid response`,
-          status === undefined || status >= 500,
-          error
-        )
-      );
-    }
-    return Promise.reject(
-      new UpstreamError(
-        "temporarily_unavailable",
-        `${provider.name} token endpoint is unreachable`,
-        true,
-        error
-      )
-    );
+    return Promise.reject(tokenRequestError(oauth, provider, error));
   }
   return {
     accessToken: response.access_token,
@@ -454,4 +686,122 @@ async function runTokenRequest(
         : [...provider.scopes],
     ...(response.id_token !== undefined && { idToken: response.id_token }),
   };
+}
+
+/**
+ * Describes a failed token request for logs. Token responses and their
+ * causes can hold tokens, so only status, content type, codes, and field
+ * names are read from them.
+ */
+function tokenRequestError(
+  oauth: typeof import("oauth4webapi"),
+  provider: RedirectUpstream,
+  error: unknown
+): UpstreamError {
+  const endpoint = `${provider.name} token endpoint`;
+  if (error instanceof oauth.ResponseBodyError) {
+    const body: unknown = error.cause;
+    const original = isRecord(body) ? body[UPSTREAM_CODE_FIELD] : undefined;
+    const upstreamCode = printable(
+      typeof original === "string" ? original : error.error,
+      64
+    );
+    const status =
+      Number(error.response.headers.get(UPSTREAM_STATUS_HEADER)) ||
+      error.status;
+    const description =
+      error.error_description === undefined
+        ? undefined
+        : printable(error.error_description);
+    return new UpstreamError(
+      error.error,
+      `${endpoint} returned ${upstreamCode}${
+        description === undefined ? "" : `: ${description}`
+      }`,
+      status >= 500,
+      {
+        cause: error,
+        upstreamCode,
+        ...(description !== undefined && { description }),
+        detail: `HTTP ${status}`,
+      }
+    );
+  }
+  if (error instanceof oauth.WWWAuthenticateChallengeError) {
+    // A 401 with a challenge: the provider refused the client credentials.
+    const schemes = error.cause.map((challenge) => challenge.scheme);
+    return new UpstreamError(
+      "invalid_client",
+      `${endpoint} refused the client credentials`,
+      error.status >= 500,
+      {
+        cause: error,
+        detail: `HTTP ${error.status}, WWW-Authenticate ${schemes.join(", ")}`,
+      }
+    );
+  }
+  if (error instanceof oauth.OperationProcessingError) {
+    const cause: unknown = error.cause;
+    const facts: string[] = [];
+    let status: number | undefined;
+    if (cause instanceof Response) {
+      status = cause.status;
+      facts.push(
+        `HTTP ${status}`,
+        `content-type ${cause.headers.get("content-type") ?? "none"}`
+      );
+    } else if (isRecord(cause) && isRecord(cause["body"])) {
+      const fields = Object.keys(cause["body"]);
+      facts.push(`fields ${fields.length > 0 ? fields.join(", ") : "none"}`);
+    }
+    if (error.code !== undefined) facts.push(error.code);
+    return new UpstreamError(
+      "server_error",
+      `${endpoint} returned an unusable response: ${error.message}`,
+      status !== undefined && status >= 500,
+      { cause: error, detail: facts.join(", ") }
+    );
+  }
+  if (
+    error instanceof Error &&
+    (error.name === "TimeoutError" || error.name === "AbortError")
+  ) {
+    return new UpstreamError(
+      "temporarily_unavailable",
+      `${endpoint} did not answer in time`,
+      true,
+      { cause: error }
+    );
+  }
+  // fetch() rejects with a TypeError whose cause names the network failure
+  // (ECONNREFUSED, ENOTFOUND, CERT_HAS_EXPIRED…). oauth4webapi's own
+  // TypeErrors carry a code of their own.
+  if (error instanceof TypeError && !("code" in error)) {
+    const cause: unknown = error.cause;
+    const reason =
+      isRecord(cause) && typeof cause["code"] === "string"
+        ? cause["code"]
+        : cause instanceof Error
+          ? cause.message
+          : error.message;
+    return new UpstreamError(
+      "temporarily_unavailable",
+      `${endpoint} is unreachable: ${printable(reason)}`,
+      true,
+      { cause: error }
+    );
+  }
+  return new UpstreamError(
+    "server_error",
+    `${endpoint} request failed: ${errorText(error)}`,
+    false,
+    { cause: error }
+  );
+}
+
+function errorText(error: unknown): string {
+  if (!(error instanceof Error)) return printable(String(error));
+  const code =
+    "code" in error && typeof error.code === "string" ? ` [${error.code}]` : "";
+  return printable(`${error.name}: ${error.message}${code}`);
 }

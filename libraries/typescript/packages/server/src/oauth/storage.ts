@@ -7,6 +7,8 @@
  *
  * @packageDocumentation
  */
+import { isBuilding } from "../build-phase.js";
+import { isRecord } from "./guards.js";
 import type { OAuthProxyStorage } from "./proxy/storage.js";
 
 export { memoryStorage, type OAuthProxyStorage } from "./proxy/storage.js";
@@ -25,7 +27,9 @@ export interface UpstashStorageOptions {
 
 /**
  * Creates a store on Upstash Redis over its REST API. It needs only `fetch`,
- * so it runs on Node, Vercel, and Cloudflare Workers alike.
+ * so it runs on Node, Vercel, and Cloudflare Workers alike. Inside
+ * `mcp-use build` (see `isBuilding()` in `mcp-use`), the URL and token may be
+ * missing.
  *
  * @param options - REST URL and token of the database.
  * @returns A store for `oauthProxy`.
@@ -33,10 +37,15 @@ export interface UpstashStorageOptions {
 export function upstashStorage(
   options: UpstashStorageOptions
 ): OAuthProxyStorage {
-  if (typeof options?.url !== "string" || typeof options.token !== "string") {
+  // `mcp-use build` runs the entry without serving requests, so it needs no
+  // credentials. Outside a build, a missing URL or token fails here.
+  if (
+    (typeof options?.url !== "string" || typeof options.token !== "string") &&
+    !isBuilding()
+  ) {
     throw new TypeError("upstashStorage requires url and token");
   }
-  const url = options.url.replace(/\/+$/, "");
+  const url = String(options?.url).replace(/\/+$/, "");
   const fetchImpl =
     options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const command = async (args: (string | number)[]): Promise<unknown> => {
@@ -77,10 +86,18 @@ export interface IORedisLikeClient {
 }
 
 /**
- * Creates a store on Redis (6.2 or later) through an existing node-redis or
- * ioredis client.
+ * Creates a store on Redis (6.2 or later) through a node-redis or ioredis
+ * client.
  *
- * @param client - A connected node-redis or ioredis client.
+ * Pass a connected client, or a function that connects one. The function
+ * runs on the first storage call, which keeps importing the server free of
+ * network calls: `mcp-use build` and serverless cold starts do not wait on
+ * Redis. Concurrent first calls share one connection attempt, and a failed
+ * attempt is retried on the next call. With a function, a wrong URL shows up
+ * at the first sign-in rather than at startup.
+ *
+ * @param client - A connected node-redis or ioredis client, or a function
+ * that returns one or a promise of one.
  * @returns A store for `oauthProxy`.
  *
  * @example
@@ -88,31 +105,56 @@ export interface IORedisLikeClient {
  * import { createClient } from "redis";
  * import { redisStorage } from "mcp-use/oauth/storage";
  *
- * const redis = await createClient({ url: process.env.REDIS_URL }).connect();
- * const storage = redisStorage(redis);
+ * const storage = redisStorage(() =>
+ *   createClient({ url: process.env.REDIS_URL })
+ *     .on("error", (error) => console.error("Redis error:", error))
+ *     .connect()
+ * );
  * ```
  */
 export function redisStorage(
-  client: NodeRedisLikeClient | IORedisLikeClient
+  client:
+    | RedisLikeClient
+    | (() => RedisLikeClient | PromiseLike<RedisLikeClient>)
 ): OAuthProxyStorage {
+  if (typeof client !== "function") {
+    const command = redisCommand(client);
+    return redisCommandStorage(command);
+  }
+  let connecting: Promise<RedisCommand> | undefined;
+  const connect = (): Promise<RedisCommand> => {
+    connecting ??= Promise.resolve()
+      .then(client)
+      .then(redisCommand)
+      .catch((error: unknown) => {
+        connecting = undefined;
+        throw error;
+      });
+    return connecting;
+  };
+  return redisCommandStorage(async (args) => (await connect())(args));
+}
+
+/** A node-redis or ioredis client accepted by {@link redisStorage}. */
+export type RedisLikeClient = NodeRedisLikeClient | IORedisLikeClient;
+
+type RedisCommand = (args: (string | number)[]) => Promise<unknown>;
+
+function redisCommand(client: RedisLikeClient): RedisCommand {
   if (client !== null && typeof client === "object") {
     if (typeof (client as NodeRedisLikeClient).sendCommand === "function") {
       const redis = client as NodeRedisLikeClient;
-      return redisCommandStorage((args) => redis.sendCommand(args.map(String)));
+      return (args) => redis.sendCommand(args.map(String));
     }
     if (typeof (client as IORedisLikeClient).call === "function") {
       const redis = client as IORedisLikeClient;
-      return redisCommandStorage(([name, ...args]) =>
-        redis.call(String(name), ...args.map(String))
-      );
+      return ([name, ...args]) => redis.call(String(name), ...args.map(String));
     }
   }
   throw new TypeError("redisStorage requires a node-redis or ioredis client");
 }
 
-function redisCommandStorage(
-  command: (args: (string | number)[]) => Promise<unknown>
-): OAuthProxyStorage {
+function redisCommandStorage(command: RedisCommand): OAuthProxyStorage {
   const asString = (value: unknown): string | undefined =>
     typeof value === "string"
       ? value
@@ -225,6 +267,174 @@ export function postgresStorage(
       return rows.length > 0;
     },
   };
+}
+
+// ─── Firestore ───────────────────────────────────────────────────────────
+
+/** The subset of a Firestore document snapshot the adapter uses. */
+export interface FirestoreLikeDocumentSnapshot {
+  /** Whether the document exists. */
+  readonly exists: boolean;
+  /** The document's fields, or `undefined` when it does not exist. */
+  data(): Record<string, unknown> | undefined;
+}
+
+/** The subset of a Firestore document reference the adapter uses. */
+export interface FirestoreLikeDocumentReference {
+  /** Reads the document. */
+  get(): Promise<FirestoreLikeDocumentSnapshot>;
+  /** Writes the document, replacing it. */
+  set(data: Record<string, unknown>): Promise<unknown>;
+  /** Deletes the document. Deleting an absent document is not an error. */
+  delete(): Promise<unknown>;
+}
+
+/** The subset of a Firestore transaction the adapter uses. */
+export interface FirestoreLikeTransaction {
+  /** Reads a document inside the transaction. */
+  get(
+    reference: FirestoreLikeDocumentReference
+  ): Promise<FirestoreLikeDocumentSnapshot>;
+  /** Writes a document when the transaction commits. */
+  set(
+    reference: FirestoreLikeDocumentReference,
+    data: Record<string, unknown>
+  ): unknown;
+  /** Deletes a document when the transaction commits. */
+  delete(reference: FirestoreLikeDocumentReference): unknown;
+}
+
+/**
+ * A server-side Firestore database: the `Firestore` instance of
+ * `@google-cloud/firestore`, or `getFirestore()` of `firebase-admin`.
+ */
+export interface FirestoreLikeDatabase {
+  /** Gets a collection. */
+  collection(path: string): {
+    doc(id: string): FirestoreLikeDocumentReference;
+  };
+  /** Runs a function in a transaction, retrying it on contention. */
+  runTransaction<T>(
+    update: (transaction: FirestoreLikeTransaction) => Promise<T>
+  ): Promise<T>;
+}
+
+/** Options for {@link firestoreStorage}. */
+export interface FirestoreStorageOptions {
+  /** Firestore database, for example `getFirestore()` from `firebase-admin/firestore`. */
+  firestore: FirestoreLikeDatabase;
+  /**
+   * Collection that holds one document per key.
+   *
+   * @defaultValue `"mcp_use_oauth"`
+   */
+  collection?: string;
+}
+
+/**
+ * Creates a store in one Firestore collection, with the server SDK
+ * (`firebase-admin` or `@google-cloud/firestore`). Atomic reads-and-deletes
+ * and writes-if-absent run in transactions.
+ *
+ * Each document holds `value` and an `expiresAt` timestamp. The adapter
+ * ignores expired documents, but Firestore keeps them until they are
+ * deleted: add a TTL policy on the `expiresAt` field of the collection so
+ * that Firestore removes them.
+ *
+ * The server SDK needs Node; it does not run on Cloudflare Workers or other
+ * edge runtimes.
+ *
+ * @param options - Firestore database and collection name.
+ * @returns A store for `oauthProxy`.
+ *
+ * @example
+ * ```ts
+ * import { initializeApp } from "firebase-admin/app";
+ * import { getFirestore } from "firebase-admin/firestore";
+ * import { firestoreStorage } from "mcp-use/oauth/storage";
+ *
+ * initializeApp();
+ * const storage = firestoreStorage({ firestore: getFirestore() });
+ * ```
+ */
+export function firestoreStorage(
+  options: FirestoreStorageOptions
+): OAuthProxyStorage {
+  const firestore = options?.firestore;
+  if (
+    firestore === null ||
+    typeof firestore?.collection !== "function" ||
+    typeof firestore.runTransaction !== "function"
+  ) {
+    throw new TypeError(
+      "firestoreStorage requires a Firestore database from firebase-admin or @google-cloud/firestore"
+    );
+  }
+  const name = options.collection ?? "mcp_use_oauth";
+  if (
+    typeof name !== "string" ||
+    !/^[^/]{1,1500}$/.test(name) ||
+    /^__.*__$/.test(name) ||
+    name === "." ||
+    name === ".."
+  ) {
+    throw new TypeError(
+      "firestoreStorage collection must be a collection ID without slashes"
+    );
+  }
+  const collection = firestore.collection(name);
+  // Keys can hold any character, and a document ID cannot hold "/".
+  const document = (key: string) => collection.doc(encodeURIComponent(key));
+  const live = (
+    snapshot: FirestoreLikeDocumentSnapshot
+  ): string | undefined => {
+    if (!snapshot.exists) return undefined;
+    const data = snapshot.data();
+    const value = data?.["value"];
+    return typeof value === "string" && expiresAtMillis(data) > Date.now()
+      ? value
+      : undefined;
+  };
+  const record = (value: string, ttlSeconds: number) => ({
+    value,
+    expiresAt: new Date(Date.now() + ttlSeconds * 1000),
+  });
+  return {
+    get: async (key) => live(await document(key).get()),
+    set: async (key, value, ttlSeconds) => {
+      await document(key).set(record(value, ttlSeconds));
+    },
+    delete: async (key) => {
+      await document(key).delete();
+    },
+    take: (key) =>
+      firestore.runTransaction(async (transaction) => {
+        const reference = document(key);
+        const snapshot = await transaction.get(reference);
+        if (snapshot.exists) transaction.delete(reference);
+        return live(snapshot);
+      }),
+    add: (key, value, ttlSeconds) =>
+      firestore.runTransaction(async (transaction) => {
+        const reference = document(key);
+        if (live(await transaction.get(reference)) !== undefined) return false;
+        transaction.set(reference, record(value, ttlSeconds));
+        return true;
+      }),
+  };
+}
+
+/** Reads `expiresAt`, a Firestore `Timestamp` or a `Date`, as milliseconds. */
+function expiresAtMillis(data: Record<string, unknown> | undefined): number {
+  const expiresAt = data?.["expiresAt"];
+  if (expiresAt instanceof Date) return expiresAt.getTime();
+  if (isRecord(expiresAt) && typeof expiresAt["toMillis"] === "function") {
+    const millis: unknown = (expiresAt["toMillis"] as () => unknown).call(
+      expiresAt
+    );
+    return typeof millis === "number" ? millis : 0;
+  }
+  return 0;
 }
 
 // ─── Cloudflare (D1 or Durable Object) ───────────────────────────────────

@@ -4,7 +4,8 @@
  * The build evaluates the server entry and mounts the server to check views
  * and collect Skills, but it serves no requests. Code at module scope can use
  * this to skip what only a running server needs, such as reading secrets or
- * connecting to a database.
+ * connecting to a database. `oauthProxy` and the storage adapters already
+ * skip their own checks for those while building.
  *
  * @returns `true` while `mcp-use build` evaluates the entry (it sets
  * `MCP_USE_PHASE=build`), otherwise `false`.

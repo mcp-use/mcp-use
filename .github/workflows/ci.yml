@@ -31,6 +31,7 @@ permissions:
 #    ├─ typescript-build: Build all packages
 #    ├─ typescript-knip: Unused code/deps check (fails CI on findings)
 #    ├─ typescript/mcp-use: Unit tests + agent integration tests (requires API keys)
+#    ├─ typescript/mcp-use firebase emulator: oauthProxy firebase() against the Auth emulator
 #    ├─ typescript/inspector: Unit tests for inspector package
 #    ├─ typescript/cli: Unit tests for CLI package
 #    ├─ typescript/tunnel: Protocol and local relay integration tests
@@ -734,6 +735,39 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter @mcp-use/agent test:integration:native-openai
+
+  # The oauthProxy firebase() upstream against the Firebase Auth emulator.
+  # The script runs firebase-tools (pinned in packages/server/package.json)
+  # with `emulators:exec --only auth`, which needs no Java and no Firebase
+  # login for the demo-mcp-use project.
+  typescript-test-firebase-emulator:
+    needs: typescript-lint
+    name: "typescript/mcp-use firebase emulator (node-${{ matrix.node-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22.23.1]
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Run Firebase Auth emulator tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter mcp-use test:firebase-emulator
 
   typescript-knip:
     needs: detect-changes

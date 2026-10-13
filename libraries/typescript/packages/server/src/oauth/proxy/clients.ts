@@ -11,8 +11,12 @@ import { isRecord } from "../guards.js";
 import { randomToken } from "./crypto.js";
 import { keys, type ClientRecord } from "./records.js";
 import type { SecureStore } from "./storage.js";
+import { printable } from "./upstream.js";
 
-/** A client configured on the server instead of registered at runtime. */
+/**
+ * A client defined on the server, for clients that can use neither a client
+ * ID metadata document nor dynamic client registration.
+ */
 export interface OAuthProxyClient {
   /** Client identifier that the client sends to `/authorize` and `/token`. */
   clientId: string;
@@ -20,14 +24,6 @@ export interface OAuthProxyClient {
   redirectUris: readonly string[];
   /** Name shown on the consent page. */
   clientName?: string;
-  /**
-   * Skip the consent page for this client. Allowed only when every redirect
-   * URI is HTTPS, because a loopback or custom-scheme redirect can be
-   * claimed by any local app.
-   *
-   * @defaultValue `false`
-   */
-  trusted?: boolean;
 }
 
 const BLOCKED_SCHEMES = new Set([
@@ -115,13 +111,43 @@ export function matchRedirectUri(
   );
 }
 
-/** @internal Validates configured clients and returns client records. */
+/**
+ * @internal Metadata-document clients that may connect: exact document URLs
+ * and whole origins. `undefined` lets any client connect.
+ */
+export interface ClientAllowlist {
+  urls: Set<string>;
+  origins: Set<string>;
+}
+
+/**
+ * @internal Validates the `clients` option: metadata-document URLs and
+ * origins go to the allowlist, and client objects become configured clients.
+ */
 export function configuredClients(
-  clients: readonly OAuthProxyClient[] | undefined,
-  trustedCimd: readonly string[] | undefined
-): { byId: Map<string, ClientRecord>; trustedCimd: Set<string> } {
+  clients: readonly (string | OAuthProxyClient)[] | undefined
+): { byId: Map<string, ClientRecord>; allow: ClientAllowlist | undefined } {
   const byId = new Map<string, ClientRecord>();
-  for (const client of clients ?? []) {
+  if (clients === undefined) return { byId, allow: undefined };
+  // Cast so that Array.isArray does not widen the entries to any.
+  if (!Array.isArray(clients as unknown) || clients.length === 0) {
+    throw new TypeError(
+      "oauthProxy clients must list at least one client; leave it unset to let any client connect"
+    );
+  }
+  const allow: ClientAllowlist = { urls: new Set(), origins: new Set() };
+  for (const client of clients) {
+    if (typeof client === "string") {
+      const origin = httpsOrigin(client);
+      if (isCimdClientId(client)) allow.urls.add(client);
+      else if (origin !== undefined) allow.origins.add(origin);
+      else {
+        throw new TypeError(
+          `oauthProxy clients: ${client} is neither a client ID metadata document URL (https with a path) nor an https origin`
+        );
+      }
+      continue;
+    }
     const redirectUris: unknown = client?.redirectUris;
     if (
       client === null ||
@@ -132,46 +158,54 @@ export function configuredClients(
       redirectUris.length === 0
     ) {
       throw new TypeError(
-        "oauthProxy preRegisteredClients entries need a clientId and redirectUris"
+        "oauthProxy clients entries must be a URL or an object with a clientId and redirectUris"
       );
     }
-    if (isCimdClientId(client.clientId)) {
+    if (
+      client.clientId.startsWith("https://") ||
+      client.clientId.startsWith("mcp_client_")
+    ) {
       throw new TypeError(
-        "oauthProxy preRegisteredClients clientId must not be an https URL; list CIMD clients in trustedClients"
+        `oauthProxy clients: client ${client.clientId} must not look like a metadata document URL or a registered client_id; list metadata documents as strings`
+      );
+    }
+    if (byId.has(client.clientId)) {
+      throw new TypeError(
+        `oauthProxy clients: client ${client.clientId} is listed twice`
       );
     }
     for (const uri of redirectUris) {
       const problem = redirectUriProblem(uri);
       if (problem !== undefined) {
-        throw new TypeError(`oauthProxy preRegisteredClients: ${problem}`);
+        throw new TypeError(`oauthProxy clients: ${problem}`);
       }
-    }
-    if (
-      client.trusted === true &&
-      !redirectUris.every((uri) => uri.startsWith("https://"))
-    ) {
-      throw new TypeError(
-        `oauthProxy preRegisteredClients: client ${client.clientId} can be trusted only with HTTPS redirect URIs`
-      );
     }
     byId.set(client.clientId, {
       clientId: client.clientId,
       redirectUris: [...redirectUris],
       ...(client.clientName !== undefined && { clientName: client.clientName }),
       source: "pre-registered",
-      trusted: client.trusted === true,
     });
   }
-  const trusted = new Set<string>();
-  for (const clientId of trustedCimd ?? []) {
-    if (typeof clientId !== "string" || !isCimdClientId(clientId)) {
-      throw new TypeError(
-        "oauthProxy trustedClients entries must be client ID metadata document URLs (https with a path)"
-      );
-    }
-    trusted.add(clientId);
+  return { byId, allow };
+}
+
+/** The origin of a bare `https://host[:port]` string, or `undefined`. */
+function httpsOrigin(value: string): string | undefined {
+  if (!value.startsWith("https://")) return undefined;
+  try {
+    const url = new URL(value);
+    return url.pathname === "/" &&
+      url.search === "" &&
+      url.hash === "" &&
+      url.username === "" &&
+      url.password === "" &&
+      value.replace(/\/$/, "") === url.origin
+      ? url.origin
+      : undefined;
+  } catch {
+    return undefined;
   }
-  return { byId, trustedCimd: trusted };
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -260,7 +294,6 @@ export async function registerClient(
     redirectUris: [...metadata.redirect_uris],
     ...(clientName !== undefined && { clientName }),
     source: "dcr",
-    trusted: false,
   };
   await store.set(keys.client(client.clientId), client, DCR_CLIENT_TTL);
   return {
@@ -287,31 +320,58 @@ function invalidMetadata(description: string): RegistrationResult {
 export interface ClientResolver {
   store: SecureStore;
   configured: Map<string, ClientRecord>;
-  trustedCimd: Set<string>;
-  cimd: boolean;
+  allow: ClientAllowlist | undefined;
   dcr: boolean;
   fetchCimd: (url: string) => Promise<ClientRecord>;
 }
 
 /**
- * @internal Resolves a client_id: a CIMD URL first, then a registered
- * client, then a configured one. Returns an error message when unknown.
+ * @internal Whether a client_id may connect under the current settings,
+ * without fetching or reading anything. Token requests and access-token
+ * checks use it, so that removing a client from `clients` or turning off
+ * registration ends its existing sign-ins too.
+ */
+export function isClientAdmitted(
+  resolver: Pick<ClientResolver, "configured" | "allow" | "dcr">,
+  clientId: string
+): boolean {
+  if (isCimdClientId(clientId)) {
+    const allow = resolver.allow;
+    return (
+      allow === undefined ||
+      allow.urls.has(clientId) ||
+      allow.origins.has(new URL(clientId).origin)
+    );
+  }
+  if (resolver.configured.has(clientId)) return true;
+  return resolver.dcr && clientId.startsWith("mcp_client_");
+}
+
+/**
+ * @internal Resolves a client_id: a CIMD URL first, then a configured
+ * client, then a registered one. Returns an error message when the client
+ * is unknown or not allowed.
  */
 export async function resolveClient(
   resolver: ClientResolver,
   clientId: string
 ): Promise<ClientRecord | string> {
   if (isCimdClientId(clientId)) {
-    if (!resolver.cimd) {
-      return "client ID metadata documents are disabled on this server";
+    // Check the allowlist before fetching, so an unlisted client never
+    // makes the server request its URL.
+    if (!isClientAdmitted(resolver, clientId)) {
+      return "this app is not allowed to connect to this server";
     }
     try {
-      const client = await resolver.fetchCimd(clientId);
-      return { ...client, trusted: resolver.trustedCimd.has(clientId) };
+      return await resolver.fetchCimd(clientId);
     } catch (error) {
-      return `client metadata document could not be used: ${
+      const reason = `client metadata document could not be used: ${
         error instanceof Error ? error.message : String(error)
       }`;
+      console.warn(
+        `[mcp-use] oauthProxy: refused ${printable(clientId)}: ${printable(reason)}`
+      );
+      return reason;
     }
   }
   const configured = resolver.configured.get(clientId);
@@ -339,12 +399,14 @@ const CIMD_CACHE_MS = 5 * 60 * 1000;
 const CIMD_CACHE_SIZE = 256;
 
 /**
- * @internal Creates a CIMD fetcher with a small in-process cache. When
- * `checkHost` is set, the host must resolve only to public addresses.
+ * @internal Creates a CIMD fetcher with a small in-process cache. With a
+ * `resolver` loader, the host must resolve only to public addresses, and a
+ * runtime without a resolver refuses every document. `false` skips the
+ * check, for a custom `fetch` that enforces its own network policy.
  */
 export function createCimdFetcher(
   fetchImpl: typeof globalThis.fetch,
-  checkHost: boolean
+  resolver: (() => Promise<HostResolver | undefined>) | false
 ): (url: string) => Promise<ClientRecord> {
   const cache = new Map<string, { client: ClientRecord; expiresAt: number }>();
   return async (clientId) => {
@@ -353,7 +415,9 @@ export function createCimdFetcher(
       return cached.client;
     }
     const url = new URL(clientId);
-    if (checkHost) await assertPublicHost(url.hostname);
+    if (resolver !== false) {
+      await assertPublicHost(url.hostname, await resolver());
+    }
     const response = await fetchImpl(url.href, {
       redirect: "manual",
       headers: { accept: "application/json" },
@@ -376,11 +440,15 @@ export function createCimdFetcher(
     if (!parsed.success || parsed.data.redirect_uris.length === 0) {
       throw new Error("metadata document has no valid redirect_uris");
     }
-    if (
-      document["client_secret"] !== undefined ||
-      (parsed.data.token_endpoint_auth_method !== undefined &&
-        parsed.data.token_endpoint_auth_method !== "none")
-    ) {
+    // When the document lists the methods it can use, the singular method
+    // is only a preference (ChatGPT prefers private_key_jwt but lists none),
+    // so the list decides. The schema strips the list; read the document.
+    const methods = document["token_endpoint_auth_methods_supported"];
+    const supportsNone = Array.isArray(methods)
+      ? methods.includes("none")
+      : parsed.data.token_endpoint_auth_method === undefined ||
+        parsed.data.token_endpoint_auth_method === "none";
+    if (document["client_secret"] !== undefined || !supportsNone) {
       throw new Error(
         "only public clients (token_endpoint_auth_method none) are supported"
       );
@@ -396,7 +464,6 @@ export function createCimdFetcher(
         clientName: parsed.data.client_name.slice(0, MAX_NAME_LENGTH),
       }),
       source: "cimd",
-      trusted: false,
     };
     if (cache.size >= CIMD_CACHE_SIZE) {
       const oldest = cache.keys().next().value;
@@ -433,13 +500,19 @@ async function readLimited(response: Response, limit: number): Promise<string> {
   return new TextDecoder().decode(bytes);
 }
 
+/** @internal Resolves a hostname to the IP addresses it points to. */
+export type HostResolver = (hostname: string) => Promise<string[]>;
+
 /**
  * @internal Refuses hosts that resolve to private, loopback, link-local, or
- * otherwise non-public addresses (SSRF). On runtimes without `node:dns`
- * (Workers), only IP literals are checked; the platform's outbound network
- * cannot reach private ranges.
+ * otherwise non-public addresses (SSRF). Without a `resolve`, only an IP
+ * literal can be checked, so any other host is refused: failing open would
+ * let a metadata-document URL reach the server's private network.
  */
-export async function assertPublicHost(hostname: string): Promise<void> {
+export async function assertPublicHost(
+  hostname: string,
+  resolve: HostResolver | undefined
+): Promise<void> {
   const host = hostname.replace(/^\[|\]$/g, "");
   if (host === "localhost" || host.endsWith(".localhost")) {
     throw new Error("metadata document host is not public");
@@ -450,41 +523,108 @@ export async function assertPublicHost(hostname: string): Promise<void> {
     }
     return;
   }
-  const lookup = await nodeLookup();
-  if (lookup === undefined) return;
-  let addresses: { address: string }[];
+  if (resolve === undefined) {
+    throw new Error(
+      "metadata document host cannot be checked: this runtime has no node:dns to resolve it. Enable node:dns (nodejs_compat on Cloudflare Workers), or pass oauthProxy a fetch that enforces your own network policy"
+    );
+  }
+  let addresses: string[];
   try {
-    addresses = await lookup(host, { all: true, verbatim: true });
+    addresses = await resolve(host);
   } catch {
     throw new Error("metadata document host does not resolve");
   }
   if (
     addresses.length === 0 ||
-    addresses.some((entry) => isPrivateAddress(entry.address))
+    addresses.some((address) => isPrivateAddress(address))
   ) {
     throw new Error("metadata document host is not public");
   }
 }
 
-type Lookup = (
-  hostname: string,
-  options: { all: true; verbatim: boolean }
-) => Promise<{ address: string }[]>;
+/** The parts of `node:dns` promises that the resolvers use. */
+interface DnsPromises {
+  lookup?: (
+    hostname: string,
+    options: { all: true; verbatim: boolean }
+  ) => Promise<{ address: string }[]>;
+  resolve4?: (hostname: string) => Promise<string[]>;
+  resolve6?: (hostname: string) => Promise<string[]>;
+}
 
-async function nodeLookup(): Promise<Lookup | undefined> {
-  if (typeof process === "undefined" || process.versions?.node === undefined) {
-    return undefined;
-  }
-  // A computed specifier keeps edge bundlers from resolving the builtin.
-  const specifier = ["node:dns", "promises"].join("/");
-  try {
-    const dns = (await import(/* @vite-ignore */ specifier)) as {
-      lookup: Lookup;
+/**
+ * @internal Picks a resolver from a loaded `node:dns` module, or returns
+ * `undefined` when it has none.
+ *
+ * Node.js, Bun, and Deno use `lookup`, which resolves as `fetch` does
+ * (getaddrinfo, including the hosts file). Cloudflare Workers is the
+ * exception: its `node:dns` (with `nodejs_compat`) implements `resolve4`
+ * and `resolve6` over DNS over HTTPS but throws "Not implemented" from
+ * `lookup`, and a Worker has no hosts file for `lookup` to honor, so its A
+ * and AAAA records are the addresses to check.
+ *
+ * @param dns - The `node:dns` module namespace.
+ * @param userAgent - The runtime's `navigator.userAgent`.
+ */
+export function hostResolverFrom(
+  dns: unknown,
+  userAgent: string | undefined
+): HostResolver | undefined {
+  const namespace = dns as
+    | { promises?: DnsPromises; default?: { promises?: DnsPromises } }
+    | undefined;
+  const promises = namespace?.promises ?? namespace?.default?.promises;
+  if (promises === undefined) return undefined;
+  if (userAgent === "Cloudflare-Workers") {
+    const { resolve4, resolve6 } = promises;
+    if (typeof resolve4 !== "function" || typeof resolve6 !== "function") {
+      return undefined;
+    }
+    return async (hostname) => {
+      const results = await Promise.allSettled([
+        resolve4(hostname),
+        resolve6(hostname),
+      ]);
+      if (results.every((result) => result.status === "rejected")) {
+        throw new Error("host does not resolve");
+      }
+      return results.flatMap((result) =>
+        result.status === "fulfilled" ? result.value : []
+      );
     };
-    return dns.lookup;
-  } catch {
-    return undefined;
   }
+  const lookup = promises.lookup;
+  if (typeof lookup !== "function") return undefined;
+  return async (hostname) =>
+    (await lookup(hostname, { all: true, verbatim: true })).map(
+      (entry) => entry.address
+    );
+}
+
+let defaultResolver: Promise<HostResolver | undefined> | undefined;
+
+/**
+ * @internal Loads the runtime's resolver once: from `node:dns` where the
+ * runtime has it, else `undefined`, which refuses metadata documents.
+ */
+export function defaultHostResolver(): Promise<HostResolver | undefined> {
+  defaultResolver ??= (async () => {
+    // A computed specifier keeps edge bundlers from resolving the builtin.
+    const specifier = ["node", "dns"].join(":");
+    let dns: unknown;
+    try {
+      dns = await import(/* @vite-ignore */ specifier);
+    } catch {
+      return undefined;
+    }
+    const userAgent = (globalThis as { navigator?: { userAgent?: unknown } })
+      .navigator?.userAgent;
+    return hostResolverFrom(
+      dns,
+      typeof userAgent === "string" ? userAgent : undefined
+    );
+  })();
+  return defaultResolver;
 }
 
 function isIpLiteral(host: string): boolean {

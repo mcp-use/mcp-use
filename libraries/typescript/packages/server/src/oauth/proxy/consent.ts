@@ -3,6 +3,7 @@
  *
  * @internal
  */
+import type { InPageUpstream } from "./upstream.js";
 
 /**
  * Values handed to a custom consent page (the `consent.page` option of
@@ -57,8 +58,12 @@ export interface ConsentPageProps {
   upstream: string;
   /** Scopes that the server requests from the upstream provider. */
   scopes: string[];
-  /** Name of this MCP server, when known. */
-  serverName?: string;
+  /**
+   * Name of this MCP server, for the page to show. It is the `resourceName`
+   * option of `oauthProxy` when set, otherwise the `MCPServer` `title`, and
+   * otherwise its `name`.
+   */
+  serverName: string;
   /** Form target and CSRF token. */
   form: {
     /** URL to post the decision to. */
@@ -72,6 +77,45 @@ export interface ConsentPageProps {
 export const PAGE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; " +
   "frame-ancestors 'none'; base-uri 'none'";
+
+/**
+ * @internal Content Security Policy for the consent page of an in-page
+ * upstream: {@link PAGE_CSP} plus the nonce and the origins its script needs.
+ *
+ * It sets no `form-action`: Chrome applies it to the redirect that follows
+ * the form post, which goes to the client's loopback or custom-scheme URI.
+ */
+export function inPageCsp(
+  sources: InPageUpstream["csp"],
+  nonce: string
+): string {
+  const list = (values: readonly string[] | undefined): string =>
+    values === undefined || values.length === 0 ? "'none'" : values.join(" ");
+  return [
+    "default-src 'none'",
+    `script-src 'nonce-${nonce}' ${(sources?.script ?? []).join(" ")}`.trim(),
+    `connect-src ${list(sources?.connect)}`,
+    `frame-src ${list(sources?.frame)}`,
+    "style-src 'unsafe-inline'",
+    "img-src https: data:",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+  ].join("; ");
+}
+
+/**
+ * @internal Adds an in-page upstream's script to a rendered page, before
+ * `</body>` when the page has one. A custom page controls the whole
+ * document, so the script may also land after it; browsers then move it
+ * into the body.
+ */
+export function withScript(html: string, script: string): string {
+  // The built-in pages and react-dom/server write the tag in lowercase.
+  const end = html.lastIndexOf("</body>");
+  return end === -1
+    ? `${html}${script}`
+    : `${html.slice(0, end)}${script}${html.slice(end)}`;
+}
 
 /** @internal Renders the built-in consent page. */
 export function renderDefaultConsentPage(props: ConsentPageProps): string {
@@ -90,7 +134,7 @@ export function renderDefaultConsentPage(props: ConsentPageProps): string {
       : `<p class="label">Access requested from ${escapeHtml(props.upstream)}</p><ul>${props.scopes
           .map((scope) => `<li><code>${escapeHtml(scope)}</code></li>`)
           .join("")}</ul>`;
-  const target = props.serverName ?? "this MCP server";
+  const target = props.serverName;
   return page(
     `Allow ${clientName}?`,
     `<h1>Allow <span>${escapeHtml(clientName)}</span> to use ${escapeHtml(target)}?</h1>
@@ -104,6 +148,27 @@ ${scopes}
   <div class="actions">
     <button type="submit" name="decision" value="deny" class="secondary">Deny</button>
     <button type="submit" name="decision" value="allow">Allow</button>
+  </div>
+</form>`
+  );
+}
+
+/**
+ * @internal Renders the built-in sign-in page of an in-page upstream when
+ * the consent step was skipped. It has only the sign-in button, because the
+ * provider's sign-in window opens only on a click.
+ */
+export function renderDefaultSignInPage(props: ConsentPageProps): string {
+  const target = props.serverName;
+  return page(
+    `Sign in to ${target}`,
+    `<h1>Sign in to <span>${escapeHtml(target)}</span></h1>
+<p>Sign in with ${escapeHtml(props.upstream)} to continue.</p>
+<p class="meta">After sign-in, you return to <b>${escapeHtml(props.redirectHost)}</b>.</p>
+<form method="post" action="${escapeHtml(props.form.action)}">
+  <input type="hidden" name="csrf" value="${escapeHtml(props.form.csrf)}">
+  <div class="actions">
+    <button type="submit" name="decision" value="allow">Continue with ${escapeHtml(props.upstream)}</button>
   </div>
 </form>`
   );

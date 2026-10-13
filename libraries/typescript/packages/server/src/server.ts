@@ -1424,7 +1424,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #runOAuthProviderSetup(
     resource: URL,
     basePath: string,
-    mode: "listen" | "handler"
+    mode: "listen" | "handler",
+    listenHost: string | undefined
   ): void {
     const setup = this.#config.oauth?.setup;
     if (setup === undefined || this.#oauthProviderSetupRan) return;
@@ -1444,8 +1445,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const host: OAuthProviderHost<TUser> = {
       resourceUrl: resource,
       basePath,
+      serverInfo: {
+        name: this.#config.name,
+        ...(this.#config.title !== undefined && { title: this.#config.title }),
+      },
       mixedAuth: this.#config.mixedAuth === true,
       mode,
+      listenHost: mode === "listen" ? listenHost : undefined,
       route: (method, path, handler) => {
         assertActive("route");
         if (method !== "GET" && method !== "POST" && method !== "OPTIONS") {
@@ -1742,7 +1748,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         // #handler is still unset, so their registrations pass the same
         // pre-start checks as user registrations, and before view-binding
         // validation below so provider items are included.
-        this.#runOAuthProviderSetup(resource, basePath, mode);
+        this.#runOAuthProviderSetup(resource, basePath, mode, listenHost);
         // Provider routes (for example authorization endpoints) land ahead of
         // the OAuth gate and the application's routes, so they stay public
         // and the application cannot shadow them.

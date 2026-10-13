@@ -48,13 +48,14 @@ function provider(setup: (host: OAuthProviderHost<TestUser>) => void) {
 
 function server(
   setup: (host: OAuthProviderHost<TestUser>) => void,
-  options: { instructions?: string; mixedAuth?: boolean } = {}
+  options: { instructions?: string; mixedAuth?: boolean; title?: string } = {}
 ) {
   return new MCPServer({
     name: "shop",
     version: "1.0.0",
     oauth: provider(setup),
     logging: { enabled: false },
+    ...(options.title !== undefined && { title: options.title }),
     ...(options.mixedAuth !== undefined && { mixedAuth: options.mixedAuth }),
     ...(options.instructions !== undefined && {
       instructions: options.instructions,
@@ -158,6 +159,7 @@ describe("OAuth provider setup hook", () => {
       expect(host.resourceUrl.href).toBe(resource);
       expect(host.basePath).toBe("/mcp");
       expect(host.mixedAuth).toBe(false);
+      expect(host.serverInfo).toEqual({ name: "shop" });
     });
     const app = server(setup);
 
@@ -397,12 +399,42 @@ describe("OAuth provider setup hook", () => {
 });
 
 describe("OAuth provider setup hook: routes", () => {
+  it("exposes the server title in serverInfo", async () => {
+    let serverInfo: OAuthProviderHost<TestUser>["serverInfo"] | undefined;
+    await server(
+      (host) => {
+        serverInfo = host.serverInfo;
+      },
+      { title: "Shop" }
+    ).fetch(post("tools/list", {}, signedIn));
+    expect(serverInfo).toEqual({ name: "shop", title: "Shop" });
+  });
+
   it("exposes the mount mode", async () => {
     let mode: string | undefined;
+    let listenHost: string | undefined = "unset";
     await server((host) => {
       mode = host.mode;
+      listenHost = host.listenHost;
     }).fetch(post("tools/list", {}, signedIn));
     expect(mode).toBe("handler");
+    expect(listenHost).toBeUndefined();
+  });
+
+  it("exposes the listen() bind address", async () => {
+    let mode: string | undefined;
+    let listenHost: string | undefined;
+    const app = server((host) => {
+      mode = host.mode;
+      listenHost = host.listenHost;
+    });
+    try {
+      await app.listen(0, { host: "127.0.0.1" });
+      expect(mode).toBe("listen");
+      expect(listenHost).toBe("127.0.0.1");
+    } finally {
+      await app.close();
+    }
   });
 
   it("serves provider routes ahead of the gate and application routes", async () => {

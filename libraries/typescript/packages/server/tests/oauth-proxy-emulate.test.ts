@@ -9,9 +9,9 @@
  * requests cover those gaps.
  */
 import { createEmulator, type Emulator } from "emulate";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { MCPServer } from "../src/index.js";
+import { isBuilding, MCPServer } from "../src/index.js";
 import {
   github,
   google,
@@ -22,6 +22,7 @@ import {
   type OAuthProxyStorage,
   type UpstreamUser,
 } from "../src/oauth/index.js";
+import { upstashStorage } from "../src/oauth/storage.js";
 
 const ORIGIN = "http://localhost:4319";
 const RESOURCE = `${ORIGIN}/mcp`;
@@ -239,7 +240,15 @@ async function signIn(
   browser: Browser,
   client: { clientId: string; redirectUri: string },
   login: string,
-  options: { decision?: "allow" | "deny"; state?: string; scope?: string } = {}
+  options: {
+    decision?: "allow" | "deny";
+    state?: string;
+    scope?: string;
+    /** `iss` to add to the upstream's redirect, as real GitHub sends one. */
+    upstreamIssuer?: string;
+    /** Edits the upstream's redirect to the proxy callback. */
+    editCallback?: (url: URL) => void;
+  } = {}
 ): Promise<SignInResult> {
   const { verifier, challenge } = await pkcePair();
   const authorize = new URL(`${RESOURCE}/oauth/authorize`);
@@ -255,6 +264,16 @@ async function signIn(
   })) {
     authorize.searchParams.set(name, value);
   }
+  const follow = (response: Response, from: string): string => {
+    const next = new URL(response.headers.get("location")!, from);
+    if (next.href.startsWith(CALLBACK)) {
+      if (options.upstreamIssuer !== undefined) {
+        next.searchParams.set("iss", options.upstreamIssuer);
+      }
+      options.editCallback?.(next);
+    }
+    return next.href;
+  };
   let url = authorize.href;
   for (let hop = 0; hop < 20; hop++) {
     const target = new URL(url);
@@ -269,7 +288,7 @@ async function signIn(
     }
     const response = await browser.request(url);
     if (response.status === 302) {
-      url = new URL(response.headers.get("location")!, url).href;
+      url = follow(response, url);
       continue;
     }
     const html = await response.text();
@@ -280,7 +299,7 @@ async function signIn(
         decision: options.decision ?? "allow",
       });
       expect(answer.status).toBe(302);
-      url = new URL(answer.headers.get("location")!, url).href;
+      url = follow(answer, url);
       continue;
     }
     if (response.status === 200 && target.origin !== ORIGIN) {
@@ -294,7 +313,7 @@ async function signIn(
         hiddenFields(`<form${form}`)
       );
       expect(answer.status).toBe(302);
-      url = new URL(answer.headers.get("location")!, url).href;
+      url = follow(answer, url);
       continue;
     }
     throw new Error(
@@ -357,12 +376,14 @@ async function exchange(
 async function refresh(
   browser: Browser,
   clientId: string,
-  refreshToken: string
+  refreshToken: string,
+  extra: Record<string, string> = {}
 ): Promise<{ status: number; body: TokenResponse }> {
   const response = await browser.form(`${RESOURCE}/oauth/token`, {
     grant_type: "refresh_token",
     refresh_token: refreshToken,
     client_id: clientId,
+    ...extra,
   });
   return {
     status: response.status,
@@ -410,6 +431,19 @@ async function toolText(response: Response): Promise<string> {
   return body.result.content[0]!.text;
 }
 
+/** Records what the code under test writes to one console method. */
+function captureConsole(method: "error" | "warn" | "info") {
+  const calls: unknown[][] = [];
+  const spy = vi.spyOn(console, method).mockImplementation((...args) => {
+    calls.push(args);
+  });
+  return {
+    calls,
+    text: () => calls.map((args) => args.join(" ")).join("\n"),
+    restore: () => spy.mockRestore(),
+  };
+}
+
 /** A Map-backed store whose contents the tests can inspect. */
 function inspectableStorage(): OAuthProxyStorage & {
   values: Map<string, string>;
@@ -437,6 +471,79 @@ function inspectableStorage(): OAuthProxyStorage & {
   };
 }
 
+/**
+ * A memoryStorage (values expire) that remembers which keys were written,
+ * so tests can see whether a lock or record is present.
+ */
+function trackedStorage(): OAuthProxyStorage & {
+  live(prefix: string): Promise<string[]>;
+} {
+  const inner = memoryStorage();
+  const written = new Set<string>();
+  return {
+    get: (key) => inner.get(key),
+    set: async (key, value, ttlSeconds) => {
+      written.add(key);
+      await inner.set(key, value, ttlSeconds);
+    },
+    delete: (key) => inner.delete(key),
+    take: (key) => inner.take(key),
+    add: async (key, value, ttlSeconds) => {
+      const added = await inner.add(key, value, ttlSeconds);
+      if (added) written.add(key);
+      return added;
+    },
+    live: async (prefix) => {
+      const found: string[] = [];
+      for (const key of written) {
+        if (
+          key.startsWith(`mcp-use:oauth:${prefix}`) &&
+          (await inner.get(key)) !== undefined
+        ) {
+          found.push(key);
+        }
+      }
+      return found;
+    },
+  };
+}
+
+/**
+ * Holds upstream refresh requests at the token endpoint. `hold()` arms one
+ * gate: the next upstream refresh waits on it until `release()`.
+ */
+function upstreamRefreshGate(inner: typeof globalThis.fetch) {
+  const armed: { entered: () => void; released: Promise<void> }[] = [];
+  const fetchImpl: typeof globalThis.fetch = async (input, init) => {
+    const url = String(input instanceof Request ? input.url : input);
+    const body = new URLSearchParams(String(init?.body ?? ""));
+    if (
+      url.endsWith("/oauth2/token") &&
+      body.get("grant_type") === "refresh_token"
+    ) {
+      const gate = armed.shift();
+      if (gate !== undefined) {
+        gate.entered();
+        await gate.released;
+      }
+    }
+    return inner(input, init);
+  };
+  const hold = () => {
+    let entered!: () => void;
+    let release!: () => void;
+    const reached = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    armed.push({ entered, released });
+    return { reached, release };
+  };
+  return { fetch: fetchImpl, hold };
+}
+
 interface GitHubSetup {
   server: MCPServer<UpstreamUser>;
   spy: UpstreamSpy;
@@ -444,13 +551,15 @@ interface GitHubSetup {
 }
 
 function githubServer(
-  overrides: Partial<OAuthProxyOptions<UpstreamUser>> = {}
+  overrides: Partial<OAuthProxyOptions<UpstreamUser>> = {},
+  serverOptions: { title?: string } = {}
 ): GitHubSetup {
   const spy = new UpstreamSpy();
   const toolTokens: string[] = [];
   const server = new MCPServer({
     name: "acme",
     version: "1.0.0",
+    ...(serverOptions.title !== undefined && { title: serverOptions.title }),
     logging: { enabled: false },
     oauth: oauthProxy({
       resource: RESOURCE,
@@ -482,12 +591,105 @@ function githubServer(
       ],
     };
   });
+  server.tool({ name: "scopes" }, async (_input, ctx) => ({
+    content: [{ type: "text", text: ctx.auth.scopes.join(" ") }],
+  }));
   return { server, spy, toolTokens };
 }
 
 // ─── GitHub ──────────────────────────────────────────────────────────────
 
 describe("oauthProxy with emulated GitHub", () => {
+  it("checks the iss parameter that GitHub adds to its redirect", async () => {
+    // github.com sends iss=https://github.com/login/oauth; the emulator sends
+    // none, so the test adds it.
+    const { server } = githubServer();
+    const browser = new Browser(server);
+    const client = await register(browser);
+    const signedIn = await signIn(browser, client, "hubot", {
+      upstreamIssuer: `${githubEmulator.url}/login/oauth`,
+    });
+    expect(signedIn.redirect.searchParams.get("error")).toBeNull();
+    const tokens = await exchange(
+      browser,
+      client,
+      signedIn.code,
+      signedIn.verifier
+    );
+    expect(tokens.status).toBe(200);
+
+    // A response from another issuer is refused (mix-up attack defense),
+    // and the log says which issuer was expected.
+    const logged = captureConsole("error");
+    let upstreamCode = "";
+    const mixedUp = await signIn(browser, client, "hubot", {
+      upstreamIssuer: "https://attacker.example",
+      editCallback: (url) => {
+        upstreamCode = url.searchParams.get("code")!;
+      },
+    }).finally(logged.restore);
+    expect(mixedUp.redirect.searchParams.get("error")).toBe("server_error");
+    expect(mixedUp.code).toBe("");
+    expect(mixedUp.redirect.searchParams.get("error_description")).toBe(
+      "GitHub sign-in failed"
+    );
+    expect(logged.text()).toContain(
+      `GitHub callback failed validation: OperationProcessingError: unexpected "iss" (issuer) response parameter value [OAUTH_INVALID_RESPONSE] (expected "${githubEmulator.url}/login/oauth", got "https://attacker.example")`
+    );
+    expect(upstreamCode).not.toBe("");
+    expect(logged.text()).not.toContain(upstreamCode);
+  });
+
+  it("explains a failed GitHub token exchange in the log and to the client", async () => {
+    const { server, spy } = githubServer();
+    // GitHub answers token errors with HTTP 200.
+    spy.rewrite = () =>
+      Response.json({
+        error: "bad_verification_code",
+        error_description: "The code passed is incorrect or expired.",
+      });
+    const browser = new Browser(server);
+    const client = await register(browser);
+    const logged = captureConsole("error");
+    const failed = await signIn(browser, client, "hubot").finally(
+      logged.restore
+    );
+    expect(failed.redirect.searchParams.get("error")).toBe("server_error");
+    expect(failed.redirect.searchParams.get("error_description")).toBe(
+      "GitHub sign-in failed (bad_verification_code): The code passed is incorrect or expired."
+    );
+    expect(failed.redirect.searchParams.get("state")).toBe("client-state-42");
+    expect(logged.text()).toContain(
+      "GitHub sign-in failed: GitHub token endpoint returned bad_verification_code: The code passed is incorrect or expired. (HTTP 200)"
+    );
+  });
+
+  it("logs an error that GitHub returns to the callback, without line breaks", async () => {
+    const { server } = githubServer();
+    const browser = new Browser(server);
+    const client = await register(browser);
+    const logged = captureConsole("error");
+    const failed = await signIn(browser, client, "hubot", {
+      editCallback: (url) => {
+        url.searchParams.delete("code");
+        url.searchParams.set("error", "application_suspended");
+        url.searchParams.set(
+          "error_description",
+          "Your application has been suspended.\n[mcp-use] forged line"
+        );
+      },
+    }).finally(logged.restore);
+    expect(failed.redirect.searchParams.get("error")).toBe("server_error");
+    expect(failed.redirect.searchParams.get("error_description")).toBe(
+      "GitHub sign-in did not complete (application_suspended)"
+    );
+    expect(logged.calls).toEqual([
+      [
+        "[mcp-use] oauthProxy: sign-in failed. GitHub returned application_suspended: Your application has been suspended. [mcp-use] forged line",
+      ],
+    ]);
+  });
+
   it("signs a client in without a GitHub app and keeps GitHub secrets on the server", async () => {
     const { server, spy, toolTokens } = githubServer();
     const browser = new Browser(server);
@@ -853,6 +1055,51 @@ describe("oauthProxy with emulated GitHub", () => {
     expect(defaultTokens.body.scope).toBe("mcp:read mcp:write");
   });
 
+  it("issues the narrower scope a refresh asks for and keeps the grant's scopes", async () => {
+    const { server } = githubServer({
+      scopesSupported: ["mcp:read", "mcp:write"],
+    });
+    const browser = new Browser(server);
+    const client = await register(browser);
+    const { code, verifier } = await signIn(browser, client, "hubot", {
+      scope: "mcp:read mcp:write",
+    });
+    const tokens = (await exchange(browser, client, code, verifier)).body;
+    expect(tokens.scope).toBe("mcp:read mcp:write");
+
+    const narrowed = await refresh(
+      browser,
+      client.clientId,
+      tokens.refresh_token!,
+      { scope: "mcp:read" }
+    );
+    expect(narrowed.body.scope).toBe("mcp:read");
+    expect(
+      await toolText(
+        await callTool(browser, "scopes", narrowed.body.access_token)
+      )
+    ).toBe("mcp:read");
+
+    // The new refresh token still carries the whole grant (RFC 6749 §6).
+    const full = await refresh(
+      browser,
+      client.clientId,
+      narrowed.body.refresh_token!
+    );
+    expect(full.body.scope).toBe("mcp:read mcp:write");
+    expect(
+      await toolText(await callTool(browser, "scopes", full.body.access_token))
+    ).toBe("mcp:read mcp:write");
+
+    const wider = await refresh(
+      browser,
+      client.clientId,
+      full.body.refresh_token!,
+      { scope: "mcp:read mcp:admin" }
+    );
+    expect(wider.body.error).toBe("invalid_scope");
+  });
+
   it("revokes a grant at the revocation endpoint", async () => {
     const { server } = githubServer();
     const browser = new Browser(server);
@@ -888,7 +1135,7 @@ describe("oauthProxy with emulated GitHub", () => {
     expect(consentPages()).toBe(3);
   });
 
-  it("identifies a client by its metadata document and skips consent for trusted ones", async () => {
+  it("identifies a client by its metadata document", async () => {
     const clientId = "https://client.example/oauth/metadata.json";
     const document = {
       client_id: clientId,
@@ -897,47 +1144,312 @@ describe("oauthProxy with emulated GitHub", () => {
       token_endpoint_auth_method: "none",
     };
     const spy = new UpstreamSpy();
-    const cimdFetch: typeof globalThis.fetch = async (input, init) =>
-      String(input) === clientId
-        ? Response.json(document)
-        : spy.fetch(input, init);
-
-    const consentFor = async (
-      trusted: boolean,
-      redirectUri = "https://client.example/callback"
-    ) => {
-      const { server } = githubServer({
-        fetch: cimdFetch,
-        ...(trusted && { trustedClients: [clientId] }),
-      });
-      const browser = new Browser(server);
-      const { code, verifier } = await signIn(
-        browser,
-        { clientId, redirectUri },
-        "hubot"
-      );
-      const consent = browser.transcript.find((entry) =>
-        entry.includes('name="decision"')
-      );
-      const tokens = await exchange(
-        browser,
-        { clientId, redirectUri },
-        code,
-        verifier
-      );
-      expect(tokens.status).toBe(200);
-      return consent;
-    };
-
-    const page = await consentFor(false);
+    const { server } = githubServer({
+      fetch: async (input, init) =>
+        String(input) === clientId
+          ? Response.json(document)
+          : spy.fetch(input, init),
+    });
+    const browser = new Browser(server);
+    const client = { clientId, redirectUri: "https://client.example/callback" };
+    const { code, verifier } = await signIn(browser, client, "hubot");
+    const page = browser.transcript.find((entry) =>
+      entry.includes('name="decision"')
+    );
     expect(page).toContain("Metadata Client");
     expect(page).toContain("client.example");
     expect(page).not.toContain("Unverified");
-    expect(await consentFor(true)).toBeUndefined();
-    // Trust never skips consent for a loopback redirect.
-    expect(await consentFor(true, CLIENT_REDIRECT)).toContain(
-      "This app runs on your computer"
+    expect((await exchange(browser, client, code, verifier)).status).toBe(200);
+  });
+
+  it("lets only the listed clients connect when clients is set", async () => {
+    const listed = "https://listed.example/oauth/client.json";
+    const onOrigin = "https://chatgpt.example/oauth/cb_123/client.json";
+    const unlisted = "https://unlisted.example/oauth/client.json";
+    const documentFor = (clientId: string) => ({
+      client_id: clientId,
+      redirect_uris: [`${new URL(clientId).origin}/callback`],
+    });
+    const fetched: string[] = [];
+    const spy = new UpstreamSpy();
+    const { server } = githubServer({
+      clients: [
+        listed,
+        "https://chatgpt.example",
+        { clientId: "acme-cli", redirectUris: [CLIENT_REDIRECT] },
+      ],
+      fetch: async (input, init) => {
+        const url = String(input);
+        if (url.includes("/oauth/client.json") || url.includes("/cb_")) {
+          fetched.push(url);
+          return Response.json(documentFor(url));
+        }
+        return spy.fetch(input, init);
+      },
+    });
+    const browser = new Browser(server);
+
+    // Registration is off and advertised as off; metadata documents are on.
+    const metadata = (await (
+      await browser.request(`${ORIGIN}/.well-known/oauth-authorization-server`)
+    ).json()) as Record<string, unknown>;
+    expect(metadata["registration_endpoint"]).toBeUndefined();
+    expect(metadata["client_id_metadata_document_supported"]).toBe(true);
+    const registration = await browser.request(`${RESOURCE}/oauth/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ redirect_uris: [CLIENT_REDIRECT] }),
+    });
+    expect(registration.status).toBe(404);
+
+    // An exact URL, a document on a listed origin, and a hand-defined client.
+    for (const client of [
+      { clientId: listed, redirectUri: "https://listed.example/callback" },
+      { clientId: onOrigin, redirectUri: "https://chatgpt.example/callback" },
+      { clientId: "acme-cli", redirectUri: CLIENT_REDIRECT },
+    ]) {
+      const { code, verifier } = await signIn(browser, client, "hubot");
+      expect((await exchange(browser, client, code, verifier)).status).toBe(
+        200
+      );
+    }
+
+    // An unlisted client is refused before its document is fetched.
+    const refused = await browser.request(
+      `${RESOURCE}/oauth/authorize?${new URLSearchParams({
+        response_type: "code",
+        client_id: unlisted,
+        redirect_uri: "https://unlisted.example/callback",
+        code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+        code_challenge_method: "S256",
+      })}`
     );
+    expect(refused.status).toBe(400);
+    expect(await refused.text()).toContain("not allowed to connect");
+    expect(fetched).toEqual([listed, onOrigin]);
+  });
+
+  it("ends existing sign-ins of a client that is no longer allowed", async () => {
+    const storage = memoryStorage();
+    const before = new Browser(githubServer({ storage }).server);
+    const client = await register(before);
+    const tokensFor = async () => {
+      const { code, verifier } = await signIn(before, client, "hubot");
+      return (await exchange(before, client, code, verifier)).body;
+    };
+    const refreshed = await tokensFor();
+    const called = await tokensFor();
+
+    // The same store and secret, now with registration off.
+    const after = new Browser(githubServer({ storage, dcr: false }).server);
+    const refresh1 = await refresh(
+      after,
+      client.clientId,
+      refreshed.refresh_token!
+    );
+    expect(refresh1.status).toBe(400);
+    expect(refresh1.body.error).toBe("invalid_client");
+    expect((await callTool(after, "whoami", called.access_token)).status).toBe(
+      401
+    );
+
+    // Both grants are gone: turning registration back on does not revive them.
+    expect(
+      (await refresh(before, client.clientId, refreshed.refresh_token!)).body
+        .error
+    ).toBe("invalid_grant");
+    expect((await callTool(before, "whoami", called.access_token)).status).toBe(
+      401
+    );
+  });
+
+  it("ends sign-ins and refuses codes of a client removed from clients", async () => {
+    const storage = memoryStorage();
+    const acme = { clientId: "acme-cli", redirectUri: CLIENT_REDIRECT };
+    const listed = githubServer({
+      storage,
+      clients: [{ clientId: "acme-cli", redirectUris: [CLIENT_REDIRECT] }],
+    });
+    const browser = new Browser(listed.server);
+    const first = await signIn(browser, acme, "hubot");
+    const tokens = (await exchange(browser, acme, first.code, first.verifier))
+      .body;
+    const second = await signIn(browser, acme, "hubot");
+
+    const removed = new Browser(
+      githubServer({
+        storage,
+        clients: [{ clientId: "other-cli", redirectUris: [CLIENT_REDIRECT] }],
+      }).server
+    );
+    const exchanged = await exchange(
+      removed,
+      acme,
+      second.code,
+      second.verifier
+    );
+    expect(exchanged.status).toBe(400);
+    expect(exchanged.body.error).toBe("invalid_client");
+    const refreshed = await refresh(
+      removed,
+      acme.clientId,
+      tokens.refresh_token!
+    );
+    expect(refreshed.body.error).toBe("invalid_client");
+
+    // Listing the client again does not bring the tokens back.
+    expect(
+      (await callTool(browser, "whoami", tokens.access_token)).status
+    ).toBe(401);
+    expect(
+      (await refresh(browser, acme.clientId, tokens.refresh_token!)).body.error
+    ).toBe("invalid_grant");
+  });
+
+  it("advertises no metadata documents when clients lists none", async () => {
+    const { server } = githubServer({
+      clients: [{ clientId: "acme-cli", redirectUris: [CLIENT_REDIRECT] }],
+    });
+    const metadata = (await (
+      await new Browser(server).request(
+        `${ORIGIN}/.well-known/oauth-authorization-server`
+      )
+    ).json()) as Record<string, unknown>;
+    expect(metadata["client_id_metadata_document_supported"]).toBe(false);
+    expect(metadata["registration_endpoint"]).toBeUndefined();
+  });
+
+  it("signs in ChatGPT, whose metadata document prefers private_key_jwt but also lists none", async () => {
+    // ChatGPT's production document, as served at its client_id URL.
+    const clientId = "https://chatgpt.com/oauth/client.json";
+    const redirectUri = "https://chatgpt.com/connector_platform_oauth_redirect";
+    const chatgpt = {
+      client_id: clientId,
+      client_uri: "https://chatgpt.com/",
+      redirect_uris: [redirectUri],
+      token_endpoint_auth_method: "private_key_jwt",
+      token_endpoint_auth_methods_supported: ["none", "private_key_jwt"],
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      client_name: "ChatGPT",
+      logo_uri: "https://persistent.oaistatic.com/sonic/misc/openai-logo.png",
+      token_endpoint_auth_signing_alg: "RS256",
+      jwks_uri: "https://chatgpt.com/oauth/jwks.json",
+    };
+    const serve =
+      (document: unknown): typeof globalThis.fetch =>
+      async (input, init) =>
+        String(input) === clientId
+          ? Response.json(document)
+          : new UpstreamSpy().fetch(input, init);
+
+    const { server } = githubServer({ fetch: serve(chatgpt) });
+    const browser = new Browser(server);
+    const metadata = (await (
+      await browser.request(`${ORIGIN}/.well-known/oauth-authorization-server`)
+    ).json()) as { token_endpoint_auth_methods_supported: string[] };
+    // The proxy advertises only none, so none is the method ChatGPT picks.
+    expect(metadata.token_endpoint_auth_methods_supported).toEqual(["none"]);
+    const { code, verifier } = await signIn(
+      browser,
+      { clientId, redirectUri },
+      "hubot"
+    );
+    const tokens = await exchange(
+      browser,
+      { clientId, redirectUri },
+      code,
+      verifier
+    );
+    expect(tokens.status).toBe(200);
+
+    // A client that can only authenticate with private_key_jwt is refused.
+    for (const document of [
+      {
+        ...chatgpt,
+        token_endpoint_auth_methods_supported: ["private_key_jwt"],
+      },
+      { ...chatgpt, token_endpoint_auth_methods_supported: undefined },
+      {
+        ...chatgpt,
+        token_endpoint_auth_method: undefined,
+        token_endpoint_auth_methods_supported: ["private_key_jwt"],
+      },
+    ]) {
+      const strict = githubServer({ fetch: serve(document) }).server;
+      const response = await new Browser(strict).request(
+        `${RESOURCE}/oauth/authorize?${new URLSearchParams({
+          response_type: "code",
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+          code_challenge_method: "S256",
+          state: "s",
+        })}`
+      );
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain("only public clients");
+    }
+  });
+
+  describe("names the server on the consent page", () => {
+    async function consentPage(server: MCPServer<UpstreamUser>) {
+      const browser = new Browser(server);
+      const client = await register(browser);
+      const { challenge } = await pkcePair();
+      const response = await browser.request(
+        `${RESOURCE}/oauth/authorize?${new URLSearchParams({
+          response_type: "code",
+          client_id: client.clientId,
+          redirect_uri: client.redirectUri,
+          code_challenge: challenge,
+          code_challenge_method: "S256",
+        })}`
+      );
+      expect(response.status).toBe(200);
+      return response.text();
+    }
+
+    it("by the server name when it has no title", async () => {
+      const { server } = githubServer();
+      expect(await consentPage(server)).toContain("to use acme?</h1>");
+    });
+
+    it("by the server title", async () => {
+      const { server } = githubServer({}, { title: "Acme Tools" });
+      const html = await consentPage(server);
+      expect(html).toContain("to use Acme Tools?</h1>");
+      expect(html).not.toContain("to use acme?");
+    });
+
+    it("by resourceName, which also stays in the resource metadata", async () => {
+      const { server } = githubServer(
+        { resourceName: "Acme API" },
+        { title: "Acme Tools" }
+      );
+      expect(await consentPage(server)).toContain("to use Acme API?</h1>");
+      const metadata = await server.fetch(
+        new Request(`${ORIGIN}/.well-known/oauth-protected-resource/mcp`)
+      );
+      expect(metadata.status).toBe(200);
+      expect(
+        ((await metadata.json()) as Record<string, unknown>)["resource_name"]
+      ).toBe("Acme API");
+    });
+
+    it("by the server title in a custom consent page", async () => {
+      const { createElement } = await import("react");
+      const { server } = githubServer(
+        {
+          consent: {
+            page: (props) =>
+              createElement("p", null, `Custom page for ${props.serverName}`),
+          },
+        },
+        { title: "Acme Tools" }
+      );
+      expect(await consentPage(server)).toContain("Custom page for Acme Tools");
+    });
   });
 
   it("renders a custom consent page component", async () => {
@@ -976,7 +1488,10 @@ describe("oauthProxy with emulated GitHub", () => {
 
 // ─── Google ──────────────────────────────────────────────────────────────
 
-function googleServer(spy: UpstreamSpy): {
+function googleServer(
+  spy: UpstreamSpy,
+  overrides: Partial<OAuthProxyOptions<UpstreamUser>> = {}
+): {
   server: MCPServer<UpstreamUser>;
   toolTokens: string[];
 } {
@@ -995,6 +1510,7 @@ function googleServer(spy: UpstreamSpy): {
       secret: SECRET,
       storage: memoryStorage(),
       fetch: spy.fetch,
+      ...overrides,
     }),
   });
   server.tool({ name: "whoami" }, async (_input, ctx) => {
@@ -1102,6 +1618,120 @@ describe("oauthProxy with emulated Google", () => {
     ).toBe("invalid_grant");
   });
 
+  /**
+   * A Google server whose tokens are short-lived, so every refresh and every
+   * MCP request refreshes upstream, where the gate can hold it.
+   */
+  function gatedGoogle() {
+    const spy = new UpstreamSpy();
+    spy.rewrite = (body) =>
+      typeof body["access_token"] === "string"
+        ? { ...body, expires_in: 30 }
+        : body;
+    const gate = upstreamRefreshGate(spy.fetch);
+    const storage = trackedStorage();
+    const { server } = googleServer(spy, { fetch: gate.fetch, storage });
+    return { server, gate, storage };
+  }
+
+  async function googleSignIn(server: MCPServer<UpstreamUser>) {
+    const browser = new Browser(server);
+    const client = await register(browser);
+    const { code, verifier } = await signIn(
+      browser,
+      client,
+      "second@example.com"
+    );
+    const tokens = (await exchange(browser, client, code, verifier)).body;
+    expect(tokens.access_token).toMatch(/^mcp_at_/);
+    return { browser, client, tokens };
+  }
+
+  it("does not restore a grant that is revoked while a refresh is in progress", async () => {
+    const { server, gate } = gatedGoogle();
+    const { browser, client, tokens } = await googleSignIn(server);
+
+    const held = gate.hold();
+    const pending = refresh(browser, client.clientId, tokens.refresh_token!);
+    await held.reached;
+    const revoked = await browser.form(`${RESOURCE}/oauth/revoke`, {
+      token: tokens.refresh_token!,
+      client_id: client.clientId,
+    });
+    expect(revoked.status).toBe(200);
+    held.release();
+    const result = await pending;
+
+    expect(
+      (await callTool(browser, "whoami", tokens.access_token)).status
+    ).toBe(401);
+    if (result.body.access_token !== undefined) {
+      expect(
+        (await callTool(browser, "whoami", result.body.access_token)).status
+      ).toBe(401);
+    }
+    expect(result.body.error).toBe("invalid_grant");
+  });
+
+  it("does not restore an upstream sign-in that ends while it is refreshed", async () => {
+    const { server, gate, storage } = gatedGoogle();
+    const { browser, tokens } = await googleSignIn(server);
+    const upstreamKeys = await storage.live("up:");
+    expect(upstreamKeys).toHaveLength(1);
+
+    const held = gate.hold();
+    const pending = callTool(browser, "whoami", tokens.access_token);
+    await held.reached;
+    // The sign-in ends, as when another request finds it revoked upstream.
+    await storage.delete(upstreamKeys[0]!);
+    held.release();
+
+    expect((await pending).status).toBe(401);
+    expect(await storage.live("up:")).toEqual([]);
+    expect(
+      (await callTool(browser, "whoami", tokens.access_token)).status
+    ).toBe(401);
+  });
+
+  it("rotates a refresh token once when a request outlives its lock", async () => {
+    const { server, gate, storage } = gatedGoogle();
+    const { browser, client, tokens } = await googleSignIn(server);
+    const original = tokens.refresh_token!;
+
+    const first = gate.hold();
+    const slow = refresh(browser, client.clientId, original);
+    await first.reached;
+    // Only Date is faked: storage leases expire, timers still run.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    let slowResult: Awaited<typeof slow>;
+    let nextResult: Awaited<typeof slow>;
+    try {
+      vi.setSystemTime(Date.now() + 61_000);
+      const second = gate.hold();
+      const next = refresh(browser, client.clientId, original);
+      await second.reached;
+      first.release();
+      slowResult = await slow;
+      // The slow request must not release the lock the next one holds.
+      expect(await storage.live("lock:rt:")).toHaveLength(1);
+      second.release();
+      nextResult = await next;
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(nextResult.status).toBe(200);
+    expect(slowResult.status).toBe(503);
+    expect(slowResult.body.error).toBe("temporarily_unavailable");
+
+    // Exactly one rotation happened: one grace use, then reuse detection.
+    expect((await refresh(browser, client.clientId, original)).status).toBe(
+      200
+    );
+    expect((await refresh(browser, client.clientId, original)).body.error).toBe(
+      "invalid_grant"
+    );
+  });
+
   it("asks Google for consent again when it returns no refresh token", async () => {
     const spy = new UpstreamSpy();
     let dropped = false;
@@ -1170,6 +1800,63 @@ describe("oauthProxy production guards", () => {
         consent: false,
       })
     ).rejects.toThrow("consent: false");
+    // Turning registration off does not make it safe: metadata documents
+    // still let any client name its own redirect URI.
+    await expect(
+      mount({
+        resource: "https://api.example.com/mcp",
+        storage: inspectableStorage(),
+        secret: SECRET,
+        consent: false,
+        dcr: false,
+      })
+    ).rejects.toThrow("consent: false is allowed only on localhost");
+  });
+
+  it("requires no secrets inside mcp-use build", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // What `mcp-use build` sets while it evaluates the entry.
+    vi.stubEnv("MCP_USE_PHASE", "build");
+    try {
+      expect(isBuilding()).toBe(true);
+      // A build with none of the runtime environment set, as in CI.
+      const unset = process.env["MCP_USE_TEST_UNSET"]!;
+      const response = await new MCPServer({
+        name: "acme",
+        version: "1.0.0",
+        logging: { enabled: false },
+        oauth: oauthProxy({
+          upstream: github({ clientId: unset, clientSecret: unset }),
+          resource: "https://api.example.com/mcp",
+          storage: upstashStorage({ url: unset, token: unset }),
+        }),
+      }).fetch(new Request("https://api.example.com/mcp/oauth/authorize"));
+      expect(response).toBeInstanceOf(Response);
+      // A store chosen from the runtime environment may be memory at build.
+      await expect(
+        mount({
+          resource: "https://api.example.com/mcp",
+          storage: memoryStorage(),
+        })
+      ).resolves.toBeInstanceOf(Response);
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.stringContaining("oauthProxy")
+      );
+      // Mistakes that no environment fixes still fail the build.
+      await expect(
+        mount({ resource: "https://api.example.com/mcp", consent: false })
+      ).rejects.toThrow("consent: false is allowed only on localhost");
+    } finally {
+      vi.unstubAllEnvs();
+      warn.mockRestore();
+    }
+    expect(isBuilding()).toBe(false);
+    expect(() => github({ clientId: "", clientSecret: "" })).toThrow(
+      "upstream.clientId must be a non-empty string"
+    );
+    expect(() => upstashStorage({} as never)).toThrow(
+      "upstashStorage requires url and token"
+    );
   });
 
   it("validates options when the provider is created", () => {
@@ -1177,34 +1864,73 @@ describe("oauthProxy production guards", () => {
       oauthProxy({ upstream: upstreamConfig(), secret: "short" })
     ).toThrow("at least 32 characters");
     expect(() =>
+      oauthProxy({ upstream: upstreamConfig(), clients: [] })
+    ).toThrow("at least one client");
+    for (const entry of [
+      "http://client.example/meta",
+      "https://client.example/meta#x",
+      "https://client.example?x=1",
+      "client.example",
+    ]) {
+      expect(() =>
+        oauthProxy({ upstream: upstreamConfig(), clients: [entry] })
+      ).toThrow("neither a client ID metadata document URL");
+    }
+    expect(() =>
       oauthProxy({
         upstream: upstreamConfig(),
-        preRegisteredClients: [
-          {
-            clientId: "app",
-            redirectUris: ["http://127.0.0.1/cb"],
-            trusted: true,
-          },
+        clients: ["https://claude.example"],
+        dcr: true,
+      })
+    ).toThrow("dcr cannot be on while clients is set");
+    expect(() =>
+      oauthProxy({
+        upstream: upstreamConfig(),
+        clients: ["https://claude.example"],
+        dcr: "true" as unknown as boolean,
+      })
+    ).toThrow("dcr must be a boolean");
+    for (const clientId of ["https://app.example", "mcp_client_x"]) {
+      expect(() =>
+        oauthProxy({
+          upstream: upstreamConfig(),
+          clients: [{ clientId, redirectUris: ["http://127.0.0.1/cb"] }],
+        })
+      ).toThrow("must not look like");
+    }
+    expect(() =>
+      oauthProxy({
+        upstream: upstreamConfig(),
+        clients: [
+          { clientId: "app", redirectUris: ["http://127.0.0.1/cb"] },
+          { clientId: "app", redirectUris: ["http://127.0.0.1/cb"] },
         ],
       })
-    ).toThrow("only with HTTPS redirect URIs");
+    ).toThrow("listed twice");
     expect(() =>
       oauthProxy({
         upstream: upstreamConfig(),
-        trustedClients: ["http://client.example/meta"],
+        clients: [{ clientId: "app", redirectUris: ["data:text/html,hi"] }],
       })
-    ).toThrow("trustedClients");
+    ).toThrow("oauthProxy clients:");
+    const inPage = {
+      kind: "in-page" as const,
+      id: "firebase",
+      name: "Firebase",
+      script: () => "",
+      verify: async () => ({ user: { subject: "u", profile: {} } }),
+    };
+    expect(() => oauthProxy({ upstream: inPage })).not.toThrow();
     expect(() =>
       oauthProxy({
-        upstream: {
-          kind: "in-page",
-          id: "firebase",
-          name: "Firebase",
-          page: () => null,
-          verify: async () => ({ user: { subject: "u", profile: {} } }),
-        },
+        upstream: { ...inPage, verify: undefined as never },
       })
-    ).toThrow("in-page upstreams");
+    ).toThrow("upstream.verify must be a function");
+    expect(() =>
+      oauthProxy({
+        upstream: { ...inPage, csp: { script: ["https://a.example; x"] } },
+      })
+    ).toThrow("upstream.csp.script");
     expect(() =>
       github({
         clientId: "a",
@@ -1224,7 +1950,7 @@ describe("oauthProxy production guards", () => {
         upstream: upstreamConfig(),
         secret: SECRET,
         storage: inspectableStorage(),
-        preRegisteredClients: [
+        clients: [
           { clientId: "desktop", redirectUris: ["http://127.0.0.1/callback"] },
         ],
       }),

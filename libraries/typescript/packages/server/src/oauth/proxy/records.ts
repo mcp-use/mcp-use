@@ -13,8 +13,6 @@ export interface ClientRecord {
   clientName?: string;
   /** Where the record came from. */
   source: "dcr" | "cimd" | "pre-registered";
-  /** Whether the consent page is skipped for this client. */
-  trusted: boolean;
 }
 
 /** @internal `txn:<id>` — one sign-in in progress (10 minutes). */
@@ -57,6 +55,11 @@ export interface GrantRecord {
 export interface AccessRecord {
   grantId: string;
   expiresAt: number;
+  /**
+   * Scopes of this token, narrower than the grant's after a refresh that
+   * asked for less. Records written before this field read as the grant's.
+   */
+  scopes?: string[];
 }
 
 /** @internal `rt:<hash>` — one proxy refresh token. */
@@ -89,6 +92,8 @@ export const keys = {
   code: (hash: string) => `code:${hash}`,
   codeUsed: (hash: string) => `codeused:${hash}`,
   grant: (id: string) => `grant:${id}`,
+  /** Marks a grant as ended, so a refresh in progress cannot restore it. */
+  revokedGrant: (id: string) => `revoked:${id}`,
   access: (hash: string) => `at:${hash}`,
   refresh: (hash: string) => `rt:${hash}`,
   refreshLock: (hash: string) => `lock:rt:${hash}`,

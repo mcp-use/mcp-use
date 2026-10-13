@@ -1,10 +1,15 @@
 /**
  * OAuth proxy building blocks: key derivation and value encryption,
- * redirect-URI and client rules, SSRF address checks, and storage adapters.
+ * redirect-URI and client rules, SSRF address checks, upstream error
+ * reports, and storage adapters.
  */
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  assertPublicHost,
+  createCimdFetcher,
+  defaultHostResolver,
+  hostResolverFrom,
   isCimdClientId,
   isPrivateAddress,
   matchRedirectUri,
@@ -18,8 +23,16 @@ import {
   pkceChallenge,
   timingSafeEqual,
 } from "../src/oauth/proxy/crypto.js";
+import { github } from "../src/oauth/proxy/providers.js";
+import { describe as describeError } from "../src/oauth/proxy/runtime.js";
+import { SecureStore } from "../src/oauth/proxy/storage.js";
+import {
+  refreshUpstreamTokens,
+  UpstreamError,
+} from "../src/oauth/proxy/upstream.js";
 import {
   cloudflareStorage,
+  firestoreStorage,
   memoryStorage,
   OAuthProxyDurableObject,
   postgresStorage,
@@ -173,6 +186,211 @@ describe("oauth proxy client rules", () => {
   });
 });
 
+describe("oauth proxy metadata-document host check", () => {
+  const resolving =
+    (...addresses: string[]) =>
+    async () =>
+      addresses;
+
+  it("refuses a hostname when the runtime has no resolver", async () => {
+    await expect(assertPublicHost("client.example", undefined)).rejects.toThrow(
+      "cannot be checked"
+    );
+    // IP literals need no resolver.
+    await expect(
+      assertPublicHost("140.82.112.3", undefined)
+    ).resolves.toBeUndefined();
+    await expect(assertPublicHost("10.0.0.1", undefined)).rejects.toThrow(
+      "not public"
+    );
+
+    const fetchImpl = vi.fn(async () => Response.json({}));
+    const fetchCimd = createCimdFetcher(fetchImpl, async () => undefined);
+    await expect(
+      fetchCimd("https://client.example/oauth/metadata.json")
+    ).rejects.toThrow("cannot be checked");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses hosts that resolve to private addresses or not at all", async () => {
+    await expect(
+      assertPublicHost("client.example", resolving("140.82.112.3"))
+    ).resolves.toBeUndefined();
+    await expect(
+      assertPublicHost(
+        "client.example",
+        resolving("140.82.112.3", "169.254.169.254")
+      )
+    ).rejects.toThrow("not public");
+    await expect(
+      assertPublicHost("client.example", resolving())
+    ).rejects.toThrow("not public");
+    await expect(
+      assertPublicHost("client.example", async () => {
+        throw new Error("ENOTFOUND");
+      })
+    ).rejects.toThrow("does not resolve");
+  });
+
+  it("resolves with lookup, or with resolve4 and resolve6 on Cloudflare Workers", async () => {
+    const lookup = vi.fn(async () => [
+      { address: "140.82.112.3" },
+      { address: "::1" },
+    ]);
+    const notImplemented = async () => {
+      throw new Error("Not implemented");
+    };
+    const node = hostResolverFrom({ promises: { lookup } }, "Node.js/22");
+    expect(await node!("client.example")).toEqual(["140.82.112.3", "::1"]);
+    expect(lookup).toHaveBeenCalledWith("client.example", {
+      all: true,
+      verbatim: true,
+    });
+
+    const workers = hostResolverFrom(
+      {
+        default: {
+          promises: {
+            lookup: notImplemented,
+            resolve4: async () => ["140.82.112.3"],
+            resolve6: async () => {
+              throw new Error("ENODATA");
+            },
+          },
+        },
+      },
+      "Cloudflare-Workers"
+    );
+    expect(await workers!("client.example")).toEqual(["140.82.112.3"]);
+    const unresolvable = hostResolverFrom(
+      {
+        promises: { resolve4: notImplemented, resolve6: notImplemented },
+      },
+      "Cloudflare-Workers"
+    );
+    await expect(unresolvable!("client.example")).rejects.toThrow();
+
+    expect(hostResolverFrom({}, "Node.js/22")).toBeUndefined();
+    expect(
+      hostResolverFrom({ promises: { lookup } }, "Cloudflare-Workers")
+    ).toBeUndefined();
+    expect(typeof (await defaultHostResolver())).toBe("function");
+  });
+});
+
+describe("oauth proxy upstream errors", () => {
+  const provider = github({
+    clientId: "client-id",
+    clientSecret: "client-secret",
+    baseUrl: "https://github.example",
+  });
+
+  /** Refreshes against a token endpoint that answers with `answer`. */
+  async function refreshError(
+    answer: () => Response | Promise<Response>
+  ): Promise<UpstreamError> {
+    const error = await refreshUpstreamTokens(
+      provider,
+      async () => answer(),
+      "refresh-token-value"
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(UpstreamError);
+    return error as UpstreamError;
+  }
+
+  it("keeps GitHub's own code and HTTP status for a refused refresh token", async () => {
+    const error = await refreshError(() =>
+      Response.json({
+        error: "bad_refresh_token",
+        error_description: "The refresh token passed is incorrect or expired.",
+      })
+    );
+    // invalid_grant ends the user's sign-ins; GitHub's code is kept for logs.
+    expect(error.code).toBe("invalid_grant");
+    expect(error.transient).toBe(false);
+    expect(error.upstreamCode).toBe("bad_refresh_token");
+    expect(describeError(error)).toBe(
+      "GitHub token endpoint returned bad_refresh_token: The refresh token passed is incorrect or expired. (HTTP 200)"
+    );
+  });
+
+  it("names the fields of an unusable token response, never their values", async () => {
+    const error = await refreshError(() =>
+      Response.json({ refresh_token: "leaked-refresh-token", scope: "user" })
+    );
+    expect(error.code).toBe("server_error");
+    expect(error.transient).toBe(false);
+    const text = describeError(error);
+    expect(text).toContain("fields refresh_token, scope");
+    expect(text).not.toContain("leaked-refresh-token");
+  });
+
+  it("reports the status and content type of a non-JSON answer", async () => {
+    const error = await refreshError(
+      () =>
+        new Response("<html>Bad gateway</html>", {
+          status: 502,
+          headers: { "content-type": "text/html" },
+        })
+    );
+    expect(error.transient).toBe(true);
+    expect(describeError(error)).toContain("HTTP 502, content-type text/html");
+  });
+
+  it("treats a 401 challenge as refused client credentials, not a revoked grant", async () => {
+    const error = await refreshError(
+      () =>
+        new Response(null, {
+          status: 401,
+          headers: { "www-authenticate": 'Basic realm="github"' },
+        })
+    );
+    expect(error.code).toBe("invalid_client");
+    expect(error.transient).toBe(false);
+    expect(describeError(error)).toContain("HTTP 401, WWW-Authenticate basic");
+  });
+
+  it("names the network failure when the endpoint is unreachable", async () => {
+    const error = await refreshError(() => {
+      throw new TypeError("fetch failed", {
+        cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), {
+          code: "ECONNREFUSED",
+        }),
+      });
+    });
+    expect(error.code).toBe("temporarily_unavailable");
+    expect(error.transient).toBe(true);
+    expect(error.message).toBe(
+      "GitHub token endpoint is unreachable: ECONNREFUSED"
+    );
+  });
+
+  it("logs records encrypted with another secret once", async () => {
+    const storage = memoryStorage();
+    const write = new SecureStore(storage, () => deriveKeyring([SECRET_A]));
+    await write.set("up:github:1", { a: 1 }, 60);
+    await write.set("up:github:2", { a: 2 }, 60);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const read = new SecureStore(storage, () => deriveKeyring([SECRET_B]));
+      expect(await read.get("up:github:1")).toBeUndefined();
+      expect(await read.get("up:github:2")).toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]![0])).toContain(
+        "encrypted with a secret this server does not have"
+      );
+      // After rotation the old records read again, without a warning.
+      const rotated = new SecureStore(storage, () =>
+        deriveKeyring([SECRET_B, SECRET_A])
+      );
+      expect(await rotated.get("up:github:1")).toEqual({ a: 1 });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
 /** Atomic semantics every adapter must provide. */
 async function exerciseStorage(storage: OAuthProxyStorage): Promise<void> {
   expect(await storage.get("a")).toBeUndefined();
@@ -185,6 +403,87 @@ async function exerciseStorage(storage: OAuthProxyStorage): Promise<void> {
   expect(await storage.add("a", "3", 60)).toBe(true);
   await storage.delete("a");
   expect(await storage.get("a")).toBeUndefined();
+}
+
+/**
+ * A tiny Firestore. Reads yield, so unsynchronized read-then-write code
+ * races; transactions run one at a time and commit their writes at the end,
+ * like the server SDK's locking transactions. Dates come back as
+ * Timestamp-like objects.
+ */
+function miniFirestore() {
+  const documents = new Map<string, Record<string, unknown>>();
+  const ids: string[] = [];
+  const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 1));
+  const stored = (data: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(data).map(([field, value]) => [
+        field,
+        value instanceof Date
+          ? { toMillis: () => value.getTime() }
+          : (value as unknown),
+      ])
+    );
+  const snapshot = (path: string) => {
+    const data = documents.get(path);
+    return { exists: data !== undefined, data: () => data };
+  };
+  let queue = Promise.resolve();
+  const firestore = {
+    collection: (name: string) => ({
+      doc: (id: string) => {
+        ids.push(id);
+        const path = `${name}/${id}`;
+        return {
+          path,
+          get: async () => {
+            // The read sees the document as it is now; the reply comes later.
+            const result = snapshot(path);
+            await tick();
+            return result;
+          },
+          set: async (data: Record<string, unknown>) => {
+            documents.set(path, stored(data));
+          },
+          delete: async () => {
+            documents.delete(path);
+          },
+        };
+      },
+    }),
+    runTransaction: <T>(
+      update: (transaction: {
+        get(reference: { path: string }): Promise<ReturnType<typeof snapshot>>;
+        set(reference: { path: string }, data: Record<string, unknown>): void;
+        delete(reference: { path: string }): void;
+      }) => Promise<T>
+    ): Promise<T> => {
+      const run = queue.then(async () => {
+        const writes: (() => void)[] = [];
+        const result = await update({
+          get: async (reference) => {
+            const result = snapshot(reference.path);
+            await tick();
+            return result;
+          },
+          set: (reference, data) => {
+            writes.push(() => documents.set(reference.path, stored(data)));
+          },
+          delete: (reference) => {
+            writes.push(() => documents.delete(reference.path));
+          },
+        });
+        for (const write of writes) write();
+        return result;
+      });
+      queue = run.then(
+        () => undefined,
+        () => undefined
+      );
+      return run;
+    },
+  };
+  return { firestore, documents, ids };
 }
 
 /** A tiny Redis that understands the commands the adapters send. */
@@ -256,10 +555,35 @@ describe("oauth proxy storage adapters", () => {
     const ioredis = miniRedis();
     await exerciseStorage(
       redisStorage({
-        call: async (command, ...args) => ioredis([command, ...args]),
+        call: async (command: string, ...args: string[]) =>
+          ioredis([command, ...args]),
       })
     );
     expect(() => redisStorage({} as never)).toThrow("node-redis or ioredis");
+  });
+
+  it("redisStorage connects through a function on first use", async () => {
+    const redis = miniRedis();
+    let attempts = 0;
+    let reachable = false;
+    const storage = redisStorage(async () => {
+      attempts += 1;
+      await Promise.resolve();
+      if (!reachable) throw new Error("connect ECONNREFUSED");
+      return { sendCommand: async (args: string[]) => redis(args) };
+    });
+    expect(attempts).toBe(0);
+    // A failed connection is not cached: the next call tries again.
+    await expect(storage.get("a")).rejects.toThrow("ECONNREFUSED");
+    reachable = true;
+    // Concurrent first calls share one connection attempt.
+    await Promise.all([storage.get("x"), storage.get("y"), storage.get("z")]);
+    expect(attempts).toBe(2);
+    await exerciseStorage(storage);
+    expect(attempts).toBe(2);
+    await expect(redisStorage(() => ({}) as never).get("a")).rejects.toThrow(
+      "node-redis or ioredis"
+    );
   });
 
   it("postgresStorage creates its table and uses DELETE … RETURNING", async () => {
@@ -293,6 +617,59 @@ describe("oauth proxy storage adapters", () => {
         table: "x; drop",
       })
     ).toThrow("plain SQL identifier");
+  });
+
+  it("firestoreStorage keeps one document per key and runs take and add in transactions", async () => {
+    const { firestore, documents, ids } = miniFirestore();
+    const storage = firestoreStorage({
+      firestore: firestore as unknown as Parameters<
+        typeof firestoreStorage
+      >[0]["firestore"],
+      collection: "oauth_state",
+    });
+    await exerciseStorage(storage);
+
+    // Any key works as a document ID, including one with a slash.
+    await storage.set("up:custom:https://id.example/u/1", "v", 60);
+    expect(await storage.get("up:custom:https://id.example/u/1")).toBe("v");
+    expect(ids.every((id) => !id.includes("/"))).toBe(true);
+    expect([...documents.keys()][0]).toMatch(/^oauth_state\//);
+
+    // Only one of many concurrent takes or adds wins.
+    await storage.set("code", "c", 60);
+    const taken = await Promise.all(
+      Array.from({ length: 10 }, () => storage.take("code"))
+    );
+    expect(taken.filter((value) => value === "c")).toHaveLength(1);
+    const added = await Promise.all(
+      Array.from({ length: 10 }, (_, index) =>
+        storage.add("lock", String(index), 60)
+      )
+    );
+    expect(added.filter(Boolean)).toHaveLength(1);
+
+    // An expired document reads as absent, and add replaces it.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      await storage.set("ttl", "x", 1);
+      vi.setSystemTime(Date.now() + 1500);
+      expect(await storage.get("ttl")).toBeUndefined();
+      expect(await storage.take("ttl")).toBeUndefined();
+      await storage.set("ttl", "x", 1);
+      vi.setSystemTime(Date.now() + 1500);
+      expect(await storage.add("ttl", "y", 60)).toBe(true);
+      expect(await storage.get("ttl")).toBe("y");
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(() => firestoreStorage({} as never)).toThrow("Firestore database");
+    expect(() =>
+      firestoreStorage({
+        firestore: firestore as never,
+        collection: "a/b",
+      })
+    ).toThrow("without slashes");
   });
 
   it("cloudflareStorage works with the Durable Object class", async () => {

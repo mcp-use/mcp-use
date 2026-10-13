@@ -73,6 +73,20 @@ export type OAuthProviderRouteHandler = (
 ) => Response | Promise<Response>;
 
 /**
+ * Server identity exposed to an OAuth provider as
+ * {@link OAuthProviderHost.serverInfo}.
+ */
+export interface OAuthProviderServerInfo {
+  /** Server name from the `MCPServer` `name` option. */
+  readonly name: string;
+  /**
+   * Human-readable display name from the `MCPServer` `title` option, or
+   * `undefined` when the server sets none.
+   */
+  readonly title?: string | undefined;
+}
+
+/**
  * Server surface handed to a provider's {@link CustomOAuthProviderOptions.setup}
  * hook while the server mounts.
  *
@@ -93,6 +107,12 @@ export interface OAuthProviderHost<TUser> {
   /** MCP endpoint base path, for example `/mcp`. */
   readonly basePath: string;
   /**
+   * The server's identity from its `MCPServer` options. A provider that
+   * renders pages for people, such as a consent page, can name the server
+   * with `title ?? name`.
+   */
+  readonly serverInfo: OAuthProviderServerInfo;
+  /**
    * Whether the server was constructed with `mixedAuth: true`, so signed-out
    * clients can connect, list, and call `noauth` tools. A provider that
    * needs anonymous discovery can throw from `setup` when this is `false`.
@@ -105,6 +125,14 @@ export interface OAuthProviderHost<TUser> {
    * local listener.
    */
   readonly mode: "listen" | "handler";
+  /**
+   * Address `server.listen()` bound to, for example `127.0.0.1` or
+   * `0.0.0.0`. `undefined` in `"handler"` mode, where the server cannot see
+   * how the platform or framework serves it. A provider can use it to allow
+   * a development-only setting only when the listener is reachable from
+   * this machine alone.
+   */
+  readonly listenHost?: string | undefined;
   /**
    * Registers a provider-owned HTTP route, such as an authorization
    * endpoint. The server mounts it ahead of the OAuth gate and of the

@@ -61,6 +61,9 @@ export function github(options: GitHubUpstreamOptions): RedirectUpstream {
   return upstream({
     id: "github",
     name: "GitHub",
+    // GitHub names this issuer in the `iss` parameter of its authorization
+    // responses, which must match it.
+    issuer: `${baseUrl}/login/oauth`,
     authorizationEndpoint: `${baseUrl}/login/oauth/authorize`,
     tokenEndpoint: `${baseUrl}/login/oauth/access_token`,
     clientId: options.clientId,

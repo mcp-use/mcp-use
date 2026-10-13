@@ -13,6 +13,7 @@ import {
 import {
   configuredClients,
   createCimdFetcher,
+  defaultHostResolver,
   type OAuthProxyClient,
 } from "./clients.js";
 import type { ConsentPageProps } from "./consent.js";
@@ -22,7 +23,7 @@ import {
   randomKeyring,
   type ProxyKeyring,
 } from "./crypto.js";
-import { ProxyRuntime, type ProxyAuthExtra } from "./runtime.js";
+import { describe, ProxyRuntime, type ProxyAuthExtra } from "./runtime.js";
 import {
   assertStorage,
   isMemoryStorage,
@@ -31,10 +32,14 @@ import {
   type OAuthProxyStorage,
 } from "./storage.js";
 import {
+  assertInPageUpstream,
   assertRedirectUpstream,
   type Upstream,
   type UpstreamUser,
 } from "./upstream.js";
+
+/** `listen()` hosts that only this machine can reach. */
+const LOOPBACK_BINDS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 /** Consent page settings for {@link OAuthProxyOptions.consent}. */
 export interface OAuthProxyConsentOptions {
@@ -51,7 +56,9 @@ export interface OAuthProxyConsentOptions {
    * React component that replaces the built-in consent page. It is rendered
    * on the server with `react-dom/server`, so it needs the `react` and
    * `react-dom` packages. See {@link ConsentPageProps} for the form it must
-   * render.
+   * render. With an in-page upstream such as `firebase()`, it receives
+   * {@link InPageProps}, and the proxy adds the upstream's sign-in script
+   * after it.
    */
   page?: (props: ConsentPageProps) => unknown;
 }
@@ -75,47 +82,56 @@ export interface OAuthProxyOptions<TUser> extends OAuthResourceOptions {
    *
    * Defaults to the `MCP_USE_OAUTH_SECRET` environment variable. Required
    * unless the server runs with `listen()` on localhost, where a random key
-   * is used and sign-ins end when the process stops.
+   * is used and sign-ins end when the process stops. `mcp-use build` does
+   * not need it.
    */
   secret?: string | readonly string[];
   /**
    * Shared store for clients, sign-ins, grants, and tokens. Required unless
    * the server runs with `listen()` on localhost, where an in-memory store is
-   * used. See `mcp-use/oauth/storage` for adapters.
+   * used. `mcp-use build` does not need it. See `mcp-use/oauth/storage` for
+   * adapters.
    */
   storage?: OAuthProxyStorage;
   /**
    * The consent page that the proxy shows before it sends the user to the
    * upstream provider. It defends against a malicious client that reuses
    * an earlier upstream approval (the confused-deputy attack). Set `false`
-   * only for local development: outside localhost it is refused while
-   * dynamic client registration is on.
+   * only for local development: it is refused outside localhost.
    *
    * @defaultValue `{ mode: "always" }`
    */
   consent?: false | OAuthProxyConsentOptions;
   /**
-   * Client ID metadata document URLs of clients that skip the consent page,
-   * for example `"https://claude.ai/oauth/mcp-client-metadata.json"`. Only
-   * HTTPS metadata documents qualify, because their owner is verified by the
-   * HTTPS host.
-   */
-  trustedClients?: readonly string[];
-  /** Clients configured on the server, with exact redirect URIs. */
-  preRegisteredClients?: readonly OAuthProxyClient[];
-  /**
-   * Accept client ID metadata documents (an HTTPS URL as the `client_id`),
-   * the client identification that the MCP specification prefers.
+   * The MCP clients that may connect. When unset, any client can connect:
+   * with a client ID metadata document (an HTTPS URL as its `client_id`,
+   * which the MCP specification prefers) or, while `dcr` is on, through
+   * dynamic client registration. When set, only these clients can connect
+   * and dynamic client registration is off:
    *
-   * @defaultValue `true`
+   * - a metadata document URL allows that one client, for example
+   *   `"https://claude.ai/oauth/mcp-client-metadata.json"`;
+   * - an HTTPS origin allows every metadata document on that origin, for
+   *   example `"https://chatgpt.com"`;
+   * - an {@link OAuthProxyClient} defines a client by hand, for a client
+   *   that can use neither a metadata document nor registration.
+   *
+   * Removing a client ends its existing sign-ins for good: the next request
+   * with one of its tokens deletes the grant. This list controls which
+   * apps connect, not which users sign in: any user of the upstream
+   * provider can sign in through an allowed app. Check the user in
+   * `mapUser` or in your tools to restrict users.
    */
-  cimd?: boolean;
+  clients?: readonly (string | OAuthProxyClient)[];
   /**
    * Accept dynamic client registration (RFC 7591) at `/oauth/register`, for
    * clients that do not support metadata documents yet. Registered clients
-   * are public clients: the proxy never issues a client secret.
+   * are public clients: the proxy never issues a client secret. Turning it
+   * off ends the sign-ins of registered clients, as removing a client from
+   * `clients` does. It cannot be on while
+   * `clients` is set, because a registered client names itself.
    *
-   * @defaultValue `true`
+   * @defaultValue `true`, or `false` when `clients` is set
    */
   dcr?: boolean;
   /**
@@ -132,9 +148,14 @@ export interface OAuthProxyOptions<TUser> extends OAuthResourceOptions {
    */
   mapUser?: (user: UpstreamUser) => TUser;
   /**
-   * Fetch implementation for upstream and metadata-document requests. When
-   * set, the proxy no longer refuses metadata-document hosts that resolve to
-   * private addresses; the custom fetch must enforce its own network policy.
+   * Fetch implementation for upstream and metadata-document requests.
+   *
+   * Without it, the proxy resolves each metadata-document host with
+   * `node:dns` and refuses hosts that resolve to private addresses. A
+   * runtime without `node:dns` cannot check a host, so the proxy refuses
+   * every metadata document there (Cloudflare Workers has `node:dns` with
+   * the `nodejs_compat` flag). When `fetch` is set, the proxy skips the
+   * check: the custom fetch must enforce its own network policy.
    */
   fetch?: typeof globalThis.fetch;
 }
@@ -148,7 +169,7 @@ export type OAuthProxyProvider<TUser> = OAuthProvider<
 /**
  * Creates an OAuth provider that makes the MCP server its own authorization
  * server, in front of an identity provider that does not support dynamic
- * client registration (for example GitHub or Google).
+ * client registration (for example GitHub, Google, or Firebase Auth).
  *
  * MCP clients discover the server's own endpoints, register (or present a
  * client ID metadata document), and sign in through
@@ -160,14 +181,17 @@ export type OAuthProxyProvider<TUser> = OAuthProvider<
  *
  * Register `https://<your server><base path>/oauth/callback` (for example
  * `https://api.example.com/mcp/oauth/callback`) as the callback URL of the
- * upstream OAuth app.
+ * upstream OAuth app. An in-page upstream such as `firebase()` has no
+ * callback: the user signs in with the provider's browser SDK on the
+ * consent page, and the page posts the result with the decision.
  *
  * @typeParam TUser - Application user type exposed as `ctx.auth.user`.
  * @param options - Upstream provider, secret, storage, and consent settings.
  * @returns A provider for the `oauth` option of `MCPServer`.
  * @throws A `TypeError` if an option is invalid. When the server mounts, the
  * provider throws if `storage` or `secret` is missing outside a localhost
- * `listen()`.
+ * `listen()`. Inside `mcp-use build` (see `isBuilding()` in `mcp-use`), it
+ * requires neither, nor the upstream client ID and secret.
  *
  * @example
  * ```ts
@@ -208,16 +232,14 @@ export function oauthProxy<TUser = UpstreamUser>(
   }
   const upstream = options.upstream;
   if (upstream?.kind === "in-page") {
+    assertInPageUpstream(upstream);
+  } else if (upstream?.kind === "redirect") {
+    assertRedirectUpstream(upstream);
+  } else {
     throw new TypeError(
-      "oauthProxy does not support in-page upstreams yet; use a redirect upstream such as github() or google()"
+      "oauthProxy upstream must be github(), google(), firebase(), or upstream({...})"
     );
   }
-  if (upstream?.kind !== "redirect") {
-    throw new TypeError(
-      "oauthProxy upstream must be github(), google(), or upstream({...})"
-    );
-  }
-  assertRedirectUpstream(upstream);
 
   const configuredSecret =
     options.secret ?? oauthEnvironmentValue("MCP_USE_OAUTH_SECRET");
@@ -227,10 +249,22 @@ export function oauthProxy<TUser = UpstreamUser>(
       : normalizeSecrets(configuredSecret);
   if (options.storage !== undefined) assertStorage(options.storage);
   const consent = normalizeConsent(options.consent);
-  const clients = configuredClients(
-    options.preRegisteredClients,
-    options.trustedClients
-  );
+  const clients = configuredClients(options.clients);
+  if (options.dcr !== undefined && typeof options.dcr !== "boolean") {
+    throw new TypeError("oauthProxy dcr must be a boolean");
+  }
+  if (options.dcr === true && clients.allow !== undefined) {
+    throw new TypeError(
+      "oauthProxy dcr cannot be on while clients is set: a registered client names itself, so it cannot be on the list"
+    );
+  }
+  const dcr = options.dcr ?? clients.allow === undefined;
+  // Advertise metadata documents only when some can pass the allowlist, so
+  // that a client does not pick a method that is bound to fail.
+  const cimd =
+    clients.allow === undefined ||
+    clients.allow.urls.size > 0 ||
+    clients.allow.origins.size > 0;
   const accessTokenTtl = options.accessTokenTtl ?? 3600;
   if (
     !Number.isInteger(accessTokenTtl) ||
@@ -247,8 +281,6 @@ export function oauthProxy<TUser = UpstreamUser>(
   if (options.fetch !== undefined && typeof options.fetch !== "function") {
     throw new TypeError("oauthProxy fetch must be a function");
   }
-  const cimd = options.cimd ?? true;
-  const dcr = options.dcr ?? true;
   const scopes = [...(options.scopesSupported ?? options.requiredScopes ?? [])];
   const fetchImpl =
     options.fetch ?? ((input, init) => globalThis.fetch(input, init));
@@ -278,31 +310,67 @@ export function oauthProxy<TUser = UpstreamUser>(
       registerRoutes(host, runtime, dcr);
       return;
     }
+    // `mcp-use build` mounts the server without serving requests, so it
+    // needs neither a store nor a secret.
+    const building = isBuilding();
     const local = host.mode === "listen" && isLocalhost(host.resourceUrl);
     let storage = options.storage;
     if (storage === undefined) {
-      if (!local) {
+      if (!local && !building) {
         throw new Error(
           "oauthProxy needs storage outside a localhost listen(): pass a shared store from mcp-use/oauth/storage"
         );
       }
       storage = memoryStorage();
-    } else if (isMemoryStorage(storage) && !isLocalhost(host.resourceUrl)) {
+    } else if (
+      isMemoryStorage(storage) &&
+      !building &&
+      !isLocalhost(host.resourceUrl)
+    ) {
       throw new Error(
         "oauthProxy memoryStorage() works only on localhost; use a shared store from mcp-use/oauth/storage"
       );
     }
-    if (secrets === undefined && !local) {
+    if (secrets === undefined && !local && !building) {
       throw new Error(
         "oauthProxy needs a secret outside a localhost listen(): set MCP_USE_OAUTH_SECRET or the secret option"
       );
     }
-    if (consent === false && dcr && !isLocalhost(host.resourceUrl)) {
-      throw new Error(
-        "oauthProxy consent: false is allowed only on localhost while dynamic client registration is on"
-      );
+    // Any client can identify itself with a metadata document, so without
+    // consent a crafted sign-in link could send codes to any redirect URI.
+    if (consent === false && !isLocalhost(host.resourceUrl)) {
+      throw new Error("oauthProxy consent: false is allowed only on localhost");
     }
-    if (secrets === undefined) {
+    // An emulator upstream accepts proofs that nobody signed, so anyone who
+    // reaches the server can sign in as anyone. A localhost resource is not
+    // enough: listen() on 0.0.0.0 serves every interface whatever the
+    // resource says. In handler mode the server cannot see how it is served.
+    if (upstream.kind === "in-page" && upstream.emulator === true) {
+      if (!isLocalhost(host.resourceUrl)) {
+        throw new Error(
+          `oauthProxy: ${upstream.name} emulator mode is allowed only on localhost`
+        );
+      }
+      if (
+        host.mode === "listen" &&
+        !LOOPBACK_BINDS.has(host.listenHost ?? "")
+      ) {
+        throw new Error(
+          `oauthProxy: ${upstream.name} emulator mode is allowed only on localhost: ` +
+            `listen() on 127.0.0.1, localhost, or ::1, not ${host.listenHost ?? "an unknown host"}`
+        );
+      }
+      if (!building) {
+        console.warn(
+          `[mcp-use] oauthProxy: ${upstream.name} emulator mode is on. Unsigned sign-in proofs are accepted, ` +
+            "so anyone who can reach this server can sign in as any user. " +
+            (host.mode === "handler"
+              ? "Serve it on a loopback address only; never use it in production."
+              : "Never use it in production.")
+        );
+      }
+    }
+    if (secrets === undefined && !building) {
       console.warn(
         "[mcp-use] oauthProxy: no secret set; using a random key for this process. " +
           "Sign-ins end when the server restarts. Set MCP_USE_OAUTH_SECRET to keep them."
@@ -324,19 +392,20 @@ export function oauthProxy<TUser = UpstreamUser>(
       clients: {
         store,
         configured: clients.byId,
-        trustedCimd: clients.trustedCimd,
-        cimd,
+        allow: clients.allow,
         dcr,
-        fetchCimd: createCimdFetcher(fetchImpl, options.fetch === undefined),
+        fetchCimd: createCimdFetcher(
+          fetchImpl,
+          options.fetch === undefined ? defaultHostResolver : false
+        ),
       },
       upstream,
       fetch: fetchImpl,
       scopes,
       accessTokenTtl,
       consent,
-      ...(options.resourceName !== undefined && {
-        serverName: options.resourceName,
-      }),
+      serverName:
+        options.resourceName ?? host.serverInfo.title ?? host.serverInfo.name,
     });
     registerRoutes(host, runtime, dcr);
   };
@@ -413,7 +482,7 @@ function registerRoutes<TUser>(
       try {
         return await handler(c);
       } catch (error) {
-        console.error("[mcp-use] oauthProxy request failed:", error);
+        console.error("[mcp-use] oauthProxy request failed:", describe(error));
         c.header("cache-control", "no-store");
         return c.json(
           {
@@ -464,7 +533,8 @@ function registerRoutes<TUser>(
 
 /**
  * Reads the upstream provider's access token for the signed-in user, for
- * example to call the GitHub API as that user from a tool.
+ * example to call the GitHub API as that user from a tool. With
+ * `firebase()`, it is the user's Firebase ID token.
  *
  * Keep the token on the server: do not return it in tool results, views,
  * or `_meta`.
@@ -493,8 +563,10 @@ export type {
   GitHubUpstreamOptions,
   GoogleUpstreamOptions,
 } from "./providers.js";
+export { firebase, type FirebaseUpstreamOptions } from "./firebase.js";
 export {
   upstream,
+  UpstreamRefreshError,
   type InPageProps,
   type InPageUpstream,
   type RedirectUpstream,
@@ -503,3 +575,4 @@ export {
   type UpstreamTokenSet,
   type UpstreamUser,
 } from "./upstream.js";
+import { isBuilding } from "../../build-phase.js";

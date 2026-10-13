@@ -1,4 +1,5 @@
 import { decryptValue, encryptValue, type ProxyKeyring } from "./crypto.js";
+import { printable } from "./upstream.js";
 
 /**
  * Key-value store that holds the OAuth proxy's state between requests:
@@ -10,7 +11,7 @@ import { decryptValue, encryptValue, type ProxyKeyring } from "./crypto.js";
  * therefore never holds a usable token, but it must be shared by every
  * instance of the server and must implement `take` and `add` atomically.
  *
- * Adapters for Upstash, Redis, Postgres, and Cloudflare are in
+ * Adapters for Upstash, Redis, Postgres, Firestore, and Cloudflare are in
  * `mcp-use/oauth/storage`.
  */
 export interface OAuthProxyStorage {
@@ -137,6 +138,8 @@ const KEY_PREFIX = "mcp-use:oauth:";
 export class SecureStore {
   readonly #storage: OAuthProxyStorage;
   readonly #keyring: () => Promise<ProxyKeyring>;
+  /** Kinds of failure already logged, so stale records log once. */
+  readonly #warned = new Set<string>();
 
   /**
    * @param storage - The application's store.
@@ -196,17 +199,35 @@ export class SecureStore {
     stored: string | undefined
   ): Promise<T | undefined> {
     if (typeof stored !== "string") return undefined;
-    const plaintext = await decryptValue(
-      await this.#keyring(),
-      fullKey,
-      stored
-    );
-    if (plaintext === undefined) return undefined;
+    const keyring = await this.#keyring();
+    const plaintext = await decryptValue(keyring, fullKey, stored);
+    if (plaintext === undefined) {
+      this.#warnUnreadable(keyring, fullKey, stored);
+      return undefined;
+    }
     try {
       return JSON.parse(plaintext) as T;
     } catch {
       return undefined;
     }
+  }
+
+  /**
+   * Logs a record that does not decrypt, which otherwise reads as expired.
+   * Logs only the kind of record and the key id, once per kind.
+   */
+  #warnUnreadable(keyring: ProxyKeyring, fullKey: string, stored: string) {
+    const kid = printable(stored.split(".")[1] ?? "", 32);
+    const known = keyring.all.some((key) => key.kid === kid);
+    const kind = fullKey.slice(KEY_PREFIX.length).split(":")[0] ?? "";
+    const id = known ? `record:${kind}` : `kid:${kid}`;
+    if (this.#warned.has(id)) return;
+    this.#warned.add(id);
+    console.warn(
+      known
+        ? `[mcp-use] oauthProxy: a stored "${kind}" record failed to decrypt and reads as absent. Is something else writing to the same keys?`
+        : `[mcp-use] oauthProxy: stored records were encrypted with a secret this server does not have (key id "${kid}"), so they read as absent and those users must sign in again. If the secret changed, pass the old one after the new one to keep their sign-ins: secret: [newSecret, oldSecret].`
+    );
   }
 }
 

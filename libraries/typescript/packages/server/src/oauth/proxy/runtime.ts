@@ -10,16 +10,20 @@ import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 
 import { invalidToken } from "../errors.js";
 import {
+  isClientAdmitted,
   matchRedirectUri,
   registerClient,
   resolveClient,
   type ClientResolver,
 } from "./clients.js";
 import {
+  inPageCsp,
   PAGE_CSP,
   renderCustomConsentPage,
   renderDefaultConsentPage,
+  renderDefaultSignInPage,
   renderErrorPage,
+  withScript,
   type ConsentPageProps,
 } from "./consent.js";
 import {
@@ -42,9 +46,13 @@ import {
 import type { SecureStore } from "./storage.js";
 import {
   exchangeUpstreamCode,
+  printable,
   refreshUpstreamTokens,
   UpstreamError,
-  type RedirectUpstream,
+  UpstreamRefreshError,
+  type InPageProps,
+  type InPageUpstream,
+  type Upstream,
   type UpstreamTokenSet,
   type UpstreamUser,
 } from "./upstream.js";
@@ -56,6 +64,30 @@ const REFRESH_GRACE = 60;
 const UPSTREAM_TTL = 60 * 24 * 60 * 60;
 const REMEMBER_TTL = 365 * 24 * 60 * 60;
 const UPSTREAM_REFRESH_MARGIN = 60;
+/**
+ * How long the "grant ended" marker lives. It must outlive any refresh that
+ * read the grant before it ended; lock deadlines keep those under a minute.
+ */
+const REVOKED_GRANT_TTL = 60 * 60;
+/**
+ * Lease of the refresh-token and upstream locks. Work under a lock is
+ * bounded well below it: the upstream request times out after 15 seconds,
+ * and nothing is written after {@link LOCK_DEADLINE}.
+ */
+const LOCK_TTL = 60;
+/** Seconds after taking a lock within which its holder may still write. */
+const LOCK_DEADLINE = 30;
+
+/** A storage lock with a lease, owned by the request that took it. */
+interface Lock {
+  /**
+   * Whether the lock is still this request's and its deadline has not
+   * passed. Checked right before writes that the lock protects.
+   */
+  held(): Promise<boolean>;
+  /** Releases the lock, unless another request has taken it since. */
+  release(): Promise<void>;
+}
 
 /** @internal Settings fixed when the server mounts. */
 export interface RuntimeConfig {
@@ -64,7 +96,7 @@ export interface RuntimeConfig {
   store: SecureStore;
   keyring: () => Promise<ProxyKeyring>;
   clients: ClientResolver;
-  upstream: RedirectUpstream;
+  upstream: Upstream;
   fetch: typeof globalThis.fetch;
   scopes: string[];
   accessTokenTtl: number;
@@ -74,7 +106,8 @@ export interface RuntimeConfig {
         mode: "always" | "remember";
         page?: (props: ConsentPageProps) => unknown;
       };
-  serverName?: string;
+  /** Server name shown on the consent and sign-in pages. */
+  serverName: string;
 }
 
 /** Why a grant can no longer produce tokens. */
@@ -94,7 +127,8 @@ class GrantError extends Error {
 /** @internal Fields the verifier adds to `AuthInfo.extra`. */
 export interface ProxyAuthExtra {
   upstreamUser: UpstreamUser;
-  upstream: { accessToken: string; scopes: string[]; expiresAt?: number };
+  /** Absent when an in-page upstream issued no tokens. */
+  upstream?: { accessToken: string; scopes: string[]; expiresAt?: number };
   userKey: string;
 }
 
@@ -250,9 +284,13 @@ export class ProxyRuntime {
     );
 
     if (await this.#skipConsent(c, client, redirectUri)) {
-      return this.#startUpstream(c, transactionId, transaction);
+      // The provider's sign-in window opens only on a click, so an in-page
+      // upstream shows a page with just the sign-in button.
+      return this.config.upstream.kind === "in-page"
+        ? this.#consentPage(c, transactionId, client, redirectUri, false)
+        : this.#startUpstream(c, transactionId, transaction);
     }
-    return this.#consentPage(c, transactionId, client, redirectUri);
+    return this.#consentPage(c, transactionId, client, redirectUri, true);
   }
 
   async #skipConsent(
@@ -265,7 +303,6 @@ export class ProxyRuntime {
     // Any local program can claim a loopback or custom-scheme redirect, so
     // only an HTTPS redirect can skip the page.
     if (!redirectUri.startsWith("https://")) return false;
-    if (client.trusted) return true;
     if (consent.mode !== "remember") return false;
     const remembered = await this.#readCookie(c, this.#cookies.remember);
     if (remembered === undefined) return false;
@@ -273,11 +310,17 @@ export class ProxyRuntime {
     return remembered.split(".").includes(entry);
   }
 
+  /**
+   * Shows the consent page, bound to the transaction by a single-use CSRF
+   * cookie. For an in-page upstream, `ask` is false when the consent step
+   * was skipped: the page then shows only the sign-in button.
+   */
   async #consentPage(
     c: Context,
     transactionId: string,
     client: ClientRecord,
-    redirectUri: string
+    redirectUri: string,
+    ask: boolean
   ): Promise<Response> {
     const csrf = randomToken(24);
     await this.#setCookie(
@@ -286,6 +329,7 @@ export class ProxyRuntime {
       `${transactionId}.${csrf}`,
       TRANSACTION_TTL
     );
+    const upstream = this.config.upstream;
     const props: ConsentPageProps = {
       client: {
         id: client.clientId,
@@ -297,22 +341,52 @@ export class ProxyRuntime {
       },
       redirectHost: redirectHost(redirectUri),
       isNative: !redirectUri.startsWith("https:"),
-      upstream: this.config.upstream.name,
-      scopes: [...this.config.upstream.scopes],
-      ...(this.config.serverName !== undefined && {
-        serverName: this.config.serverName,
-      }),
+      upstream: upstream.name,
+      scopes: upstream.kind === "redirect" ? [...upstream.scopes] : [],
+      serverName: this.config.serverName,
       form: {
         action: `${this.paths.consent}?txn=${encodeURIComponent(transactionId)}`,
         csrf,
       },
     };
+    if (upstream.kind === "in-page") {
+      return this.#signInPage(c, upstream, props, ask);
+    }
     const consent = this.config.consent;
     const html =
       consent !== false && consent.page !== undefined
         ? await renderCustomConsentPage(consent.page, props)
         : renderDefaultConsentPage(props);
     return this.#html(c, 200, html);
+  }
+
+  /**
+   * The consent page of an in-page upstream, with the upstream's script
+   * added. Its policy allows the script by nonce and the origins the
+   * upstream names. It sends no Cross-Origin-Opener-Policy: the provider's
+   * sign-in window reports back through `window.opener`.
+   */
+  async #signInPage(
+    c: Context,
+    upstream: InPageUpstream,
+    consentProps: ConsentPageProps,
+    ask: boolean
+  ): Promise<Response> {
+    const nonce = randomToken(16);
+    const props: InPageProps = { ...consentProps, nonce, consent: ask };
+    const consent = this.config.consent;
+    const html =
+      consent !== false && consent.page !== undefined
+        ? await renderCustomConsentPage(consent.page, props)
+        : ask
+          ? renderDefaultConsentPage(props)
+          : renderDefaultSignInPage(props);
+    return this.#html(
+      c,
+      200,
+      withScript(html, upstream.script(nonce)),
+      inPageCsp(upstream.csp, nonce)
+    );
   }
 
   // ─── POST /consent ───────────────────────────────────────────────────
@@ -358,6 +432,68 @@ export class ProxyRuntime {
         }),
       });
     }
+    const upstream = this.config.upstream;
+    if (upstream.kind === "in-page") {
+      return this.#inPageSignIn(
+        c,
+        transactionId,
+        transaction,
+        upstream,
+        form.get("proof") ?? ""
+      );
+    }
+    await this.#rememberIfAsked(c, transaction);
+    return this.#startUpstream(c, transactionId, transaction);
+  }
+
+  /**
+   * Checks the proof that an in-page upstream's script posted with the
+   * Allow decision, then issues the code. The CSRF cookie was spent above,
+   * so the proof is accepted once.
+   */
+  async #inPageSignIn(
+    c: Context,
+    transactionId: string,
+    transaction: TransactionRecord,
+    upstream: InPageUpstream,
+    proof: string
+  ): Promise<Response> {
+    let result: { user: UpstreamUser; tokens?: UpstreamTokenSet };
+    try {
+      result = await upstream.verify(proof, { fetch: this.config.fetch });
+      if (
+        typeof result?.user?.subject !== "string" ||
+        result.user.subject === ""
+      ) {
+        throw new Error("verify returned no subject");
+      }
+    } catch (error) {
+      console.error(
+        `[mcp-use] oauthProxy: ${upstream.name} sign-in failed:`,
+        describe(error)
+      );
+      return this.#finish(
+        c,
+        transactionId,
+        transaction,
+        signInFailure(upstream.name, error)
+      );
+    }
+    // Remember only a sign-in that succeeded.
+    await this.#rememberIfAsked(c, transaction);
+    return this.#completeSignIn(
+      c,
+      transactionId,
+      transaction,
+      result.user,
+      result.tokens ?? { accessToken: "", scopes: [] }
+    );
+  }
+
+  async #rememberIfAsked(
+    c: Context,
+    transaction: TransactionRecord
+  ): Promise<void> {
     const consent = this.config.consent;
     if (
       consent !== false &&
@@ -366,7 +502,6 @@ export class ProxyRuntime {
     ) {
       await this.#remember(c, transaction);
     }
-    return this.#startUpstream(c, transactionId, transaction);
   }
 
   async #remember(c: Context, transaction: TransactionRecord): Promise<void> {
@@ -394,6 +529,9 @@ export class ProxyRuntime {
     extraParams: Readonly<Record<string, string>> = {}
   ): Promise<Response> {
     const upstream = this.config.upstream;
+    if (upstream.kind !== "redirect") {
+      throw new Error("An in-page upstream has no upstream redirect");
+    }
     const state = randomToken(32);
     await this.config.store.set(
       keys.upstreamState(await sha256(state)),
@@ -430,6 +568,15 @@ export class ProxyRuntime {
 
   /** `GET /oauth/callback`: finishes the upstream round and issues a code. */
   async callback(c: Context): Promise<Response> {
+    const upstream = this.config.upstream;
+    if (upstream.kind !== "redirect") {
+      return this.#errorPage(
+        c,
+        400,
+        "Sign-in failed",
+        "This server does not use a sign-in callback."
+      );
+    }
     const params = new URL(c.req.url).searchParams;
     const state = params.get("state");
     if (state === null || state === "") {
@@ -473,28 +620,27 @@ export class ProxyRuntime {
         "This sign-in took too long."
       );
     }
-    const toClient = (values: Record<string, string>): Response =>
-      this.#redirectToClient(c, transaction.redirectUri, {
-        ...values,
-        ...(transaction.clientState !== undefined && {
-          state: transaction.clientState,
-        }),
-      });
-    const finish = async (
-      values: Record<string, string>
-    ): Promise<Response> => {
-      await this.config.store.delete(keys.transaction(transactionId));
-      return toClient(values);
-    };
+    const finish = (values: Record<string, string>): Promise<Response> =>
+      this.#finish(c, transactionId, transaction, values);
 
-    const upstream = this.config.upstream;
-    if (params.get("error") !== null) {
+    const upstreamError = params.get("error");
+    if (upstreamError !== null) {
+      // The browser delivers these parameters, so they are cleaned first.
+      const code = printable(upstreamError, 64);
+      const description = params.get("error_description");
+      const reason = `${upstream.name} returned ${code}${
+        description === null ? "" : `: ${printable(description)}`
+      }`;
+      if (code === "access_denied") {
+        console.info(`[mcp-use] oauthProxy: sign-in declined. ${reason}`);
+      } else {
+        console.error(`[mcp-use] oauthProxy: sign-in failed. ${reason}`);
+      }
       return finish({
-        error:
-          params.get("error") === "access_denied"
-            ? "access_denied"
-            : "server_error",
-        error_description: `${upstream.name} sign-in did not complete`,
+        error: code === "access_denied" ? "access_denied" : "server_error",
+        error_description: errorDescription(
+          `${upstream.name} sign-in did not complete (${code})`
+        ),
       });
     }
 
@@ -516,10 +662,7 @@ export class ProxyRuntime {
         `[mcp-use] oauthProxy: ${upstream.name} sign-in failed:`,
         describe(error)
       );
-      return finish({
-        error: "server_error",
-        error_description: `${upstream.name} sign-in failed`,
-      });
+      return finish(signInFailure(upstream.name, error));
     }
 
     const userKey = `${upstream.id}:${user.subject}`;
@@ -551,6 +694,22 @@ export class ProxyRuntime {
       }
     }
 
+    return this.#completeSignIn(c, transactionId, transaction, user, tokens);
+  }
+
+  /**
+   * Finishes a sign-in that the upstream confirmed: stores the user's
+   * upstream tokens, issues a one-time code, and sends the browser back to
+   * the client.
+   */
+  async #completeSignIn(
+    c: Context,
+    transactionId: string,
+    transaction: TransactionRecord,
+    user: UpstreamUser,
+    tokens: UpstreamTokenSet
+  ): Promise<Response> {
+    const userKey = `${this.config.upstream.id}:${user.subject}`;
     const record = await this.#saveUpstream(userKey, tokens, user);
     const code = randomToken(32);
     const codeRecord: CodeRecord = {
@@ -567,7 +726,23 @@ export class ProxyRuntime {
       codeRecord,
       CODE_TTL
     );
-    return finish({ code });
+    return this.#finish(c, transactionId, transaction, { code });
+  }
+
+  /** Ends the transaction and sends the browser back to the client. */
+  async #finish(
+    c: Context,
+    transactionId: string,
+    transaction: TransactionRecord,
+    values: Record<string, string>
+  ): Promise<Response> {
+    await this.config.store.delete(keys.transaction(transactionId));
+    return this.#redirectToClient(c, transaction.redirectUri, {
+      ...values,
+      ...(transaction.clientState !== undefined && {
+        state: transaction.clientState,
+      }),
+    });
   }
 
   async #saveUpstream(
@@ -638,7 +813,7 @@ export class ProxyRuntime {
       );
       if (typeof grantId === "string") {
         // A replayed code means it leaked: revoke what it produced.
-        await this.config.store.delete(keys.grant(grantId));
+        await this.#endGrant(grantId);
       }
       return this.#tokenError(
         c,
@@ -652,6 +827,10 @@ export class ProxyRuntime {
         "invalid_grant",
         "The code was issued to another client"
       );
+    }
+    // The code is already spent, and no grant exists yet.
+    if (!isClientAdmitted(this.config.clients, record.clientId)) {
+      return this.#clientNotAllowed(c);
     }
     if (
       form.get("redirect_uri") !== null &&
@@ -701,7 +880,7 @@ export class ProxyRuntime {
     };
     await this.config.store.set(keys.grant(grant.id), grant, REFRESH_TTL);
     await this.config.store.add(keys.codeUsed(codeHash), grant.id, CODE_TTL);
-    return this.#tokenResponse(c, grant);
+    return this.#tokenResponse(c, grant, grant.scopes);
   }
 
   async #refreshTokenGrant(
@@ -717,7 +896,7 @@ export class ProxyRuntime {
       );
     }
     const hash = await sha256(token);
-    const release = await this.#lock(keys.refreshLock(hash), 10);
+    const lock = await this.#lock(keys.refreshLock(hash));
     try {
       const record = await this.config.store.get<RefreshRecord>(
         keys.refresh(hash)
@@ -742,20 +921,25 @@ export class ProxyRuntime {
           "The refresh token was issued to another client"
         );
       }
-      const requestedScope = form.get("scope");
-      if (
-        requestedScope !== null &&
-        !requestedScope
-          .split(" ")
-          .filter(Boolean)
-          .every((scope) => grant.scopes.includes(scope))
-      ) {
+      if (!isClientAdmitted(this.config.clients, record.clientId)) {
+        await this.#endGrant(grant.id);
+        await this.config.store.delete(keys.refresh(hash));
+        return this.#clientNotAllowed(c);
+      }
+      const asked = (form.get("scope") ?? "").split(" ").filter(Boolean);
+      if (!asked.every((scope) => grant.scopes.includes(scope))) {
         return this.#tokenError(
           c,
           "invalid_scope",
           "scope exceeds the original grant"
         );
       }
+      // A narrower scope applies to the new access token only. The grant,
+      // and so the new refresh token, keeps every scope (RFC 6749 §6).
+      const scopes =
+        asked.length === 0
+          ? grant.scopes
+          : grant.scopes.filter((scope) => asked.includes(scope));
       const resources = form.getAll("resource");
       if (
         resources.length > 1 ||
@@ -776,7 +960,7 @@ export class ProxyRuntime {
           now - record.rotatedAt <= REFRESH_GRACE;
         if (!inGrace) {
           // A rotated token came back: someone else holds it. End the grant.
-          await this.config.store.delete(keys.grant(grant.id));
+          await this.#endGrant(grant.id);
           await this.config.store.delete(keys.refresh(hash));
           return this.#tokenError(
             c,
@@ -802,26 +986,55 @@ export class ProxyRuntime {
         );
       }
 
+      // A request that outlived its lock may race one that took the lock
+      // after it; only the holder may rotate the token.
+      if (!(await lock.held())) {
+        throw new GrantError(
+          "transient",
+          "The token refresh took too long; try again"
+        );
+      }
       const rotated: RefreshRecord =
         record.state === "active"
           ? { ...record, state: "rotated", rotatedAt: now }
           : { ...record, graceUsed: true };
       await this.config.store.set(keys.refresh(hash), rotated, REFRESH_TTL);
+      // Rewriting the grant extends its lifetime while the client stays
+      // active. If the grant ended since it was read above, the rewrite has
+      // just restored it: the marker that #endGrant writes before deleting
+      // tells, so delete it again. A grant ended after this check is
+      // deleted after the rewrite, and the tokens below die with it.
       await this.config.store.set(keys.grant(grant.id), grant, REFRESH_TTL);
+      if (
+        (await this.config.store.get(keys.revokedGrant(grant.id))) !== undefined
+      ) {
+        await this.config.store.delete(keys.grant(grant.id));
+        return this.#tokenError(c, "invalid_grant", "The grant was revoked");
+      }
       await this.#touchUpstream(fresh);
-      return this.#tokenResponse(c, grant);
+      return this.#tokenResponse(c, grant, scopes);
     } finally {
-      await release();
+      await lock.release();
     }
   }
 
-  async #tokenResponse(c: Context, grant: GrantRecord): Promise<Response> {
+  /**
+   * Issues a new access and refresh token for a grant.
+   *
+   * @param scopes - Scopes of the access token: the grant's, or fewer.
+   */
+  async #tokenResponse(
+    c: Context,
+    grant: GrantRecord,
+    scopes: string[]
+  ): Promise<Response> {
     const ttl = this.config.accessTokenTtl;
     const accessToken = `mcp_at_${randomToken(32)}`;
     const refreshToken = `mcp_rt_${randomToken(32)}`;
     const access: AccessRecord = {
       grantId: grant.id,
       expiresAt: seconds() + ttl,
+      scopes,
     };
     const refresh: RefreshRecord = {
       grantId: grant.id,
@@ -843,7 +1056,7 @@ export class ProxyRuntime {
       token_type: "Bearer",
       expires_in: ttl,
       refresh_token: refreshToken,
-      ...(grant.scopes.length > 0 && { scope: grant.scopes.join(" ") }),
+      ...(scopes.length > 0 && { scope: scopes.join(" ") }),
     });
   }
 
@@ -894,7 +1107,7 @@ export class ProxyRuntime {
         keys.grant(grantId)
       );
       if (grant !== undefined && grant.clientId === clientId) {
-        await this.config.store.delete(keys.grant(grantId));
+        await this.#endGrant(grantId);
       }
     }
     // RFC 7009: unknown and foreign tokens get the same answer.
@@ -932,6 +1145,12 @@ export class ProxyRuntime {
     if (grant === undefined) {
       throw invalidToken("The grant was revoked");
     }
+    if (!isClientAdmitted(this.config.clients, grant.clientId)) {
+      // End the sign-in for good, so that allowing the client again does not
+      // bring back tokens issued before it was removed.
+      await this.#endGrant(grant.id);
+      throw invalidToken("The app is no longer allowed on this server");
+    }
     let upstream: UpstreamRecord;
     try {
       upstream = await this.#freshUpstream(
@@ -951,19 +1170,23 @@ export class ProxyRuntime {
     }
     const extra: ProxyAuthExtra = {
       upstreamUser: upstream.user,
-      upstream: {
-        accessToken: upstream.tokens.accessToken,
-        scopes: [...upstream.tokens.scopes],
-        ...(upstream.tokens.expiresAt !== undefined && {
-          expiresAt: upstream.tokens.expiresAt,
-        }),
-      },
+      // An in-page upstream whose `verify` returned no tokens stores an
+      // empty access token; tools then get none.
+      ...(upstream.tokens.accessToken !== "" && {
+        upstream: {
+          accessToken: upstream.tokens.accessToken,
+          scopes: [...upstream.tokens.scopes],
+          ...(upstream.tokens.expiresAt !== undefined && {
+            expiresAt: upstream.tokens.expiresAt,
+          }),
+        },
+      }),
       userKey: grant.userKey,
     };
     return {
       token,
       clientId: grant.clientId,
-      scopes: [...grant.scopes],
+      scopes: [...(access.scopes ?? grant.scopes)],
       expiresAt: access.expiresAt,
       resource: new URL(grant.resource),
       extra: extra as unknown as Record<string, unknown>,
@@ -998,9 +1221,13 @@ export class ProxyRuntime {
     }
     const refreshToken = record.tokens.refreshToken;
     if (refreshToken === undefined) return record;
+    const provider = this.config.upstream;
+    if (provider.kind === "in-page" && provider.refresh === undefined) {
+      return record;
+    }
 
-    const lockKey = keys.upstreamLock(record.userKey);
-    if (!(await this.config.store.add(lockKey, "1", 30))) {
+    const lock = await this.#tryLock(keys.upstreamLock(record.userKey));
+    if (lock === undefined) {
       // Another request refreshes now; wait for its result.
       for (let attempt = 0; attempt < 25; attempt++) {
         await sleep(200);
@@ -1024,21 +1251,33 @@ export class ProxyRuntime {
       if (current.version !== record.version) return current;
       let tokens: UpstreamTokenSet;
       try {
-        tokens = await refreshUpstreamTokens(
-          this.config.upstream,
-          this.config.fetch,
-          refreshToken
-        );
+        tokens =
+          provider.kind === "in-page"
+            ? await provider.refresh!(current.tokens, {
+                fetch: this.config.fetch,
+              })
+            : await refreshUpstreamTokens(
+                provider,
+                this.config.fetch,
+                refreshToken
+              );
       } catch (error) {
         if (
-          error instanceof UpstreamError &&
-          !error.transient &&
-          error.code === "invalid_grant"
+          (error instanceof UpstreamError &&
+            !error.transient &&
+            error.code === "invalid_grant") ||
+          (error instanceof UpstreamRefreshError && error.revoked)
         ) {
+          console.warn(
+            `[mcp-use] oauthProxy: ${describe(error)}. The user's sign-ins end; they must sign in again.`
+          );
           const latest = await this.config.store.get<UpstreamRecord>(
             keys.upstream(record.userKey)
           );
-          if (latest?.version === current.version) {
+          if (
+            latest?.generation === current.generation &&
+            latest.version === current.version
+          ) {
             // The user revoked the app upstream: end every grant of theirs.
             await this.config.store.delete(keys.upstream(record.userKey));
           }
@@ -1057,6 +1296,24 @@ export class ProxyRuntime {
           `${this.config.upstream.name} is unavailable`
         );
       }
+      // Read again before writing: writing the refreshed tokens over a
+      // sign-in that ended during the request would bring it back.
+      const latest = await this.config.store.get<UpstreamRecord>(
+        keys.upstream(record.userKey)
+      );
+      if (latest === undefined || latest.generation !== current.generation) {
+        throw new GrantError(
+          "revoked",
+          `The ${this.config.upstream.name} sign-in was revoked`
+        );
+      }
+      if (latest.version !== current.version) return latest;
+      if (!(await lock.held())) {
+        throw new GrantError(
+          "transient",
+          `${this.config.upstream.name} refresh took too long`
+        );
+      }
       const next: UpstreamRecord = {
         ...current,
         version: current.version + 1,
@@ -1072,7 +1329,7 @@ export class ProxyRuntime {
       );
       return next;
     } finally {
-      await this.config.store.delete(lockKey);
+      await lock.release();
     }
   }
 
@@ -1082,13 +1339,17 @@ export class ProxyRuntime {
    * progress is never overwritten with an older version.
    */
   async #touchUpstream(record: UpstreamRecord): Promise<void> {
-    const lockKey = keys.upstreamLock(record.userKey);
-    if (!(await this.config.store.add(lockKey, "1", 30))) return;
+    const lock = await this.#tryLock(keys.upstreamLock(record.userKey));
+    if (lock === undefined) return;
     try {
       const current = await this.config.store.get<UpstreamRecord>(
         keys.upstream(record.userKey)
       );
-      if (current !== undefined && current.version === record.version) {
+      if (
+        current !== undefined &&
+        current.generation === record.generation &&
+        current.version === record.version
+      ) {
         await this.config.store.set(
           keys.upstream(record.userKey),
           current,
@@ -1096,20 +1357,57 @@ export class ProxyRuntime {
         );
       }
     } finally {
-      await this.config.store.delete(lockKey);
+      await lock.release();
     }
+  }
+
+  /**
+   * Ends a grant. The marker written first outlives any refresh of the grant
+   * in progress, which checks it after rewriting the grant (see
+   * #refreshTokenGrant), so the refresh cannot bring the grant back.
+   */
+  async #endGrant(grantId: string): Promise<void> {
+    await this.config.store.set(
+      keys.revokedGrant(grantId),
+      true,
+      REVOKED_GRANT_TTL
+    );
+    await this.config.store.delete(keys.grant(grantId));
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
 
-  async #lock(key: string, ttlSeconds: number): Promise<() => Promise<void>> {
+  /**
+   * Takes a lock, waiting up to 5 seconds for its holder. The lock stores a
+   * random owner value, so a holder whose lease ran out never releases or
+   * writes under a lock that another request took since.
+   */
+  async #lock(key: string): Promise<Lock> {
     for (let attempt = 0; attempt < 50; attempt++) {
-      if (await this.config.store.add(key, "1", ttlSeconds)) {
-        return () => this.config.store.delete(key);
-      }
+      const lock = await this.#tryLock(key);
+      if (lock !== undefined) return lock;
       await sleep(100);
     }
     throw new GrantError("transient", "The token is in use by another request");
+  }
+
+  /**
+   * Takes a lock if it is free. Storage has no compare-and-delete, so
+   * `held()` and `release()` read the owner before acting; the lease is long
+   * enough that the holder finishes well before it can expire in between.
+   */
+  async #tryLock(key: string): Promise<Lock | undefined> {
+    const store = this.config.store;
+    const owner = randomToken(16);
+    if (!(await store.add(key, owner, LOCK_TTL))) return undefined;
+    const deadline = Date.now() + LOCK_DEADLINE * 1000;
+    const owned = async () => (await store.get<string>(key)) === owner;
+    return {
+      held: async () => Date.now() < deadline && (await owned()),
+      release: async () => {
+        if (await owned()) await store.delete(key);
+      },
+    };
   }
 
   #isOwnResource(value: string): boolean {
@@ -1183,9 +1481,14 @@ export class ProxyRuntime {
     c.header("x-content-type-options", "nosniff");
   }
 
-  #html(c: Context, status: 200 | 400 | 403, html: string): Response {
+  #html(
+    c: Context,
+    status: 200 | 400 | 403,
+    html: string,
+    csp: string = PAGE_CSP
+  ): Response {
     this.#headers(c);
-    c.header("content-security-policy", PAGE_CSP);
+    c.header("content-security-policy", csp);
     c.header("x-frame-options", "DENY");
     return c.html(html, status);
   }
@@ -1216,6 +1519,15 @@ export class ProxyRuntime {
     status: 400 | 503 = 400
   ): Response {
     return this.#json(c, status, { error, error_description: description });
+  }
+
+  /** A client that the settings do not admit. */
+  #clientNotAllowed(c: Context): Response {
+    return this.#tokenError(
+      c,
+      "invalid_client",
+      "This app is not allowed to connect to this server"
+    );
   }
 
   #redirect(c: Context, location: string): Response {
@@ -1273,7 +1585,64 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function describe(error: unknown): string {
-  if (error instanceof UpstreamError) return `${error.code}: ${error.message}`;
-  return error instanceof Error ? error.message : String(error);
+/**
+ * @internal Describes an error for logs. An upstream error gives only its
+ * safe summary, since its causes can hold tokens; any other error gives its
+ * stack.
+ */
+export function describe(error: unknown): string {
+  if (error instanceof UpstreamError) {
+    return `${error.message}${error.detail === undefined ? "" : ` (${error.detail})`}`;
+  }
+  if (error instanceof UpstreamRefreshError) {
+    return error.message;
+  }
+  if (!(error instanceof Error)) return String(error);
+  let text = error.stack ?? `${error.name}: ${error.message}`;
+  let cause: unknown = error.cause;
+  for (let depth = 0; cause instanceof Error && depth < 3; depth++) {
+    const code =
+      "code" in cause && typeof cause.code === "string"
+        ? ` [${cause.code}]`
+        : "";
+    text += `\n  caused by ${cause.name}: ${cause.message}${code}`;
+    cause = cause.cause;
+  }
+  return text;
+}
+
+/** The redirect parameters that tell the client why the sign-in failed. */
+function signInFailure(
+  upstreamName: string,
+  error: unknown
+): Record<string, string> {
+  if (!(error instanceof UpstreamError)) {
+    return {
+      error: "server_error",
+      error_description: `${upstreamName} sign-in failed`,
+    };
+  }
+  const reason =
+    error.upstreamCode === undefined ? "" : ` (${error.upstreamCode})`;
+  return {
+    error:
+      error.code === "access_denied"
+        ? "access_denied"
+        : error.transient
+          ? "temporarily_unavailable"
+          : "server_error",
+    error_description: errorDescription(
+      `${upstreamName} sign-in failed${reason}${
+        error.description === undefined ? "" : `: ${error.description}`
+      }`
+    ),
+  };
+}
+
+/** Limits text to the characters that RFC 6749 allows in error_description. */
+function errorDescription(text: string): string {
+  const safe = text
+    .replace(/"/g, "'")
+    .replace(/[^\x20-\x21\x23-\x5b\x5d-\x7e]/g, "");
+  return safe.length > 300 ? `${safe.slice(0, 299)}.` : safe;
 }
