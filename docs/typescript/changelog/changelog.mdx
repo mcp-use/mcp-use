@@ -6,6 +6,23 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.9.0" description="October 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.9.0&title=Typed%20composer%20mention%20search&date=2026-10&lang=typescript" alt="Release 2.9.0" />
+  </Frame>
+  ## Typed composer mention search
+  Canary release (`mcp-use@2.9.0-canary.0`) adding typed search for app-owned items in supporting ChatGPT desktop composers. Stable v2.9.0 has not shipped.
+
+- **New** (server): `server.mentions({ name, search })` registers a normal typed `ToolRef` for searching people, files, channels, and other app-owned items without a View or iframe handshake (`#2792`)
+- **New** (server): generate a required string `query` input schema and an `{ items: ResourceLink[] }` output schema using the official SDK resource-link schema; export `ResourceLink`, `MentionSearchParams`, `MentionSearchResult`, and `MentionsRegistration` from `mcp-use` (`#2792`)
+- **Enhancement** (server): mention tools advertise `mentions/search` extension metadata and always include app visibility, preserving unrelated descriptor metadata; search is annotated read-only by default (`#2792`)
+- **Enhancement** (server): search callbacks receive ordinary request context, OAuth sign-in defaults, and `ctx.signal`; empty and whitespace queries pass through unchanged. Applications control authorization, ranking, and result limits (`#2792`)
+- **Documentation**: add composer mention registration, result contracts, visibility behavior, and authorization guidance to [ChatGPT Plugin Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#composer-mention-search) (`#2792`)
+- **Update** (@mcp-use/cli): rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated @mcp-use/cli to v4.3.3 (canary.0)
+- **Update**: Updated @mcp-use/inspector to v20.3.19 (canary.0); see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.8.2" description="October 2026">
   ## Tunnel cancellation & API reference navigation
   Patch release keeping development tunnels connected when a cancellation arrives after its request has finished, with clearer API reference navigation.

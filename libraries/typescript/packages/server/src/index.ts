@@ -51,6 +51,7 @@ export type {
   InputResponses,
   PromptMessage,
   ReadResourceResult,
+  ResourceLink,
 } from "@modelcontextprotocol/server";
 /**
  * Official SDK descriptor metadata contracts. Tools use
@@ -236,3 +237,8 @@ export type {
   SettingsLayoutGroup,
   SettingsRegistration,
 } from "./settings.js";
+export type {
+  MentionSearchParams,
+  MentionSearchResult,
+  MentionsRegistration,
+} from "./mentions.js";
