@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.9.1-canary.1
+
+### Patch Changes
+
+- 3591976: Convert OpenAPI 3.0 boolean `exclusiveMinimum` and `exclusiveMaximum` into JSON Schema numeric bounds so `MCPServer.fromOpenAPI` accepts specs that use them instead of throwing while registering tools.
+
 ## 2.9.1-canary.0
 
 ### Patch Changes
