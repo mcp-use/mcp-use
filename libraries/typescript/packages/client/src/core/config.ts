@@ -195,7 +195,11 @@ export interface HttpServerConfig extends BaseServerConfig {
   url: string;
   /** Headers included with MCP transport requests. */
   headers?: Record<string, string>;
-  /** Fetch implementation used by the HTTP transport. */
+  /**
+   * Base fetch implementation used by HTTP transport requests. Browser clients
+   * automatically apply an OAuth provider's scoped wrapper; pass the raw base
+   * fetch rather than a result previously returned by `getProxyFetch()`.
+   */
   fetch?: typeof fetch;
   /** Bearer token added as the `Authorization` header. */
   authToken?: string;
