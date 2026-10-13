@@ -21,18 +21,24 @@ interface ChatResult {
   toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
 }
 
+/** Applies OpenRouter's base URL and attribution headers. */
+export function withOpenRouterConfig(config: ProviderConfig): ProviderConfig {
+  return {
+    ...config,
+    baseUrl: "https://openrouter.ai/api/v1",
+    extraHeaders: {
+      ...config.extraHeaders,
+      "HTTP-Referer": "https://inspector.mcp-use.com",
+      "X-Title": "mcp-use Inspector",
+    },
+  };
+}
+
 /** Patches ChatParams with OpenRouter's base URL and required headers. */
 function withOpenRouter(params: ChatParams): ChatParams {
   return {
     ...params,
-    config: {
-      ...params.config,
-      baseUrl: "https://openrouter.ai/api/v1",
-      extraHeaders: {
-        "HTTP-Referer": "https://inspector.mcp-use.com",
-        "X-Title": "mcp-use Inspector",
-      },
-    },
+    config: withOpenRouterConfig(params.config),
   };
 }
 

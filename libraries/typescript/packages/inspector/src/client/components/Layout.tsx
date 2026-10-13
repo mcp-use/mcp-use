@@ -23,6 +23,7 @@ import {
   protocolModeFromNegotiation,
   protocolNegotiationForMode,
   saveStoredConnectionConfig,
+  toEditableConnectionConfig,
   toMcpServerConfig,
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
@@ -460,15 +461,23 @@ export function Layout({ children }: LayoutProps) {
     (config: EditableConnectionConfig) => {
       if (!selectedServerId) return;
 
-      const currentConnection =
-        getStoredConnectionConfig<EditableConnectionConfig>(selectedServerId) ||
-        connections.find(
-          (connection: McpServer) => connection.id === selectedServerId
-        );
+      const server = connections.find(
+        (connection: McpServer) => connection.id === selectedServerId
+      );
+      const storedConfig =
+        getStoredConnectionConfig<EditableConnectionConfig>(selectedServerId);
+      const currentConnection = server
+        ? toEditableConnectionConfig(server, storedConfig)
+        : storedConfig;
 
       if (config.url !== selectedServerId) {
+        if (connections.some((connection) => connection.id === config.url)) {
+          toast.error("A connection with this URL already exists");
+          return;
+        }
         removeConnection(selectedServerId);
         addServer(config.url, toMcpServerConfig(config));
+        saveStoredConnectionConfig(config.url, config);
       } else if (
         currentConnection &&
         isAliasOnlyConnectionUpdate(currentConnection, config)

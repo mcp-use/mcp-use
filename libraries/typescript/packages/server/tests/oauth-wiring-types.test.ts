@@ -28,7 +28,7 @@ import {
   oauthWorkOSProvider,
   type WorkOSOAuthUser,
 } from "../src/oauth/workos.js";
-import type { OAuthAuth } from "../src/index.js";
+import type { OAuthAuth, ToolSecurityScheme } from "../src/index.js";
 import type {
   OAuthMetadata,
   OAuthTokenVerifier,
@@ -41,6 +41,7 @@ interface TestUser {
 }
 
 declare const provider: OAuthProvider<TestUser>;
+declare const widenedSchemes: readonly ToolSecurityScheme[];
 
 function verifyStructuralProviderTyping(
   tokenVerifier: OAuthTokenVerifier,
@@ -251,6 +252,148 @@ function verifyOAuthCallbackTyping(): void {
 }
 
 void verifyOAuthCallbackTyping;
+
+// Type-level only: a tool's `ctx.auth` is narrowed from its literal
+// `securitySchemes`; resources and prompts always require sign-in.
+function verifyItemAuthTyping(): void {
+  const mixed = new MCPServer({
+    name: "mixed",
+    version: "1.0.0",
+    oauth: provider,
+    mixedAuth: true,
+  });
+
+  mixed.tool(
+    { name: "browse_catalog", securitySchemes: [{ type: "noauth" }] },
+    (_params, ctx) => {
+      const maybeAuth: OAuthAuth<TestUser> | undefined = ctx.auth;
+      const id: string | undefined = ctx.auth?.user.id;
+      // @ts-expect-error ctx.auth may be missing on a noauth tool
+      void ctx.auth.user.id;
+      void [maybeAuth, id];
+      return { content: [] };
+    }
+  );
+  mixed.tool(
+    {
+      name: "recommend_scoped",
+      securitySchemes: [
+        { type: "noauth" },
+        { type: "oauth2", scopes: ["orders:read"] },
+      ],
+    },
+    (_params, ctx) => {
+      const scoped: boolean = ctx.auth?.scopes.includes("orders:read") ?? false;
+      // @ts-expect-error noauth next to oauth2 never guarantees ctx.auth
+      void ctx.auth.scopes;
+      void scoped;
+      return { content: [] };
+    }
+  );
+  mixed.tool({ name: "order_history" }, (_params, ctx) => {
+    const id: string = ctx.auth.user.id;
+    return { content: [{ type: "text", text: id }] };
+  });
+  mixed.tool(
+    {
+      name: "create_checkout",
+      securitySchemes: [{ type: "oauth2", scopes: ["checkout"] }],
+    },
+    (_params, ctx) => {
+      const id: string = ctx.auth.user.id;
+      return { content: [{ type: "text", text: id }] };
+    }
+  );
+
+  // A widened declaration might accept noauth, so ctx.auth stays optional
+  // rather than claiming an identity the gate may not guarantee.
+  mixed.tool(
+    { name: "widened", securitySchemes: widenedSchemes },
+    (_params, ctx) => {
+      // @ts-expect-error a widened array may include noauth
+      void ctx.auth.user.id;
+      return { content: [] };
+    }
+  );
+
+  // A variable declared `as const` keeps its literal types.
+  const checkoutSchemes = [{ type: "oauth2", scopes: ["checkout"] }] as const;
+  mixed.tool(
+    { name: "stored", securitySchemes: checkoutSchemes },
+    (_params, ctx) => {
+      const id: string = ctx.auth.user.id;
+      return { content: [{ type: "text", text: id }] };
+    }
+  );
+
+  mixed.resource({ name: "profile", uri: "shop://me" }, (_uri, ctx) => {
+    const id: string = ctx.auth.user.id;
+    return { contents: [{ uri: "shop://me", text: id }] };
+  });
+  mixed.resourceTemplate(
+    { name: "order", uriTemplate: "shop://orders/{id}" },
+    (_uri, params, ctx) => {
+      const orderId: string | string[] = params.id;
+      const id: string = ctx.auth.user.id;
+      void [orderId, id];
+      return { contents: [] };
+    }
+  );
+  mixed.prompt({ name: "upsell" }, (_params, ctx) => {
+    const id: string = ctx.auth.user.id;
+    return {
+      messages: [{ role: "user", content: { type: "text", text: id } }],
+    };
+  });
+
+  const strict = new MCPServer({
+    name: "strict",
+    version: "1.0.0",
+    oauth: provider,
+    mixedAuth: false,
+  });
+  strict.tool({ name: "whoami" }, (_params, ctx) => {
+    const id: string = ctx.auth.user.id;
+    return { content: [{ type: "text", text: id }] };
+  });
+
+  const noOAuth = new MCPServer({
+    name: "plain",
+    version: "1",
+    mixedAuth: false,
+  });
+  noOAuth.tool({ name: "anything" }, (_params, ctx) => {
+    // @ts-expect-error auth is unavailable without an OAuth provider
+    void ctx.auth.user;
+    return { content: [] };
+  });
+
+  const invalid = new MCPServer({
+    name: "x",
+    version: "1",
+    // @ts-expect-error mixedAuth requires an OAuth provider
+    mixedAuth: true,
+  });
+  void invalid;
+
+  mixed.tool(
+    // @ts-expect-error securitySchemes accepts noauth and oauth2 only
+    { name: "typo", securitySchemes: [{ type: "anonymous" }] },
+    () => ({ content: [] })
+  );
+  mixed.tool(
+    // @ts-expect-error oauth2 requires scopes
+    { name: "no_scopes", securitySchemes: [{ type: "oauth2" }] },
+    () => ({ content: [] })
+  );
+  mixed.resource(
+    // @ts-expect-error resources have no per-item auth
+    { name: "catalog", uri: "shop://catalog", auth: "public" },
+    () => ({ contents: [] })
+  );
+}
+
+void verifyItemAuthTyping;
 
 it("throws when authenticated callbacks lack mapped AuthInfo", () => {
   expect(() =>

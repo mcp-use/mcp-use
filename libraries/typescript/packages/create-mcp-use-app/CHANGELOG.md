@@ -1,5 +1,53 @@
 # create-mcp-use-app
 
+## 2.0.10
+
+### Patch Changes
+
+- 6bf3a79: Install dependencies on Windows. `--install` and the install prompt started npm and pnpm without a shell, which cannot run their `.cmd` shims, so the install step failed with `spawn npm ENOENT` and asked for a manual install. On Windows the package manager now runs through the shell; macOS and Linux are unchanged.
+
+## 2.0.10-canary.0
+
+### Patch Changes
+
+- 368b835: Install dependencies on Windows. `--install` and the install prompt started npm and pnpm without a shell, which cannot run their `.cmd` shims, so the install step failed with `spawn npm ENOENT` and asked for a manual install. On Windows the package manager now runs through the shell; macOS and Linux are unchanged.
+
+## 2.0.9
+
+### Patch Changes
+
+- 24bf7b0: A scaffold that fails before copying the template no longer leaves an empty project directory behind. An unknown or invalid `--template`, or a GitHub template that can't be cloned, used to leave `my-project/` in place, so retrying with a valid template failed with `Directory "my-project" already exists!` until the directory was deleted by hand.
+
+## 2.0.9-canary.0
+
+### Patch Changes
+
+- b3408b9: A scaffold that fails before copying the template no longer leaves an empty project directory behind. An unknown or invalid `--template`, or a GitHub template that can't be cloned, used to leave `my-project/` in place, so retrying with a valid template failed with `Directory "my-project" already exists!` until the directory was deleted by hand.
+
+## 2.0.8
+
+### Patch Changes
+
+- 8dc3750: Print `pnpm run deploy` instead of `pnpm deploy` in the post-scaffold summary. `deploy` is also a built-in pnpm command, so on pnpm 9 and 10 `pnpm deploy` failed with `ERR_PNPM_CANNOT_DEPLOY` instead of running the project's `deploy` script.
+
+## 2.0.8-canary.0
+
+### Patch Changes
+
+- b99caea: Print `pnpm run deploy` instead of `pnpm deploy` in the post-scaffold summary. `deploy` is also a built-in pnpm command, so on pnpm 9 and 10 `pnpm deploy` failed with `ERR_PNPM_CANNOT_DEPLOY` instead of running the project's `deploy` script.
+
+## 2.0.7
+
+### Patch Changes
+
+- 4866186: Add `types: ["node"]` to the template tsconfigs. The templates install `@types/node` with TypeScript 7, which no longer loads `@types` packages on its own, so `mcp-use typecheck` failed with TS2591 on the first `process.env` read or `node:` import.
+
+## 2.0.7-canary.0
+
+### Patch Changes
+
+- 3b0b76e: Add `types: ["node"]` to the template tsconfigs. The templates install `@types/node` with TypeScript 7, which no longer loads `@types` packages on its own, so `mcp-use typecheck` failed with TS2591 on the first `process.env` read or `node:` import.
+
 ## 2.0.6
 
 ### Patch Changes

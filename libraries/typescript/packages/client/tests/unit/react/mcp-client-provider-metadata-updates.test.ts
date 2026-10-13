@@ -115,11 +115,12 @@ describe("McpClientProvider metadata-only updates", () => {
   });
 
   it("updates configured server metadata without reconnecting", async () => {
+    const storage = new MemoryStorageProvider();
     await act(async () => {
       create(
         React.createElement(
           McpClientProvider,
-          null,
+          { storageProvider: storage },
           React.createElement(TestHarness)
         )
       );
@@ -149,6 +150,8 @@ describe("McpClientProvider metadata-only updates", () => {
     expect(latestClient?.getServer("sandbox")?.displayName).toBe(
       "Sandbox Alias"
     );
+    expect(latestClient?.getServer("sandbox")?.name).toBe("sandbox");
+    expect(storage.getServers().sandbox.displayName).toBe("Sandbox Alias");
     expect(disconnectSpies[0]).not.toHaveBeenCalled();
     expect(clearStorageSpies[0]).not.toHaveBeenCalled();
     expect(mountCount).toBe(1);

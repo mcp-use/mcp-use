@@ -107,17 +107,34 @@ describe("published CLI boundaries", () => {
     }
   });
 
-  it("keeps the edge entry under one hundred thousand bytes and its static graph under one hundred twenty-four KiB", async () => {
+  it("keeps the edge entry under one hundred thousand bytes and its static graph under one hundred thirty-two KiB", async () => {
     const entry = new URL("index.js", DIST);
     const graph = await buildStaticGraph(entry);
     const graphBytes = await sumFileBytes(graph.files.keys());
 
     expect((await stat(entry)).size).toBeLessThanOrEqual(100_000);
-    expect(graphBytes).toBeLessThanOrEqual(124 * 1024);
+    // Raised from 124 KiB when mixed auth's securitySchemes resolver joined
+    // the static graph (about 5 KiB). The OAuth gate and its challenge
+    // builder stay in a lazy chunk. Raised again from 130 KiB for the OAuth
+    // provider setup hook, which runs synchronously at mount.
+    expect(graphBytes).toBeLessThanOrEqual(132 * 1024);
   });
 
   it("keeps the unpacked framework artifact below five MiB", async () => {
     expect(await directoryBytes(DIST)).toBeLessThanOrEqual(5 * 1024 * 1024);
+  });
+
+  it("shares private buffered-response state across every server integration", async () => {
+    const shared = new URL("internal/buffered-response.js", DIST).href;
+    for (const entry of [
+      "index.js",
+      "index-node.js",
+      "node-bridge.js",
+      "vite/index.js",
+    ]) {
+      const graph = await buildStaticGraph(new URL(entry, DIST));
+      expect(graph.files.has(shared), entry).toBe(true);
+    }
   });
 
   it("keeps skill discovery in the CLI without a runtime dependency", async () => {
@@ -199,6 +216,14 @@ async function buildStaticGraph(entry: URL): Promise<ModuleGraph> {
     for (const specifier of specifiers.static) {
       if (specifier.startsWith(".")) {
         await visit(new URL(specifier, file));
+      } else if (specifier === "#mcp-use-buffered-response") {
+        // Count the shared private runtime module in each actual static graph.
+        await visit(
+          new URL(
+            packageJson.imports[specifier],
+            new URL("../../", import.meta.url)
+          )
+        );
       } else {
         graph.staticPackages.add(specifier);
       }

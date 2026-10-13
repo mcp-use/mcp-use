@@ -1,3 +1,5 @@
+import type { ViewConfig } from "../react/runtime/view-config.js";
+import type { DisplayMode } from "../react/types/host-types.js";
 import type {
   McpUiResourceCsp,
   McpUiResourcePermissions,
@@ -35,6 +37,10 @@ export interface ViewResourceFacts {
   domain?: string;
   /** Ask the host to draw a border around the view → `_meta.ui.prefersBorder`. */
   prefersBorder?: boolean;
+  /** Supported modes extracted from the frontend named `viewConfig` export. */
+  displayModes?: readonly DisplayMode[];
+  /** Initial ChatGPT display preference extracted from frontend config. */
+  preferredDisplayMode?: "inline" | "fullscreen";
 }
 
 /**
@@ -46,6 +52,8 @@ export interface ViewResourceFacts {
 export interface InlineViewManifestEntry {
   /** Discriminant for the embedded bundle shape. */
   kind: "inline";
+  /** Static frontend configuration captured by build tooling. */
+  viewConfig?: ViewConfig | undefined;
   /**
    * Minified ES module source embedded in the generated view document's
    * `<script type="module">` element.
@@ -69,6 +77,8 @@ export interface InlineViewManifestEntry {
 export interface ExternalViewManifestEntry {
   /** Discriminant for the external-module shape. */
   kind: "external";
+  /** Static frontend configuration captured by build tooling. */
+  viewConfig?: ViewConfig | undefined;
   /**
    * Module entry path. Dev: origin-absolute Vite URL (`/…`). Production:
    * view-relative path under `.mcp-use/build/views/<name>/` (`assets/…`).
@@ -102,4 +112,25 @@ export type ViewManifestEntry =
 /** Map of view name to registry entry, primed by `registerViews()`. */
 export interface ViewsManifest {
   [viewName: string]: ViewManifestEntry;
+}
+
+/** Static view/public files embedded by framework build plugins. @internal */
+export interface EmbeddedViewAssets {
+  /** Paths relative to the generated views directory, including `public/`. */
+  [path: string]: {
+    /** Base64-encoded file bytes. */
+    body: string;
+    /** HTTP media type for this file. */
+    contentType: string;
+  };
+}
+
+/** Runtime registration supplied by build tooling. @internal */
+export interface ViewRegistrationOptions {
+  /** Whether view URLs target a development module server. */
+  dev?: boolean;
+  /** Source project used by filesystem-backed assets. */
+  projectRoot?: string;
+  /** Bundled assets used instead of filesystem reads, including on misses. */
+  assets?: EmbeddedViewAssets;
 }

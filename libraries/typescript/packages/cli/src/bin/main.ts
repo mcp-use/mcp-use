@@ -44,6 +44,8 @@ interface CliCommandOptions {
   mcpDir?: string;
   /** View source directory (`--views-dir`), relative to the project root. */
   viewsDir?: string;
+  /** Discover the project's Vite config for production views. Defaults to `true`. */
+  viewsConfig?: boolean;
   /** Port override (`--port`/`-p`). */
   port?: number;
   /** Host override (`--host`). */
@@ -130,6 +132,7 @@ Options:
   --mcp-dir <dir>    Directory containing the entry and views/
   --views-dir <dir>  Views directory
   --source-maps      Emit source maps
+  --no-views-config  Do not load the project's Vite config for views
   --inline           Embed view JavaScript and CSS in MCP resources
   -h, --help         Show this help
 
@@ -326,6 +329,7 @@ async function cliCommand(
     ...(args.entry !== undefined && { entry: args.entry }),
     ...(args.mcpDir !== undefined && { mcpDir: args.mcpDir }),
     ...(args.viewsDir !== undefined && { viewsDir: args.viewsDir }),
+    ...(!args.viewsConfig && { viewsConfig: false }),
     ...(args.port !== undefined && { port: args.port }),
     ...(args.host !== undefined && { host: args.host }),
     ...(args.tunnel && { tunnel: true }),

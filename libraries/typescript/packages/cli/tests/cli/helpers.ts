@@ -38,6 +38,14 @@ export function copyFixture(
   const dest = join(TMP_ROOT, `${label}-${randomBytes(4).toString("hex")}`);
   mkdirSync(dest, { recursive: true });
   cpSync(source, dest, { recursive: true });
+  // Mark each copy as its own repository root, like a scaffolded project.
+  // TMP_ROOT is git-ignored, and Tailwind's source detection stops applying
+  // ignore rules (node_modules included) under a git-ignored base: it would
+  // follow the mcp-use link below into the whole server workspace (~137k
+  // files) in one synchronous scan. That multi-second stall blocks the
+  // in-process dev server past its keep-alive timeout, so a request the test
+  // already wrote to a pooled socket is reset (ECONNRESET) unread.
+  mkdirSync(join(dest, ".git"));
   const nodeModules = join(dest, "node_modules");
   mkdirSync(nodeModules, { recursive: true });
   symlinkSync(serverPackageRoot, join(nodeModules, "mcp-use"), "junction");

@@ -15,6 +15,7 @@ import type { DisplayMode } from "../types/host-types.js";
  * export const viewConfig = {
  *   autoResize: false,
  *   displayModes: ["inline", "fullscreen"],
+ *   preferredDisplayMode: "fullscreen",
  * } satisfies ViewConfig;
  *
  * export default function CanvasView() {
@@ -38,10 +39,18 @@ export interface ViewConfig {
    * @defaultValue ["inline", "fullscreen", "pip"]
    */
   displayModes?: readonly DisplayMode[];
+
+  /**
+   * Hint to ChatGPT for the initial display mode, emitted on the UI resource.
+   * Must belong to `displayModes`. ChatGPT may ignore this preference and
+   * currently supports only "inline" and "fullscreen".
+   */
+  preferredDisplayMode?: "inline" | "fullscreen";
 }
 
 /**
- * Fully-resolved {@link ViewConfig} with every field required.
+ * {@link ViewConfig} with runtime defaults applied. The initial display
+ * preference stays absent unless explicitly configured.
  *
  * @internal
  */
@@ -50,6 +59,8 @@ export interface NormalizedViewConfig {
   autoResize: boolean;
   /** Display modes advertised to the host via App capabilities. */
   displayModes: readonly DisplayMode[];
+  /** Optional initial display preference emitted on the UI resource. */
+  preferredDisplayMode?: "inline" | "fullscreen";
 }
 
 const DEFAULT_DISPLAY_MODES: readonly DisplayMode[] = [
@@ -70,18 +81,18 @@ const VALID_DISPLAY_MODES: ReadonlySet<string> = new Set<DisplayMode>([
  * @param config - Optional named export from a view module.
  * @returns A fully-resolved config with defaults applied.
  * @throws When `displayModes` is empty, contains duplicates, omits `"inline"`,
- *   or includes a value that is not a known {@link DisplayMode}.
+ *   or includes a value that is not a known {@link DisplayMode}, or when
+ *   `preferredDisplayMode` is invalid or not among the supported modes.
  *
  * @internal
  */
 export function normalizeViewConfig(config?: ViewConfig): NormalizedViewConfig {
   const autoResize = config?.autoResize ?? true;
 
-  if (config?.displayModes === undefined) {
-    return { autoResize, displayModes: DEFAULT_DISPLAY_MODES };
-  }
-
-  const modes = config.displayModes;
+  const modes =
+    config?.displayModes === undefined
+      ? DEFAULT_DISPLAY_MODES
+      : config.displayModes;
   if (!Array.isArray(modes) || modes.length === 0) {
     throw new Error(
       'viewConfig.displayModes must be a non-empty array that includes "inline"'
@@ -110,7 +121,24 @@ export function normalizeViewConfig(config?: ViewConfig): NormalizedViewConfig {
     throw new Error('viewConfig.displayModes must include "inline"');
   }
 
+  const preferred = config?.preferredDisplayMode;
+  if (
+    preferred !== undefined &&
+    preferred !== "inline" &&
+    preferred !== "fullscreen"
+  ) {
+    throw new Error(
+      'viewConfig.preferredDisplayMode must be "inline" or "fullscreen"'
+    );
+  }
+  if (preferred !== undefined && !seen.has(preferred)) {
+    throw new Error(
+      "viewConfig.preferredDisplayMode must belong to displayModes"
+    );
+  }
+
   return {
+    ...(preferred !== undefined && { preferredDisplayMode: preferred }),
     autoResize,
     displayModes: normalizedModes,
   };

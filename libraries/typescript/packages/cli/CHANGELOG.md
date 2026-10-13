@@ -1,5 +1,280 @@
 # @mcp-use/cli
 
+## 4.3.3
+
+### Patch Changes
+
+- b49c5f0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.3-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.2
+
+### Patch Changes
+
+- ad6ce34: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.2-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.1
+
+### Patch Changes
+
+- 6bf3a79: Fix deployment dashboard links to use the selected organization slug and server ID for managed uploads and GitHub deployments. Leave the link unavailable when an organization has no slug instead of returning an invalid route.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: `mcp-use deploy` now verifies that a Git remote is actually hosted on `github.com` before treating it as a GitHub repository. Non-GitHub hosts that contain `github.com` in their hostname or path are rejected instead of being mapped to an unrelated GitHub repository. Only explicit HTTP(S), SSH, Git, or SCP-style GitHub remotes with the original owner/repo path shape are accepted.
+
+## 4.3.1-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.1-canary.2
+
+### Patch Changes
+
+- 45bc353: `mcp-use deploy` now verifies that a Git remote is actually hosted on `github.com` before treating it as a GitHub repository. Non-GitHub hosts that contain `github.com` in their hostname or path are rejected instead of being mapped to an unrelated GitHub repository. Only explicit HTTP(S), SSH, Git, or SCP-style GitHub remotes with the original owner/repo path shape are accepted.
+
+## 4.3.1-canary.1
+
+### Patch Changes
+
+- 4d93a2e: Fix deployment dashboard links to use the selected organization slug and server ID for managed uploads and GitHub deployments. Leave the link unavailable when an organization has no slug instead of returning an invalid route.
+
+## 4.3.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.0
+
+### Minor Changes
+
+- 24bf7b0: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+
+### Patch Changes
+
+- 24bf7b0: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 4.3.0-canary.1
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 4.3.0-canary.0
+
+### Minor Changes
+
+- ab53ccd: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+
+### Patch Changes
+
+- ef495f6: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+## 4.2.1
+
+### Patch Changes
+
+- 8dc3750: fix(cli): keep `:=` inside a plain `key=value` tool or prompt argument instead of splitting the key there, so `code="x := 1"` is sent as a string
+- 8dc3750: On Windows, `mcp-use screenshot` now finds Microsoft Edge, which ships with Windows, Chrome installed under `Program Files (x86)`, and Brave. It used to check only two Chrome locations, so it failed with `chrome_not_found` on machines without them even though the error message lists Edge and Brave.
+
+## 4.2.1-canary.1
+
+### Patch Changes
+
+- f44450c: On Windows, `mcp-use screenshot` now finds Microsoft Edge, which ships with Windows, Chrome installed under `Program Files (x86)`, and Brave. It used to check only two Chrome locations, so it failed with `chrome_not_found` on machines without them even though the error message lists Edge and Brave.
+
+## 4.2.1-canary.0
+
+### Patch Changes
+
+- 0e240fc: fix(cli): keep `:=` inside a plain `key=value` tool or prompt argument instead of splitting the key there, so `code="x := 1"` is sent as a string
+
+## 4.2.0
+
+### Minor Changes
+
+- cdf2cc6: Reject an inline value on boolean CLI switches instead of silently discarding it. `mcp-use dev --tunnel=false` previously parsed as `--tunnel` and opened a public tunnel; it now fails with `--tunnel does not take a value`. The same applies to `--no-open`, `--no-inspector`, `--with-inspector`, `--source-maps`, `--inline`, `--help`, and `--version`. Flags that take a value continue to accept both `--flag value` and `--flag=value`.
+
+### Patch Changes
+
+- cdf2cc6: Route `mcp-use servers env --help` and related flags to the `servers env` command help instead of the root servers help.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.2.0-canary.4
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.2.0-canary.3
+
+### Minor Changes
+
+- cc3ec31: Reject an inline value on boolean CLI switches instead of silently discarding it. `mcp-use dev --tunnel=false` previously parsed as `--tunnel` and opened a public tunnel; it now fails with `--tunnel does not take a value`. The same applies to `--no-open`, `--no-inspector`, `--with-inspector`, `--source-maps`, `--inline`, `--help`, and `--version`. Flags that take a value continue to accept both `--flag value` and `--flag=value`.
+
+## 4.1.18-canary.2
+
+### Patch Changes
+
+- edf4bb4: Route `mcp-use servers env --help` and related flags to the `servers env` command help instead of the root servers help.
+
+## 4.1.18-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.18-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.17
+
+### Patch Changes
+
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.17-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.16
+
+### Patch Changes
+
+- 3640505: Reject screenshot dimensions that Chrome cannot use.
+
+## 4.1.16-canary.0
+
+### Patch Changes
+
+- 7eb0466: Reject screenshot dimensions that Chrome cannot use.
+
+## 4.1.15
+
+### Patch Changes
+
+- 4866186: Resolve the organization in `mcp-use whoami` the same way `org current` and every `servers`/`deployments` command already do, by falling back to the account default when the local config has no explicit selection. Authenticating with `MCP_USE_API_KEY` without running `mcp-use login` previously made `whoami` report `organization: null` while the rest of the CLI read and mutated that organization's resources.
+- 4866186: Trim `skills.directory` before resolving it. The blank check already tested the trimmed value, but the untrimmed string was passed to `resolve`, so `skills: { directory: " skills" }` resolved to a sibling directory with a leading space and no skills were discovered.
+- 4866186: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 4866186: Add `mcp-use/vite`, `mcp-use/tanstack-start` and `mcp-use/tanstack-start/vite` for mounting MCP servers in TanStack React Start. A dedicated MCP Vite environment reloads server code and skill/view registrations, while views share the application's browser environment for React Fast Refresh and CSS HMR. Successful server updates interrupt old requests; invalid edits retain the previous handler.
+
+  Production builds compile views in a separate environment and embed assets and skills into the deployable server output. The route adapter uses `createTanStackStartHandler()` without importing the authored server. Configure React, CSS and aliases in the main Vite config; the previous `viewsConfig` option is no longer supported. Include a Node/Nitro example and browser checks for development HMR and source-free production deployments.
+
+  Validate the compiled MCP server with the host's production Vite configuration, preserving custom defines, build plugins, aliases and mode-specific environment values.
+
+## 4.1.15-canary.2
+
+### Patch Changes
+
+- 3e8a1d6: Resolve the organization in `mcp-use whoami` the same way `org current` and every `servers`/`deployments` command already do, by falling back to the account default when the local config has no explicit selection. Authenticating with `MCP_USE_API_KEY` without running `mcp-use login` previously made `whoami` report `organization: null` while the rest of the CLI read and mutated that organization's resources.
+- 01dedad: Trim `skills.directory` before resolving it. The blank check already tested the trimmed value, but the untrimmed string was passed to `resolve`, so `skills: { directory: " skills" }` resolved to a sibling directory with a leading space and no skills were discovered.
+
+## 4.1.15-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.15-canary.0
+
+### Patch Changes
+
+- 02196f8: Add `mcp-use/vite`, `mcp-use/tanstack-start` and `mcp-use/tanstack-start/vite` for mounting MCP servers in TanStack React Start. A dedicated MCP Vite environment reloads server code and skill/view registrations, while views share the application's browser environment for React Fast Refresh and CSS HMR. Successful server updates interrupt old requests; invalid edits retain the previous handler.
+
+  Production builds compile views in a separate environment and embed assets and skills into the deployable server output. The route adapter uses `createTanStackStartHandler()` without importing the authored server. Configure React, CSS and aliases in the main Vite config; the previous `viewsConfig` option is no longer supported. Include a Node/Nitro example and browser checks for development HMR and source-free production deployments.
+
+  Validate the compiled MCP server with the host's production Vite configuration, preserving custom defines, build plugins, aliases and mode-specific environment values.
+
+## 4.1.14
+
+### Patch Changes
+
+- 46cc2cf: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.14-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.13
+
+### Patch Changes
+
+- b1bda25: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.13-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.1.12
+
+### Patch Changes
+
+- 485c79c: Report a malformed JSON argument to `client` and `screenshot` as a usage error instead of letting the engine's `SyntaxError` escape. A bad `{...}` or `key:=<json>` value exited 1 with a bare parser message and no indication of which argument was wrong, while every other grammar mistake in the same parser exits 2.
+- 485c79c: Document that `--secret` must be passed on every `servers env set` write, including updates and rotations, and say so in the success message when a value is stored write-only
+- 485c79c: Fix `servers list` reporting a bad `--limit` or `--skip` as `Not logged in.` when signed out. Pagination was validated after the cloud client was created, so an invalid page size surfaced as an operational failure with exit 1 instead of the usage error with exit 2 that `deployments list` already returns for the same input.
+
+## 4.1.12-canary.3
+
+### Patch Changes
+
+- b86bf80: Fix `servers list` reporting a bad `--limit` or `--skip` as `Not logged in.` when signed out. Pagination was validated after the cloud client was created, so an invalid page size surfaced as an operational failure with exit 1 instead of the usage error with exit 2 that `deployments list` already returns for the same input.
+
+## 4.1.12-canary.2
+
+### Patch Changes
+
+- d6614ff: Report a malformed JSON argument to `client` and `screenshot` as a usage error instead of letting the engine's `SyntaxError` escape. A bad `{...}` or `key:=<json>` value exited 1 with a bare parser message and no indication of which argument was wrong, while every other grammar mistake in the same parser exits 2.
+
+## 4.1.12-canary.1
+
+### Patch Changes
+
+- 290d7c4: Document that `--secret` must be passed on every `servers env set` write, including updates and rotations, and say so in the success message when a value is stored write-only
+
+## 4.1.12-canary.0
+
+### Patch Changes
+
+- @mcp-use/inspector@20.3.8-canary.0
+
 ## 4.1.11
 
 ### Patch Changes

@@ -189,7 +189,7 @@ ${moduleScript}
   // receive this development-only map.
   const devImportMap =
     entry.entry.startsWith("/") &&
-    (entry.scripts ?? []).includes("/@vite/client")
+    (entry.scripts ?? []).some((path) => path.endsWith("/@vite/client"))
       ? `<script type="importmap">${escapeInlineScript(
           JSON.stringify({
             imports: {

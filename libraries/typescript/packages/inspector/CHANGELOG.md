@@ -1,5 +1,299 @@
 # @mcp-use/inspector
 
+## 20.3.19
+
+### Patch Changes
+
+- b49c5f0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.19-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.18
+
+### Patch Changes
+
+- ad6ce34: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.18-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17
+
+### Patch Changes
+
+- 6bf3a79: Apply saved Inspector timeout settings to tool calls, preserve cleared timeouts when reopening or renaming a connection, and explain what blank timeout fields mean.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17-canary.1
+
+### Patch Changes
+
+- 53dcb47: Apply saved Inspector timeout settings to tool calls, preserve cleared timeouts when reopening or renaming a connection, and explain what blank timeout fields mean.
+
+## 20.3.17-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- 24bf7b0: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 24bf7b0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.15
+
+### Patch Changes
+
+- 8dc3750: Fix chat input text overlapping with the bottom toolbar when typing multi-line messages
+- 8dc3750: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.15-canary.1
+
+### Patch Changes
+
+- f3d4ae7: Fix chat input text overlapping with the bottom toolbar when typing multi-line messages
+
+## 20.3.15-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14
+
+### Patch Changes
+
+- cdf2cc6: Release the upstream stream when an Express client disconnects mid-response. The Express adapter's proxy loop had no abort wiring, so a client that went away during a long-lived SSE response left the loop writing to a dead socket and the upstream connection open until it ended on its own.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+## 20.3.14-canary.5
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.4
+
+### Patch Changes
+
+- 604b130: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+## 20.3.14-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.0
+
+### Patch Changes
+
+- ee1c64b: Release the upstream stream when an Express client disconnects mid-response. The Express adapter's proxy loop had no abort wiring, so a client that went away during a long-lived SSE response left the loop writing to a dead socket and the upstream connection open until it ended on its own.
+
+## 20.3.13
+
+### Patch Changes
+
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.13-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.13-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.13-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.13-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.12
+
+### Patch Changes
+
+- 3640505: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 3640505: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.12-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.12-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.11
+
+### Patch Changes
+
+- 4866186: Fix two Inspector crashes and resets: searchable pickers (debugger timezone and locale) no longer unmount the app when the checked option is filtered out while typing, and Connection Settings keeps edits while a failed connection retries instead of resetting the form on every retry.
+- 4866186: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 4866186: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 4866186: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.11-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.11-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.11-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.10
+
+### Patch Changes
+
+- 46cc2cf: Fix tall MCP Apps overflowing the tool result view by allowing the result content to grow and scroll without clipping the top of the app behind the response toolbar.
+
+## 20.3.10-canary.0
+
+### Patch Changes
+
+- 8f7b6ac: Fix tall MCP Apps overflowing the tool result view by allowing the result content to grow and scroll without clipping the top of the app behind the response toolbar.
+
+## 20.3.9
+
+### Patch Changes
+
+- b1bda25: Limit the Inspector's Manufact cloud provider picker to OpenAI, Anthropic, and Google. Preserve existing selections from other providers with accurate labels, while keeping the full cloud model catalog and BYOK OpenRouter support available for evals and other cloud features.
+- b1bda25: Updated dependency `hono` to `^4.13.5`.
+- b1bda25: Mark the `auth_token` alias deprecated on both `MCPServerConfig` types. v2 renamed it to `authToken` and nothing has read the snake-case spelling since, so setting it produces no `Authorization` header. The field stays for now so existing TypeScript consumers keep compiling, and editors flag it at the call site instead. Removal waits for the next major.
+- b1bda25: Fix the managed chat model badge showing the default OpenAI logo when a Claude or Gemini model is selected. Use the selected cloud model for both its name and provider logo.
+- b1bda25: Rebuild bundled workspace code and synchronize published internal package metadata.
+- b1bda25: Save and display server aliases consistently, including after reload, without reconnecting when only the alias changes.
+
+## 20.3.9-canary.5
+
+### Patch Changes
+
+- 67ba680: Save and display server aliases consistently, including after reload, without reconnecting when only the alias changes.
+
+## 20.3.9-canary.4
+
+### Patch Changes
+
+- 0e5ff4b: Limit the Inspector's Manufact cloud provider picker to OpenAI, Anthropic, and Google. Preserve existing selections from other providers with accurate labels, while keeping the full cloud model catalog and BYOK OpenRouter support available for evals and other cloud features.
+
+## 20.3.9-canary.3
+
+### Patch Changes
+
+- cf8ce39: Fix the managed chat model badge showing the default OpenAI logo when a Claude or Gemini model is selected. Use the selected cloud model for both its name and provider logo.
+
+## 20.3.9-canary.2
+
+### Patch Changes
+
+- 99414e0: Updated dependency `hono` to `^4.13.5`.
+
+## 20.3.9-canary.1
+
+### Patch Changes
+
+- 76a7973: Mark the `auth_token` alias deprecated on both `MCPServerConfig` types. v2 renamed it to `authToken` and nothing has read the snake-case spelling since, so setting it produces no `Authorization` header. The field stays for now so existing TypeScript consumers keep compiling, and editors flag it at the call site instead. Removal waits for the next major.
+
+## 20.3.9-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.8
+
+### Patch Changes
+
+- 485c79c: Rebuild the standalone Inspector with the current Agent OpenRouter Responses API fix and repair the published framework peer metadata. Automatically propagate future bundle rebuilds and metadata changes through the release plan without adding Inspector runtime dependencies.
+
+## 20.3.8-canary.1
+
+### Patch Changes
+
+- e7ff4a2: Rebuild the standalone Inspector with the current Agent OpenRouter Responses API fix and repair the published framework peer metadata. Automatically propagate future bundle rebuilds and metadata changes through the release plan without adding Inspector runtime dependencies.
+
+## 20.3.8-canary.0
+
+### Patch Changes
+
+- @mcp-use/agent@2.0.16-canary.0
+- mcp-use@2.4.4-canary.0
+
 ## 20.3.7
 
 ## 20.3.7-canary.1

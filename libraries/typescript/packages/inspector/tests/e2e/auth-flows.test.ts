@@ -3,26 +3,52 @@
  *
  * Tests for API Key, Custom Header, and OAuth authentication flows in the inspector.
  *
- * IMPORTANT: Start authentication test servers before running these tests:
+ * The fixture servers are started by this file's beforeAll hook:
  * 1. API Key server: Port 3003
  * 2. Custom Header server: Port 3004
- * 3. OAuth mock servers: Ports 3105-3108 (Linear, Supabase, GitHub, Vercel)
+ * 3. OAuth mock servers: issuers on 3005-3008, MCP servers on 3105-3108
+ *    (Linear, Supabase, GitHub, Vercel)
  *
- * Run from inspector package root:
- * pnpm test:e2e auth-flows.test.ts
+ * They share fixed ports, so this file runs in a single worker.
+ *
+ * Until initialize succeeds the inspector does not know the server name, so
+ * failed and pending-auth tiles are headed by the server URL.
  */
 
 import { expect, test } from "@playwright/test";
 import {
+  addCustomHeaderInSettingsTab,
+  returnToDashboardAndWaitReady,
   connectToApiKeyServer,
   connectToCustomHeaderServer,
   connectToOAuthServer,
-  waitForServerState,
   clickAuthenticateButton,
   executeToolAndVerifyAuth,
   navigateToServerTools,
-  addCustomHeader,
+  openConnectionSettings,
+  waitForServerState,
 } from "./helpers/auth";
+import { AuthServersManager } from "./fixtures/auth-servers.js";
+
+// Fixed ports mean the fixtures cannot be shared across parallel workers:
+// "default" keeps this file in one worker (overriding fullyParallel) without
+// serial's skip-the-rest-after-a-failure behaviour.
+test.describe.configure({ mode: "default" });
+
+let authServers: AuthServersManager;
+
+// oauth2-mock-server issuers have no registration endpoint and accept any
+// client id at /authorize, so register a static client before connecting.
+const MOCK_OAUTH_CLIENT = { clientId: "test-client" };
+
+test.beforeAll(async () => {
+  authServers = new AuthServersManager();
+  await authServers.startAll();
+});
+
+test.afterAll(async () => {
+  await authServers?.stopAll();
+});
 
 test.describe("API Key Authentication", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -40,7 +66,7 @@ test.describe("API Key Authentication", () => {
 
     // Verify server appears but is in failed/pending_auth state
     await expect(
-      page.getByRole("heading", { name: "ApiKeyTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3003/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Check for failed or pending_auth status
@@ -48,9 +74,9 @@ test.describe("API Key Authentication", () => {
     await expect(statusBadge).toBeVisible({ timeout: 5000 });
 
     // Verify error message mentions authentication
-    const serverTile = page.locator("text=ApiKeyTestServer").locator("..");
+    const serverTile = page.getByTestId("server-tile-error");
     await expect(serverTile).toContainText(
-      /401|Unauthorized|Missing Authorization|API key/i,
+      /401|Unauthorized|Missing Authorization|API key|metadata|Registration/i,
       {
         timeout: 5000,
       }
@@ -105,7 +131,7 @@ test.describe("API Key Authentication", () => {
 
     // Verify server shows auth error
     await expect(
-      page.getByRole("heading", { name: "ApiKeyTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3003/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Should not reach ready state
@@ -131,7 +157,7 @@ test.describe("Custom Header Authentication", () => {
 
     // Verify server appears but is in failed state
     await expect(
-      page.getByRole("heading", { name: "CustomHeaderTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3004/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Check for failed status or auth error
@@ -139,11 +165,9 @@ test.describe("Custom Header Authentication", () => {
     await expect(statusBadge).toBeVisible({ timeout: 5000 });
 
     // Verify error message mentions custom header
-    const serverTile = page
-      .locator("text=CustomHeaderTestServer")
-      .locator("..");
+    const serverTile = page.getByTestId("server-tile-error");
     await expect(serverTile).toContainText(
-      /401|Unauthorized|Missing.*header|X-Custom-Auth/i,
+      /401|Unauthorized|Missing.*header|X-Custom-Auth|metadata|Registration/i,
       {
         timeout: 5000,
       }
@@ -198,7 +222,7 @@ test.describe("Custom Header Authentication", () => {
 
     // Verify server shows auth error
     await expect(
-      page.getByRole("heading", { name: "CustomHeaderTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3004/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Should not reach ready state
@@ -216,7 +240,7 @@ test.describe("Custom Header Authentication", () => {
 
     // Verify server shows auth error
     await expect(
-      page.getByRole("heading", { name: "CustomHeaderTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3004/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Should not reach ready state
@@ -236,11 +260,11 @@ test.describe("OAuth Authentication - Linear", () => {
 
   test("should show authenticate button for OAuth server", async ({ page }) => {
     // Connect to Linear OAuth server (port 3105 = 3005 + 100)
-    await connectToOAuthServer(page, "linear", 3105);
+    await connectToOAuthServer(page, "linear", 3105, MOCK_OAUTH_CLIENT);
 
     // Verify server appears
     await expect(
-      page.getByRole("heading", { name: "LinearOAuthTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3105/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Should show pending_auth or authenticating state
@@ -258,7 +282,7 @@ test.describe("OAuth Authentication - Linear", () => {
     // This test requires proper OAuth flow simulation
     // Skip for now until oauth2-mock-server integration is complete
 
-    await connectToOAuthServer(page, "linear", 3105);
+    await connectToOAuthServer(page, "linear", 3105, MOCK_OAUTH_CLIENT);
 
     // Wait for authenticate button
     const authenticateButton = await clickAuthenticateButton(page);
@@ -285,11 +309,11 @@ test.describe("OAuth Authentication - Supabase", () => {
     page,
   }) => {
     // Connect to Supabase OAuth server (port 3106 = 3006 + 100)
-    await connectToOAuthServer(page, "supabase", 3106);
+    await connectToOAuthServer(page, "supabase", 3106, MOCK_OAUTH_CLIENT);
 
     // Verify server appears
     await expect(
-      page.getByRole("heading", { name: "SupabaseOAuthTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3106/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Authenticate button should be visible
@@ -308,11 +332,11 @@ test.describe("OAuth Authentication - GitHub", () => {
 
   test("should show authenticate button for GitHub OAuth", async ({ page }) => {
     // Connect to GitHub OAuth server (port 3107 = 3007 + 100)
-    await connectToOAuthServer(page, "github", 3107);
+    await connectToOAuthServer(page, "github", 3107, MOCK_OAUTH_CLIENT);
 
     // Verify server appears
     await expect(
-      page.getByRole("heading", { name: "GitHubOAuthTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3107/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Authenticate button should be visible
@@ -331,11 +355,11 @@ test.describe("OAuth Authentication - Vercel", () => {
 
   test("should show authenticate button for Vercel OAuth", async ({ page }) => {
     // Connect to Vercel OAuth server (port 3108 = 3008 + 100)
-    await connectToOAuthServer(page, "vercel", 3108);
+    await connectToOAuthServer(page, "vercel", 3108, MOCK_OAUTH_CLIENT);
 
     // Verify server appears
     await expect(
-      page.getByRole("heading", { name: "VercelOAuthTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3108/mcp" })
     ).toBeVisible({ timeout: 10000 });
 
     // Authenticate button should be visible
@@ -355,52 +379,60 @@ test.describe("Authentication - Add after connection", () => {
   test("should allow adding API key after initial failed connection", async ({
     page,
   }) => {
-    // Connect without auth
+    const serverUrl = "http://localhost:3003/mcp";
+
+    // Connect without auth and land in a non-ready state
     await connectToApiKeyServer(page, { withAuth: false });
-
-    // Wait for server to appear in failed state
     await expect(
-      page.getByRole("heading", { name: "ApiKeyTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3003/mcp" })
     ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("server-tile-status-ready")).not.toBeVisible({
+      timeout: 5000,
+    });
 
-    // Now add the API key header by editing connection
-    // Go back to home to edit
-    await page.goto("http://localhost:3000/inspector");
+    // Add the Authorization header on the Connection Settings tab and save.
+    // Saving reconnects with the new headers.
+    await openConnectionSettings(page, serverUrl);
+    await addCustomHeaderInSettingsTab(
+      page,
+      "Authorization",
+      "Bearer test-api-key-12345"
+    );
 
-    // Click settings on the server tile
-    const settingsButton = page
-      .locator("text=ApiKeyTestServer")
-      .locator("..")
-      .getByRole("button", { name: /settings|more/i })
-      .first();
+    // Saving remounts the connection with the header; wait for it in-app.
+    await returnToDashboardAndWaitReady(page, "ApiKeyTestServer");
 
-    if (await settingsButton.isVisible()) {
-      await settingsButton.click();
-
-      // Look for edit/settings option in dropdown
-      const editOption = page.getByText(/edit|settings/i);
-      if (await editOption.isVisible()) {
-        await editOption.click();
-      }
-    }
-
-    // At this point, we would add the header and reconnect
-    // The exact UI flow depends on the implementation
-    // This test demonstrates the pattern for adding auth after connection
+    await navigateToServerTools(page, serverUrl);
+    await executeToolAndVerifyAuth(
+      page,
+      "verify_auth",
+      "Authentication successful"
+    );
   });
 
   test("should allow adding custom header after initial failed connection", async ({
     page,
   }) => {
-    // Connect without auth
+    const serverUrl = "http://localhost:3004/mcp";
+
     await connectToCustomHeaderServer(page, { withAuth: false });
-
-    // Wait for server to appear in failed state
     await expect(
-      page.getByRole("heading", { name: "CustomHeaderTestServer" })
+      page.getByRole("heading", { name: "http://localhost:3004/mcp" })
     ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("server-tile-status-ready")).not.toBeVisible({
+      timeout: 5000,
+    });
 
-    // Similar pattern as above - add custom header after connection
-    // The exact implementation depends on the settings UI
+    await openConnectionSettings(page, serverUrl);
+    await addCustomHeaderInSettingsTab(
+      page,
+      "X-Custom-Auth",
+      "custom-auth-token-xyz"
+    );
+
+    await returnToDashboardAndWaitReady(page, "CustomHeaderTestServer");
+
+    await navigateToServerTools(page, serverUrl);
+    await executeToolAndVerifyAuth(page, "verify_auth");
   });
 });

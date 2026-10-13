@@ -410,6 +410,7 @@ describe("runBuild (views)", () => {
           "react-dom/client",
           "mcp-use > @modelcontextprotocol/ext-apps",
           "mcp-use > @modelcontextprotocol/server",
+          "mcp-use > @modelcontextprotocol/core",
           "zod",
         ],
       },
@@ -578,6 +579,16 @@ describe("runBuild (views)", () => {
       });
       const text = (readBody["result"] as { contents: { text: string }[] })
         .contents[0]!.text;
+      expect(
+        (
+          readBody["result"] as {
+            contents: { _meta: Record<string, unknown> }[];
+          }
+        ).contents[0]?._meta["openai/ui"]
+      ).toEqual({
+        availableDisplayModes: ["inline", "fullscreen"],
+        preferredDisplayMode: "fullscreen",
+      });
       expect(text).toContain('id="root"');
       expect(text).toMatch(/<script type="module" src="/);
       expect(text).toContain("/mcp/_mcp-use/views/product-search-result/");
@@ -726,6 +737,13 @@ describe("runBuild (views)", () => {
     });
     const text = (readBody["result"] as { contents: { text: string }[] })
       .contents[0]!.text;
+    expect(
+      (readBody["result"] as { contents: { _meta: Record<string, unknown> }[] })
+        .contents[0]?._meta["openai/ui"]
+    ).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
+      preferredDisplayMode: "fullscreen",
+    });
     expect(text).toContain('<script type="module">');
     expect(text).not.toContain('<script type="module" src=');
     expect(text).toContain("<style>");

@@ -23,6 +23,9 @@ const FILL_HOST_WRAPPER_STYLE: React.CSSProperties = {
   flexDirection: "column",
 };
 
+/** Inline views size to content, so the wrapper must not add a layout box. */
+const INLINE_WRAPPER_STYLE: React.CSSProperties = { display: "contents" };
+
 /** ponytail: inline widgets size to content; fullscreen/pip need a height chain */
 function useFillHostDocument(fillHost: boolean): void {
   useLayoutEffect(() => {
@@ -132,9 +135,11 @@ export const ThemeProvider: React.FC<{
     }
   }, [hostContext]);
 
-  if (fillHost) {
-    return <div style={FILL_HOST_WRAPPER_STYLE}>{children}</div>;
-  }
-
-  return <>{children}</>;
+  // Keep the wrapper element type stable across display modes; swapping it
+  // would remount the view subtree and drop its local state.
+  return (
+    <div style={fillHost ? FILL_HOST_WRAPPER_STYLE : INLINE_WRAPPER_STYLE}>
+      {children}
+    </div>
+  );
 };

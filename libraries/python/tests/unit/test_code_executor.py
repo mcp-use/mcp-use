@@ -5,7 +5,7 @@ Tests the code execution functionality for MCP code mode.
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -36,12 +36,13 @@ class TestCodeExecutorBasics:
         """Test executing simple Python code."""
         code = "result = 1 + 1\nreturn result"
 
-        result = await code_executor.execute(code, timeout=5.0)
+        with patch("mcp_use.client.code_executor.perf_counter", side_effect=[100.0, 100.125]):
+            result = await code_executor.execute(code, timeout=5.0)
 
         assert result["error"] is None
         assert result["result"] == 2
         assert isinstance(result["execution_time"], float)
-        assert result["execution_time"] > 0
+        assert result["execution_time"] == pytest.approx(0.125)
 
     @pytest.mark.asyncio
     async def test_execute_with_print(self, code_executor):

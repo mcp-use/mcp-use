@@ -1,6 +1,6 @@
 ---
 title: "Migrate to v2"
-description: "Migrate mcp-use 1.x servers, widgets, and runtime behavior to the v2 beta."
+description: "Migrate mcp-use 1.x servers, widgets, and runtime behavior to mcp-use v2."
 icon: "arrow-right-left"
 ---
 
@@ -29,7 +29,7 @@ changes. Widgets require a complete rewrite as MCP App Views.
     Replace the widget file layout, tool binding, result helper, provider,
     generated helpers, hooks, state model, and asset paths.
   </Step>
-  <Step title="Review beta limitations and verify">
+  <Step title="Review v2 limitations and verify">
     Check whether a missing v1 capability affects the server, then typecheck,
     build, run, and exercise the migrated project.
   </Step>
@@ -37,7 +37,7 @@ changes. Widgets require a complete rewrite as MCP App Views.
 
 ## Update the runtime and entry point
 
-The current v2 beta requires Node.js `>=22.22.2` and ESM.
+mcp-use v2 requires Node.js `>=22.22.2` and ESM.
 
 ```bash
 npm install mcp-use
@@ -57,6 +57,17 @@ export default server;
 ```
 
 Default-export the server from `index.ts`.
+
+v1 `getHandler()` remains only as a deprecated alias for `server.fetch`. Pass
+`server.fetch` to edge and Fetch-based runtimes directly. To serve from a custom
+Node.js `http` server, wrap the server with `toNodeHandler()`:
+
+```typescript
+import { createServer } from "node:http";
+import { toNodeHandler } from "mcp-use/node";
+
+createServer(toNodeHandler(server)).listen(3000);
+```
 
 ## Export every static tool
 
@@ -131,8 +142,8 @@ export const weather = server.tool(
 );
 ```
 
-`schema` remains an alias for `inputSchema` in the current beta, but
-`inputSchema` matches the MCP wire field and is the migration target.
+`schema` remains an alias for `inputSchema`, but `inputSchema` matches the MCP
+wire field and is the migration target.
 
 Follow these result rules:
 
@@ -230,16 +241,16 @@ v2 request context exists only for the current request. Remove session
 assumptions from client metadata, logging, progress, notifications, and
 elicitation.
 
-| v1                          | v2                                            |
-| --------------------------- | --------------------------------------------- |
-| `ctx.req`                   | `ctx.request`                                 |
-| Node/Web request access     | `ctx.request.raw` for the Web `Request`       |
-| `ctx.log(...)`              | `ctx.sendLog(...)`                            |
-| `ctx.client.supportsApps()` | `ctx.client.supportsViews()`                  |
-| `ctx.user`                  | provider-specific `ctx.auth.user`             |
-| session metadata            | current request's `ctx.client` snapshot       |
-| blocking `ctx.elicit(...)`  | keyed input-required round trip               |
-| `ctx.sample(...)`           | no server-side equivalent in the current beta |
+| v1                          | v2                                      |
+| --------------------------- | --------------------------------------- |
+| `ctx.req`                   | `ctx.request`                           |
+| Node/Web request access     | `ctx.request.raw` for the Web `Request` |
+| `ctx.log(...)`              | `ctx.sendLog(...)`                      |
+| `ctx.client.supportsApps()` | `ctx.client.supportsViews()`            |
+| `ctx.user`                  | provider-specific `ctx.auth.user`       |
+| session metadata            | current request's `ctx.client` snapshot |
+| blocking `ctx.elicit(...)`  | keyed input-required round trip         |
+| `ctx.sample(...)`           | no server-side equivalent               |
 
 `ctx.client.info()`, `capabilities()`, `can()`, `extension()`, and `user()`
 return client-declared request hints. Never use them for authorization. Use
@@ -425,6 +436,11 @@ export default function ResultsView() {
 }
 ```
 
+The `error` status also covers a host that cancels the tool call before a result
+arrives. `view.error` is then a `ToolCancelledError`; check
+`view.error instanceof ToolError` before reading `view.error.result`. Import both
+classes from `mcp-use/react`.
+
 Use the focused v2 surface:
 
 | v1                                 | v2                                                            |
@@ -466,9 +482,12 @@ snapshot across the mounted View. The state is model-visible.
 ChatGPT can restore View state across View lifetimes. Other MCP Apps hosts keep
 the state only for the current iframe lifetime.
 
-Use `ModelContext` or `modelContext` for model-visible natural-language context.
-Use `useSendFollowUp()` to trigger a new model turn. Keep presentation-only
-state in ordinary React state.
+Use the declarative `<ModelContext>` component for model-visible
+natural-language context. v2 removes the imperative `modelContext.set()`,
+`modelContext.remove()`, and `modelContext.clear()` helpers; render
+`<ModelContext>` where the annotation applies so it follows React state and
+component lifecycle. Use `useSendFollowUp()` to trigger a new model turn. Keep
+presentation-only state in ordinary React state.
 
 `useFiles()` keeps the upload/download capability check, but it no longer
 accepts the v1 `modelVisible` option or mutates widget state automatically.
@@ -487,6 +506,72 @@ Native View documents are generated MCP resources. Do not register
 
 Move existing widget CSP domains to `view.csp`.
 
+### Handle View URIs cached by ChatGPT
+
+v1 served widgets at `ui://widget/<name>.html`, and sometimes
+`ui://widget/<name>.<buildId>.html`; v2 serves Views at exactly
+`ui://views/<name>.html`. A published ChatGPT app caches the resource URI from
+the v1 tool metadata and keeps requesting the old URI after you deploy v2, so
+its Views fail to load until the app is resubmitted and re-approved with the
+new metadata.
+
+As a temporary bridge, add middleware that rewrites the legacy URI before the
+request reaches the MCP handler and restores the requested URI in the
+response:
+
+```ts
+// TEMPORARY: mcp-use v1 served views at ui://widget/<name>.html, v2 at ui://views/<name>.html.
+// Clients that cached the v1 tool metadata still read the old URI, so rewrite
+// resources/read to the v2 URI before it reaches the SDK, then restore the
+// requested URI in the response. Remove once all clients have refreshed.
+const LEGACY_VIEW_PREFIX = "ui://widget/";
+const CURRENT_VIEW_PREFIX = "ui://views/";
+
+function rewriteLegacyViewUri(legacyUri: string): string | undefined {
+  if (!legacyUri.startsWith(LEGACY_VIEW_PREFIX) || !legacyUri.endsWith(".html")) {
+    return undefined;
+  }
+  const suffix = legacyUri.slice(LEGACY_VIEW_PREFIX.length, -".html".length);
+  if (!suffix) return undefined;
+  // v1 could emit ui://widget/<view>.<buildId>.html, but v2 view URIs never
+  // include a build id, so strip the trailing build id segment.
+  const dotIndex = suffix.lastIndexOf(".");
+  const name = dotIndex > 0 ? suffix.slice(0, dotIndex) : suffix;
+  return `${CURRENT_VIEW_PREFIX}${name}.html`;
+}
+
+server.use(server.basePath, async (c, next) => {
+  if (c.req.method !== 'POST') return next();
+
+  const body = await c.req.raw.clone().json().catch(() => undefined);
+  const legacyUri = body?.method === 'resources/read' ? body.params?.uri : undefined;
+  const viewUri = typeof legacyUri === 'string' ? rewriteLegacyViewUri(legacyUri) : undefined;
+  if (!viewUri) return next();
+
+  console.log('legacy view uri rewrite:', legacyUri, '->', viewUri);
+  const reqHeaders = new Headers(c.req.raw.headers);
+  reqHeaders.delete("content-length");
+  c.req.raw = new Request(c.req.raw, {
+    body: JSON.stringify({ ...body, params: { ...body.params, uri: viewUri } }),
+    headers: reqHeaders,
+  });
+  await next();
+
+  const text = await c.res.text();
+  const resHeaders = new Headers(c.res.headers);
+  resHeaders.delete("content-length");
+  resHeaders.delete("content-encoding");
+  c.res = new Response(
+    text.replaceAll(JSON.stringify(viewUri), JSON.stringify(legacyUri)),
+    { status: c.res.status, statusText: c.res.statusText, headers: resHeaders },
+  );
+});
+```
+
+This shim is temporary. Submit a new version of the published app so ChatGPT
+picks up the v2 tool metadata and starts requesting `ui://views/<name>.html`
+directly. Once the new submission is approved and live, remove the middleware.
+
 ## Update authentication, proxies, and security
 
 Native v2 acts as an OAuth resource server backed by an external authorization
@@ -496,6 +581,13 @@ locator options, and use the provider-specific `ctx.auth.user` type.
 Replace generic `userId` assumptions with the provider's mapped field, commonly
 `id`. Replace `getAuth`, `hasScope`, and `requireScope` with verified
 `ctx.auth`, scopes, permissions, and application authorization checks.
+
+To serve public, optional, and sign-in tools from one OAuth-enabled endpoint,
+set `mixedAuth: true` on the server and declare `securitySchemes` on each tool.
+Without `mixedAuth`, every request to the MCP endpoint needs a valid token. If a
+v1 tool sets `_meta.securitySchemes` by hand, v2 passes it through unchanged but
+does not enforce it; declare `securitySchemes` on the tool instead. See
+[Mixed authentication](/v2/typescript/server/authentication/mixed-auth).
 
 OAuth proxy or authorization-server mode has no native v2 migration. Do not
 translate `oauthProxy`, `jwksVerifier`, or `mountOAuthProxy` as resource-server
@@ -520,7 +612,111 @@ Map v1 CORS `allowMethods` and `allowHeaders` to v2 `methods` and
 Use `basePath` for the MCP route. Set `MCP_URL` for the externally visible
 server origin.
 
-## Review current beta limitations
+### Keep existing OAuth connections working
+
+v2 binds every access token to the MCP endpoint instead of the server origin.
+Clients that authorized against a v1 server can hold tokens that v2 rejects.
+Plan this migration before you deploy v2 to an existing production URL.
+
+| OAuth behavior                        | v1                                       | v2                                                    |
+| ------------------------------------- | ---------------------------------------- | ----------------------------------------------------- |
+| Protected resource identifier         | Server origin: `https://mcp.example.com` | Origin plus `basePath`: `https://mcp.example.com/mcp` |
+| 401 challenge `resource_metadata` URL | `/.well-known/oauth-protected-resource`  | `/.well-known/oauth-protected-resource/mcp`           |
+| Access token `aud` claim              | Not checked                              | Must include the v2 identifier exactly                |
+
+A token whose `aud` is only the v1 identifier fails with `Token audience does
+not include the protected resource`, and the client receives HTTP 401. The v2
+identifier always ends with `basePath`, so you cannot configure v2 to advertise
+the bare origin.
+
+Which clients are affected depends on where the client gets its resource
+identifier:
+
+- **Clients that read protected-resource metadata** follow the 401 challenge
+  and request tokens for the v2 identifier when they next authorize.
+- **Clients with a saved resource setting** keep requesting the v1 identifier.
+  A published ChatGPT or Codex app uses the Resource value from its approved app
+  submission. Reconnecting does not help, because every new token has the v1
+  audience. OpenAI tool scans that use the same saved value fail with the same
+  error.
+- **Clients that refresh tokens** get whichever audience your authorization
+  server issues for the `resource` they send on refresh. A client that keeps
+  sending the v1 identifier can keep getting v1-audience tokens indefinitely
+  when refresh tokens rotate.
+
+<Steps>
+  <Step title="Find the identifier your v1 clients use">
+    Check the `resource` value in your v1 protected-resource metadata, or the
+    `aud` claim of a current access token. It is usually your `MCP_URL` origin.
+  </Step>
+  <Step title="Accept both identifiers during the migration">
+    Pass both identifiers to `createJwtVerifier` through `audience`. The server
+    still advertises only the v2 identifier, and still verifies the signature,
+    issuer, and expiry.
+  </Step>
+  <Step title="Update clients that save a resource setting">
+    Submit a new version of each published app with the v2 identifier as its
+    Resource. Keep accepting the v1 identifier until that version is approved
+    and live. Submitting it is not enough.
+  </Step>
+  <Step title="Allow the v2 identifier on the authorization server">
+    Confirm that the authorization server issues tokens with the v2 identifier
+    as their audience. For the Better Auth OAuth provider plugin, include it in
+    `validAudiences`.
+  </Step>
+  <Step title="Remove the v1 identifier after the last v1 token expires">
+    Log when an accepted token's `aud` does not include the v2 identifier. The
+    verified claims are available in `authInfo.extra.payload`. Remove the v1
+    identifier only after no v1-audience tokens appear for at least your longest
+    access-token lifetime.
+  </Step>
+</Steps>
+
+This example accepts both identifiers with the Better Auth provider:
+
+```ts server.ts
+import { MCPServer } from "mcp-use";
+import { createJwtVerifier } from "mcp-use/oauth";
+import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
+
+const authURL = "https://auth.example.com/api/auth";
+// The resource identifier that v1 clients requested tokens for.
+const v1Resource = "https://mcp.example.com";
+
+const provider = oauthBetterAuthProvider({ authURL });
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "2.0.0",
+  oauth: {
+    ...provider,
+    createTokenVerifier: (resource) =>
+      createJwtVerifier({
+        issuer: authURL,
+        jwksUrl: new URL(`${authURL}/jwks`),
+        resource,
+        audience: [resource.href, v1Resource],
+      }),
+  },
+});
+
+export default server;
+```
+
+The `audience` option checks the `aud` claim only. If your authorization server
+also sets a `resource` claim to the v1 identifier, v2 still rejects the token.
+Verify the migration with a real token that a v1 client holds.
+
+<Warning>
+  Removing the v1 identifier before every client has moved breaks those
+  connections immediately. Published apps show a reconnect prompt that cannot
+  succeed, because each reconnect issues another v1-audience token.
+</Warning>
+
+The resource identifier is part of your public contract. Changing `MCP_URL` or
+`basePath` later changes it again and requires the same migration.
+
+## Review v2 limitations
 
 The following v1 capabilities do not currently have direct v2 equivalents.
 Update the application design where one of these limitations affects your
@@ -535,18 +731,19 @@ server.
   available.
 - Server-to-client sampling through `ctx.sample()` is not available.
 - The v1 roots-changed callback surface is not available.
-- Express and Connect adapters are not available. Use Hono or `server.fetch`.
+- Express and Connect adapters are not available. Use Hono, `server.fetch`, or
+  `toNodeHandler()` from `mcp-use/node`.
 - Stdio serving and stdio child-process proxy configuration do not have a
   native migration path.
 - CommonJS and unsupported Node.js versions are intentional compatibility
-  breaks, not beta bugs.
+  breaks.
 
 Move durable state to application storage keyed by verified user, tenant, or an
 explicit domain handle. Do not key business state to an MCP transport session.
 
 ### OAuth, proxy, and OpenAPI
 
-- OAuth proxy and authorization-server mode are deferred. Direct
+- OAuth proxy and authorization-server mode are not provided. Direct
   resource-server authentication is implemented.
 - Unsigned token bypasses such as `verifyJwt: false` are not supported.
 - Verify proxy requirements for upstream OAuth, templates, completions,
@@ -586,8 +783,9 @@ explicit domain handle. Do not key business state to an MCP transport session.
     display mode; sizing; CSP; and public assets in a capable host.
   </Step>
   <Step title="Test security and authentication">
-    Check a valid token, missing or invalid scopes, mapped user data, Host
-    rejection, Origin rejection, and browser CORS behavior.
+    Check a valid token, a token issued before the migration, missing or invalid
+    scopes, mapped user data, Host rejection, Origin rejection, and browser CORS
+    behavior.
   </Step>
   <Step title="Preserve behavioral coverage">
     Keep existing runtime assertions as runtime assertions. If v2 does not

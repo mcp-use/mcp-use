@@ -1,5 +1,6 @@
 import type {
   CallToolResult,
+  Icon,
   InputRequiredResult,
   MetaObject,
   StandardSchemaWithJSON,
@@ -9,8 +10,55 @@ import type { Env } from "hono";
 
 import type { McpUiResourceCsp } from "@modelcontextprotocol/ext-apps";
 
-import type { RequestContext } from "./context.js";
+import type { OAuthMode, RequestContext } from "./context.js";
 import type { UiPermissions } from "./views/types.js";
+
+/**
+ * One way a client may call a tool, from the `securitySchemes` convention
+ * ChatGPT reads on `tools/list`. See {@link ToolDefinition.securitySchemes}.
+ */
+export type ToolSecurityScheme =
+  | {
+      /** The tool runs without a token. */
+      readonly type: "noauth";
+    }
+  | {
+      /** The tool accepts an OAuth 2.1 bearer token. */
+      readonly type: "oauth2";
+      /**
+       * Scopes beyond the provider's `requiredScopes`. Use `[]` for the
+       * provider's `requiredScopes` alone.
+       */
+      readonly scopes: readonly string[];
+    };
+
+/** Manual launch locations advertised by ChatGPT on a view-bound tool. */
+export type ToolViewEntrypoint =
+  | {
+      /** Opens the app from the global launcher. */
+      readonly type: "global";
+    }
+  | {
+      /** Opens the app within the current conversation. */
+      readonly type: "thread";
+    }
+  | {
+      /** Opens a matching file in the app. */
+      readonly type: "file";
+      /** HTML accept-style file extensions, each beginning with a dot. */
+      readonly extensions: readonly string[];
+    };
+
+/** Arguments supplied by the host when opening a file entrypoint. */
+export interface FileEntrypointInput {
+  /** Host-provided file identity and resource reference. */
+  file: {
+    /** File name including its extension, without a filesystem path. */
+    name: string;
+    /** Opaque host resource URI. */
+    resourceUri: string;
+  };
+}
 
 /**
  * Binds a tool to a view directory for MCP Apps rendering.
@@ -24,6 +72,16 @@ import type { UiPermissions } from "./views/types.js";
 export interface ToolViewConfig {
   /** View directory / registry name, e.g. `"product-search-result"`. */
   name: string;
+  /**
+   * Manual launch locations → tool `_meta["openai/ui"].entrypoints`.
+   * Global/thread launchers must accept `{}`; file launchers require
+   * {@link FileEntrypointInput}. Entrypoints open fullscreen in supporting
+   * hosts. Typed entrypoints take precedence over raw metadata declarations.
+   * Registration checks the input JSON Schema against `{}` and representative
+   * file payloads for the declared extensions. Application refinements must
+   * also accept host launch arguments; they only run on actual tool calls.
+   */
+  entrypoints?: readonly ToolViewEntrypoint[];
   /**
    * Human-readable description of the view resource → the resource's
    * `description` on `resources/list` and `resources/read`.
@@ -58,6 +116,13 @@ export interface ToolDefinition {
   title?: string;
   /** LLM-facing description of what the tool does. */
   description?: string;
+  /**
+   * Tool icons advertised on `tools/list`, in author order. Absolute HTTP(S)
+   * and data URLs pass through; paths relative to `public/` become absolute
+   * asset URLs for HTTP requests. Entrypoint hosts prefer these icons over
+   * server branding. Use monochrome SVGs with `currentColor` for ChatGPT.
+   */
+  icons?: Icon[];
   /**
    * Object schema for input validation — any Standard Schema library with
    * JSON Schema conversion ({@link StandardSchemaWithJSON}): zod v4, ArkType,
@@ -100,6 +165,28 @@ export interface ToolDefinition {
    * views via `useCallTool` while the host hides them from the model.
    */
   visibility?: "model" | "app";
+  /**
+   * How the tool may be called on an OAuth server. Checked before the
+   * callback runs, and advertised on `tools/list` for hosts such as ChatGPT.
+   *
+   * - `[{ type: "noauth" }]`: anyone may call it; `ctx.auth` is set when the
+   *   caller is signed in.
+   * - `[{ type: "noauth" }, { type: "oauth2", scopes }]`: anyone may call it.
+   *   The scopes are only advertised, so the callback checks
+   *   `ctx.auth?.scopes` itself.
+   * - `[{ type: "oauth2", scopes }]`: sign-in required with every listed
+   *   scope plus the provider's `requiredScopes`.
+   *
+   * Omitted means sign-in with the provider's `requiredScopes`. `noauth`
+   * requires `mixedAuth: true` on the server.
+   *
+   * @example
+   * ```ts
+   * securitySchemes: [{ type: "noauth" }]
+   * securitySchemes: [{ type: "oauth2", scopes: ["checkout"] }]
+   * ```
+   */
+  securitySchemes?: readonly ToolSecurityScheme[];
   /**
    * Bind this tool to a view for MCP Apps rendering. Requires
    * {@link ToolDefinition.outputSchema} — the view reads the result's
@@ -212,7 +299,7 @@ export type ToolCallback<
   TInput = Record<string, unknown>,
   TOutput = never,
   TUser = never,
-  HasOAuth extends boolean = false,
+  HasOAuth extends OAuthMode = false,
   TEnv extends Env = Env,
 > = (
   params: TInput,

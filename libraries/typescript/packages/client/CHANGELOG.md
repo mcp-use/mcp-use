@@ -1,5 +1,161 @@
 # @mcp-use/client
 
+## 2.4.2
+
+### Patch Changes
+
+- 6bf3a79: Implement `listTools` and protocol metadata on `CodeModeConnector`
+
+## 2.4.2-canary.0
+
+### Patch Changes
+
+- b3990f0: Implement `listTools` and protocol metadata on `CodeModeConnector`
+
+## 2.4.1
+
+### Patch Changes
+
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 2.4.1-canary.0
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 2.4.0
+
+### Minor Changes
+
+- cdf2cc6: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+### Patch Changes
+
+- cdf2cc6: Decode base64 MCP App HTML resources as UTF-8 so non-ASCII text renders correctly in React views.
+- cdf2cc6: Document that `proxyOAuthRequests` also routes UserInfo requests through the OAuth proxy.
+
+## 2.4.0-canary.2
+
+### Patch Changes
+
+- 63b923e: Document that `proxyOAuthRequests` also routes UserInfo requests through the OAuth proxy.
+
+## 2.4.0-canary.1
+
+### Minor Changes
+
+- 604b130: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+## 2.3.5-canary.0
+
+### Patch Changes
+
+- 19a3d94: Decode base64 MCP App HTML resources as UTF-8 so non-ASCII text renders correctly in React views.
+
+## 2.3.4
+
+### Patch Changes
+
+- 7d71ef7: `BrowserMCPClient` now expands the `capabilities.views` shorthand into the `io.modelcontextprotocol/ui` extension and forwards `roots` and `defaultRequestOptions` to the connector, matching the Node client.
+- 7d71ef7: `getOAuthTokenExpiry` now reads the JWT `exp` claim when the token payload contains the Base64URL characters `-` or `_`. These tokens previously fell back to `expires_in`, so nothing changes for providers that return `expires_in`. The `authTokens.expires_at` docs now say milliseconds, matching the value `useMcp` has always returned.
+- 7d71ef7: Views no longer stay pending forever when the host cancels the tool call that rendered them. When `ui/notifications/tool-cancelled` arrives before a result, `useToolContext()` now switches to `status: "error"` with a new `ToolCancelledError` (exported from `mcp-use/react`) that carries the host's `reason`. Views that already render `error.message` show the cancellation without changes. Check `error instanceof ToolCancelledError` to show a "Cancelled" state or a retry. A cancellation that arrives after a result is still ignored.
+
+  `ToolContextError` is now `ToolError | ToolCancelledError`. Narrow with `instanceof ToolError` before reading `error.result`.
+
+  `ViewRenderer` no longer sends `tool-cancelled` when a tool call made by the view fails. That failure already rejects the view's call, and the notification refers to the tool call that rendered the view.
+
+## 2.3.4-canary.2
+
+### Patch Changes
+
+- 1a5dbe5: `getOAuthTokenExpiry` now reads the JWT `exp` claim when the token payload contains the Base64URL characters `-` or `_`. These tokens previously fell back to `expires_in`, so nothing changes for providers that return `expires_in`. The `authTokens.expires_at` docs now say milliseconds, matching the value `useMcp` has always returned.
+
+## 2.3.4-canary.1
+
+### Patch Changes
+
+- a294830: `BrowserMCPClient` now expands the `capabilities.views` shorthand into the `io.modelcontextprotocol/ui` extension and forwards `roots` and `defaultRequestOptions` to the connector, matching the Node client.
+
+## 2.3.4-canary.0
+
+### Patch Changes
+
+- a7f5b34: Views no longer stay pending forever when the host cancels the tool call that rendered them. When `ui/notifications/tool-cancelled` arrives before a result, `useToolContext()` now switches to `status: "error"` with a new `ToolCancelledError` (exported from `mcp-use/react`) that carries the host's `reason`. Views that already render `error.message` show the cancellation without changes. Check `error instanceof ToolCancelledError` to show a "Cancelled" state or a retry. A cancellation that arrives after a result is still ignored.
+
+  `ToolContextError` is now `ToolError | ToolCancelledError`. Narrow with `instanceof ToolError` before reading `error.result`.
+
+  `ViewRenderer` no longer sends `tool-cancelled` when a tool call made by the view fails. That failure already rejects the view's call, and the notification refers to the tool call that rendered the view.
+
+## 2.3.3
+
+### Patch Changes
+
+- 4866186: Prevent sibling inline MCP View widgets from clobbering global document fullscreen and pip attributes.
+- 4866186: Keep MCP App iframe backgrounds transparent when embedded in dark hosts by matching the iframe color scheme to the sandbox document.
+- 4866186: Forward `modelContent` from the `window.openai.setWidgetState` compatibility shim to the host as `ui/update-model-context`, so view model context reaches the Inspector Chat LLM. `privateContent` and `imageIds` stay in the view, and the setter still resolves on surfaces without model context.
+
+## 2.3.3-canary.1
+
+### Patch Changes
+
+- 6e6f391: Keep MCP App iframe backgrounds transparent when embedded in dark hosts by matching the iframe color scheme to the sandbox document.
+
+## 2.3.3-canary.0
+
+### Patch Changes
+
+- b906d63: Prevent sibling inline MCP View widgets from clobbering global document fullscreen and pip attributes.
+
+## 2.3.2
+
+### Patch Changes
+
+- b1bda25: Restore SDK progress and cancellation notification handling by forwarding the SDK handler arguments. Remove obsolete SDK v2 beta progress workarounds, including the extra HTTP SSE reader, and preserve progress routing across concurrent calls and multi-round retries.
+
+## 2.3.2-canary.0
+
+### Patch Changes
+
+- 6f818f8: Restore SDK progress and cancellation notification handling by forwarding the SDK handler arguments. Remove obsolete SDK v2 beta progress workarounds, including the extra HTTP SSE reader, and preserve progress routing across concurrent calls and multi-round retries.
+
+## 2.3.1
+
+### Patch Changes
+
+- 485c79c: Stabilize `clientInfo` and `proxyConfig` dependencies in `useMcp` to prevent reconnection loops on parent component re-renders.
+- 485c79c: Clean up sandbox proxy message listener and cancel pending readiness wait on `ViewRenderer` unmount.
+- 485c79c: Prevent duplicate subprocesses and HTTP transports from concurrent connection attempts. Coordinate connection and disconnection calls so a later disconnect cancels in-flight and queued reconnects, releasing resources before shutdown completes.
+- 485c79c: Replace the temporary `@mcp-use/ext-apps` package alias with the official `@modelcontextprotocol/ext-apps` 2.0.0 release. The upstream release includes the SDK v2 role-isolation work previously carried by the fork.
+
+## 2.3.1-canary.3
+
+### Patch Changes
+
+- 4740f9b: Replace the temporary `@mcp-use/ext-apps` package alias with the official `@modelcontextprotocol/ext-apps` 2.0.0 release. The upstream release includes the SDK v2 role-isolation work previously carried by the fork.
+
+## 2.3.1-canary.2
+
+### Patch Changes
+
+- 6e6de8b: Prevent duplicate subprocesses and HTTP transports from concurrent connection attempts. Coordinate connection and disconnection calls so a later disconnect cancels in-flight and queued reconnects, releasing resources before shutdown completes.
+
+## 2.3.1-canary.1
+
+### Patch Changes
+
+- ce6b9e1: Stabilize `clientInfo` and `proxyConfig` dependencies in `useMcp` to prevent reconnection loops on parent component re-renders.
+
+## 2.3.1-canary.0
+
+### Patch Changes
+
+- 322a6d3: Clean up sandbox proxy message listener and cancel pending readiness wait on `ViewRenderer` unmount.
+
 ## 2.3.0
 
 ### Minor Changes

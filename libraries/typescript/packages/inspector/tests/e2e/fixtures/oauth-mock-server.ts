@@ -108,7 +108,9 @@ export function createOAuthMcpServer(providerKey: string) {
       grant_types_supported: ["authorization_code", "refresh_token"],
       token_endpoint_auth_methods_supported: ["client_secret_post", "none"],
     },
-    createTokenVerifier: () => ({
+    // The verifier is bound to the canonical MCP resource; v2 rejects verified
+    // tokens that do not echo it back.
+    createTokenVerifier: (protectedResource) => ({
       async verifyAccessToken(token: string) {
         const payload = decodeJwtPayload(token);
         return {
@@ -125,6 +127,7 @@ export function createOAuthMcpServer(providerKey: string) {
             typeof payload.exp === "number"
               ? payload.exp
               : Math.floor(Date.now() / 1000) + 3600,
+          resource: protectedResource,
           extra: { payload },
         };
       },
@@ -222,7 +225,7 @@ export class OAuthMockServerHelper {
 
   async start() {
     try {
-      const { default: OAuth2Server } = await import("oauth2-mock-server");
+      const { OAuth2Server } = await import("oauth2-mock-server");
 
       this.oauthServer = new OAuth2Server();
       await this.oauthServer.issuer.keys.generate("RS256");

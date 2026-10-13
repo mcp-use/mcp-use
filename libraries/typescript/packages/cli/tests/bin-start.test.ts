@@ -231,6 +231,12 @@ describe("parseArgs", () => {
     expect(parseArgs(["start"]).tunnel).toBe(false);
   });
 
+  it("rejects a value on a boolean flag instead of ignoring it", () => {
+    expect(() => parseArgs(["dev", "--tunnel=false"])).toThrow(
+      "--tunnel does not take a value"
+    );
+  });
+
   it("parses --no-open (auto-open defaults to on)", () => {
     expect(parseArgs(["dev", "--no-open"]).open).toBe(false);
     expect(parseArgs(["dev"]).open).toBe(true);
@@ -246,6 +252,14 @@ describe("parseArgs", () => {
   it("parses --source-maps for build", () => {
     expect(parseArgs(["build", "--source-maps"]).sourceMaps).toBe(true);
     expect(parseArgs(["build"]).sourceMaps).toBe(false);
+  });
+
+  it("discovers view config by default and allows opting out", () => {
+    expect(parseArgs(["build"]).viewsConfig).toBe(true);
+    expect(parseArgs(["build", "--no-views-config"]).viewsConfig).toBe(false);
+    expect(() =>
+      parseArgs(["build", "--views-config=views.vite.config.ts"])
+    ).toThrow("Unknown option: --views-config");
   });
 
   it("parses --inline for build without changing the default", () => {

@@ -11,6 +11,7 @@
  * `mcp-use start` therefore never evaluate Vite.
  */
 
+import { readViewConfig } from "./view-config.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
@@ -80,6 +81,8 @@ export interface BuildOptions {
   mcpDir?: string;
   /** Explicit views directory, absolute or relative to `cwd`. */
   viewsDir?: string;
+  /** Discover the project's Vite config for views. Defaults to `true`. */
+  viewsConfig?: boolean;
   /** Emit source maps for the server and view bundles. */
   sourceMaps?: boolean;
   /**
@@ -277,6 +280,7 @@ async function buildView(
     }
     return {
       kind: "inline",
+      viewConfig: readViewConfig(view.entryPath),
       js: inlineJs,
       css: inlineCss.join("\n"),
     };
@@ -284,6 +288,7 @@ async function buildView(
 
   return {
     kind: "external",
+    viewConfig: readViewConfig(view.entryPath),
     entry: jsFileName.replace(/^\/+/, ""),
     css: cssFileName !== undefined ? [cssFileName.replace(/^\/+/, "")] : [],
   };
@@ -332,7 +337,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     console.log("[mcp-use] views directory not configured.");
   }
   const views = discoverViews(options.cwd, viewsDirectory);
-  const userViteConfig = resolveUserViteConfig(options.cwd);
+  const userViteConfig =
+    options.viewsConfig === false ? false : resolveUserViteConfig(options.cwd);
   const sourceMaps = options.sourceMaps === true;
   const inline = options.inline === true;
   let bindingServer:
@@ -342,13 +348,14 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     options.mcpDir === undefined ? "skills" : join(options.mcpDir, "skills");
 
   if (views.length === 0) {
+    let skillsSnapshot: SkillsSnapshot | undefined;
     bindingServer ??= await createBindingValidationServer(
       options.cwd,
       paths.cache,
       false
     );
     try {
-      const skillsSnapshot = await validateViewBindingsAtBuild(
+      skillsSnapshot = await validateViewBindingsAtBuild(
         bindingServer.environments.ssr,
         entry,
         {},
@@ -406,6 +413,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       entryPoint: BUILD_ENTRY_NAME,
       createdAt: new Date().toISOString(),
       views: {},
+      ...(skillsSnapshot !== undefined && { skills: skillsSnapshot }),
     };
     await mkdir(paths.build, { recursive: true });
     await writeFile(
@@ -535,6 +543,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     entryPoint: BUILD_ENTRY_NAME,
     createdAt: new Date().toISOString(),
     views: viewsManifest,
+    ...(skillsSnapshot !== undefined && { skills: skillsSnapshot }),
   };
   await mkdir(paths.build, { recursive: true });
   await writeFile(

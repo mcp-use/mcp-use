@@ -142,7 +142,7 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       await verifyWidgetDebugInfo(frame, { locale: "de-DE" });
 
       await page
-        .getByRole("tab", { name: /Resources/ })
+        .locator('[data-testid="tab-resources"]:visible')
         .first()
         .click();
       await expect(
@@ -153,7 +153,7 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
         timeout: 5000,
       });
 
-      await page.getByRole("tab", { name: /Tools/ }).first().click();
+      await page.locator('[data-testid="tab-tools"]:visible').first().click();
       await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
       await page.getByTestId("tool-item-get-weather-delayed").click();
       await page.getByTestId("tool-result-view-mcp-apps").click();
@@ -244,19 +244,16 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
         temperature: "18",
       });
 
-      // Refresh the page
+      // Refresh the page; the inspector reconnects and restores the last
+      // active tab, so wait for the sidebar rather than the Tools heading.
       await page.reload();
+      await expect(
+        page.locator('[data-testid="tab-resources"]:visible').first()
+      ).toBeVisible({ timeout: 15000 });
 
-      // Wait for reconnection and navigation
-      await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForViews: true,
-      });
-
-      // Navigate back to Resources tab and select weather-display.
-      // Don't use navigateToResourcesAndSelectWeather here because the
-      // persisted preset means the widget renders immediately (no "requires props" wall).
+      // Navigate to Resources tab and select weather-display.
       await page
-        .getByRole("tab", { name: /Resources/ })
+        .locator('[data-testid="tab-resources"]:visible')
         .first()
         .click();
       await expect(

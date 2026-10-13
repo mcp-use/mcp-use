@@ -4,8 +4,8 @@ description: "Migrate client, agent, and React connection code from mcp-use 1.x"
 icon: "arrow-right-left"
 ---
 
-This guide updates applications from the mcp-use 1.x client surface to the
-current beta packages. It covers client, agent, and React connection code.
+This guide updates applications from the mcp-use 1.x client surface to the v2
+packages. It covers client, agent, and React connection code.
 
 <Warning>
   Server and interactive UI APIs also have breaking changes. Do not assume that
@@ -266,7 +266,7 @@ URLs.
 
 <Steps>
   <Step title="Update the runtime and packages">
-    Use Node.js `>=22.22.2`, install the beta package tags, and confirm ESM output.
+    Use Node.js `>=22.22.2`, install the v2 packages, and confirm ESM output.
   </Step>
   <Step title="Fix imports">
     Search for client and agent imports from `mcp-use`, removed

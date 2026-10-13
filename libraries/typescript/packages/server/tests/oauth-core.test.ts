@@ -498,6 +498,27 @@ describe("OAuth core", () => {
     ).toThrow("resource must use HTTPS, or HTTP for localhost");
   });
 
+  it("rejects a malformed verifier resource as configuration, not as a bad token", () => {
+    const requirement = new TypeError(
+      "resource must use HTTPS, or HTTP for localhost, without credentials, query, or fragment"
+    );
+    const verifier = (resource: URL | string) => () =>
+      createJwtVerifier({
+        issuer: "https://issuer.example.com",
+        jwksUrl: new URL("https://issuer.example.com/jwks"),
+        resource: resource as URL,
+      });
+
+    expect(verifier(new URL("https://api.example.com/mcp?v=1"))).toThrow(
+      requirement
+    );
+    // A JavaScript caller is not held to the URL type, and a scheme-less
+    // string must stay rejected rather than being read as https://.
+    expect(verifier("api.example.com/mcp")).toThrow(requirement);
+    expect(verifier("http://api.example.com/mcp")).toThrow(requirement);
+    expect(verifier("http://localhost:3000/mcp")).not.toThrow();
+  });
+
   it("resolves an explicit canonical resource and rejects a path mismatch", () => {
     const provider = oauthCustomProvider({
       createTokenVerifier: () => ({

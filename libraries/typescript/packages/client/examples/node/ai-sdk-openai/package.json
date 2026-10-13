@@ -7,14 +7,11 @@
   },
   "scripts": {
     "prestart": "pnpm --dir ../../.. build",
-    "start": "tsx index.ts"
+    "start": "node index.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.58",
     "@mcp-use/client": "file:../../..",
     "ai": "^7.0.92"
-  },
-  "devDependencies": {
-    "tsx": "^4.23.13"
   }
 }

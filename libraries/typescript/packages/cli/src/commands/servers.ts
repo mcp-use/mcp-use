@@ -52,17 +52,20 @@ const COMMAND_HELP: Record<string, string> = {
   delete: `Usage: mcp-use servers delete <id-or-slug> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --yes               Confirm deletion without prompting\n  --json              Emit the deletion result; never prompt\n  -h, --help          Show this help`,
   env: `Usage: mcp-use servers env <list|set|unset> [options]\n\nCommands:\n  list <server>             List keys and metadata; values are never returned\n  set <server> <KEY=VALUE> Create or update a value\n  unset <server> <key>     Delete a value\n\nRun mcp-use servers env <command> --help for all options.`,
   "env list": `Usage: mcp-use servers env list <server> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Select preview variables for a branch\n  --json              Emit metadata only; never values\n  -h, --help          Show this help`,
-  "env set": `Usage: mcp-use servers env set <server> <KEY=VALUE> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Set a preview value for a branch (default: production)\n  --secret            Mark the value sensitive\n  --json              Emit mutation metadata only; never the value\n  -h, --help          Show this help`,
+  "env set": `Usage: mcp-use servers env set <server> <KEY=VALUE> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Set a preview value for a branch (default: production)\n  --secret            Store the value as a write-only secret. Required on every write to keep it write-only.\n  --json              Emit mutation metadata only; never the value\n  -h, --help          Show this help`,
   "env unset": `Usage: mcp-use servers env unset <server> <key> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Delete a preview value for a branch\n  --yes               Confirm deletion without prompting\n  --json              Emit the deletion result; never prompt\n  -h, --help          Show this help`,
 };
 
 /** Run the `mcp-use servers` command family. */
 export async function runServers(argv: readonly string[]): Promise<number> {
   if (argv.some((token) => token === "--help" || token === "-h")) {
+    const sub = argv.filter(
+      (token) => token !== "--help" && token !== "-h" && token !== "--json"
+    );
     const key =
-      argv[0] === "env" && argv[1] !== undefined
-        ? `env ${argv[1]}`
-        : (argv[0] ?? "");
+      sub[0] === "env" && sub[1] !== undefined
+        ? `env ${sub[1]}`
+        : (sub[0] ?? "");
     process.stdout.write(`${COMMAND_HELP[key] ?? HELP}\n`);
     return 0;
   }
@@ -90,8 +93,8 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
     strict: true,
     options: commonListOptions(),
   });
-  const { api, organizationId } = await cloudApiForOrganization(values.org);
   const { limit, skip } = parsePagination(values.limit, values.skip);
+  const { api, organizationId } = await cloudApiForOrganization(values.org);
   const query = new URLSearchParams({
     organizationId,
     limit: String(limit),
@@ -317,7 +320,11 @@ async function envSet(argv: readonly string[], json: boolean): Promise<number> {
     secret: values.secret === true,
     updated: existing !== undefined,
   };
-  printResult(result, json, `Set ${key}.`);
+  printResult(
+    result,
+    json,
+    values.secret === true ? `Set ${key} (saved as write-only).` : `Set ${key}.`
+  );
   return 0;
 }
 

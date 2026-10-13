@@ -1,5 +1,5 @@
 /**
- * The Leaflet half of the view: an OpenStreetMap basemap with price-bubble pins.
+ * The Leaflet half of the view: an Esri Canvas basemap with price-bubble pins.
  *
  * Leaflet is imperative, so the map is created once and reconciled by effects.
  * Camera moves are exposed through {@link MapHandle} rather than props because
@@ -43,9 +43,9 @@ export interface PropertyMapProps {
   hoveredId: string | null;
   /** Homes the user hearted. */
   savedIds: readonly string[];
-  /** Host color scheme; swaps the basemap between CARTO light and dark. */
+  /** Host color scheme; swaps the basemap between Esri light and dark gray. */
   theme: "light" | "dark";
-  /** Required OpenStreetMap / CARTO attribution HTML. */
+  /** Required Esri / OpenStreetMap attribution HTML. */
   attribution: string;
   /** Called when a pin is clicked. */
   onSelect: (id: string) => void;
@@ -58,8 +58,16 @@ export interface PropertyMapProps {
 const SF_CENTER: L.LatLngTuple = [37.7749, -122.4194];
 const SF_ZOOM = 12.5;
 
-const tileUrl = (theme: "light" | "dark") =>
-  `https://basemaps.cartocdn.com/${theme === "dark" ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`;
+/** Esri's keyless Canvas basemaps: a gray base plus a transparent label layer. */
+const tileUrl = (theme: "light" | "dark", layer: "Base" | "Reference") =>
+  `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${theme === "dark" ? "Dark" : "Light"}_Gray_${layer}/MapServer/tile/{z}/{y}/{x}`;
+
+/** Canvas tiles stop at z16; Leaflet upscales them for closer zooms. */
+const TILE_OPTIONS: L.TileLayerOptions = {
+  maxNativeZoom: 16,
+  maxZoom: 19,
+  minZoom: 10,
+};
 
 function pinMarkup(
   listing: Listing,
@@ -90,7 +98,7 @@ export function PropertyMap({
 }: PropertyMapProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const tileRef = useRef<L.TileLayer | null>(null);
+  const tileRef = useRef<L.LayerGroup | null>(null);
   const ringRef = useRef<L.Circle | null>(null);
   const markersRef = useRef(new Map<string, L.Marker>());
   // Handlers live in refs so marker click bindings survive parent re-renders
@@ -137,12 +145,10 @@ export function PropertyMap({
     const map = mapRef.current;
     if (map === null) return;
     tileRef.current?.remove();
-    tileRef.current = L.tileLayer(tileUrl(theme), {
-      attribution,
-      detectRetina: true,
-      maxZoom: 19,
-      minZoom: 10,
-    }).addTo(map);
+    tileRef.current = L.layerGroup([
+      L.tileLayer(tileUrl(theme, "Base"), { ...TILE_OPTIONS, attribution }),
+      L.tileLayer(tileUrl(theme, "Reference"), TILE_OPTIONS),
+    ]).addTo(map);
   }, [theme, attribution]);
 
   useEffect(() => {

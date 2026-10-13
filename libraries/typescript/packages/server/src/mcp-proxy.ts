@@ -84,7 +84,8 @@ export interface ProxyConnection {
   /** Render an upstream prompt. */
   getPrompt(
     name: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    options?: ProxyRequestOptions
   ): Promise<GetPromptResult>;
 }
 
@@ -92,6 +93,8 @@ export interface ProxyConnection {
 export interface ProxyTool {
   /** Upstream tool name. */
   name: string;
+  /** Upstream tool icons advertised on `tools/list`. */
+  icons?: ToolDefinition["icons"];
   /** Human-readable tool title. */
   title?: string | undefined;
   /** LLM-facing tool description. */
@@ -116,6 +119,10 @@ export interface ProxyResource {
   description?: string | undefined;
   /** Resource media type. */
   mimeType?: string | undefined;
+  /** Upstream client hints, e.g. audience and priority. */
+  annotations?: ResourceDefinition["annotations"] | undefined;
+  /** Upstream extension metadata advertised on `resources/list`. */
+  _meta?: ResourceDefinition["_meta"] | undefined;
 }
 
 /** Prompt metadata consumed while introspecting an upstream connection. */
@@ -351,6 +358,7 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
     const definition: ToolDefinition = {
       name,
       ...(tool.title !== undefined && { title: tool.title }),
+      ...(tool.icons !== undefined && { icons: tool.icons }),
       ...(tool.description !== undefined && { description: tool.description }),
       ...(tool.annotations !== undefined && { annotations: tool.annotations }),
       ...(tool.inputSchema !== undefined && {
@@ -413,6 +421,10 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
         ...(resource.mimeType !== undefined && {
           mimeType: resource.mimeType,
         }),
+        ...(resource.annotations !== undefined && {
+          annotations: resource.annotations,
+        }),
+        ...(resource._meta !== undefined && { _meta: resource._meta }),
       },
       async (_uri, ctx) =>
         plan.connection.readResource(upstreamUri, { signal: ctx.signal })
@@ -437,7 +449,8 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
         }),
         schema: passthroughJsonSchema(promptArgsToJsonSchema(prompt.arguments)),
       },
-      async (params) => plan.connection.getPrompt(upstreamName, params)
+      async (params, ctx) =>
+        plan.connection.getPrompt(upstreamName, params, { signal: ctx.signal })
     );
   }
 }

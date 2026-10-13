@@ -29,6 +29,7 @@
 
 import { join } from "node:path";
 import type { ViewsManifest } from "../views/types.js";
+import type { SkillsSnapshot } from "../skills/types.js";
 
 /**
  * Fixed name of the per-project workspace directory.
@@ -63,6 +64,8 @@ export interface BuildManifest {
   createdAt: string;
   /** Mode-neutral view registration data consumed by runtime adapters. */
   views: ViewsManifest;
+  /** Immutable skills included by embedded framework integrations. */
+  skills?: SkillsSnapshot;
 }
 
 /**

@@ -1,5 +1,29 @@
 # @mcp-use/tunnel
 
+## 0.2.2
+
+### Patch Changes
+
+- ad6ce34: fix(tunnel): ignore a relay `cancel` for a request that already finished instead of closing the tunnel and dropping every other in-flight request
+
+## 0.2.2-canary.0
+
+### Patch Changes
+
+- abd6eb4: fix(tunnel): ignore a relay `cancel` for a request that already finished instead of closing the tunnel and dropping every other in-flight request
+
+## 0.2.1
+
+### Patch Changes
+
+- 485c79c: Default `localHostHeader` to `localhost` in standalone `mcp-tunnel` CLI to match `mcp-use start --tunnel` and prevent DNS-rebinding / host-validation rejections on local servers.
+
+## 0.2.1-canary.0
+
+### Patch Changes
+
+- 3d5494e: Default `localHostHeader` to `localhost` in standalone `mcp-tunnel` CLI to match `mcp-use start --tunnel` and prevent DNS-rebinding / host-validation rejections on local servers.
+
 ## 0.2.0
 
 ### Minor Changes

@@ -23,13 +23,14 @@ export interface SkillsDiscoveryOptions {
 }
 
 function assertSafeDirectory(projectRoot: string, directory: string): string {
-  if (directory.trim() === "" || isAbsolute(directory)) {
+  const trimmed = directory.trim();
+  if (trimmed === "" || isAbsolute(trimmed)) {
     throw new TypeError(
       "skills.directory must be a non-empty project-relative path"
     );
   }
   const root = resolve(projectRoot);
-  const resolved = resolve(root, directory);
+  const resolved = resolve(root, trimmed);
   const rel = relative(root, resolved);
   if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
     throw new TypeError("skills.directory must stay within the project root");

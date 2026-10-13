@@ -1,44 +1,81 @@
 import { DefaultTheme } from "typedoc";
 
-const SCOPE_FOLDER = "@mcp-use";
-const TOP_LEVEL_PACKAGES = new Set(["agent", "client"]);
+// Only navigation text/order changes: reflection names, URLs and import paths stay stable.
+const LABELS = {
+  "mcp-use": "Server · mcp-use",
+  "_mcp-use_client": "Client · @mcp-use/client",
+  "_mcp-use_agent": "Agent · @mcp-use/agent",
+  "_mcp-use_tunnel": "Tunnel · @mcp-use/tunnel",
+  "mcp-use.index": "Server API",
+  "mcp-use.react": "MCP Apps · React hooks & components",
+  "mcp-use.oauth": "OAuth configuration",
+  "mcp-use.landing": "Server landing page",
+  "mcp-use.node-bridge": "Node.js bridge",
+  "mcp-use.next": "Next.js integration",
+  "_mcp-use_client.index": "Node.js client",
+  "_mcp-use_client.index-browser": "Browser client",
+  "_mcp-use_client.react": "React client hooks",
+  "_mcp-use_client.sandbox": "Code execution sandbox",
+  "_mcp-use_agent.index": "Agent API",
+  "_mcp-use_agent.langchain": "LangChain integration",
+};
+const PRIORITY = [
+  "mcp-use.index",
+  "mcp-use.react",
+  "mcp-use.next",
+  "mcp-use.oauth",
+];
+
+function decorate(item) {
+  const key = item.path?.replace(/^modules\//, "").replace(/\.html$/, "");
+  const children = item.children?.map(decorate);
+  if (key === "mcp-use.oauth" && children) {
+    const providers = children.filter((child) =>
+      child.path?.startsWith("modules/mcp-use.oauth_")
+    );
+    const rest = children.filter((child) => !providers.includes(child));
+    if (providers.length)
+      rest.push({ text: "OAuth providers", children: providers });
+    return { ...item, text: LABELS[key], children: rest };
+  }
+  if (key === "mcp-use" && children) {
+    const rest = [...children];
+    rest.sort((a, b) => {
+      const rank = (entry) => {
+        const index = PRIORITY.indexOf(
+          entry.path?.replace(/^modules\//, "").replace(/\.html$/, "")
+        );
+        return index < 0 ? PRIORITY.length : index;
+      };
+      return rank(a) - rank(b);
+    });
+    return { ...item, text: LABELS[key], children: rest };
+  }
+  return {
+    ...item,
+    text: LABELS[key] ?? item.text,
+    ...(children ? { children } : {}),
+  };
+}
 
 class McpUseTheme extends DefaultTheme {
   buildNavigation(project) {
     const navigation = super.buildNavigation(project);
-    const scopeIndex = navigation.findIndex(
-      (item) =>
-        item.text === SCOPE_FOLDER &&
-        item.path === undefined &&
-        item.children?.length
+    // Flatten TypeDoc's synthetic npm scope folder into the public package list.
+    const items = navigation.flatMap((item) =>
+      item.text === "@mcp-use" && !item.path && item.children
+        ? item.children.map((child) =>
+            decorate({ ...child, text: `@mcp-use/${child.text}` })
+          )
+        : [decorate(item)]
     );
-
-    if (scopeIndex === -1) {
-      return navigation;
-    }
-
-    const scope = navigation[scopeIndex];
-    const peers = [];
-    const remaining = [];
-
-    for (const child of scope.children) {
-      if (child.path && TOP_LEVEL_PACKAGES.has(child.text)) {
-        peers.push({ ...child, text: `${SCOPE_FOLDER}/${child.text}` });
-      } else {
-        remaining.push(child);
-      }
-    }
-
-    if (peers.length === 0) {
-      return navigation;
-    }
-
-    const replacement = [...peers];
-    if (remaining.length > 0) {
-      replacement.push({ ...scope, children: remaining });
-    }
-
-    return navigation.toSpliced(scopeIndex, 1, ...replacement);
+    const order = [
+      "modules/mcp-use.html",
+      "modules/_mcp-use_client.html",
+      "modules/_mcp-use_agent.html",
+      "modules/_mcp-use_tunnel.html",
+    ];
+    return items.sort((a, b) => order.indexOf(a.path) - order.indexOf(b.path));
   }
 }
 

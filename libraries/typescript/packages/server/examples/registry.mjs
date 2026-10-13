@@ -44,6 +44,13 @@ export const examples = [
     scenario: "nextjs-standalone",
     view: true,
   }),
+  local("tanstack-start", {
+    tools: ["greet", "show-status-card"],
+    endpoint: "/api/mcp",
+    scenario: "tanstack-start",
+    view: true,
+    portableOutput: ".output",
+  }),
   local("public-landing", { tools: ["greet"], landing: true }),
   local("events", {
     tools: ["ping", "recent-events"],
@@ -64,6 +71,7 @@ export const examples = [
   local("resource-template-completion", {
     resourceTemplates: ["repository-file"],
   }),
+  local("views/a2ui", { tools: ["render-ui"], view: true }),
   local("views/basic", { tools: ["search-fruits"], view: true }),
   local("views/excalidraw", { view: true }),
   local("views/file-upload", { view: true }),
@@ -79,6 +87,9 @@ export const examples = [
   external("auth/keycloak"),
   external("auth/supabase"),
   external("auth/workos"),
+  external("daytona"),
+  external("sentry"),
+  external("upstash"),
   configuration(
     "openapi",
     "Loads the live weather.gov OpenAPI document; deterministic fixture coverage is deferred."

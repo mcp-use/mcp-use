@@ -607,7 +607,7 @@ export function parseMcpArguments(
 ): Record<string, unknown> {
   if (argv.length === 0) return {};
   if (argv.length === 1 && argv[0]?.trimStart().startsWith("{")) {
-    const value = JSON.parse(argv[0]) as unknown;
+    const value = parseJsonArgument(argv[0], "The JSON argument");
     if (value === null || Array.isArray(value) || typeof value !== "object") {
       throw new UsageError("The JSON argument must be an object.");
     }
@@ -615,10 +615,12 @@ export function parseMcpArguments(
   }
   const result: Record<string, unknown> = {};
   for (const token of argv) {
-    const typed = token.indexOf(":=");
+    // The key ends at the first "=". It is typed only when that "=" is the
+    // end of ":=", so a plain value may itself contain ":=".
     const plain = token.indexOf("=");
-    const separator = typed >= 0 ? typed : plain;
-    const width = typed >= 0 ? 2 : 1;
+    const typed = plain > 0 && token[plain - 1] === ":";
+    const separator = typed ? plain - 1 : plain;
+    const width = typed ? 2 : 1;
     if (separator <= 0) {
       throw new UsageError(
         `Expected key=value or key:=<json>, received: ${token}`
@@ -626,9 +628,28 @@ export function parseMcpArguments(
     }
     const key = token.slice(0, separator).replace(/^--/, "");
     const raw = token.slice(separator + width);
-    result[key] = typed >= 0 ? (JSON.parse(raw) as unknown) : raw;
+    result[key] = typed
+      ? parseJsonArgument(raw, `The value for "${key}"`)
+      : raw;
   }
   return result;
+}
+
+/**
+ * Parse one JSON argument, reporting a bad one as a usage error.
+ *
+ * Without this the engine's own SyntaxError escapes, which exits 1 as an
+ * operational failure and says nothing about which argument was wrong, while
+ * every other grammar mistake in this function exits 2.
+ */
+function parseJsonArgument(raw: string, label: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch (error) {
+    throw new UsageError(
+      `${label} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 function resolveBrowserMode(options: {

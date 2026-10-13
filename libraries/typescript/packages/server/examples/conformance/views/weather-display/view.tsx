@@ -85,6 +85,11 @@ function WeatherDisplayContent() {
           <p style={{ margin: "4px 0 0", textTransform: "capitalize" }}>
             {weather.conditions}
           </p>
+          {/* Version marker: the Inspector HMR e2e edits this string to verify
+              view code hot-updates inside the mounted iframe. */}
+          <p style={{ margin: "8px 0 0", fontSize: 12, opacity: 0.7 }}>
+            Weather view v1
+          </p>
         </div>
         <p style={{ margin: 0, fontSize: 44, fontWeight: 700 }}>
           {weather.temperature}°

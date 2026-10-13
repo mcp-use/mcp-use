@@ -277,7 +277,9 @@ async function whoami(argv: readonly string[], json: boolean): Promise<number> {
   const config = await readCloudConfig();
   const identity = await (await CloudApi.create()).identity();
   const organization =
-    identity.organizations.find((item) => item.id === config.orgId) ?? null;
+    identity.organizations.find(
+      (item) => item.id === (config.orgId ?? identity.defaultOrganizationId)
+    ) ?? null;
   const result = {
     userId: identity.userId,
     email: identity.email,

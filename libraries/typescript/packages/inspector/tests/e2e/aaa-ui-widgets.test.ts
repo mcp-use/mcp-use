@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  configureLLMAPI,
   connectToConformanceServer,
   goToInspectorWithAutoConnectAndOpenTools,
   navigateToTools,
@@ -145,10 +146,7 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
       await navigateToTools(page);
     }
 
-    await page
-      .getByRole("tab", { name: /Resources/ })
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-resources"]:visible').first().click();
     await expect(
       page.getByRole("heading", { name: "Resources" })
     ).toBeVisible();
@@ -159,11 +157,13 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
   }) => {
     await page.getByTestId("resource-item-weather-display").click();
 
-    // Widget requires props - check props wall text is visible
+    // The MCP Apps view mounts directly in the resource preview (it shows its
+    // pending state until props or tool data arrive).
+    await expect(page.getByTestId("resource-widget-preview")).toBeVisible({
+      timeout: 15000,
+    });
     await expect(
-      page.getByText(
-        "This widget requires props, set or generate them in the props debugger"
-      )
+      page.locator('[data-testid="mcp-app-frame"]').first()
     ).toBeVisible({ timeout: 15000 });
   });
 
@@ -172,12 +172,9 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
   }) => {
     await page.getByTestId("resource-item-weather-display").click();
 
-    // Widget requires props - check props wall text is visible in preview
-    await expect(
-      page.getByText(
-        "This widget requires props, set or generate them in the props debugger"
-      )
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("resource-widget-preview")).toBeVisible({
+      timeout: 10000,
+    });
 
     await page.getByRole("button", { name: "JSON" }).click();
     await expect(page.getByTestId("resource-result-json")).toBeVisible({
@@ -186,43 +183,16 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
     const resultContent = page.getByTestId("resource-result-json");
     await expect(resultContent).toContainText('"uri"');
 
-    await page.getByRole("button", { name: /Component|Preview/ }).click();
-    // Back to preview - props wall is shown again
-    await expect(
-      page.getByText(
-        "This widget requires props, set or generate them in the props debugger"
-      )
-    ).toBeVisible({ timeout: 10000 });
+    // The header toggle reads "Preview" (the "MCP Apps" pill is a badge).
+    await page.getByRole("button", { name: /Preview/ }).click();
+    // Back to the component preview
+    await expect(page.getByTestId("resource-widget-preview")).toBeVisible({
+      timeout: 10000,
+    });
   });
 });
 
 test.describe("Conformance UI widgets - Chat Tab", () => {
-  async function configureChatAPI(page: import("@playwright/test").Page) {
-    const apiKey = process.env.OPENAI_API_KEY || "";
-    if (!apiKey) {
-      test.skip(true, "OPENAI_API_KEY required for chat widget tests");
-      return;
-    }
-
-    await page.getByRole("tab", { name: /Chat/ }).first().click();
-    await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible();
-    await page.getByTestId("chat-configure-api-key-button").click();
-    await expect(page.getByTestId("chat-config-dialog")).toBeVisible();
-    await page.getByTestId("chat-config-api-key-input").fill(apiKey);
-    await page.waitForTimeout(1000);
-    await page.getByTestId("chat-config-model-select").click();
-    const modelSearch = page.getByPlaceholder("Search models...");
-    await expect(modelSearch).toBeVisible();
-    await modelSearch.fill("gpt-5-nano");
-    await page
-      .getByRole("option", { name: /gpt-5-nano/ })
-      .first()
-      .click();
-    await page.getByTestId("chat-config-save-button").click();
-    await expect(page.getByTestId("chat-config-dialog")).not.toBeVisible();
-    await expect(page.getByTestId("chat-landing-header")).toBeVisible();
-  }
-
   test.beforeEach(async ({ page, context }) => {
     test.skip(
       !process.env.OPENAI_API_KEY,
@@ -243,7 +213,7 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
       await navigateToTools(page);
     }
 
-    await configureChatAPI(page);
+    await configureLLMAPI(page);
   });
 
   test("get-weather-delayed in chat - should render weather widget inline", async ({
@@ -254,13 +224,12 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
       .fill("Use the get-weather-delayed tool with city Tokyo and delay 2000");
     await page.getByTestId("chat-send-button").click();
 
-    await expect(
-      page.getByTestId("chat-tool-call-get-weather-delayed")
-    ).toBeVisible({ timeout: 20000 });
+    const toolCall = page.getByTestId("chat-tool-call-get-weather-delayed");
+    await expect(toolCall).toBeVisible({ timeout: 20000 });
 
-    await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
-      timeout: 45000,
-    });
+    await expect(
+      toolCall.getByTestId("chat-tool-call-status-result")
+    ).toBeVisible({ timeout: 45000 });
 
     // MCP Apps uses double-nested iframe (outer proxy + inner guest)
     const widgetFrame = getMcpAppsGuestFrame(page, "get-weather-delayed");
@@ -273,28 +242,38 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     page,
   }) => {
     await page.getByTestId("chat-tool-selector").click();
+    // Each selector row is a button named after the tool. Match by role so the
+    // (mounted but hidden) Tools tab list does not interfere.
     await expect(
-      page.getByText("chat-conformance-fixture", { exact: true })
+      page.getByRole("button", {
+        name: "chat-conformance-fixture",
+        exact: true,
+      })
     ).toBeVisible();
     await expect(
-      page.getByText("chat-conformance-helper", { exact: true })
-    ).not.toBeVisible();
+      page.getByRole("button", { name: "chat-conformance-helper", exact: true })
+    ).toHaveCount(0);
   });
 
   test("chat-conformance fixture sends follow-ups and replaces model context", async ({
     page,
   }) => {
+    // Two LLM turns plus a view round-trip; dev-mode (builtin) runs need the
+    // extra headroom.
+    test.slow();
     await page
       .getByTestId("chat-input")
       .fill("Use the chat-conformance-fixture tool now");
     await page.getByTestId("chat-send-button").click();
 
+    // The model may call other tools first; scope the status to this call.
+    const toolCall = page.getByTestId(
+      "chat-tool-call-chat-conformance-fixture"
+    );
+    await expect(toolCall).toBeVisible({ timeout: 20000 });
     await expect(
-      page.getByTestId("chat-tool-call-chat-conformance-fixture")
-    ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
-      timeout: 45000,
-    });
+      toolCall.getByTestId("chat-tool-call-status-result")
+    ).toBeVisible({ timeout: 45000 });
 
     const fixture = getMcpAppsGuestFrame(page, "chat-conformance-fixture");
     await expect(fixture.getByText("Chat conformance fixture")).toBeVisible();
@@ -303,13 +282,36 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     await expect(fixture.getByTestId("fixture-context-value")).toContainText(
       "Selection: 2"
     );
-    await expect(page.getByText("State synced to model")).toBeVisible();
 
-    await fixture.getByRole("button", { name: "Send follow-up" }).click();
-    await expect(fixture.getByTestId("fixture-follow-up-status")).toHaveText(
-      "sent",
+    // Chat rejects view follow-ups while a turn is still streaming, so wait
+    // for the first turn to finish (the send button leaves its stop state).
+    await expect(page.getByTestId("chat-send-button")).toHaveAttribute(
+      "title",
+      "Send",
       { timeout: 45000 }
     );
+
+    // The view's <ModelContext> must reach the model: the follow-up turn's LLM
+    // request carries it as a system message.
+    const followUpRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        (request.postData() ?? "").includes(
+          "Follow up from fixture selection 2"
+        ),
+      { timeout: 45000 }
+    );
+    await fixture.getByRole("button", { name: "Send follow-up" }).click();
+    expect((await followUpRequest).postData()).toContain(
+      "Fixture selection is 2"
+    );
+    // The view's follow-up resolves once the whole follow-up turn completes.
+    await expect(fixture.getByTestId("fixture-follow-up-status")).toHaveText(
+      "sent",
+      { timeout: 90000 }
+    );
+
+    await expect(page.getByText("State synced to model").first()).toBeVisible();
   });
 
   test("apps-sdk-only-card in chat - should show raw result without widget", async ({
@@ -324,9 +326,11 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
       page.getByTestId("chat-tool-call-apps-sdk-only-card")
     ).toBeVisible({ timeout: 20000 });
 
-    await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
-      timeout: 45000,
-    });
+    await expect(
+      page
+        .getByTestId("chat-tool-call-apps-sdk-only-card")
+        .getByTestId("chat-tool-call-status-result")
+    ).toBeVisible({ timeout: 45000 });
 
     // No ChatGPT emulation — no MCP Apps frame for apps-sdk-only tools
     await expect(page.getByTestId("mcp-app-frame")).not.toBeVisible();

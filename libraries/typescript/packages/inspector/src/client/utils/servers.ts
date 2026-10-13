@@ -26,6 +26,7 @@ export function isMcpUseTunnelUrl(serverUrl: string): boolean {
 
 interface ServerNameLike {
   name?: string;
+  displayName?: string;
   url?: string;
   serverInfo?: {
     title?: string;
@@ -36,7 +37,7 @@ interface ServerNameLike {
 }
 
 export function getConfiguredServerAlias(server: ServerNameLike): string {
-  const configuredName = server.name?.trim();
+  const configuredName = server.displayName?.trim();
   const url = server.url?.trim();
 
   if (!configuredName) {

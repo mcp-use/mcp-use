@@ -252,20 +252,43 @@ export interface CorsOptions {
   credentials?: boolean;
 }
 
+/** Whether a value has the shape of an {@link OAuthProvider}. */
+function isOAuthProviderLike(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const provider = value as Record<string, unknown>;
+  return (
+    typeof provider["createTokenVerifier"] === "function" &&
+    typeof provider["mapAuthInfo"] === "function" &&
+    typeof provider["oauthMetadata"] === "object" &&
+    provider["oauthMetadata"] !== null
+  );
+}
+
 /**
  * Runtime checks for optional {@link ServerConfig} fields that TypeScript
  * alone cannot enforce when values arrive from untyped call sites.
  *
  * @throws TypeError When `basePath` is present but not an absolute URL
  * pathname without empty segments, trailing slash, query, fragment, or
- * whitespace, or when `skills` is not a boolean or valid configuration
- * object.
+ * whitespace, when `skills` is not a boolean or valid configuration object,
+ * or when `mixedAuth` is not a boolean or is `true` without an OAuth provider
+ * (a missing, `null`, or malformed `oauth` value).
  */
 export function assertServerConfig(config: {
   basePath?: unknown;
   port?: unknown;
   skills?: unknown;
+  oauth?: unknown;
+  mixedAuth?: unknown;
 }): void {
+  if (config.mixedAuth !== undefined && typeof config.mixedAuth !== "boolean") {
+    throw new TypeError("mixedAuth must be a boolean");
+  }
+  if (config.mixedAuth === true && !isOAuthProviderLike(config.oauth)) {
+    throw new TypeError(
+      "mixedAuth requires an OAuth provider; set oauth on the server"
+    );
+  }
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
       throw new TypeError(
@@ -322,11 +345,36 @@ export type ServerConfig<TUser = never> = BaseServerConfig &
     ? {
         /** OAuth is unavailable when no authenticated user type is declared. */
         oauth?: undefined;
+        /**
+         * Mixed authentication is unavailable without an OAuth provider;
+         * only `false` is accepted here.
+         */
+        mixedAuth?: false;
       }
     : {
         /**
          * External OAuth resource-server provider. Callback contexts receive
-         * this provider's user type as required `ctx.auth.user`.
+         * this provider's user type as `ctx.auth.user`: required in callbacks
+         * that need sign-in, optional in tools whose `securitySchemes`
+         * accept `noauth`.
          */
         oauth: OAuthProvider<TUser>;
+        /**
+         * Serve signed-out and signed-in tools from one endpoint.
+         *
+         * When `true`, anyone can connect and list tools, resources, and
+         * prompts without a token. It does not make anything public: only
+         * tools whose `securitySchemes` include `noauth` run signed out, and
+         * the tools' views load signed out so hosts can render them. Other
+         * tools, and every other resource and prompt, still require sign-in
+         * with the provider's `requiredScopes`. A token that is sent is
+         * always verified, and an invalid or expired one is refused with
+         * `401`, even on `noauth` tools.
+         *
+         * When `false` or omitted, every request to the MCP endpoint needs a
+         * valid token.
+         *
+         * @defaultValue `false`
+         */
+        mixedAuth?: boolean;
       });

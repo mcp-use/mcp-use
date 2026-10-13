@@ -6,6 +6,124 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.19" description="October 2026">
+  ## Composer mention search release alignment
+  Canary patch release (`@mcp-use/inspector@20.3.19-canary.0`) paired with `mcp-use@2.9.0-canary.0`, rebuilding bundled workspace code with the framework's composer mention search helper. Stable v20.3.19 has not shipped; this wave has no Inspector-specific source changes.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.9.0 (canary.0)
+</Update>
+
+<Update label="v20.3.18" description="October 2026">
+  ## Framework release alignment
+  Patch release paired with `mcp-use` v2.8.2, rebuilding the bundled Inspector and synchronizing internal package metadata.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.8.2
+</Update>
+
+<Update label="v20.3.17" description="October 2026">
+  ## Saved tool timeout settings
+  Patch release paired with `mcp-use` v2.8.1, applying connection timeout settings to tool calls and preserving cleared values.
+
+- **Fix**: tool calls use the saved request timeout, maximum total timeout, and reset-on-progress setting instead of hard-coded defaults (`#2656`)
+- **Fix**: cleared timeout fields stay cleared when reopening or renaming a connection (`#2656`)
+- **Fix**: changing a connection URL rejects duplicates before removing the existing connection (`#2656`)
+- **Enhancement**: connection settings explain that a blank request timeout uses the 10-minute default and a blank maximum total timeout removes the overall time limit while retaining the request timeout (`#2656`)
+- **Update**: Updated mcp-use to v2.8.1
+</Update>
+
+<Update label="v20.3.16" description="October 2026">
+  ## Framework release alignment
+  Patch release paired with `mcp-use` v2.8.0, rebuilding the bundled Inspector with the ChatGPT Plugin Extensions framework updates.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.8.0
+</Update>
+
+<Update label="v20.3.15" description="October 2026">
+  ## Chat input toolbar spacing
+  Patch release paired with `mcp-use` v2.7.3, keeping multiline messages clear of the chat toolbar and updating dependencies.
+
+- **Fix**: chat input reserves space above the bottom toolbar so multiline text no longer overlaps its controls (`#2735`)
+- **Update**: update Hono to `^4.13.7` and refresh workspace dependency security floors (`#2746`)
+- **Update**: Updated mcp-use to v2.7.3
+</Update>
+
+<Update label="v20.3.14" description="September 2026">
+  ## Disconnect abort & UserInfo proxy
+  Patch release paired with `mcp-use` v2.7.2. The Express adapter stops holding upstream streams after the client leaves, and the OAuth proxy can fetch UserInfo.
+
+- **Fix**: disconnecting an Express client aborts the outbound fetch and the proxy read loop, so a long-lived SSE response no longer writes to a dead socket or leaves the upstream connection open (`#2394`)
+- **Enhancement**: the OAuth proxy allows GET to UserInfo endpoints listed on the authorization server's metadata, and rejects other methods and URLs that are not in that set (`#2688`)
+- **Update**: Updated mcp-use to v2.7.2
+</Update>
+
+<Update label="v20.3.13" description="September 2026">
+  ## View cancellation release alignment
+  Patch release paired with `mcp-use` v2.7.1; rebuilds the bundled Inspector with no Inspector-specific source changes.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.7.1
+</Update>
+
+<Update label="v20.3.12" description="September 2026">
+  ## Mixed authentication release alignment
+  Patch release paired with `mcp-use` v2.7.0; rebuilds the bundled Inspector with no Inspector-specific source changes.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.7.0
+</Update>
+
+<Update label="v20.3.11" description="September 2026">
+  ## TanStack Start release alignment
+  Patch release paired with `mcp-use` v2.6.0; there are no Inspector-specific source changes.
+
+- **Update**: Updated mcp-use to v2.6.0
+</Update>
+
+<Update label="v20.3.10" description="September 2026">
+  ## Scrollable MCP App results
+  Patch release paired with `mcp-use` v2.5.2, keeping tall tool results accessible.
+
+- **Fix**: tall MCP App tool results scroll within the result panel instead of extending beyond it (`#2598`)
+- **Update**: Updated mcp-use to v2.5.2
+</Update>
+
+<Update label="v20.3.9" description="September 2026">
+  ## Managed chat model branding & provider selection
+  Patch release paired with `mcp-use` v2.5.1, showing the selected cloud model accurately and simplifying provider selection.
+
+- **Fix**: managed chat badges use the selected cloud model's name and provider logo instead of the default transport model's branding (`#2575`)
+- **Enhancement**: the Manufact cloud provider picker offers OpenAI, Anthropic, and Google; existing selections from other providers remain visible with accurate labels, while evals retain the full catalog and BYOK OpenRouter remains available (`#2576`)
+- **Update**: `MCPServerConfig.auth_token` is deprecated but retained for type compatibility; use `authToken` to send an authentication token (`#2486`)
+- **Update**: update Hono to `^4.13.5` (`#2492`)
+- **Update**: Updated mcp-use to v2.5.1
+</Update>
+
+<Update label="v20.3.8" description="September 2026">
+  ## Bundled Inspector rebuild
+  Patch release paired with `mcp-use` v2.5.0, rebuilding the standalone Inspector with the agent OpenRouter fix.
+
+- **Fix**: rebuild the standalone Inspector with the OpenRouter Responses API agent fix and repair published framework peer metadata (`#2504`)
+- **Update**: Updated mcp-use to v2.5.0
+</Update>
+
+<Update label="v20.3.7" description="September 2026">
+  ## Workspace package alignment
+  Patch release paired with `mcp-use` v2.4.3; there are no Inspector-specific source changes.
+
+- **Update**: Updated mcp-use to v2.4.3
+</Update>
+
+<Update label="v20.3.6" description="September 2026">
+  ## Publish artifact preservation
+  Patch release paired with `mcp-use` v2.4.2, keeping package builds intact while npm pack runs.
+
+- **Fix**: concurrent publishing no longer drops the Client build while its tarball is created, and packed artifacts are checked for declared files and entry points (`#2428`)
+- **Update**: Updated mcp-use to v2.4.2
+</Update>
+
 <Update label="v20.3.5" description="September 2026">
   ## Chat widgets use the connection id
   Patch release paired with `mcp-use` v2.4.1, rendering chat MCP Apps against the registered connection.

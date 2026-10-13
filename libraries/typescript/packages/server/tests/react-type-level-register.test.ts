@@ -13,6 +13,7 @@ import type {
   CallToolResult,
   CallToolSuccess,
   ToolContextError,
+  ToolCancelledError,
   ToolError,
 } from "../src/react/types/result-types.js";
 import type {
@@ -75,7 +76,9 @@ describe("ToolsFromModule / Register", () => {
       "toolName" extends keyof ErrorBranch ? true : false
     >().toEqualTypeOf<false>();
     expectTypeOf<ErrorBranch["error"]>().toEqualTypeOf<ToolContextError>();
-    expectTypeOf<ErrorBranch["error"]>().toEqualTypeOf<ToolError>();
+    expectTypeOf<ErrorBranch["error"]>().toEqualTypeOf<
+      ToolError | ToolCancelledError
+    >();
     expectTypeOf<ErrorBranch["error"]["message"]>().toEqualTypeOf<string>();
 
     expect(true).toBe(true);

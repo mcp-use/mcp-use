@@ -1,0 +1,40 @@
+diff --git a/dist/src-Cqbh3MYc.mjs b/dist/src-Cqbh3MYc.mjs
+--- a/dist/src-Cqbh3MYc.mjs
++++ b/dist/src-Cqbh3MYc.mjs
+@@ -4484,14 +4484,14 @@
+ *
+ * @returns True if the value is a valid {@linkcode JSONRPCResultResponse}, false otherwise.
+ */
+-const isJSONRPCResultResponse = (value) => JSONRPCResultResponseSchema.safeParse(value).success;
++const isJSONRPCResultResponse = (value) => typeof value === "object" && value !== null && Object.hasOwn(value, "result") && JSONRPCResultResponseSchema.safeParse(value).success;
+ /**
+ * Checks if a value is a valid {@linkcode JSONRPCErrorResponse}.
+ * @param value - The value to check.
+ *
+ * @returns True if the value is a valid {@linkcode JSONRPCErrorResponse}, false otherwise.
+ */
+-const isJSONRPCErrorResponse = (value) => JSONRPCErrorResponseSchema.safeParse(value).success;
++const isJSONRPCErrorResponse = (value) => typeof value === "object" && value !== null && Object.hasOwn(value, "error") && JSONRPCErrorResponseSchema.safeParse(value).success;
+ /**
+ * Checks if a value is a valid {@linkcode JSONRPCResponse} (either a result or error response).
+ * @param value - The value to check.
+diff --git a/dist/src-BhnGYybN.cjs b/dist/src-BhnGYybN.cjs
+--- a/dist/src-BhnGYybN.cjs
++++ b/dist/src-BhnGYybN.cjs
+@@ -4485,14 +4485,14 @@
+ *
+ * @returns True if the value is a valid {@linkcode JSONRPCResultResponse}, false otherwise.
+ */
+-const isJSONRPCResultResponse = (value) => _modelcontextprotocol_core_internal.JSONRPCResultResponseSchema.safeParse(value).success;
++const isJSONRPCResultResponse = (value) => typeof value === "object" && value !== null && Object.hasOwn(value, "result") && _modelcontextprotocol_core_internal.JSONRPCResultResponseSchema.safeParse(value).success;
+ /**
+ * Checks if a value is a valid {@linkcode JSONRPCErrorResponse}.
+ * @param value - The value to check.
+ *
+ * @returns True if the value is a valid {@linkcode JSONRPCErrorResponse}, false otherwise.
+ */
+-const isJSONRPCErrorResponse = (value) => _modelcontextprotocol_core_internal.JSONRPCErrorResponseSchema.safeParse(value).success;
++const isJSONRPCErrorResponse = (value) => typeof value === "object" && value !== null && Object.hasOwn(value, "error") && _modelcontextprotocol_core_internal.JSONRPCErrorResponseSchema.safeParse(value).success;
+ /**
+ * Checks if a value is a valid {@linkcode JSONRPCResponse} (either a result or error response).
+ * @param value - The value to check.

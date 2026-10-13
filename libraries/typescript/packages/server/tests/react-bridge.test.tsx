@@ -3,7 +3,13 @@ import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { act, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { useState, type ComponentType, type SetStateAction } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  type ComponentType,
+  type SetStateAction,
+} from "react";
 
 import {
   bootstrapView,
@@ -11,6 +17,7 @@ import {
   getPublicBaseUrl,
   Image,
   ModelContext,
+  ToolCancelledError,
   ToolError,
   ThemeProvider,
   toolResultText,
@@ -23,6 +30,7 @@ import {
   useSendSizeChanged,
   useToolContext,
   useViewState,
+  useModelContext,
   useViewTheme,
   useViewTool,
   ViewControls,
@@ -240,12 +248,25 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("leaves the progressive pending snapshot unchanged on cancellation", async () => {
+  it("latches host cancellation as status error with ToolCancelledError", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
     function View() {
       const handle = useToolContext();
+      if (handle.status === "error") {
+        return (
+          <div data-testid="lifecycle">
+            error|
+            {handle.error instanceof ToolCancelledError
+              ? `cancelled:${handle.error.reason ?? ""}`
+              : "other"}
+            |{handle.error.message}|
+            {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}|
+            {handle.content === undefined ? "no-content" : "content"}
+          </div>
+        );
+      }
       return (
         <div data-testid="lifecycle">
           {handle.status}|
@@ -264,7 +285,37 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolCancelled({ reason: "user action" });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|ap");
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "error|cancelled:user action|Tool call was cancelled: user action|ap|no-content"
+      );
+    });
+  });
+
+  it("uses a default cancellation message when the host sends no reason", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      if (handle.status === "error") {
+        return (
+          <div data-testid="lifecycle">
+            {handle.error instanceof ToolCancelledError ? "cancelled" : "other"}
+            |{handle.error.message}
+          </div>
+        );
+      }
+      return <div data-testid="lifecycle">{handle.status}</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolCancelled({});
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "cancelled|Tool call was cancelled."
+      );
     });
   });
 
@@ -457,15 +508,20 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("continues accepting progressive input after cancellation until a result latches", async () => {
+  it("keeps a cancellation latched across later lifecycle notifications", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
     function View() {
       const handle = useToolContext();
-      if (handle.status === "ready") {
-        const { query } = handle.toolOutput as { query: string };
-        return <div data-testid="lifecycle">ready|{query}</div>;
+      if (handle.status === "error") {
+        return (
+          <div data-testid="lifecycle">
+            error|
+            {handle.error instanceof ToolCancelledError ? "cancelled" : "other"}
+            |{(handle.toolInput as { query?: string } | undefined)?.query ?? ""}
+          </div>
+        );
       }
       return (
         <div data-testid="lifecycle">
@@ -485,22 +541,29 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolCancelled({ reason: "user action" });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|ap");
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "error|cancelled|ap"
+      );
     });
 
+    // Later notifications can belong to useCallTool/useViewTool executions.
+    // None may overwrite the cancelled rendering invocation.
     await bridge.sendToolInputPartial({ arguments: { query: "or" } });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|or");
-    });
-
     await bridge.sendToolInput({ arguments: { query: "orange" } });
     await bridge.sendToolResult({
       content: [{ type: "text", text: "ok" }],
       structuredContent: { query: "orange", items: ["o"] },
     });
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "late failure" }],
+      isError: true,
+    });
+    await bridge.sendToolCancelled({ reason: "second cancel" });
 
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("ready|orange");
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "error|cancelled|ap"
+      );
     });
   });
 
@@ -1173,6 +1236,53 @@ describe("react bridge runtime", () => {
       expect(document.body.style.height).toBe("");
       expect(root!.style.height).toBe("");
     });
+  });
+
+  it("ThemeProvider keeps child state across display mode switches", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    let mounts = 0;
+    let setCount: ((value: SetStateAction<number>) => void) | undefined;
+
+    function Counter() {
+      const [count, set] = useState(() => {
+        mounts += 1;
+        return 0;
+      });
+      setCount = set;
+      return <div data-testid="count">{count}</div>;
+    }
+
+    function View() {
+      return (
+        <ThemeProvider>
+          <Counter />
+        </ThemeProvider>
+      );
+    }
+
+    act(() => {
+      bootstrapView({ default: View as ComponentType });
+    });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("count").textContent).toBe("0");
+    });
+    act(() => {
+      setCount!(3);
+    });
+
+    for (const displayMode of ["fullscreen", "inline", "pip"] as const) {
+      await act(async () => {
+        await bridge.sendHostContextChange({ displayMode });
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("count").textContent).toBe("3");
+      });
+    }
+    expect(mounts).toBe(1);
   });
 
   it("ViewControls stays inline until Debug expands it, then restores the prior mode", async () => {
@@ -2087,6 +2197,162 @@ describe("react bridge runtime", () => {
     // Allow any (erroneous) post-connect flush to drain before asserting.
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(modelContextUpdates).toHaveLength(0);
+  });
+
+  it("does not activate native delivery for an abandoned attachment render", async () => {
+    resetRuntime();
+    const setWidgetState = vi.fn();
+    Object.defineProperty(window, "openai", {
+      configurable: true,
+      value: { widgetState: {}, setWidgetState },
+    });
+    try {
+      const { init, modelContextUpdates } = await startHost(undefined, {
+        updateModelContext: { text: {}, structuredContent: {} },
+      });
+      const never = new Promise<void>(() => {});
+      let renders = 0;
+      const mounted = vi.fn();
+      function Abandoned(): never {
+        useModelContext();
+        renders++;
+        useEffect(mounted, []);
+        throw never;
+      }
+      function View() {
+        const [show, setShow] = useState(true);
+        const [state, setState] = useViewState({ count: 0 });
+        return (
+          <>
+            <button onClick={() => setShow(false)}>abandon</button>
+            <button onClick={() => setState({ count: state.count + 1 })}>
+              count:{state.count}
+            </button>
+            <Suspense fallback={<span>waiting</span>}>
+              {show && <Abandoned />}
+            </Suspense>
+          </>
+        );
+      }
+      bootstrapView({ default: View as ComponentType });
+      await init;
+      await waitFor(() => expect(screen.getByText("waiting")).not.toBeNull());
+      await act(async () => screen.getByText("abandon").click());
+      await act(async () => screen.getByText("count:0").click());
+      await waitFor(() =>
+        expect(setWidgetState).toHaveBeenLastCalledWith({
+          privateContent: {},
+          modelContent: { count: 1, _uiContext: "" },
+        })
+      );
+      expect(renders).toBeGreaterThan(0);
+      expect(mounted).not.toHaveBeenCalled();
+      expect(modelContextUpdates).toEqual([]);
+    } finally {
+      resetRuntime();
+      delete (window as unknown as { openai?: unknown }).openai;
+    }
+  });
+
+  it("activates committed native delivery before child background effects", async () => {
+    resetRuntime();
+    const setWidgetState = vi.fn();
+    Object.defineProperty(window, "openai", {
+      configurable: true,
+      value: { widgetState: {}, setWidgetState },
+    });
+    try {
+      const { init, modelContextUpdates } = await startHost(undefined, {
+        updateModelContext: { text: {}, structuredContent: {} },
+      });
+      function Background() {
+        useViewState({ count: 1 });
+        return <ModelContext content="Catalog" />;
+      }
+      function View() {
+        useModelContext();
+        return <Background />;
+      }
+      bootstrapView({ default: View as ComponentType });
+      await init;
+      await waitFor(() =>
+        expect(modelContextUpdates.at(-1)?.structuredContent).toEqual({
+          count: 1,
+          _uiContext: "- Catalog",
+        })
+      );
+      expect(setWidgetState).not.toHaveBeenCalled();
+    } finally {
+      resetRuntime();
+      delete (window as unknown as { openai?: unknown }).openai;
+    }
+  });
+
+  it("shares native attachments across hook consumers and preserves them on consumer unmount", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost(undefined, {
+      updateModelContext: { text: {}, image: {}, structuredContent: {} },
+    });
+    function Add({ name }: { name: string }) {
+      const { add, attachments, pending } = useModelContext();
+      return (
+        <button
+          onClick={() => {
+            void add(name, { type: "text", text: name });
+          }}
+        >
+          {name}:{attachments.length}:{String(pending)}
+        </button>
+      );
+    }
+    function View() {
+      const [show, setShow] = useState(true);
+      const { attachments, clearAttachments } = useModelContext();
+      useViewState({ sort: "price" });
+      return (
+        <>
+          <span data-testid="attachments">
+            {attachments.map((item) => item.key).join(",")}
+          </span>
+          {show && <Add name="one" />}
+          <Add name="two" />
+          <button onClick={() => setShow(false)}>hide</button>
+          <button
+            onClick={() => {
+              void clearAttachments();
+            }}
+          >
+            clear
+          </button>
+        </>
+      );
+    }
+    bootstrapView({
+      default: View as ComponentType,
+    });
+    await init;
+    await waitFor(() => expect(screen.getByText("one:0:false")).not.toBeNull());
+    await act(async () => {
+      screen.getByText("one:0:false").click();
+      screen.getByText("two:0:false").click();
+    });
+    await waitFor(() => expect(screen.getByText("two:2:false")).not.toBeNull());
+    expect(modelContextUpdates.at(-1)?.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify({ sort: "price", _uiContext: "" }),
+      },
+      { type: "text", text: "one" },
+      { type: "text", text: "two" },
+    ]);
+    await act(async () => screen.getByText("hide").click());
+    expect(screen.getByTestId("attachments").textContent).toBe("one,two");
+    await act(async () => screen.getByText("clear").click());
+    await waitFor(() => expect(screen.getByText("two:0:false")).not.toBeNull());
+    expect(modelContextUpdates.at(-1)?.structuredContent).toEqual({
+      sort: "price",
+      _uiContext: "",
+    });
   });
 
   it("initializes useViewState, shares it across components, and sends complete MCP model context", async () => {

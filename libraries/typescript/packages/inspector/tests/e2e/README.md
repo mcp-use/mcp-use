@@ -32,13 +32,13 @@ pnpm test:e2e:mix
 **What each mode tests:**
 
 - **builtin**: Tests HMR (hot module reload) functionality with the server running in dev mode with built-in inspector on a single port
-  - Skips: auth-flows tests, connection tests, setup tests (not applicable for single-port builtin mode)
+  - Skips: auth-flows, oauth-emulate, connection, and setup tests (they target the standalone inspector at :3000)
   - Execution: Serial (1 worker) - HMR tests modify files and must not run concurrently
 - **prod**: Tests the full production build of both inspector and server, catching build/minification issues
-  - Skips: auth-flows tests, HMR tests
+  - Skips: HMR tests (auth-flows and oauth-emulate start their own fixture servers)
   - Execution: Parallel (3 workers) - No file modifications, improved test speed
 - **mix**: Tests dev inspector against a built server (default testing mode, fastest iteration)
-  - Skips: auth-flows tests, HMR tests
+  - Skips: HMR tests (auth-flows and oauth-emulate start their own fixture servers)
   - Execution: Serial (1 worker) - Dev server can be affected by concurrent operations
 
 **Run specific test files or individual tests:**
@@ -67,7 +67,7 @@ pnpm test:e2e:mix tests/e2e/chat.test.ts --debug
 
 ### Python server E2E
 
-Runs a subset of E2E tests against the Python MCP server (from `libraries/python/examples/server/server_example.py`). The runner builds the inspector, serves `dist/web` with `npx http-server` (so the Python server can load the inspector from that URL when `INSPECTOR_CDN_BASE_URL` is set), starts the Python server, then runs `tests/e2e/python.test.ts`.
+Runs a subset of E2E tests against the Python MCP server (from `libraries/python/examples/server/server_example.py`). The runner builds the inspector, assembles a legacy CDN layout (`index.html` + `assets/`) in `dist/e2e-cdn` from the v2 `dist/app` bundle, serves it with `npx http-server` (the Python loader fetches `<cdn>/index.html` and rewrites `/inspector/assets/` paths when `INSPECTOR_CDN_BASE_URL` is set), starts the Python server, then runs `tests/e2e/python.test.ts`.
 
 **Requirements:** Python with `mcp_use` installed (e.g. `pip install -e .` from `libraries/python`).
 
@@ -141,6 +141,7 @@ pnpm test:e2e:codegen
 
 - `setup.test.ts` - Smoke tests for basic inspector functionality
 - `connection.test.ts` - Tests for server connection management
+- `v2-conformance.test.ts` - v2-only conformance coverage (header params, JSON Schema 2020-12, list_changed notifications, Notifications/Elicitation tabs, input_required elicitation)
 - `tools.test.ts` - Tests for MCP tool execution
 - `fixtures/conformance-server.ts` - Helper to start real conformance server
 

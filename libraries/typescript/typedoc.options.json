@@ -11,7 +11,7 @@
   "plugin": ["./scripts/typedoc-navigation-plugin.mjs"],
   "theme": "mcp-use",
   "out": ".typedoc",
-  "readme": "none",
+  "readme": "API.md",
   "includeVersion": false,
   "cleanOutputDir": true,
   "githubPages": false,

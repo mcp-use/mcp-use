@@ -199,7 +199,8 @@
                           "inspector/command-palette",
                           "inspector/integration",
                           "inspector/self-hosting",
-                          "inspector/debugging-chatgpt-apps"
+                          "inspector/debugging-chatgpt-apps",
+                          "inspector/webmcp-inspector"
                         ]
                       },
                       "tunneling/index"
@@ -300,8 +301,8 @@
                       "v2/typescript/getting-started/welcome",
                       "v2/typescript/getting-started/quickstart",
                       "v2/typescript/getting-started/templates",
-                      "v2/typescript/changelog/changelog",
-                      "v2/inspector/changelog"
+                      "typescript/changelog/changelog",
+                      "inspector/changelog"
                     ]
                   },
                   {
@@ -327,6 +328,7 @@
                         "pages": [
                           "v2/typescript/server/authentication/index",
                           "v2/typescript/server/authentication/user-context",
+                          "v2/typescript/server/authentication/mixed-auth",
                           {
                             "group": "OAuth Providers",
                             "icon": "plug",
@@ -373,6 +375,7 @@
                     "pages": [
                       "v2/typescript/mcp-apps",
                       "v2/typescript/mcp-apps/quickstart",
+                      "v2/typescript/mcp-apps/chatgpt-extensions",
                       "v2/typescript/mcp-apps/generative-ui",
                       "v2/typescript/mcp-apps/interactivity",
                       "v2/typescript/mcp-apps/model-context",
@@ -447,10 +450,30 @@
                           "inspector/command-palette",
                           "inspector/integration",
                           "inspector/self-hosting",
-                          "inspector/debugging-chatgpt-apps"
+                          "inspector/debugging-chatgpt-apps",
+                          "inspector/webmcp-inspector"
                         ]
                       },
                       "tunneling/index"
+                    ]
+                  }
+                ]
+              },
+              {
+                "tab": "Cookbook",
+                "icon": "book-open",
+                "groups": [
+                  {
+                    "group": "Recipes",
+                    "pages": [
+                      "v2/typescript/cookbook/index",
+                      "v2/typescript/cookbook/daytona",
+                      "v2/typescript/cookbook/nextjs",
+                      "v2/typescript/cookbook/tanstack-start",
+                      "v2/typescript/cookbook/upstash",
+                      "v2/typescript/cookbook/sentry",
+                      "v2/typescript/cookbook/a2ui",
+                      "v2/typescript/cookbook/property-search"
                     ]
                   }
                 ]
@@ -885,6 +908,14 @@
     {
       "source": "/changelog",
       "destination": "/python/changelog/changelog"
+    },
+    {
+      "source": "/v2/typescript/changelog/changelog",
+      "destination": "/typescript/changelog/changelog"
+    },
+    {
+      "source": "/v2/inspector/changelog",
+      "destination": "/inspector/changelog"
     },
     {
       "source": "/typescript/server/migration",

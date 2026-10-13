@@ -9,3 +9,7 @@ declare module "#mcp-use-skills-loader" {
     conventionalDirectory?: string
   ): import("./skills/types.js").SkillsSnapshot | undefined;
 }
+
+declare module "#mcp-use-vite-handler" {
+  export function handleMcpRequest(request: Request): Promise<Response>;
+}

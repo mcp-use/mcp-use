@@ -224,11 +224,8 @@ describe("injectOpenAiFileApis", () => {
     cleanup();
   });
 
-  it("keeps widget state private, updates synchronously, and returns a promise", async () => {
-    vi.useFakeTimers();
-    const { guest, cleanup } = mountInjectedBridge();
-    const postMessage = vi.spyOn(guest.parent, "postMessage");
-    const openai = (
+  function getWidgetStateApi(guest: Window) {
+    return (
       guest as typeof guest & {
         openai: {
           widgetState: unknown;
@@ -236,8 +233,32 @@ describe("injectOpenAiFileApis", () => {
         };
       }
     ).openai;
+  }
+
+  function findModelContextRequest(
+    postMessage: ReturnType<typeof vi.spyOn>
+  ): { id: string; params: Record<string, unknown> } | undefined {
+    return postMessage.mock.calls.find(
+      ([message]) =>
+        (message as { method?: string }).method === "ui/update-model-context"
+    )?.[0] as { id: string; params: Record<string, unknown> } | undefined;
+  }
+
+  function respond(guest: Window, id: string, response: object) {
+    guest.dispatchEvent(
+      new guest.MessageEvent("message", {
+        source: guest.parent,
+        data: { jsonrpc: "2.0", id, ...response },
+      })
+    );
+  }
+
+  it("keeps private widget state in the view and returns a promise", async () => {
+    vi.useFakeTimers();
+    const { guest, cleanup } = mountInjectedBridge();
+    const postMessage = vi.spyOn(guest.parent, "postMessage");
+    const openai = getWidgetStateApi(guest);
     const state = {
-      modelContent: "Selected image",
       privateContent: { selectedId: "private-1" },
       imageIds: ["file-1"],
     };
@@ -248,10 +269,69 @@ describe("injectOpenAiFileApis", () => {
       openai.setWidgetState(state).catch(() => {})
     ).resolves.toBeUndefined();
     expect(openai.widgetState).toEqual(state);
-    expect(postMessage).not.toHaveBeenCalledWith(
-      expect.objectContaining({ method: "ui/update-model-context" }),
-      "*"
-    );
+    expect(findModelContextRequest(postMessage)).toBeUndefined();
+
+    cleanup();
+  });
+
+  it("forwards only text modelContent to the host as model context", async () => {
+    vi.useFakeTimers();
+    const { guest, cleanup } = mountInjectedBridge();
+    const postMessage = vi.spyOn(guest.parent, "postMessage");
+    const openai = getWidgetStateApi(guest);
+    const state = {
+      modelContent: "Selected image",
+      privateContent: { selectedId: "private-1" },
+      imageIds: ["file-1"],
+    };
+
+    const pending = openai.setWidgetState(state);
+    expect(openai.widgetState).toEqual(state);
+
+    const request = findModelContextRequest(postMessage);
+    expect(request?.params).toEqual({
+      content: [{ type: "text", text: "Selected image" }],
+    });
+    respond(guest, request!.id, { result: {} });
+    await expect(pending).resolves.toBeUndefined();
+
+    cleanup();
+  });
+
+  it("forwards object modelContent as structured model context", async () => {
+    vi.useFakeTimers();
+    const { guest, cleanup } = mountInjectedBridge();
+    const postMessage = vi.spyOn(guest.parent, "postMessage");
+    const openai = getWidgetStateApi(guest);
+
+    const pending = openai.setWidgetState({
+      modelContent: { selection: 2 },
+      privateContent: { draft: "hidden" },
+    });
+
+    const request = findModelContextRequest(postMessage);
+    expect(request?.params).toEqual({ structuredContent: { selection: 2 } });
+    respond(guest, request!.id, { result: {} });
+    await expect(pending).resolves.toBeUndefined();
+
+    cleanup();
+  });
+
+  it("resolves when the host surface rejects model context updates", async () => {
+    vi.useFakeTimers();
+    const { guest, cleanup } = mountInjectedBridge();
+    const postMessage = vi.spyOn(guest.parent, "postMessage");
+    const openai = getWidgetStateApi(guest);
+
+    const pending = openai.setWidgetState({ modelContent: "Selected image" });
+    const request = findModelContextRequest(postMessage);
+    respond(guest, request!.id, {
+      error: {
+        code: -32603,
+        message: "This host surface does not support model context updates",
+      },
+    });
+    await expect(pending).resolves.toBeUndefined();
 
     cleanup();
   });

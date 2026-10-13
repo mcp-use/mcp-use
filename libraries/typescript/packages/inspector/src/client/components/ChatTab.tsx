@@ -34,7 +34,6 @@ import { copyToClipboard } from "@/client/utils/browser";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { downloadJSON } from "../utils/jsonUtils";
 import { isCloudFetchFailure } from "./chat/managedChatNotice";
-import { formatManagedModelName } from "./chat/providerMeta";
 import type { useManagedCloudModel } from "./chat/useManagedCloudModel";
 import { useHostedSession } from "../hooks/useHostedSession";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
@@ -605,13 +604,6 @@ export function ChatTab({
       : undefined;
 
   const modelBadgeMode = isManaged ? ("managed" as const) : ("byok" as const);
-  const modelDisplayName =
-    isManaged && managedCloudModel?.selectedModel
-      ? formatManagedModelName(
-          managedCloudModel.selectedModel.name,
-          managedCloudModel.selectedModel.provider
-        )
-      : undefined;
 
   const toolLimitProvider =
     isManaged && managedCloudModel?.selectedModel
@@ -1582,7 +1574,9 @@ export function ChatTab({
           freeTierInfo={freeTierInfo}
           managedCloudInfo={managedCloudInfo}
           modelBadgeMode={modelBadgeMode}
-          modelDisplayName={modelDisplayName}
+          managedModel={
+            isManaged ? managedCloudModel?.selectedModel : undefined
+          }
           quickQuestions={quickQuestions}
           onQuickQuestionSelect={handleQuickQuestionSelect}
           pendingElicitationRequests={connection.pendingElicitationRequests}
@@ -1736,7 +1730,9 @@ export function ChatTab({
             freeTierInfo={freeTierInfo}
             managedCloudInfo={managedCloudInfo}
             modelBadgeMode={modelBadgeMode}
-            modelDisplayName={modelDisplayName}
+            managedModel={
+              isManaged ? managedCloudModel?.selectedModel : undefined
+            }
             followups={followups}
             onFollowupSelect={handleFollowupSelect}
             pendingElicitationRequests={connection.pendingElicitationRequests}
