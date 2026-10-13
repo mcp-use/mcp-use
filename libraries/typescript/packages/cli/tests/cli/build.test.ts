@@ -306,38 +306,46 @@ describe("runBuild", () => {
     expect(process.env.MCP_USE_PHASE).toBe(before.MCP_USE_PHASE);
   });
 
-  it("compiles server JSX for production when NODE_ENV is unset", async () => {
-    // Like a server that renders a page itself, such as a custom OAuth
-    // consent page.
-    const cwd = copyFixture("build-server-jsx");
-    dirs.push(cwd);
-    writeFileSync(
-      join(cwd, "src/page.tsx"),
-      "export function Page() {\n  return <main>consent</main>;\n}\n"
-    );
-    const indexPath = join(cwd, "src/index.ts");
-    writeFileSync(
-      indexPath,
-      readFileSync(indexPath, "utf8").replace(
-        'import { MCPServer } from "mcp-use";',
-        'import { MCPServer } from "mcp-use";\nimport { Page } from "./page.js";\n(globalThis as { page?: unknown }).page = Page;'
-      )
-    );
-    // Run as `mcp-use build` does, without a NODE_ENV of its own.
-    vi.stubEnv("NODE_ENV", undefined);
-    try {
-      await runBuild({ cwd });
-    } finally {
-      vi.unstubAllEnvs();
-    }
+  it.each([
+    ["NODE_ENV is unset", undefined],
+    ["the project .env sets NODE_ENV=development", "NODE_ENV=development\n"],
+  ])(
+    "compiles server JSX for production when %s",
+    async (_case, dotenv) => {
+      // Like a server that renders a page itself, such as a custom OAuth
+      // consent page.
+      const cwd = copyFixture("build-server-jsx");
+      dirs.push(cwd);
+      if (dotenv !== undefined) writeFileSync(join(cwd, ".env"), dotenv);
+      writeFileSync(
+        join(cwd, "src/page.tsx"),
+        "export function Page() {\n  return <main>consent</main>;\n}\n"
+      );
+      const indexPath = join(cwd, "src/index.ts");
+      writeFileSync(
+        indexPath,
+        readFileSync(indexPath, "utf8").replace(
+          'import { MCPServer } from "mcp-use";',
+          'import { MCPServer } from "mcp-use";\nimport { Page } from "./page.js";\n(globalThis as { page?: unknown }).page = Page;'
+        )
+      );
+      // Run as `mcp-use build` does, without a NODE_ENV of its own.
+      vi.stubEnv("NODE_ENV", undefined);
+      try {
+        await runBuild({ cwd });
+      } finally {
+        vi.unstubAllEnvs();
+      }
 
-    const built = readFileSync(
-      join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"),
-      "utf8"
-    );
-    expect(built).toContain("react/jsx-runtime");
-    expect(built).not.toContain("jsx-dev-runtime");
-  }, 60_000);
+      const built = readFileSync(
+        join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"),
+        "utf8"
+      );
+      expect(built).toContain("react/jsx-runtime");
+      expect(built).not.toContain("jsx-dev-runtime");
+    },
+    60_000
+  );
 
   it("honors an --entry override", async () => {
     const cwd = copyFixture("build-entry");
