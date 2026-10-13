@@ -5,6 +5,10 @@
  * agent executor exactly once. The query used to be pushed into
  * conversationHistory before the history snapshot was taken, so it reached the
  * model twice: once inside the history and once as the trailing HumanMessage.
+ *
+ * They also verify that the user message is only committed to memory after the
+ * stream completes, so a stream that throws leaves no orphaned HumanMessage
+ * (an unanswered query the next turn would feed back to the model).
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -68,5 +72,42 @@ describe("mCPAgent streamEvents() input assembly", () => {
       { type: "ai", content: "answer-1" },
       { type: "human", content: "world" },
     ]);
+  });
+
+  it("leaves no orphaned user message in memory when the stream fails", async () => {
+    const agent = new MCPAgent({
+      llm: { fakeModel: true } as any,
+      connectors: [{ fakeConnector: true }] as any,
+      memoryEnabled: true,
+    });
+    (agent as any)._initialized = true;
+
+    (agent as any)._agentExecutor = {
+      streamEvents: vi.fn().mockImplementation(async function* () {
+        yield {
+          event: "on_chat_model_stream",
+          data: { chunk: { content: "partial" } },
+        } as any;
+        throw new Error("stream exploded");
+      }),
+    };
+    vi.spyOn((agent as any).telemetry, "trackAgentExecution").mockResolvedValue(
+      undefined
+    );
+
+    const consume = async () => {
+      for await (const _ of agent.streamEvents({ prompt: "doomed" })) {
+        void _;
+      }
+    };
+    await expect(consume()).rejects.toThrow("stream exploded");
+
+    // The failed query must not linger in memory as an unanswered HumanMessage,
+    // mirroring run()/stream() which only commit history on success
+    const orphaned = agent
+      .getConversationHistory()
+      .filter((m) => m.getType?.() === "human" && m.content === "doomed");
+    expect(orphaned).toHaveLength(0);
+    expect(agent.getConversationHistory()).toEqual([]);
   });
 });
