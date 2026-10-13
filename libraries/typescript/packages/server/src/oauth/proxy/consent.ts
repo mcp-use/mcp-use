@@ -139,7 +139,7 @@ export function renderDefaultConsentPage(props: ConsentPageProps): string {
     `Allow ${clientName}?`,
     `<h1>Allow <span>${escapeHtml(clientName)}</span> to connect to ${escapeHtml(target)}?</h1>
 ${who}
-<p>You will sign in with ${escapeHtml(props.upstream)}. The app can then use ${escapeHtml(target)} as you. Your ${escapeHtml(props.upstream)} credentials stay on the server.</p>
+<p>You will sign in with ${escapeHtml(props.upstream)}. The app can then use ${escapeHtml(target)} as you. The app never sees your ${escapeHtml(props.upstream)} credentials.</p>
 <p class="meta">After sign-in, you return to <b>${escapeHtml(props.redirectHost)}</b>.</p>
 ${loopback}
 ${scopes}

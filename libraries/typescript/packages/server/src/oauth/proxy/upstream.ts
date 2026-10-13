@@ -379,7 +379,11 @@ export function assertInPageUpstream(value: InPageUpstream): void {
   }
 }
 
-function assertEndpoint(value: unknown, name: string): void {
+/**
+ * @internal Validates an upstream endpoint URL: HTTPS, or HTTP on localhost,
+ * without credentials or a fragment.
+ */
+export function assertEndpoint(value: unknown, name: string): void {
   let url: URL;
   try {
     url = new URL(String(value));

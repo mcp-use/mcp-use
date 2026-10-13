@@ -3,17 +3,21 @@
  * redirect-URI and client rules, SSRF address checks, upstream error
  * reports, and storage adapters.
  */
-import { describe, expect, it, vi } from "vitest";
+import { Readable } from "node:stream";
+
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import {
   assertPublicHost,
   createCimdFetcher,
   defaultHostResolver,
+  defaultPinnedTransport,
   hostResolverFrom,
   isCimdClientId,
   isPrivateAddress,
   matchRedirectUri,
   redirectUriProblem,
+  type PinnedTransport,
 } from "../src/oauth/proxy/clients.js";
 import {
   decryptValue,
@@ -21,10 +25,15 @@ import {
   encryptValue,
   normalizeSecrets,
   pkceChallenge,
+  sha256,
   timingSafeEqual,
 } from "../src/oauth/proxy/crypto.js";
 import { github } from "../src/oauth/proxy/providers.js";
-import { describe as describeError } from "../src/oauth/proxy/runtime.js";
+import { keys } from "../src/oauth/proxy/records.js";
+import {
+  describe as describeError,
+  ProxyRuntime,
+} from "../src/oauth/proxy/runtime.js";
 import { SecureStore } from "../src/oauth/proxy/storage.js";
 import {
   refreshUpstreamTokens,
@@ -38,6 +47,7 @@ import {
   postgresStorage,
   redisStorage,
   upstashStorage,
+  type DurableObjectStorageLike,
   type OAuthProxyStorage,
 } from "../src/oauth/storage.js";
 
@@ -176,6 +186,7 @@ describe("oauth proxy client rules", () => {
       "::1",
       "fd00::1",
       "fe80::1",
+      "fec0::1",
       "::ffff:127.0.0.1",
     ]) {
       expect(isPrivateAddress(address), address).toBe(true);
@@ -276,6 +287,123 @@ describe("oauth proxy metadata-document host check", () => {
     ).toBeUndefined();
     expect(typeof (await defaultHostResolver())).toBe("function");
   });
+
+  describe("connects only to the checked addresses", () => {
+    const clientId = "https://client.example/oauth/metadata.json";
+    const document = {
+      client_id: clientId,
+      redirect_uris: ["https://client.example/callback"],
+    };
+
+    /**
+     * A host that answers DNS with a public address, then with a private
+     * one (DNS rebinding), and a fetch that resolves the host itself, as
+     * the global fetch does.
+     */
+    function rebinding() {
+      const resolve = vi
+        .fn<(hostname: string) => Promise<string[]>>()
+        .mockResolvedValueOnce(["140.82.112.3"])
+        .mockResolvedValue(["10.0.0.5"]);
+      const connected: string[] = [];
+      const fetchImpl = vi.fn(
+        async (input: string | URL | Request, _init?: RequestInit) => {
+          connected.push(...(await resolve(new URL(String(input)).hostname)));
+          return Response.json(document);
+        }
+      );
+      return { resolve, connected, fetchImpl };
+    }
+
+    /** A `node:https` stand-in that connects where `lookup` points it. */
+    function transport(connected: string[], status = 200) {
+      const response = Object.assign(
+        Readable.from([Buffer.from(JSON.stringify(document))]),
+        { statusCode: status, headers: { "content-type": "application/json" } }
+      );
+      const request = vi.fn<PinnedTransport["request"]>(
+        (url, options, onResponse) => {
+          options.lookup(url.hostname, { all: true }, (_error, addresses) => {
+            for (const entry of addresses as { address: string }[]) {
+              connected.push(entry.address);
+            }
+          });
+          options.lookup(url.hostname, {}, (_error, address) => {
+            connected.push(address as string);
+          });
+          queueMicrotask(() => onResponse(response));
+          return { on: () => undefined, end: () => undefined };
+        }
+      );
+      const pinned: PinnedTransport = {
+        request,
+        toWeb: () => Readable.toWeb(response) as ReadableStream<Uint8Array>,
+      };
+      return { pinned, request, response };
+    }
+
+    it("never connects to an address that the host check did not see", async () => {
+      const { resolve, connected, fetchImpl } = rebinding();
+      const { pinned, request } = transport(connected);
+      const fetchCimd = createCimdFetcher(
+        fetchImpl,
+        async () => resolve,
+        async () => pinned
+      );
+
+      const client = await fetchCimd(clientId);
+      expect(client.redirectUris).toEqual(["https://client.example/callback"]);
+      expect(connected).toEqual(["140.82.112.3", "140.82.112.3"]);
+      expect(resolve).toHaveBeenCalledTimes(1);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      const [url, options] = request.mock.calls[0]!;
+      expect(url.href).toBe(clientId);
+      expect(options.headers).toEqual({
+        accept: "application/json",
+        "user-agent": "mcp-use-oauth-proxy",
+      });
+    });
+
+    it("hides the HTTP status of a failed request in the error's cause", async () => {
+      const { resolve, connected, fetchImpl } = rebinding();
+      const { pinned, response } = transport(connected, 503);
+      const fetchCimd = createCimdFetcher(
+        fetchImpl,
+        async () => resolve,
+        async () => pinned
+      );
+
+      const error = await fetchCimd(clientId).catch((caught: Error) => caught);
+      expect((error as Error).message).toBe(
+        "metadata document could not be loaded"
+      );
+      expect(((error as Error).cause as Error).message).toBe("HTTP 503");
+      expect(response.destroyed).toBe(true);
+    });
+
+    it("falls back to fetch where node:https cannot be pinned", async () => {
+      const { resolve, connected, fetchImpl } = rebinding();
+      const fetchCimd = createCimdFetcher(
+        fetchImpl,
+        async () => resolve,
+        async () => undefined
+      );
+      await fetchCimd(clientId);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(fetchImpl.mock.calls[0]![1]?.headers).toEqual({
+        accept: "application/json",
+        "user-agent": "mcp-use-oauth-proxy",
+      });
+      // The window that pinning closes: fetch resolved the host again.
+      expect(connected).toEqual(["10.0.0.5"]);
+    });
+
+    it("loads node:https on Node.js", async () => {
+      const pinned = await defaultPinnedTransport();
+      expect(typeof pinned?.request).toBe("function");
+      expect(typeof pinned?.toWeb).toBe("function");
+    });
+  });
 });
 
 describe("oauth proxy upstream errors", () => {
@@ -367,12 +495,21 @@ describe("oauth proxy upstream errors", () => {
 
   it("logs records encrypted with another secret once", async () => {
     const storage = memoryStorage();
-    const write = new SecureStore(storage, () => deriveKeyring([SECRET_A]));
+    const resource = new URL("https://mcp.example.com/mcp");
+    const write = new SecureStore(
+      storage,
+      () => deriveKeyring([SECRET_A]),
+      resource
+    );
     await write.set("up:github:1", { a: 1 }, 60);
     await write.set("up:github:2", { a: 2 }, 60);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      const read = new SecureStore(storage, () => deriveKeyring([SECRET_B]));
+      const read = new SecureStore(
+        storage,
+        () => deriveKeyring([SECRET_B]),
+        resource
+      );
       expect(await read.get("up:github:1")).toBeUndefined();
       expect(await read.get("up:github:2")).toBeUndefined();
       expect(warn).toHaveBeenCalledTimes(1);
@@ -380,14 +517,117 @@ describe("oauth proxy upstream errors", () => {
         "encrypted with a secret this server does not have"
       );
       // After rotation the old records read again, without a warning.
-      const rotated = new SecureStore(storage, () =>
-        deriveKeyring([SECRET_B, SECRET_A])
+      const rotated = new SecureStore(
+        storage,
+        () => deriveKeyring([SECRET_B, SECRET_A]),
+        resource
       );
       expect(await rotated.get("up:github:1")).toEqual({ a: 1 });
       expect(warn).toHaveBeenCalledTimes(1);
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it("keeps the records of each MCP resource apart in one store", async () => {
+    const storage = memoryStorage();
+    const keyring = () => deriveKeyring([SECRET_A]);
+    const a = new SecureStore(
+      storage,
+      keyring,
+      new URL("https://a.example.com/mcp")
+    );
+    const b = new SecureStore(
+      storage,
+      keyring,
+      new URL("https://b.example.com/mcp")
+    );
+    await a.set("up:github:1", { server: "a" }, 60);
+    await b.set("up:github:1", { server: "b" }, 60);
+    expect(await a.get("up:github:1")).toEqual({ server: "a" });
+    expect(await b.get("up:github:1")).toEqual({ server: "b" });
+    await b.delete("up:github:1");
+    expect(await a.get("up:github:1")).toEqual({ server: "a" });
+    // The namespace is the same after a restart.
+    const restarted = new SecureStore(
+      storage,
+      keyring,
+      new URL("https://a.example.com/mcp")
+    );
+    expect(await restarted.get("up:github:1")).toEqual({ server: "a" });
+  });
+});
+
+describe("oauth proxy access-token checks", () => {
+  it("refuses a token whose grant is for another resource", async () => {
+    // Namespaced storage keeps another server's grants out of reach; this
+    // shares one store between two resources to check the guard behind it.
+    const keyring = () => deriveKeyring([SECRET_A]);
+    const store = new SecureStore(
+      memoryStorage(),
+      keyring,
+      new URL("https://a.example.com/mcp")
+    );
+    const runtimeFor = (resource: string) =>
+      new ProxyRuntime({
+        resource: new URL(resource),
+        basePath: "/mcp",
+        store,
+        keyring,
+        clients: {
+          store,
+          configured: new Map(),
+          allow: undefined,
+          dcr: true,
+          fetchCimd: async () => {
+            throw new Error("unused");
+          },
+        },
+        upstream: github({ clientId: "id", clientSecret: "secret" }),
+        fetch: async () => {
+          throw new Error("unused");
+        },
+        scopes: [],
+        accessTokenTtl: 3600,
+        consent: false,
+        serverHost: new URL(resource).host,
+      });
+    const token = "mcp_at_test";
+    await store.set(
+      keys.access(await sha256(token)),
+      { grantId: "g1", expiresAt: Math.floor(Date.now() / 1000) + 3600 },
+      3600
+    );
+    await store.set(
+      keys.grant("g1"),
+      {
+        id: "g1",
+        clientId: "mcp_client_1",
+        userKey: "github:1",
+        generation: "gen",
+        scopes: [],
+        resource: "https://a.example.com/mcp",
+      },
+      3600
+    );
+    await store.set(
+      keys.upstream("github:1"),
+      {
+        userKey: "github:1",
+        generation: "gen",
+        version: 1,
+        tokens: { accessToken: "gho_a", scopes: [] },
+        user: { subject: "1", profile: {} },
+      },
+      3600
+    );
+    const own = await runtimeFor("https://a.example.com/mcp").verifyAccessToken(
+      token
+    );
+    expect(own.clientId).toBe("mcp_client_1");
+    await expect(
+      runtimeFor("https://b.example.com/mcp").verifyAccessToken(token)
+    ).rejects.toThrow("another MCP server");
   });
 });
 
@@ -587,6 +827,10 @@ describe("oauth proxy storage adapters", () => {
   });
 
   it("postgresStorage creates its table and uses DELETE … RETURNING", async () => {
+    // Run the background sweep (1 write in 100) on every write: the
+    // assertions must hold when it runs too.
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    onTestFinished(() => random.mockRestore());
     const queries: string[] = [];
     const storage = postgresStorage({
       table: "oauth_state",
@@ -608,8 +852,10 @@ describe("oauth proxy storage adapters", () => {
     expect(
       queries.filter((query) => query.includes("CREATE TABLE"))
     ).toHaveLength(1);
-    expect(queries.at(-1)).toContain(
-      "WHERE oauth_state.expires_at <= now() RETURNING key"
+    expect(queries).toContainEqual(
+      expect.stringContaining(
+        "WHERE oauth_state.expires_at <= now() RETURNING key"
+      )
     );
     expect(() =>
       postgresStorage({
@@ -693,5 +939,106 @@ describe("oauth proxy storage adapters", () => {
       },
     });
     await exerciseStorage(storage);
+  });
+
+  it("OAuthProxyDurableObject sweeps expired keys behind 1,000 live ones", async () => {
+    const entries = new Map<string, { value: string; expiresAt: number }>();
+    const live = Date.now() + 3_600_000;
+    for (let index = 0; index <= 1000; index += 1) {
+      entries.set(`a${String(index).padStart(4, "0")}`, {
+        value: "v",
+        expiresAt: live,
+      });
+    }
+    for (let index = 0; index < 5; index += 1) {
+      entries.set(`z${index}`, { value: "v", expiresAt: Date.now() - 1000 });
+    }
+    // Lists like Durable Object storage: in key order, from `startAfter`.
+    const object = new OAuthProxyDurableObject({
+      storage: {
+        get: async <T>(key: string) => entries.get(key) as T | undefined,
+        put: async (key, value) => {
+          entries.set(key, value as { value: string; expiresAt: number });
+        },
+        delete: async (key) => entries.delete(key),
+        list: async <T>(options?: { limit?: number; startAfter?: string }) =>
+          new Map(
+            [...entries]
+              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+              .filter(
+                ([key]) =>
+                  options?.startAfter === undefined || key > options.startAfter
+              )
+              .slice(0, options?.limit) as [string, T][]
+          ),
+      },
+    });
+    // A sweep runs every 200 writes.
+    for (let index = 0; index < 400; index += 1) {
+      const response = await object.fetch(
+        new Request("https://durable-object.example/", {
+          method: "POST",
+          body: JSON.stringify({ op: "set", key: "b", value: "v", ttl: 3600 }),
+        })
+      );
+      expect(response.status).toBe(200);
+    }
+    expect([...entries.keys()].filter((key) => key.startsWith("z"))).toEqual(
+      []
+    );
+    expect(entries.size).toBe(1002);
+  });
+
+  it("OAuthProxyDurableObject keeps its sweep position when it is evicted", async () => {
+    const entries = new Map<string, unknown>();
+    const live = Date.now() + 3_600_000;
+    for (let index = 0; index <= 1000; index += 1) {
+      entries.set(`a${String(index).padStart(4, "0")}`, {
+        value: "v",
+        expiresAt: live,
+      });
+    }
+    for (let index = 0; index < 5; index += 1) {
+      entries.set(`z${index}`, { value: "v", expiresAt: Date.now() - 1000 });
+    }
+    const storage: DurableObjectStorageLike = {
+      get: async <T>(key: string) => entries.get(key) as T | undefined,
+      put: async (key, value) => {
+        entries.set(key, value);
+      },
+      delete: async (key) => entries.delete(key),
+      list: async <T>(options?: { limit?: number; startAfter?: string }) =>
+        new Map(
+          [...entries]
+            .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+            .filter(
+              ([key]) =>
+                options?.startAfter === undefined || key > options.startAfter
+            )
+            .slice(0, options?.limit) as [string, T][]
+        ),
+    };
+    // Each instance sweeps once (every 200 writes) before it is evicted and
+    // the next one starts over the same storage.
+    for (let instance = 0; instance < 2; instance += 1) {
+      const object = new OAuthProxyDurableObject({ storage });
+      for (let index = 0; index < 200; index += 1) {
+        await object.fetch(
+          new Request("https://durable-object.example/", {
+            method: "POST",
+            body: JSON.stringify({
+              op: "set",
+              key: "b",
+              value: "v",
+              ttl: 3600,
+            }),
+          })
+        );
+      }
+    }
+    expect([...entries.keys()].filter((key) => key.startsWith("z"))).toEqual(
+      []
+    );
+    expect(entries.size).toBe(1002);
   });
 });

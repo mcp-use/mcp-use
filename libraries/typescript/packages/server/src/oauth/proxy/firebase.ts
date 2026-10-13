@@ -163,10 +163,11 @@ export function firebase(options: FirebaseUpstreamOptions): InPageUpstream {
     throw new TypeError("firebase() requires options");
   }
   // `mcp-use build` runs the entry without serving requests, so it needs
-  // no project settings.
+  // no project settings: they may be empty or missing.
   const building = isBuilding();
   for (const field of ["apiKey", "authDomain", "projectId"] as const) {
     const value: unknown = options[field];
+    if (building && value === undefined) continue;
     if (
       typeof value !== "string" ||
       (value.length === 0 && !building) ||
@@ -176,6 +177,7 @@ export function firebase(options: FirebaseUpstreamOptions): InPageUpstream {
     }
   }
   if (
+    options.authDomain !== undefined &&
     options.authDomain !== "" &&
     !/^[a-z0-9.-]+(?::\d+)?$/i.test(options.authDomain)
   ) {

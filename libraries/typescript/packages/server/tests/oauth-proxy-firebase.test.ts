@@ -395,6 +395,12 @@ describe("oauthProxy with firebase()", () => {
     // The consent page, then the script, inside the body.
     expect(page.html).toContain('name="decision" value="allow"');
     expect(page.html).toContain('name="decision" value="deny"');
+    // The Firebase token passes through this page, so the copy does not
+    // claim that it stays on the server.
+    expect(page.html).toContain(
+      "The app never sees your Firebase credentials."
+    );
+    expect(page.html).not.toContain("stay on the server");
     expect(page.html).toContain(`<script type="module" nonce="${nonce}">`);
     expect(page.html).toContain(
       "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js"
@@ -546,6 +552,58 @@ describe("oauthProxy with firebase()", () => {
     );
     expect(response.status).toBe(400);
   });
+
+  it("keeps two servers with one store and one secret apart", async () => {
+    const stub = new FirebaseStub();
+    const storage = memoryStorage();
+    const otherResource = "http://localhost:4321/mcp";
+    const other = oauthFlow({
+      resource: otherResource,
+      redirectUri: CLIENT_REDIRECT,
+    });
+    const serverA = firebaseServer(stub, {}, { storage });
+    const serverB = firebaseServer(
+      stub,
+      {},
+      { storage, resource: otherResource }
+    );
+    const browserA = new Browser(serverA);
+    const browserB = new Browser(serverB);
+
+    // The same user signs in to both, with a different ID token for each.
+    const tokenA = await idToken({ server: "a" });
+    const tokenB = await idToken({ server: "b" });
+    const signedInA = await signIn(
+      browserA,
+      await register(browserA),
+      proof(tokenA)
+    );
+    const signedInB = await other.signIn(
+      browserB,
+      await other.register(browserB),
+      proof(tokenB)
+    );
+
+    // Each server's tools get the upstream token of their own sign-in.
+    expect(
+      await toolText(
+        await callTool(browserA, "whoami", signedInA.access_token!)
+      )
+    ).toBe(`${UID} ${tokenA}`);
+    expect(
+      await toolText(
+        await other.callTool(browserB, "whoami", signedInB.access_token!)
+      )
+    ).toBe(`${UID} ${tokenB}`);
+
+    // An access token of one server is not valid at the other.
+    const crossed = await other.callTool(
+      browserB,
+      "whoami",
+      signedInA.access_token!
+    );
+    expect(crossed.status).toBe(401);
+  });
 });
 
 // ─── Refresh ─────────────────────────────────────────────────────────────
@@ -667,10 +725,13 @@ describe("firebase() emulator mode and options", () => {
 
   it("throws for emulator mode when listen() binds beyond loopback", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    // A localhost resource does not stop peers reaching a wildcard bind.
-    const server = firebaseServer(new FirebaseStub(), {
-      emulator: { url: EMULATOR },
-    });
+    // A localhost resource does not stop peers reaching a wildcard bind. A
+    // shared store gets past the memoryStorage() check to the emulator one.
+    const server = firebaseServer(
+      new FirebaseStub(),
+      { emulator: { url: EMULATOR } },
+      { storage: mapStorage() }
+    );
     try {
       await expect(server.listen(0, { host: "0.0.0.0" })).rejects.toThrow(
         "emulator mode is allowed only on localhost: listen() on 127.0.0.1, localhost, or ::1, not 0.0.0.0"
@@ -758,5 +819,29 @@ describe("firebase() emulator mode and options", () => {
     expect(() => firebase(firebaseOptions({ maxAuthAge: 0 }))).toThrow(
       "maxAuthAge"
     );
+  });
+
+  it("needs no project settings inside mcp-use build", () => {
+    // What `mcp-use build` sets while it evaluates the entry.
+    vi.stubEnv("MCP_USE_PHASE", "build");
+    try {
+      // A build with none of the runtime environment set, as in CI.
+      const unset = process.env["MCP_USE_TEST_UNSET"]!;
+      expect(() =>
+        firebase({ apiKey: unset, authDomain: unset, projectId: unset })
+      ).not.toThrow();
+      expect(() =>
+        firebase({ apiKey: "", authDomain: "", projectId: "" })
+      ).not.toThrow();
+      // Mistakes that no environment fixes still fail the build.
+      expect(() =>
+        firebase(firebaseOptions({ authDomain: `https://${AUTH_DOMAIN}` }))
+      ).toThrow("without https://");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(() =>
+      firebase(firebaseOptions({ apiKey: process.env["MCP_USE_TEST_UNSET"]! }))
+    ).toThrow("firebase apiKey must be a non-empty string");
   });
 });

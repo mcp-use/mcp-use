@@ -623,9 +623,21 @@ export interface DurableObjectStorageLike {
   put(key: string, value: unknown): Promise<void>;
   /** Removes a value. */
   delete(key: string): Promise<boolean>;
-  /** Lists values. */
-  list<T>(options?: { limit?: number }): Promise<Map<string, T>>;
+  /**
+   * Lists values in key order.
+   *
+   * @param options - `limit` caps how many entries come back; `startAfter`
+   * lists only keys that sort after this key.
+   */
+  list<T>(options?: {
+    limit?: number;
+    startAfter?: string;
+  }): Promise<Map<string, T>>;
 }
+
+// Where OAuthProxyDurableObject keeps its sweep position: outside the
+// `mcp-use:oauth:` keys that oauthProxy stores.
+const SWEEP_CURSOR_KEY = "mcp-use-sweep-cursor";
 
 /**
  * Durable Object class for {@link cloudflareStorage}. Export it from the
@@ -712,13 +724,27 @@ export class OAuthProxyDurableObject {
     return Response.json({ result });
   }
 
+  // Each sweep checks the next page of keys, so expired entries behind
+  // 1,000 live ones are reached too. The position is stored, so it survives
+  // the object being evicted between sweeps.
   async #sweep(): Promise<void> {
+    const limit = 1000;
+    const cursor = await this.#storage.get<string>(SWEEP_CURSOR_KEY);
     const entries = await this.#storage.list<{ expiresAt: number }>({
-      limit: 1000,
+      limit,
+      ...(cursor !== undefined && { startAfter: cursor }),
     });
     const now = Date.now();
+    let last: string | undefined;
     for (const [key, entry] of entries) {
+      last = key;
+      if (key === SWEEP_CURSOR_KEY) continue;
       if (entry.expiresAt <= now) await this.#storage.delete(key);
+    }
+    if (entries.size < limit || last === undefined) {
+      await this.#storage.delete(SWEEP_CURSOR_KEY);
+    } else {
+      await this.#storage.put(SWEEP_CURSOR_KEY, last);
     }
   }
 }

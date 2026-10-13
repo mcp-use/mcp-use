@@ -496,8 +496,9 @@ function trackedStorage(): OAuthProxyStorage & {
     live: async (prefix) => {
       const found: string[] = [];
       for (const key of written) {
+        // Keys are `mcp-use:oauth:<hash of the resource>:<record key>`.
         if (
-          key.startsWith(`mcp-use:oauth:${prefix}`) &&
+          key.split(":").slice(3).join(":").startsWith(prefix) &&
           (await inner.get(key)) !== undefined
         ) {
           found.push(key);
@@ -828,6 +829,155 @@ describe("oauthProxy with emulated GitHub", () => {
     // The state is spent, so the attacker cannot finish either.
     const replay = await attacker.request(callbackUrl!);
     expect(replay.status).toBe(400);
+  });
+
+  it("finishes two sign-ins started in one browser that return in reverse order", async () => {
+    const { server } = githubServer();
+    const browser = new Browser(server);
+    const client = await register(browser);
+
+    /** Runs /authorize and the consent page, up to GitHub's sign-in page. */
+    const start = async () => {
+      const { verifier, challenge } = await pkcePair();
+      let url = `${RESOURCE}/oauth/authorize?${new URLSearchParams({
+        response_type: "code",
+        client_id: client.clientId,
+        redirect_uri: client.redirectUri,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        resource: RESOURCE,
+      })}`;
+      for (let hop = 0; hop < 10; hop++) {
+        const response = await browser.request(url);
+        if (response.status === 302) {
+          url = new URL(response.headers.get("location")!, url).href;
+          continue;
+        }
+        const html = await response.text();
+        expect(response.status).toBe(200);
+        if (new URL(url).origin !== ORIGIN) return { url, html, verifier };
+        const action = decodeHtml(html.match(/action="([^"]+)"/)![1]!);
+        const answer = await browser.form(new URL(action, url).href, {
+          ...hiddenFields(html),
+          decision: "allow",
+        });
+        url = new URL(answer.headers.get("location")!, url).href;
+      }
+      throw new Error("never reached the GitHub sign-in page");
+    };
+    /** Signs in on GitHub's page and follows the callback to the client. */
+    const finish = async (flow: Awaited<ReturnType<typeof start>>) => {
+      const form = flow.html
+        .split("<form")
+        .find((part) => part.includes('value="hubot"'))!;
+      const action = decodeHtml(form.match(/action="([^"]+)"/)![1]!);
+      const answer = await browser.form(
+        new URL(action, flow.url).href,
+        hiddenFields(`<form${form}`)
+      );
+      const callback = new URL(answer.headers.get("location")!, flow.url);
+      expect(callback.href.startsWith(CALLBACK)).toBe(true);
+      const response = await browser.request(callback.href);
+      expect(response.status).toBe(302);
+      const code = new URL(response.headers.get("location")!).searchParams.get(
+        "code"
+      );
+      expect(code).toBeTruthy();
+      return exchange(browser, client, code!, flow.verifier);
+    };
+
+    // The second sign-in starts before the first one returns from GitHub,
+    // then they return in reverse order.
+    const first = await start();
+    const second = await start();
+    const secondTokens = await finish(second);
+    const firstTokens = await finish(first);
+    expect(secondTokens.status).toBe(200);
+    expect(firstTokens.status).toBe(200);
+  });
+
+  describe("sign-ins started at once in one browser", () => {
+    /** Opens the consent page of a new sign-in (a native client always gets one). */
+    async function consentPage(
+      browser: Browser,
+      client: { clientId: string; redirectUri: string }
+    ): Promise<{ url: string; html: string }> {
+      const { challenge } = await pkcePair();
+      const url = `${RESOURCE}/oauth/authorize?${new URLSearchParams({
+        response_type: "code",
+        client_id: client.clientId,
+        redirect_uri: client.redirectUri,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+      })}`;
+      const response = await browser.request(url);
+      expect(response.status).toBe(200);
+      return { url, html: await response.text() };
+    }
+
+    /** Approves a consent page and returns the upstream `state`. */
+    async function approve(
+      browser: Browser,
+      page: { url: string; html: string }
+    ): Promise<string> {
+      const action = decodeHtml(page.html.match(/action="([^"]+)"/)![1]!);
+      const answer = await browser.form(new URL(action, page.url).href, {
+        ...hiddenFields(page.html),
+        decision: "allow",
+      });
+      expect(answer.status).toBe(302);
+      const location = new URL(answer.headers.get("location")!);
+      expect(location.origin).toBe(githubEmulator.url);
+      return location.searchParams.get("state")!;
+    }
+
+    function cookieNames(browser: Browser, prefix: string): string[] {
+      return [...(browser.jar.get(ORIGIN)?.keys() ?? [])].filter((name) =>
+        name.startsWith(prefix)
+      );
+    }
+
+    it("approves the first of two consent pages open in one browser", async () => {
+      const { server } = githubServer();
+      const browser = new Browser(server);
+      const client = await register(browser);
+
+      const first = await consentPage(browser, client);
+      await consentPage(browser, client);
+      await approve(browser, first);
+    });
+
+    it("keeps at most five binding and CSRF cookies, dropping the oldest", async () => {
+      const { server } = githubServer();
+      const browser = new Browser(server);
+      const client = await register(browser);
+
+      const pages = [];
+      for (let index = 0; index < 6; index++) {
+        pages.push(await consentPage(browser, client));
+      }
+      expect(cookieNames(browser, "mcp-oauth-csrf-")).toHaveLength(5);
+      // The oldest consent page lost its cookie; the newest still works.
+      const stale = pages[0]!;
+      const action = decodeHtml(stale.html.match(/action="([^"]+)"/)![1]!);
+      const refused = await browser.form(new URL(action, stale.url).href, {
+        ...hiddenFields(stale.html),
+        decision: "allow",
+      });
+      expect(refused.status).toBe(403);
+
+      const states = [];
+      for (const page of pages.slice(1)) {
+        states.push(await approve(browser, page));
+      }
+      states.push(await approve(browser, await consentPage(browser, client)));
+      expect(cookieNames(browser, "mcp-oauth-bind-")).toHaveLength(5);
+      // The oldest round lost its cookie, so its callback is refused.
+      const callback = await browser.request(
+        `${CALLBACK}?${new URLSearchParams({ state: states[0]!, code: "x" })}`
+      );
+      expect(callback.status).toBe(403);
+    });
   });
 
   it("spends a code on first use and revokes the grant when it is replayed", async () => {
@@ -1392,6 +1542,36 @@ describe("oauthProxy with emulated GitHub", () => {
     }
   });
 
+  it("logs why a metadata document could not be loaded, without showing it on the page", async () => {
+    const clientId = "https://client.example/oauth/metadata.json";
+    const { server } = githubServer({
+      fetch: async (input, init) =>
+        String(input) === clientId
+          ? new Response("internal", { status: 503 })
+          : new UpstreamSpy().fetch(input, init),
+    });
+    const logged = captureConsole("warn");
+    try {
+      const response = await new Browser(server).request(
+        `${RESOURCE}/oauth/authorize?${new URLSearchParams({
+          response_type: "code",
+          client_id: clientId,
+          redirect_uri: "https://client.example/callback",
+          code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+          code_challenge_method: "S256",
+          state: "s",
+        })}`
+      );
+      expect(response.status).toBe(400);
+      const page = await response.text();
+      expect(page).not.toContain("503");
+      expect(page).toContain("could not be loaded");
+      expect(logged.text()).toContain("HTTP 503");
+    } finally {
+      logged.restore();
+    }
+  });
+
   describe("names the server on the consent page", () => {
     async function consentPage(server: MCPServer<UpstreamUser>) {
       const browser = new Browser(server);
@@ -1810,6 +1990,56 @@ describe("oauthProxy production guards", () => {
     ).rejects.toThrow("consent: false is allowed only on localhost");
   });
 
+  it("treats a localhost listen() beyond loopback like production", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const listen = async (
+      host: string,
+      options: Partial<OAuthProxyOptions<UpstreamUser>>
+    ) => {
+      const server = new MCPServer({
+        name: "acme",
+        version: "1.0.0",
+        logging: { enabled: false },
+        oauth: oauthProxy({
+          upstream: upstreamConfig(),
+          resource: RESOURCE,
+          ...options,
+        }),
+      });
+      try {
+        await server.listen(0, { host });
+      } finally {
+        await server.close();
+      }
+    };
+    try {
+      // A localhost resource does not stop peers reaching a wildcard bind.
+      await expect(listen("0.0.0.0", { secret: SECRET })).rejects.toThrow(
+        "needs storage"
+      );
+      await expect(
+        listen("0.0.0.0", { storage: inspectableStorage() })
+      ).rejects.toThrow("needs a secret");
+      await expect(
+        listen("0.0.0.0", { storage: memoryStorage(), secret: SECRET })
+      ).rejects.toThrow("memoryStorage() works only on localhost");
+      await expect(
+        listen("0.0.0.0", {
+          storage: inspectableStorage(),
+          secret: SECRET,
+          consent: false,
+        })
+      ).rejects.toThrow("consent: false is allowed only on localhost");
+      // A loopback bind keeps the development defaults.
+      await expect(listen("127.0.0.1", {})).resolves.toBeUndefined();
+      await expect(
+        listen("127.0.0.1", { storage: memoryStorage(), consent: false })
+      ).resolves.toBeUndefined();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("requires no secrets inside mcp-use build", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     // What `mcp-use build` sets while it evaluates the entry.
@@ -1935,6 +2165,21 @@ describe("oauthProxy production guards", () => {
         baseUrl: "http://github.example",
       })
     ).toThrow("HTTPS");
+    // The API receives the access token, so it follows the same rule.
+    expect(() =>
+      github({
+        clientId: "a",
+        clientSecret: "b",
+        apiUrl: "http://api.github.example",
+      })
+    ).toThrow("oauthProxy github apiUrl must be an HTTPS URL");
+    expect(() =>
+      github({
+        clientId: "a",
+        clientSecret: "b",
+        apiUrl: "http://localhost:8080/api",
+      })
+    ).not.toThrow();
   });
 
   it("serves secured responses on an HTTPS resource with __Host- cookies", async () => {
@@ -1969,7 +2214,7 @@ describe("oauthProxy production guards", () => {
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     expect(response.headers.get("x-frame-options")).toBe("DENY");
     const cookie = response.headers.getSetCookie()[0]!;
-    expect(cookie).toMatch(/^__Host-mcp-oauth-csrf=/);
+    expect(cookie).toMatch(/^__Host-mcp-oauth-csrf-[\w-]{16}=/);
     expect(cookie).toContain("Secure");
     expect(cookie).toContain("HttpOnly");
     const html = await response.text();

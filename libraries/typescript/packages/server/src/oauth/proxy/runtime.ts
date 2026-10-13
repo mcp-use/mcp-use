@@ -6,7 +6,12 @@
  */
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 import type { Context } from "hono";
-import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
+import {
+  deleteCookie,
+  getCookie,
+  getSignedCookie,
+  setSignedCookie,
+} from "hono/cookie";
 
 import { invalidToken } from "../errors.js";
 import {
@@ -63,6 +68,12 @@ const REFRESH_TTL = 30 * 24 * 60 * 60;
 const REFRESH_GRACE = 60;
 const UPSTREAM_TTL = 60 * 24 * 60 * 60;
 const REMEMBER_TTL = 365 * 24 * 60 * 60;
+/**
+ * Most CSRF or binding cookies one browser keeps at once. Abandoned sign-ins
+ * leave theirs behind, and too many would push the Cookie header past
+ * server limits.
+ */
+const ROUND_COOKIE_LIMIT = 5;
 const UPSTREAM_REFRESH_MARGIN = 60;
 /**
  * How long the "grant ended" marker lives. It must outlive any refresh that
@@ -323,11 +334,11 @@ export class ProxyRuntime {
     ask: boolean
   ): Promise<Response> {
     const csrf = randomToken(24);
-    await this.#setCookie(
+    await this.#setRoundCookie(
       c,
       this.#cookies.csrf,
-      `${transactionId}.${csrf}`,
-      TRANSACTION_TTL
+      transactionId,
+      `${transactionId}.${csrf}`
     );
     const upstream = this.config.upstream;
     const props: ConsentPageProps = {
@@ -396,8 +407,11 @@ export class ProxyRuntime {
     const transactionId = new URL(c.req.url).searchParams.get("txn") ?? "";
     const form = await formBody(c);
     const csrf = form.get("csrf") ?? "";
-    const cookie = await this.#readCookie(c, this.#cookies.csrf);
-    deleteCookie(c, this.#cookies.csrf, this.#cookieOptions(0));
+    const csrfCookie = await this.#roundCookie(
+      this.#cookies.csrf,
+      transactionId
+    );
+    const cookie = await this.#readCookie(c, csrfCookie);
     if (
       transactionId === "" ||
       csrf === "" ||
@@ -411,6 +425,7 @@ export class ProxyRuntime {
         "This approval form is no longer valid."
       );
     }
+    deleteCookie(c, csrfCookie, this.#cookieOptions(0));
     const transaction = await this.config.store.get<TransactionRecord>(
       keys.transaction(transactionId)
     );
@@ -538,7 +553,7 @@ export class ProxyRuntime {
       transactionId,
       TRANSACTION_TTL
     );
-    await this.#setCookie(c, this.#cookies.bind, state, TRANSACTION_TTL);
+    await this.#setRoundCookie(c, this.#cookies.bind, state, state);
 
     const target = new URL(upstream.authorizationEndpoint);
     const params = target.searchParams;
@@ -599,8 +614,8 @@ export class ProxyRuntime {
         "This sign-in expired or was already used."
       );
     }
-    const bound = await this.#readCookie(c, this.#cookies.bind);
-    deleteCookie(c, this.#cookies.bind, this.#cookieOptions(0));
+    const bindCookie = await this.#roundCookie(this.#cookies.bind, state);
+    const bound = await this.#readCookie(c, bindCookie);
     if (bound === undefined || !timingSafeEqual(bound, state)) {
       return this.#errorPage(
         c,
@@ -609,6 +624,7 @@ export class ProxyRuntime {
         "This sign-in was not started in this browser."
       );
     }
+    deleteCookie(c, bindCookie, this.#cookieOptions(0));
     const transaction = await this.config.store.get<TransactionRecord>(
       keys.transaction(transactionId)
     );
@@ -1145,6 +1161,11 @@ export class ProxyRuntime {
     if (grant === undefined) {
       throw invalidToken("The grant was revoked");
     }
+    // Storage keys are namespaced per resource, so this holds already; the
+    // check keeps a token for another MCP server from ever passing here.
+    if (!this.#isOwnResource(grant.resource)) {
+      throw invalidToken("The access token is for another MCP server");
+    }
     if (!isClientAdmitted(this.config.clients, grant.clientId)) {
       // End the sign-in for good, so that allowing the client again does not
       // bring back tokens issued before it was removed.
@@ -1472,6 +1493,42 @@ export class ProxyRuntime {
       if (typeof value === "string") return value;
     }
     return undefined;
+  }
+
+  /**
+   * Name of the CSRF cookie of one consent page (`key` is the transaction
+   * ID) or the binding cookie of one upstream round (`key` is the state).
+   * Each has its own, so sign-ins running at once in one browser do not
+   * replace each other's.
+   */
+  async #roundCookie(base: string, key: string): Promise<string> {
+    return `${base}-${(await sha256(key)).slice(0, 16)}`;
+  }
+
+  /**
+   * Sets the cookie that `#roundCookie` names, first deleting the oldest of
+   * its kind so that the browser keeps at most {@link ROUND_COOKIE_LIMIT}.
+   * Browsers send older cookies first (RFC 6265 section 5.4).
+   */
+  async #setRoundCookie(
+    c: Context,
+    base: string,
+    key: string,
+    value: string
+  ): Promise<void> {
+    const existing = Object.keys(getCookie(c)).filter((name) =>
+      name.startsWith(`${base}-`)
+    );
+    const excess = existing.length - (ROUND_COOKIE_LIMIT - 1);
+    for (const name of existing.slice(0, Math.max(0, excess))) {
+      deleteCookie(c, name, this.#cookieOptions(0));
+    }
+    await this.#setCookie(
+      c,
+      await this.#roundCookie(base, key),
+      value,
+      TRANSACTION_TTL
+    );
   }
 
   #headers(c: Context): void {

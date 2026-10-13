@@ -368,8 +368,14 @@ export async function resolveClient(
       const reason = `client metadata document could not be used: ${
         error instanceof Error ? error.message : String(error)
       }`;
+      // Only the log gets the cause of a failed request (an HTTP status or
+      // a network error): on the page, it would let a caller probe hosts.
+      const cause =
+        error instanceof Error && error.cause !== undefined
+          ? ` (${error.cause instanceof Error ? error.cause.message : String(error.cause)})`
+          : "";
       console.warn(
-        `[mcp-use] oauthProxy: refused ${printable(clientId)}: ${printable(reason)}`
+        `[mcp-use] oauthProxy: refused ${printable(clientId)}: ${printable(reason + cause)}`
       );
       return reason;
     }
@@ -397,16 +403,29 @@ const CIMD_MAX_BYTES = 5 * 1024;
 const CIMD_TIMEOUT_MS = 10_000;
 const CIMD_CACHE_MS = 5 * 60 * 1000;
 const CIMD_CACHE_SIZE = 256;
+// The page shows only this for a failed request; the log adds the cause.
+const CIMD_UNAVAILABLE = "metadata document could not be loaded";
+// Both request paths send these. Some CDNs and WAFs refuse a request with no
+// User-Agent, and `node:https` sends none by default.
+const CIMD_HEADERS = {
+  accept: "application/json",
+  "user-agent": "mcp-use-oauth-proxy",
+};
 
 /**
  * @internal Creates a CIMD fetcher with a small in-process cache. With a
  * `resolver` loader, the host must resolve only to public addresses, and a
  * runtime without a resolver refuses every document. `false` skips the
  * check, for a custom `fetch` that enforces its own network policy.
+ *
+ * When the host is checked and `transport` loads one (Node.js and Bun), the
+ * request connects only to the checked addresses. Elsewhere `fetchImpl`
+ * resolves the host again, which leaves a small DNS-rebinding window.
  */
 export function createCimdFetcher(
   fetchImpl: typeof globalThis.fetch,
-  resolver: (() => Promise<HostResolver | undefined>) | false
+  resolver: (() => Promise<HostResolver | undefined>) | false,
+  transport: () => Promise<PinnedTransport | undefined> = defaultPinnedTransport
 ): (url: string) => Promise<ClientRecord> {
   const cache = new Map<string, { client: ClientRecord; expiresAt: number }>();
   return async (clientId) => {
@@ -415,16 +434,39 @@ export function createCimdFetcher(
       return cached.client;
     }
     const url = new URL(clientId);
-    if (resolver !== false) {
-      await assertPublicHost(url.hostname, await resolver());
+    const pinned =
+      resolver === false
+        ? undefined
+        : {
+            addresses: await resolvePublicAddresses(
+              url.hostname,
+              await resolver()
+            ),
+            transport: await transport(),
+          };
+    const signal = AbortSignal.timeout(CIMD_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response =
+        pinned?.transport === undefined
+          ? await fetchImpl(url.href, {
+              redirect: "manual",
+              headers: { ...CIMD_HEADERS },
+              signal,
+            })
+          : await requestPinned(
+              pinned.transport,
+              url,
+              pinned.addresses,
+              signal
+            );
+    } catch (error) {
+      throw new Error(CIMD_UNAVAILABLE, { cause: error });
     }
-    const response = await fetchImpl(url.href, {
-      redirect: "manual",
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(CIMD_TIMEOUT_MS),
-    });
     if (response.status !== 200) {
-      throw new Error(`metadata document returned HTTP ${response.status}`);
+      throw new Error(CIMD_UNAVAILABLE, {
+        cause: new Error(`HTTP ${response.status}`),
+      });
     }
     const text = await readLimited(response, CIMD_MAX_BYTES);
     let document: unknown;
@@ -500,6 +542,142 @@ async function readLimited(response: Response, limit: number): Promise<string> {
   return new TextDecoder().decode(bytes);
 }
 
+/** @internal A `lookup` for `node:https` that answers from a fixed list. */
+export type PinnedLookup = (
+  hostname: string,
+  options: { all?: boolean },
+  callback: (
+    error: Error | null,
+    address: string | { address: string; family: number }[],
+    family?: number
+  ) => void
+) => void;
+
+/** The parts of a `node:http` response that {@link requestPinned} uses. */
+interface PinnedResponse {
+  statusCode?: number | undefined;
+  headers: Record<string, string | string[] | undefined>;
+  destroy(): unknown;
+}
+
+/**
+ * @internal The parts of `node:https` and `node:stream` that
+ * {@link createCimdFetcher} uses to connect to checked addresses only.
+ */
+export interface PinnedTransport {
+  /** `https.request`. */
+  request(
+    url: URL,
+    options: {
+      headers: Record<string, string>;
+      signal: AbortSignal;
+      lookup: PinnedLookup;
+    },
+    onResponse: (response: PinnedResponse) => void
+  ): {
+    on(event: "error", listener: (error: Error) => void): unknown;
+    end(): unknown;
+  };
+  /** `Readable.toWeb`. */
+  toWeb(response: PinnedResponse): ReadableStream<Uint8Array>;
+}
+
+/**
+ * GETs `url` over `node:https`, connecting only to `addresses` (already
+ * checked) instead of resolving the host again, which would let a host
+ * that answers DNS differently the second time reach a private address.
+ * TLS and the Host header still use the URL's hostname. Like the `fetch`
+ * call it replaces, it does not follow redirects.
+ */
+function requestPinned(
+  transport: PinnedTransport,
+  url: URL,
+  addresses: readonly string[],
+  signal: AbortSignal
+): Promise<Response> {
+  const entries = addresses.map((address) => ({
+    address,
+    family: address.includes(":") ? 6 : 4,
+  }));
+  const lookup: PinnedLookup = (_hostname, options, callback) => {
+    const first = entries[0];
+    if (options.all === true) callback(null, entries);
+    else if (first !== undefined) callback(null, first.address, first.family);
+    else callback(new Error("no checked address"), "");
+  };
+  return new Promise((resolve, reject) => {
+    const request = transport.request(
+      url,
+      { headers: { ...CIMD_HEADERS }, signal, lookup },
+      (response) => {
+        const status = response.statusCode ?? 0;
+        if (status !== 200) {
+          response.destroy();
+          reject(new Error(`HTTP ${status}`));
+          return;
+        }
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(response.headers)) {
+          if (typeof value === "string") headers.set(name, value);
+        }
+        resolve(
+          new Response(transport.toWeb(response), { status: 200, headers })
+        );
+      }
+    );
+    request.on("error", reject);
+    request.end();
+  });
+}
+
+let defaultTransport: Promise<PinnedTransport | undefined> | undefined;
+
+/**
+ * @internal Loads `node:https` once on Node.js and Bun, where its `lookup`
+ * option is honored, else `undefined`. Deno and Cloudflare Workers also
+ * have `node:https`, but are not known to honor `lookup`.
+ */
+export function defaultPinnedTransport(): Promise<PinnedTransport | undefined> {
+  defaultTransport ??= (async () => {
+    const versions = (
+      globalThis as { process?: { versions?: Record<string, unknown> } }
+    ).process?.versions;
+    const userAgent = (globalThis as { navigator?: { userAgent?: unknown } })
+      .navigator?.userAgent;
+    const nodeOrBun =
+      typeof versions?.["bun"] === "string" ||
+      (typeof versions?.["node"] === "string" &&
+        !("Deno" in globalThis) &&
+        userAgent !== "Cloudflare-Workers");
+    if (!nodeOrBun) return undefined;
+    try {
+      // Computed specifiers keep edge bundlers from resolving the builtins.
+      type Https = { request?: PinnedTransport["request"] };
+      type Stream = {
+        Readable?: { toWeb?: PinnedTransport["toWeb"] };
+      };
+      const [https, stream] = (await Promise.all([
+        import(/* @vite-ignore */ ["node", "https"].join(":")),
+        import(/* @vite-ignore */ ["node", "stream"].join(":")),
+      ])) as [Https & { default?: Https }, Stream & { default?: Stream }];
+      const request = https.request ?? https.default?.request;
+      const readable = stream.Readable ?? stream.default?.Readable;
+      const toWeb = readable?.toWeb?.bind(readable);
+      if (typeof request !== "function" || typeof toWeb !== "function") {
+        return undefined;
+      }
+      return {
+        request: (url, options, onResponse) =>
+          request(url, options, onResponse),
+        toWeb,
+      };
+    } catch {
+      return undefined;
+    }
+  })();
+  return defaultTransport;
+}
+
 /** @internal Resolves a hostname to the IP addresses it points to. */
 export type HostResolver = (hostname: string) => Promise<string[]>;
 
@@ -513,6 +691,17 @@ export async function assertPublicHost(
   hostname: string,
   resolve: HostResolver | undefined
 ): Promise<void> {
+  await resolvePublicAddresses(hostname, resolve);
+}
+
+/**
+ * @internal {@link assertPublicHost}, returning the checked addresses (the
+ * address itself for an IP literal) so the request can connect to them.
+ */
+export async function resolvePublicAddresses(
+  hostname: string,
+  resolve: HostResolver | undefined
+): Promise<string[]> {
   const host = hostname.replace(/^\[|\]$/g, "");
   if (host === "localhost" || host.endsWith(".localhost")) {
     throw new Error("metadata document host is not public");
@@ -521,7 +710,7 @@ export async function assertPublicHost(
     if (isPrivateAddress(host)) {
       throw new Error("metadata document host is not public");
     }
-    return;
+    return [host];
   }
   if (resolve === undefined) {
     throw new Error(
@@ -540,6 +729,7 @@ export async function assertPublicHost(
   ) {
     throw new Error("metadata document host is not public");
   }
+  return addresses;
 }
 
 /** The parts of `node:dns` promises that the resolvers use. */
@@ -656,7 +846,8 @@ export function isPrivateAddress(address: string): boolean {
     ipv6 === "::" ||
     ipv6 === "::1" ||
     /^f[cd]/.test(ipv6) ||
-    /^fe[89ab]/.test(ipv6) ||
+    // fe80::/10 link-local and fec0::/10 (deprecated) site-local.
+    /^fe[89a-f]/.test(ipv6) ||
     ipv6.startsWith("ff") ||
     ipv6.startsWith("64:ff9b:") ||
     ipv6.startsWith("::ffff:")

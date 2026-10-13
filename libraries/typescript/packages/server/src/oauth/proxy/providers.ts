@@ -1,5 +1,5 @@
 import { isRecord } from "../guards.js";
-import { upstream, type RedirectUpstream } from "./upstream.js";
+import { assertEndpoint, upstream, type RedirectUpstream } from "./upstream.js";
 
 /** Options for {@link github}. */
 export interface GitHubUpstreamOptions {
@@ -21,7 +21,8 @@ export interface GitHubUpstreamOptions {
    */
   baseUrl?: string;
   /**
-   * Base URL of the GitHub REST API.
+   * Base URL of the GitHub REST API. It receives the user's access token, so
+   * it must use HTTPS (HTTP only on localhost).
    *
    * @defaultValue `"https://api.github.com"`, or `baseUrl` when `baseUrl` is set
    */
@@ -53,6 +54,12 @@ export interface GitHubUpstreamOptions {
  * ```
  */
 export function github(options: GitHubUpstreamOptions): RedirectUpstream {
+  // The access token is sent to the API, so it needs the same rule as the
+  // OAuth endpoints. Without it, the API is `baseUrl` (checked through those
+  // endpoints) or GitHub's own.
+  if (options.apiUrl !== undefined) {
+    assertEndpoint(options.apiUrl, "github apiUrl");
+  }
   const baseUrl = trimSlash(options.baseUrl ?? "https://github.com");
   const apiUrl = trimSlash(
     options.apiUrl ??

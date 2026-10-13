@@ -1,4 +1,9 @@
-import { decryptValue, encryptValue, type ProxyKeyring } from "./crypto.js";
+import {
+  decryptValue,
+  encryptValue,
+  sha256,
+  type ProxyKeyring,
+} from "./crypto.js";
 import { printable } from "./upstream.js";
 
 /**
@@ -63,8 +68,9 @@ const MEMORY_STORAGE = Symbol.for("mcp-use.oauth.memoryStorage");
  * Creates an in-process store for local development.
  *
  * Its state is lost on restart and is not shared between instances, so
- * `oauthProxy` accepts it only when the MCP resource is on localhost. A
- * local `listen()` uses it by default when no `storage` is set.
+ * `oauthProxy` accepts it only when the MCP resource is on localhost and a
+ * `listen()` binds a loopback address. A local `listen()` uses it by default
+ * when no `storage` is set.
  *
  * @returns A store that keeps values in memory.
  */
@@ -134,34 +140,47 @@ const KEY_PREFIX = "mcp-use:oauth:";
 /**
  * @internal JSON records over an {@link OAuthProxyStorage}, encrypted with
  * the proxy keyring. A value that fails to decrypt or parse reads as absent.
+ *
+ * Keys are namespaced by the MCP resource, so servers that share one store
+ * and one secret never read or overwrite each other's records. The full key
+ * is also the encryption's associated data, so a record copied to another
+ * server's key does not decrypt.
  */
 export class SecureStore {
   readonly #storage: OAuthProxyStorage;
   readonly #keyring: () => Promise<ProxyKeyring>;
+  /** `mcp-use:oauth:<hash of the resource>:`, prepended to every key. */
+  readonly #prefix: Promise<string>;
   /** Kinds of failure already logged, so stale records log once. */
   readonly #warned = new Set<string>();
 
   /**
    * @param storage - The application's store.
    * @param keyring - Loads the proxy keyring (derived once, on first use).
+   * @param resource - Canonical URL of the MCP resource whose records this
+   * store holds. A hash of it namespaces every key.
    */
   constructor(
     storage: OAuthProxyStorage,
-    keyring: () => Promise<ProxyKeyring>
+    keyring: () => Promise<ProxyKeyring>,
+    resource: URL
   ) {
     this.#storage = storage;
     this.#keyring = keyring;
+    this.#prefix = sha256(resource.href).then(
+      (hash) => `${KEY_PREFIX}${hash.slice(0, 16)}:`
+    );
   }
 
   /** Reads and decrypts a record. */
   async get<T>(key: string): Promise<T | undefined> {
-    const fullKey = KEY_PREFIX + key;
-    return this.#decode<T>(fullKey, await this.#storage.get(fullKey));
+    const fullKey = (await this.#prefix) + key;
+    return this.#decode<T>(key, fullKey, await this.#storage.get(fullKey));
   }
 
   /** Encrypts and writes a record. */
   async set(key: string, value: unknown, ttlSeconds: number): Promise<void> {
-    const fullKey = KEY_PREFIX + key;
+    const fullKey = (await this.#prefix) + key;
     await this.#storage.set(
       fullKey,
       await this.#encode(fullKey, value),
@@ -171,18 +190,18 @@ export class SecureStore {
 
   /** Removes a record. */
   async delete(key: string): Promise<void> {
-    await this.#storage.delete(KEY_PREFIX + key);
+    await this.#storage.delete((await this.#prefix) + key);
   }
 
   /** Atomically reads, removes, and decrypts a record. */
   async take<T>(key: string): Promise<T | undefined> {
-    const fullKey = KEY_PREFIX + key;
-    return this.#decode<T>(fullKey, await this.#storage.take(fullKey));
+    const fullKey = (await this.#prefix) + key;
+    return this.#decode<T>(key, fullKey, await this.#storage.take(fullKey));
   }
 
   /** Writes a record only when the key is absent. */
   async add(key: string, value: unknown, ttlSeconds: number): Promise<boolean> {
-    const fullKey = KEY_PREFIX + key;
+    const fullKey = (await this.#prefix) + key;
     return this.#storage.add(
       fullKey,
       await this.#encode(fullKey, value),
@@ -195,6 +214,7 @@ export class SecureStore {
   }
 
   async #decode<T>(
+    key: string,
     fullKey: string,
     stored: string | undefined
   ): Promise<T | undefined> {
@@ -202,7 +222,7 @@ export class SecureStore {
     const keyring = await this.#keyring();
     const plaintext = await decryptValue(keyring, fullKey, stored);
     if (plaintext === undefined) {
-      this.#warnUnreadable(keyring, fullKey, stored);
+      this.#warnUnreadable(keyring, key, stored);
       return undefined;
     }
     try {
@@ -216,10 +236,10 @@ export class SecureStore {
    * Logs a record that does not decrypt, which otherwise reads as expired.
    * Logs only the kind of record and the key id, once per kind.
    */
-  #warnUnreadable(keyring: ProxyKeyring, fullKey: string, stored: string) {
+  #warnUnreadable(keyring: ProxyKeyring, key: string, stored: string) {
     const kid = printable(stored.split(".")[1] ?? "", 32);
-    const known = keyring.all.some((key) => key.kid === kid);
-    const kind = fullKey.slice(KEY_PREFIX.length).split(":")[0] ?? "";
+    const known = keyring.all.some((entry) => entry.kid === kid);
+    const kind = key.split(":")[0] ?? "";
     const id = known ? `record:${kind}` : `kid:${kid}`;
     if (this.#warned.has(id)) return;
     this.#warned.add(id);

@@ -81,14 +81,16 @@ export interface OAuthProxyOptions<TUser> extends OAuthResourceOptions {
    * encrypts and signs, and the others still decrypt and verify.
    *
    * Defaults to the `MCP_USE_OAUTH_SECRET` environment variable. Required
-   * unless the server runs with `listen()` on localhost, where a random key
-   * is used and sign-ins end when the process stops. `mcp-use build` does
-   * not need it.
+   * unless the server runs with `listen()` on a localhost resource and a
+   * loopback address (`127.0.0.1`, `localhost`, or `::1`), where a random
+   * key is used and sign-ins end when the process stops. `mcp-use build`
+   * does not need it.
    */
   secret?: string | readonly string[];
   /**
    * Shared store for clients, sign-ins, grants, and tokens. Required unless
-   * the server runs with `listen()` on localhost, where an in-memory store is
+   * the server runs with `listen()` on a localhost resource and a loopback
+   * address (`127.0.0.1`, `localhost`, or `::1`), where an in-memory store is
    * used. `mcp-use build` does not need it. See `mcp-use/oauth/storage` for
    * adapters.
    */
@@ -97,7 +99,8 @@ export interface OAuthProxyOptions<TUser> extends OAuthResourceOptions {
    * The consent page that the proxy shows before it sends the user to the
    * upstream provider. It defends against a malicious client that reuses
    * an earlier upstream approval (the confused-deputy attack). Set `false`
-   * only for local development: it is refused outside localhost.
+   * only for local development: it is refused outside localhost, and on a
+   * `listen()` that binds beyond a loopback address.
    *
    * @defaultValue `{ mode: "always" }`
    */
@@ -115,6 +118,10 @@ export interface OAuthProxyOptions<TUser> extends OAuthResourceOptions {
    *   example `"https://chatgpt.com"`;
    * - an {@link OAuthProxyClient} defines a client by hand, for a client
    *   that can use neither a metadata document nor registration.
+   *
+   * Listing metadata documents also closes the small DNS-rebinding window
+   * that runtimes other than Node.js and Bun leave when fetching them (see
+   * `fetch`).
    *
    * Removing a client ends its existing sign-ins for good: the next request
    * with one of its tokens deletes the grant. This list controls which
@@ -156,6 +163,13 @@ export interface OAuthProxyOptions<TUser> extends OAuthResourceOptions {
    * every metadata document there (Cloudflare Workers has `node:dns` with
    * the `nodejs_compat` flag). When `fetch` is set, the proxy skips the
    * check: the custom fetch must enforce its own network policy.
+   *
+   * On Node.js and Bun, the proxy then connects only to the addresses it
+   * checked. Other runtimes (Cloudflare Workers, Deno) fetch the document
+   * with the global `fetch`, which resolves the host again, so a host that
+   * answers DNS with a public address and then a private one (DNS
+   * rebinding) can still reach the private one. Listing the trusted
+   * metadata documents in `clients` closes that window.
    */
   fetch?: typeof globalThis.fetch;
 }
@@ -313,38 +327,43 @@ export function oauthProxy<TUser = UpstreamUser>(
     // `mcp-use build` mounts the server without serving requests, so it
     // needs neither a store nor a secret.
     const building = isBuilding();
-    const local = host.mode === "listen" && isLocalhost(host.resourceUrl);
+    // A localhost resource is not enough: listen() on 0.0.0.0 serves every
+    // interface whatever the resource says. In handler mode the server
+    // cannot see how it is served, so only the resource counts.
+    const localhost =
+      isLocalhost(host.resourceUrl) &&
+      (host.mode !== "listen" || LOOPBACK_BINDS.has(host.listenHost ?? ""));
+    const local = host.mode === "listen" && localhost;
     let storage = options.storage;
     if (storage === undefined) {
       if (!local && !building) {
         throw new Error(
-          "oauthProxy needs storage outside a localhost listen(): pass a shared store from mcp-use/oauth/storage"
+          "oauthProxy needs storage outside a localhost listen() on 127.0.0.1, localhost, or ::1: " +
+            "pass a shared store from mcp-use/oauth/storage"
         );
       }
       storage = memoryStorage();
-    } else if (
-      isMemoryStorage(storage) &&
-      !building &&
-      !isLocalhost(host.resourceUrl)
-    ) {
+    } else if (isMemoryStorage(storage) && !building && !localhost) {
       throw new Error(
-        "oauthProxy memoryStorage() works only on localhost; use a shared store from mcp-use/oauth/storage"
+        "oauthProxy memoryStorage() works only on localhost, with listen() on 127.0.0.1, localhost, or ::1; " +
+          "use a shared store from mcp-use/oauth/storage"
       );
     }
     if (secrets === undefined && !local && !building) {
       throw new Error(
-        "oauthProxy needs a secret outside a localhost listen(): set MCP_USE_OAUTH_SECRET or the secret option"
+        "oauthProxy needs a secret outside a localhost listen() on 127.0.0.1, localhost, or ::1: " +
+          "set MCP_USE_OAUTH_SECRET or the secret option"
       );
     }
     // Any client can identify itself with a metadata document, so without
     // consent a crafted sign-in link could send codes to any redirect URI.
-    if (consent === false && !isLocalhost(host.resourceUrl)) {
-      throw new Error("oauthProxy consent: false is allowed only on localhost");
+    if (consent === false && !localhost) {
+      throw new Error(
+        "oauthProxy consent: false is allowed only on localhost, with listen() on 127.0.0.1, localhost, or ::1"
+      );
     }
     // An emulator upstream accepts proofs that nobody signed, so anyone who
-    // reaches the server can sign in as anyone. A localhost resource is not
-    // enough: listen() on 0.0.0.0 serves every interface whatever the
-    // resource says. In handler mode the server cannot see how it is served.
+    // reaches the server can sign in as anyone.
     if (upstream.kind === "in-page" && upstream.emulator === true) {
       if (!isLocalhost(host.resourceUrl)) {
         throw new Error(
@@ -383,9 +402,10 @@ export function oauthProxy<TUser = UpstreamUser>(
         secrets === undefined ? randomKeyring() : deriveKeyring(secrets);
       return keyring;
     };
-    const store = new SecureStore(storage, loadKeyring);
+    const resource = new URL(host.resourceUrl.href);
+    const store = new SecureStore(storage, loadKeyring, resource);
     runtime = new ProxyRuntime({
-      resource: new URL(host.resourceUrl.href),
+      resource,
       basePath: host.basePath,
       store,
       keyring: loadKeyring,

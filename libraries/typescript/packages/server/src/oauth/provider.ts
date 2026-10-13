@@ -119,6 +119,12 @@ export interface OAuthProviderHost<TUser> {
    * application's own routes, so it is public and the application cannot
    * shadow it.
    *
+   * These routes also skip the server's `Origin` validation
+   * (`allowedOrigins`), because MCP clients call OAuth endpoints
+   * cross-origin and the provider's own pages post back to them. The handler
+   * must validate each request itself, for example with a CSRF token on a
+   * cookie-authenticated `POST`.
+   *
    * @param method - HTTP method to match.
    * @param path - Absolute pathname. It must sit under the MCP base path, for
    * example `/mcp/oauth/token`.
