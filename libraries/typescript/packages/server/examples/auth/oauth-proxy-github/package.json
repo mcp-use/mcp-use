@@ -1,0 +1,31 @@
+{
+  "name": "mcp-use-example-auth-oauth-proxy-github",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: mcp-use as its own OAuth authorization server in front of GitHub, with oauthProxy.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev --port 3000",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "mcp-use": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "redis": "^6.2.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.0.16"
+  }
+}
