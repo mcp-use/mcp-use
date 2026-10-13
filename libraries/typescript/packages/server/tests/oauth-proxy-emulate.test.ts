@@ -1410,26 +1410,22 @@ describe("oauthProxy with emulated GitHub", () => {
       return response.text();
     }
 
-    it("by the server name when it has no title", async () => {
+    it("by the host of the MCP server URL", async () => {
       const { server } = githubServer();
-      expect(await consentPage(server)).toContain("to use acme?</h1>");
+      expect(await consentPage(server)).toContain(
+        "to connect to localhost:4319?</h1>"
+      );
     });
 
-    it("by the server title", async () => {
-      const { server } = githubServer({}, { title: "Acme Tools" });
-      const html = await consentPage(server);
-      expect(html).toContain("to use Acme Tools?</h1>");
-      expect(html).not.toContain("to use acme?");
-    });
-
-    it("by the server title even with a resourceName, which only goes in the resource metadata", async () => {
+    it("by the host, not the server title or resourceName, which only goes in the resource metadata", async () => {
       const { server } = githubServer(
         { resourceName: "Acme API" },
         { title: "Acme Tools" }
       );
       const html = await consentPage(server);
-      expect(html).toContain("to use Acme Tools?</h1>");
+      expect(html).toContain("to connect to localhost:4319?</h1>");
       expect(html).not.toContain("Acme API");
+      expect(html).not.toContain("Acme Tools");
       const metadata = await server.fetch(
         new Request(`${ORIGIN}/.well-known/oauth-protected-resource/mcp`)
       );
@@ -1439,18 +1435,17 @@ describe("oauthProxy with emulated GitHub", () => {
       ).toBe("Acme API");
     });
 
-    it("by the server title in a custom consent page", async () => {
+    it("by the host in a custom consent page", async () => {
       const { createElement } = await import("react");
-      const { server } = githubServer(
-        {
-          consent: {
-            page: (props) =>
-              createElement("p", null, `Custom page for ${props.serverName}`),
-          },
+      const { server } = githubServer({
+        consent: {
+          page: (props) =>
+            createElement("p", null, `Custom page for ${props.serverHost}`),
         },
-        { title: "Acme Tools" }
+      });
+      expect(await consentPage(server)).toContain(
+        "Custom page for localhost:4319"
       );
-      expect(await consentPage(server)).toContain("Custom page for Acme Tools");
     });
   });
 

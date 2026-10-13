@@ -35,7 +35,6 @@ export {
   type OAuthProviderRouteHandler,
   type OAuthProvider,
   type OAuthProviderHost,
-  type OAuthProviderServerInfo,
   type OAuthResourceOptions,
 } from "./provider.js";
 export {

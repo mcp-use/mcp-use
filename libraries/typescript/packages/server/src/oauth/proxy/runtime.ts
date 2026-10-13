@@ -106,8 +106,8 @@ export interface RuntimeConfig {
         mode: "always" | "remember";
         page?: (props: ConsentPageProps) => unknown;
       };
-  /** Server name shown on the consent and sign-in pages. */
-  serverName: string;
+  /** Host of the MCP server URL, shown on the consent and sign-in pages. */
+  serverHost: string;
 }
 
 /** Why a grant can no longer produce tokens. */
@@ -343,7 +343,7 @@ export class ProxyRuntime {
       isNative: !redirectUri.startsWith("https:"),
       upstream: upstream.name,
       scopes: upstream.kind === "redirect" ? [...upstream.scopes] : [],
-      serverName: this.config.serverName,
+      serverHost: this.config.serverHost,
       form: {
         action: `${this.paths.consent}?txn=${encodeURIComponent(transactionId)}`,
         csrf,

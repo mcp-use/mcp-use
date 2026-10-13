@@ -73,20 +73,6 @@ export type OAuthProviderRouteHandler = (
 ) => Response | Promise<Response>;
 
 /**
- * Server identity exposed to an OAuth provider as
- * {@link OAuthProviderHost.serverInfo}.
- */
-export interface OAuthProviderServerInfo {
-  /** Server name from the `MCPServer` `name` option. */
-  readonly name: string;
-  /**
-   * Human-readable display name from the `MCPServer` `title` option, or
-   * `undefined` when the server sets none.
-   */
-  readonly title?: string | undefined;
-}
-
-/**
  * Server surface handed to a provider's {@link CustomOAuthProviderOptions.setup}
  * hook while the server mounts.
  *
@@ -106,12 +92,6 @@ export interface OAuthProviderHost<TUser> {
   readonly resourceUrl: URL;
   /** MCP endpoint base path, for example `/mcp`. */
   readonly basePath: string;
-  /**
-   * The server's identity from its `MCPServer` options. A provider that
-   * renders pages for people, such as a consent page, can name the server
-   * with `title ?? name`.
-   */
-  readonly serverInfo: OAuthProviderServerInfo;
   /**
    * Whether the server was constructed with `mixedAuth: true`, so signed-out
    * clients can connect, list, and call `noauth` tools. A provider that

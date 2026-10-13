@@ -59,10 +59,11 @@ export interface ConsentPageProps {
   /** Scopes that the server requests from the upstream provider. */
   scopes: string[];
   /**
-   * Name of this MCP server, for the page to show. It is the `MCPServer`
-   * `title`, or its `name` when the server sets no title.
+   * Host of this MCP server's public URL, for example `mcp.acme.com` or
+   * `localhost:3000`. The page names the server by it, because the user can
+   * check it in the address bar.
    */
-  serverName: string;
+  serverHost: string;
   /** Form target and CSRF token. */
   form: {
     /** URL to post the decision to. */
@@ -133,10 +134,10 @@ export function renderDefaultConsentPage(props: ConsentPageProps): string {
       : `<p class="label">Access requested from ${escapeHtml(props.upstream)}</p><ul>${props.scopes
           .map((scope) => `<li><code>${escapeHtml(scope)}</code></li>`)
           .join("")}</ul>`;
-  const target = props.serverName;
+  const target = props.serverHost;
   return page(
     `Allow ${clientName}?`,
-    `<h1>Allow <span>${escapeHtml(clientName)}</span> to use ${escapeHtml(target)}?</h1>
+    `<h1>Allow <span>${escapeHtml(clientName)}</span> to connect to ${escapeHtml(target)}?</h1>
 ${who}
 <p>You will sign in with ${escapeHtml(props.upstream)}. The app can then use ${escapeHtml(target)} as you. Your ${escapeHtml(props.upstream)} credentials stay on the server.</p>
 <p class="meta">After sign-in, you return to <b>${escapeHtml(props.redirectHost)}</b>.</p>
@@ -158,7 +159,7 @@ ${scopes}
  * provider's sign-in window opens only on a click.
  */
 export function renderDefaultSignInPage(props: ConsentPageProps): string {
-  const target = props.serverName;
+  const target = props.serverHost;
   return page(
     `Sign in to ${target}`,
     `<h1>Sign in to <span>${escapeHtml(target)}</span></h1>

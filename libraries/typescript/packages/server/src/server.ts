@@ -1445,10 +1445,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const host: OAuthProviderHost<TUser> = {
       resourceUrl: resource,
       basePath,
-      serverInfo: {
-        name: this.#config.name,
-        ...(this.#config.title !== undefined && { title: this.#config.title }),
-      },
       mixedAuth: this.#config.mixedAuth === true,
       mode,
       listenHost: mode === "listen" ? listenHost : undefined,
