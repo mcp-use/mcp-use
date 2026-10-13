@@ -9,13 +9,15 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   MCPServer,
   type FromOpenAPIOptions,
   type OpenAPIDocument,
 } from "../src/index.js";
+
+import { registerOpenAPITools } from "../src/openapi/index.js";
 
 interface CapturedRequest {
   method: string;
@@ -402,6 +404,152 @@ describe("MCPServer.fromOpenAPI", () => {
       await connection.close();
     }
   });
+
+  it.each([
+    ["getReport", "getReport", "getReport_2"],
+    ["getReport_2", "getReport", "getReport"],
+    ["getReport", "getReport_2", "getReport"],
+    ["a".repeat(64), "a".repeat(64), `${"a".repeat(62)}_2`],
+  ])("keeps suffix collisions distinct: %j", async (...operationIds) => {
+    const connection = await connect(
+      MCPServer.fromOpenAPI({
+        baseUrl: upstreamBaseUrl,
+        spec: {
+          openapi: "3.1.0",
+          info: { title: "Collisions", version: "1" },
+          paths: {
+            "/first": {
+              get: {
+                operationId: operationIds[0]!,
+                responses: { "200": { description: "ok" } },
+              },
+            },
+            "/second": {
+              get: {
+                operationId: operationIds[1]!,
+                responses: { "200": { description: "ok" } },
+              },
+            },
+            "/third": {
+              get: {
+                operationId: operationIds[2]!,
+                responses: { "200": { description: "ok" } },
+              },
+            },
+          },
+        },
+      })
+    );
+    try {
+      const { tools } = await connection.client.listTools();
+      expect(tools).toHaveLength(3);
+      for (const tool of tools) {
+        const result = await connection.client.callTool({
+          name: tool.name,
+          arguments: {},
+        });
+        expect(result.isError).not.toBe(true);
+      }
+      expect(
+        new Set(captured.slice(-3).map((request) => request.url)).size
+      ).toBe(3);
+    } finally {
+      await connection.close();
+    }
+  });
+
+  it("keeps every declared operationId whatever the path order", async () => {
+    const operation = (operationId?: string) => ({
+      get: {
+        ...(operationId === undefined ? {} : { operationId }),
+        responses: { "200": { description: "ok" } },
+      },
+    });
+    const namesFor = async (paths: Record<string, unknown>) => {
+      const connection = await connect(
+        MCPServer.fromOpenAPI({
+          baseUrl: upstreamBaseUrl,
+          spec: {
+            openapi: "3.1.0",
+            info: { title: "Order", version: "1" },
+            paths,
+          } as FromOpenAPIOptions["spec"],
+        })
+      );
+      try {
+        const { tools } = await connection.client.listTools();
+        return tools.map((tool) => tool.name);
+      } finally {
+        await connection.close();
+      }
+    };
+    // The declared getReport_2 comes last, yet no generated suffix takes it.
+    expect(
+      await namesFor({
+        "/a": operation("getReport"),
+        "/b": operation("getReport"),
+        "/c": operation("getReport_2"),
+      })
+    ).toEqual(["getReport", "getReport_3", "getReport_2"]);
+    // Reordering the paths moves the names with them but never changes the set
+    // of declared ids that survive.
+    expect(
+      await namesFor({
+        "/c": operation("getReport_2"),
+        "/a": operation("getReport"),
+        "/b": operation("getReport"),
+      })
+    ).toEqual(["getReport_2", "getReport", "getReport_3"]);
+    // A name synthesized from method and path cannot take a declared id either.
+    expect(
+      await namesFor({
+        "/x": operation(),
+        "/y": operation("get_x"),
+      })
+    ).toEqual(["get_x_2", "get_x"]);
+  });
+
+  it.each(["report", "a".repeat(80)])(
+    "advances repeated suffixes without rescanning: %s",
+    (operationId) => {
+      const count = 1000;
+      const paths = Object.fromEntries(
+        Array.from({ length: count }, (_, index) => [
+          `/reports/${index}`,
+          { get: { operationId, responses: { "200": { description: "ok" } } } },
+        ])
+      );
+      const names: string[] = [];
+      let probes = 0;
+      const originalHas = Set.prototype.has;
+      const hasSpy = vi
+        .spyOn(Set.prototype, "has")
+        .mockImplementation(function (this: Set<unknown>, value) {
+          probes += 1;
+          return originalHas.call(this, value);
+        });
+      try {
+        registerOpenAPITools(
+          {
+            tool: (definition: { name: string }) => names.push(definition.name),
+          } as unknown as Pick<MCPServer, "tool">,
+          {
+            baseUrl: upstreamBaseUrl,
+            spec: {
+              openapi: "3.1.0",
+              info: { title: "Many tools", version: "1" },
+              paths,
+            },
+          }
+        );
+      } finally {
+        hasSpy.mockRestore();
+      }
+      expect(new Set(names).size).toBe(count);
+      expect(names.every((name) => name.length <= 64)).toBe(true);
+      expect(probes).toBeLessThan(count * 8);
+    }
+  );
 
   it("disambiguates same-name parameters and a body parameter", async () => {
     captured.length = 0;
