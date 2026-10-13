@@ -10,5 +10,8 @@
     "mcp-use": "2.9.0",
     "@mcp-use/tunnel": "0.2.2"
   },
-  "changesets": []
+  "changesets": [
+    "propagated-73aa1a1894ad56a2",
+    "smart-deploy-gitignore"
+  ]
 }
