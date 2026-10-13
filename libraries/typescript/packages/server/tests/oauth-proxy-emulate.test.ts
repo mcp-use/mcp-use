@@ -1422,12 +1422,14 @@ describe("oauthProxy with emulated GitHub", () => {
       expect(html).not.toContain("to use acme?");
     });
 
-    it("by resourceName, which also stays in the resource metadata", async () => {
+    it("by the server title even with a resourceName, which only goes in the resource metadata", async () => {
       const { server } = githubServer(
         { resourceName: "Acme API" },
         { title: "Acme Tools" }
       );
-      expect(await consentPage(server)).toContain("to use Acme API?</h1>");
+      const html = await consentPage(server);
+      expect(html).toContain("to use Acme Tools?</h1>");
+      expect(html).not.toContain("Acme API");
       const metadata = await server.fetch(
         new Request(`${ORIGIN}/.well-known/oauth-protected-resource/mcp`)
       );

@@ -404,8 +404,7 @@ export function oauthProxy<TUser = UpstreamUser>(
       scopes,
       accessTokenTtl,
       consent,
-      serverName:
-        options.resourceName ?? host.serverInfo.title ?? host.serverInfo.name,
+      serverName: host.serverInfo.title ?? host.serverInfo.name,
     });
     registerRoutes(host, runtime, dcr);
   };

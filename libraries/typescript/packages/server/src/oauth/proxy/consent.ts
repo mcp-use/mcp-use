@@ -59,9 +59,8 @@ export interface ConsentPageProps {
   /** Scopes that the server requests from the upstream provider. */
   scopes: string[];
   /**
-   * Name of this MCP server, for the page to show. It is the `resourceName`
-   * option of `oauthProxy` when set, otherwise the `MCPServer` `title`, and
-   * otherwise its `name`.
+   * Name of this MCP server, for the page to show. It is the `MCPServer`
+   * `title`, or its `name` when the server sets no title.
    */
   serverName: string;
   /** Form target and CSRF token. */
