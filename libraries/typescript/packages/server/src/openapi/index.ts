@@ -495,21 +495,24 @@ function buildHeaders(
   params: Record<string, unknown>,
   options: FromOpenAPIOptions
 ): Record<string, string> {
-  const headers: Record<string, string> = { ...(options.headers ?? {}) };
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(options.headers ?? {})) {
+    headers.set(name, value);
+  }
 
   for (const { parameter, inputName } of parameterBindings) {
     if (parameter.in !== "header") continue;
     const value = params[inputName];
     if (value === undefined || value === null || value === "") continue;
-    headers[parameter.name] = String(value);
+    headers.set(parameter.name, String(value));
   }
   if (options.auth?.type === "bearer" && options.auth.token) {
-    headers["authorization"] = `Bearer ${options.auth.token}`;
+    headers.set("authorization", `Bearer ${options.auth.token}`);
   }
   if (options.auth?.type === "header" && options.auth.value) {
-    headers[options.auth.name] = options.auth.value;
+    headers.set(options.auth.name, options.auth.value);
   }
-  return headers;
+  return Object.fromEntries(headers.entries());
 }
 
 function resolveBaseUrl(options: FromOpenAPIOptions): string {
