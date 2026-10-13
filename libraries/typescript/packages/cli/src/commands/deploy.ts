@@ -105,7 +105,8 @@ Incompatible combinations:
 Managed archive:
   Uploads the selected project without .git, dependencies, build output,
   .mcp-use, .env*, caches, coverage, OS metadata, or symbolic links.
-  The compressed archive limit is 80 MB.
+  Paths matched by the project root's .gitignore are also excluded; nested
+  .gitignore files are not read. The compressed archive limit is 80 MB.
 
 Examples:
   mcp-use deploy
