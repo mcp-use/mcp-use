@@ -1,5 +1,4 @@
 ---
-"@mcp-use/cli": patch
 "@mcp-use/inspector": patch
 ---
 

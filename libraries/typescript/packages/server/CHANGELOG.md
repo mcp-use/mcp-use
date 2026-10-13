@@ -1,5 +1,32 @@
 # mcp-use
 
+## 2.9.1-canary.1
+
+### Patch Changes
+
+- 3591976: Convert OpenAPI 3.0 boolean `exclusiveMinimum` and `exclusiveMaximum` into JSON Schema numeric bounds so `MCPServer.fromOpenAPI` accepts specs that use them instead of throwing while registering tools.
+
+## 2.9.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [884521e]
+  - @mcp-use/inspector@20.3.20-canary.0
+  - @mcp-use/cli@4.4.0-canary.0
+
+## 2.9.0
+
+### Minor Changes
+
+- b49c5f0: Add typed `server.mentions({ name, search })` registration for composer mention search using official SDK ResourceLink results, generated schemas, and app visibility that preserves descriptor metadata.
+
+### Patch Changes
+
+- Updated dependencies [b49c5f0]
+  - @mcp-use/cli@4.3.3
+  - @mcp-use/inspector@20.3.19
+
 ## 2.9.0-canary.0
 
 ### Minor Changes
