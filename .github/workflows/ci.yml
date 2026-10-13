@@ -764,6 +764,9 @@ jobs:
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
+      # The server's `#mcp-use-*` imports resolve to dist/.
+      - name: Build Packages
+        run: pnpm build
       - name: Run Firebase Auth emulator tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
