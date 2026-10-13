@@ -220,4 +220,49 @@ describe("NodeOAuthClientProvider", () => {
       }
     }
   });
+
+  it("invalidates tokens and client info kept in the default file store", async () => {
+    const root = mkdtempSync(join(tmpdir(), "mcp-use-node-oauth-"));
+    let provider: NodeOAuthClientProvider | undefined;
+
+    try {
+      provider = await NodeOAuthClientProvider.create(
+        "https://files.example.com/mcp",
+        {
+          baseDir: join(root, "oauth"),
+          openBrowser: vi.fn(),
+          preferredPort: 35_000 + (process.pid % 1_000),
+          portRange: 100,
+        }
+      );
+      const issuer = { issuer: "https://auth.example.com" } as Parameters<
+        NodeOAuthClientProvider["tokens"]
+      >[0];
+
+      await provider.saveClientInformation(
+        { client_id: "client", redirect_uris: [provider.redirectUrl] },
+        issuer
+      );
+      await provider.saveTokens(
+        { access_token: "revoked", token_type: "Bearer", refresh_token: "r" },
+        issuer
+      );
+      expect(await provider.tokens()).toMatchObject({
+        access_token: "revoked",
+      });
+
+      // The SDK calls this after invalid_grant so the next attempt starts a
+      // fresh authorization instead of replaying the revoked refresh token.
+      await provider.invalidateCredentials("tokens");
+      expect(await provider.tokens()).toBeUndefined();
+      expect(await provider.tokens(issuer)).toBeUndefined();
+
+      await provider.invalidateCredentials("client");
+      expect(await provider.clientInformation()).toBeUndefined();
+      expect(await provider.clientInformation(issuer)).toBeUndefined();
+    } finally {
+      provider?.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
