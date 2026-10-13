@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.19
+
+### Patch Changes
+
+- b49c5f0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.19-canary.0
 
 ### Patch Changes
