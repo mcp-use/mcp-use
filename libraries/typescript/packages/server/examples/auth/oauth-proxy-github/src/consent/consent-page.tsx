@@ -14,7 +14,6 @@ import { consentStyles } from "./styles.js";
 export function ConsentPage({
   client,
   redirectHost,
-  isNative,
   upstream,
   scopes,
   serverHost,
@@ -29,7 +28,7 @@ export function ConsentPage({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex" />
         <title>{`Allow ${appName}?`}</title>
-        <style dangerouslySetInnerHTML={{ __html: consentStyles }} />
+        <style>{consentStyles}</style>
       </head>
       <body>
         <div className="page">
@@ -86,13 +85,6 @@ export function ConsentPage({
                 )}
               </Row>
             </dl>
-
-            {isNative && (
-              <p className="warning">
-                This app runs on your computer. Approve only if you started this
-                sign-in just now.
-              </p>
-            )}
 
             <p className="note">
               Your {upstream} credentials stay on this server. {appName} gets a

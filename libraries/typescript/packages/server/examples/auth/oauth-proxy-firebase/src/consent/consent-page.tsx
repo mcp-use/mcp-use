@@ -19,7 +19,7 @@ const PROVIDER = "Google";
  * Sign-in errors appear at the top of the form.
  */
 export function ConsentPage(props: ConsentPageProps) {
-  const { client, redirectHost, isNative, serverHost, form } = props;
+  const { client, redirectHost, serverHost, form } = props;
   const appName = client.name ?? client.host ?? "An app";
   // With an in-page upstream such as firebase(), the props also carry
   // `consent`. It is false when the user already approved this app, or
@@ -37,7 +37,7 @@ export function ConsentPage(props: ConsentPageProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex" />
         <title>{askConsent ? `Allow ${appName}?` : title}</title>
-        <style dangerouslySetInnerHTML={{ __html: consentStyles }} />
+        <style>{consentStyles}</style>
       </head>
       <body>
         <div className="page">
@@ -86,13 +86,6 @@ export function ConsentPage(props: ConsentPageProps) {
                   </span>
                 </Row>
               </dl>
-            )}
-
-            {askConsent && isNative && (
-              <p className="warning">
-                This app runs on your computer. Approve only if you started this
-                sign-in just now.
-              </p>
             )}
 
             <p className="note">

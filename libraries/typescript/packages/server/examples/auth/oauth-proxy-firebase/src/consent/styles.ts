@@ -264,16 +264,6 @@ code {
   flex-wrap: wrap;
   gap: 0.375rem;
 }
-.warning {
-  margin-top: 1rem;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid #fde68a;
-  border-radius: 0.5rem;
-  background: #fffbeb;
-  color: #78350f;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-}
 .note {
   margin-top: 1rem;
   color: var(--muted);
