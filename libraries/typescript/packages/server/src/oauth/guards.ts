@@ -38,3 +38,21 @@ export function assertSecureHttpUrl(url: URL, name: string): void {
   }
   throw new Error(`${name} must use HTTPS, or HTTP for localhost`);
 }
+
+/** @internal Validates authorization-server metadata and its issuer URL. */
+export function assertOAuthMetadata(
+  metadata: unknown
+): asserts metadata is { issuer: string } {
+  if (
+    metadata === null ||
+    typeof metadata !== "object" ||
+    !("issuer" in metadata) ||
+    typeof metadata.issuer !== "string"
+  ) {
+    throw new TypeError("oauthMetadata must include a string issuer");
+  }
+  assertSecureHttpUrl(
+    parseAbsoluteUrl(metadata.issuer, "oauthMetadata.issuer"),
+    "oauthMetadata.issuer"
+  );
+}
