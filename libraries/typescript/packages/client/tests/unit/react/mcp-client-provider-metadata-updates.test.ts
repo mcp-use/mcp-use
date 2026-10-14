@@ -12,7 +12,12 @@ const disconnectSpies: Array<ReturnType<typeof vi.fn>> = [];
 const clearStorageSpies: Array<ReturnType<typeof vi.fn>> = [];
 const authenticateSpies: Array<ReturnType<typeof vi.fn>> = [];
 let latestClient: ReturnType<typeof useMcpClient> | null = null;
-let mockState: "discovering" | "pending_auth" | "ready" | "failed" = "ready";
+let mockState:
+  | "discovering"
+  | "pending_auth"
+  | "authenticating"
+  | "ready"
+  | "failed" = "ready";
 let mockProtocolEra: "legacy" | "modern" = "legacy";
 let mockInstructions = "legacy instructions";
 let mockAuthorization: { mode: "mixed"; authenticated: boolean } | undefined;
@@ -122,64 +127,6 @@ describe("McpClientProvider metadata-only updates", () => {
     mockAuthorization = undefined;
     mockSkills = [];
     vi.restoreAllMocks();
-  });
-
-  it("atomically tears down, clears credentials, remounts, and authenticates", async () => {
-    let renderer: ReturnType<typeof create>;
-    await act(async () => {
-      renderer = create(
-        React.createElement(
-          McpClientProvider,
-          null,
-          React.createElement(TestHarness)
-        )
-      );
-    });
-    await flushUpdates();
-
-    const firstDisconnect = disconnectSpies[0];
-    const firstClearStorage = clearStorageSpies[0];
-    const order: string[] = [];
-    firstDisconnect.mockImplementation(async () => {
-      order.push("disconnect:start");
-      await Promise.resolve();
-      order.push("disconnect:end");
-    });
-    firstClearStorage.mockImplementation(() => {
-      order.push("clearStorage");
-    });
-
-    mockState = "discovering";
-    let reauthentication: Promise<void> | undefined;
-    await act(async () => {
-      reauthentication = latestClient!.reauthenticateServer("sandbox");
-      await Promise.resolve();
-    });
-    await flushUpdates();
-    expect(authenticateSpies[1]).not.toHaveBeenCalled();
-
-    mockState = "pending_auth";
-    await act(async () => {
-      renderer!.update(
-        React.createElement(
-          McpClientProvider,
-          null,
-          React.createElement(TestHarness)
-        )
-      );
-    });
-    await act(async () => {
-      await reauthentication;
-    });
-
-    expect(order).toEqual([
-      "disconnect:start",
-      "disconnect:end",
-      "clearStorage",
-    ]);
-    expect(mountCount).toBe(2);
-    expect(authenticateSpies[0]).not.toHaveBeenCalled();
-    expect(authenticateSpies[1]).toHaveBeenCalledTimes(1);
   });
 
   it("updates configured server metadata without reconnecting", async () => {
@@ -469,5 +416,182 @@ describe("McpClientProvider metadata-only updates", () => {
 
     const lastClearStorage = clearStorageSpies[clearStorageSpies.length - 1];
     expect(lastClearStorage).toHaveBeenCalledTimes(1);
+  });
+
+  describe("reauthenticateServer", () => {
+    const renderers: Array<ReturnType<typeof create>> = [];
+
+    afterEach(async () => {
+      await act(async () => {
+        for (const renderer of renderers.splice(0)) renderer.unmount();
+      });
+    });
+
+    async function renderProvider() {
+      const tree = () =>
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        );
+      let renderer!: ReturnType<typeof create>;
+      await act(async () => {
+        renderer = create(tree());
+      });
+      renderers.push(renderer);
+      await flushUpdates();
+
+      return {
+        rerender: () =>
+          act(async () => {
+            renderer.update(tree());
+          }),
+      };
+    }
+
+    async function reauthenticate() {
+      await act(async () => {
+        await latestClient!.reauthenticateServer("sandbox");
+      });
+    }
+
+    it("tears down, clears credentials, remounts, and authenticates once", async () => {
+      const { rerender } = await renderProvider();
+
+      const order: string[] = [];
+      disconnectSpies[0].mockImplementation(async () => {
+        order.push("disconnect:start");
+        await Promise.resolve();
+        order.push("disconnect:end");
+      });
+      clearStorageSpies[0].mockImplementation(() => {
+        order.push("clearStorage");
+      });
+
+      mockState = "discovering";
+      await reauthenticate();
+      expect(mountCount).toBe(2);
+      expect(authenticateSpies[1]).not.toHaveBeenCalled();
+
+      mockState = "pending_auth";
+      await rerender();
+      await rerender();
+
+      expect(order).toEqual([
+        "disconnect:start",
+        "disconnect:end",
+        "clearStorage",
+      ]);
+      expect(authenticateSpies[0]).not.toHaveBeenCalled();
+      expect(authenticateSpies[1]).toHaveBeenCalledTimes(1);
+    });
+
+    it("authenticates an anonymously ready mixed-auth replacement", async () => {
+      const { rerender } = await renderProvider();
+
+      mockState = "discovering";
+      await reauthenticate();
+
+      mockState = "ready";
+      mockAuthorization = { mode: "mixed", authenticated: false };
+      await rerender();
+
+      expect(authenticateSpies[1]).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(["ready", "failed", "authenticating"] as const)(
+      "drops the request when the replacement settles in %s",
+      async (settledState) => {
+        const { rerender } = await renderProvider();
+
+        mockState = "discovering";
+        await reauthenticate();
+        mockState = settledState;
+        await rerender();
+
+        // A later reconnect that needs authorization must not start an
+        // unrequested popup or redirect.
+        mockState = "pending_auth";
+        await act(async () => {
+          await latestClient!.getServer("sandbox")!.reconnect();
+        });
+        await rerender();
+
+        expect(mountCount).toBe(3);
+        for (const authenticate of authenticateSpies) {
+          expect(authenticate).not.toHaveBeenCalled();
+        }
+      }
+    );
+
+    it("shares one preparation between concurrent calls", async () => {
+      await renderProvider();
+
+      let first!: Promise<void>;
+      let second!: Promise<void>;
+      await act(async () => {
+        first = latestClient!.reauthenticateServer("sandbox");
+        second = latestClient!.reauthenticateServer("sandbox");
+        await Promise.all([first, second]);
+      });
+
+      expect(second).toBe(first);
+      expect(disconnectSpies[0]).toHaveBeenCalledTimes(1);
+      expect(clearStorageSpies[0]).toHaveBeenCalledTimes(1);
+      expect(mountCount).toBe(2);
+    });
+
+    it("does not clear credentials or remount after removal during teardown", async () => {
+      await renderProvider();
+
+      let releaseDisconnect!: () => void;
+      const disconnectGate = new Promise<void>((resolve) => {
+        releaseDisconnect = resolve;
+      });
+      disconnectSpies[0].mockImplementation(() => disconnectGate);
+
+      let reauthentication!: Promise<void>;
+      let removal!: Promise<void>;
+      await act(async () => {
+        reauthentication = latestClient!.reauthenticateServer("sandbox");
+        removal = latestClient!.removeServer("sandbox");
+      });
+      await act(async () => {
+        releaseDisconnect();
+        await expect(reauthentication).rejects.toThrow(
+          'MCP server "sandbox" was removed during reauthentication'
+        );
+        await removal;
+      });
+
+      expect(clearStorageSpies[0]).not.toHaveBeenCalled();
+      expect(latestClient!.servers).toHaveLength(0);
+      expect(mountCount).toBe(1);
+    });
+
+    it("remounts without clearing credentials when teardown fails", async () => {
+      await renderProvider();
+      disconnectSpies[0].mockRejectedValue(new Error("teardown failed"));
+
+      mockState = "pending_auth";
+      await act(async () => {
+        await expect(
+          latestClient!.reauthenticateServer("sandbox")
+        ).rejects.toThrow("teardown failed");
+      });
+
+      expect(mountCount).toBe(2);
+      expect(clearStorageSpies[0]).not.toHaveBeenCalled();
+      expect(authenticateSpies[1]).not.toHaveBeenCalled();
+    });
+
+    it("rejects unknown servers", async () => {
+      await renderProvider();
+
+      await expect(
+        latestClient!.reauthenticateServer("missing")
+      ).rejects.toThrow('Cannot reauthenticate unknown MCP server "missing"');
+      expect(disconnectSpies[0]).not.toHaveBeenCalled();
+    });
   });
 });

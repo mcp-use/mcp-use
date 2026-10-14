@@ -63,6 +63,7 @@ Must run inside `McpClientProvider`.
 | `addServer(id, config)` | fn | Add server (ignores duplicate ids) |
 | `removeServer(id, opts?)` | fn | Remove; `clearCredentials` clears OAuth |
 | `updateServer(id, partial)` | fn | Update and reconnect |
+| `reauthenticateServer(id)` | fn | Clear OAuth credentials, reconnect, and start a fresh sign-in |
 | `updateServerMetadata(id, { displayName })` | fn | Update label only |
 | `getServer(id)` | fn | Lookup by id |
 | `storageLoaded` | `boolean` | Storage hydration complete |
