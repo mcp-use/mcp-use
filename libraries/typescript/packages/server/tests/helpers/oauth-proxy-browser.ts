@@ -1,8 +1,7 @@
 /**
  * A fetch-based browser and MCP client for `oauthProxy` tests: registers a
  * client, opens the consent page, posts the decision, exchanges the code,
- * and calls tools with the access token. Used by the Firebase stub test and
- * the Firebase Auth emulator test.
+ * and calls tools with the access token. Used by the Firebase stub test.
  */
 import { expect } from "vitest";
 

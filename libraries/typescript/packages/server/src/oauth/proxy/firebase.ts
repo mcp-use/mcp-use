@@ -2,14 +2,13 @@ import {
   createLocalJWKSet,
   errors,
   jwtVerify,
-  UnsecuredJWT,
   type JSONWebKeySet,
   type JWTPayload,
   type JWTVerifyOptions,
 } from "jose";
 
 import { isBuilding } from "../../build-phase.js";
-import { isLocalhost, isRecord } from "../guards.js";
+import { isRecord } from "../guards.js";
 import { escapeHtml } from "./consent.js";
 import {
   printable,
@@ -101,23 +100,6 @@ export interface FirebaseUpstreamOptions {
    * in. When unset, users of any tenant are refused.
    */
   tenantId?: string;
-  /**
-   * Firebase Auth emulator, for local development and tests. The emulator
-   * issues ID tokens that are not signed, and the proxy accepts them, so
-   * anyone who can reach the MCP server can sign in as any user. `oauthProxy`
-   * therefore refuses to run unless the resource URL is on localhost and,
-   * under `server.listen()`, the server binds `127.0.0.1`, `localhost`, or
-   * `::1`. When a framework or `mcp-use dev` serves `server.fetch`, the
-   * server cannot see the bind address: serve it on a loopback address
-   * only, with no tunnel. It is never read from `FIREBASE_AUTH_EMULATOR_HOST`.
-   */
-  emulator?: {
-    /**
-     * URL of the emulator on a loopback address, for example
-     * `http://127.0.0.1:9099`.
-     */
-    url: string;
-  };
 }
 
 /**
@@ -224,10 +206,6 @@ export function firebase(options: FirebaseUpstreamOptions): InPageUpstream {
   ) {
     throw new TypeError("firebase tenantId must be a non-empty string");
   }
-  const emulator =
-    options.emulator === undefined
-      ? undefined
-      : emulatorOrigin(options.emulator);
 
   const settings: VerifySettings = {
     projectId: options.projectId,
@@ -235,7 +213,6 @@ export function firebase(options: FirebaseUpstreamOptions): InPageUpstream {
     maxAuthAge,
     requireVerifiedEmail: options.requireVerifiedEmail === true,
     tenantId: options.tenantId,
-    emulator: emulator !== undefined,
   };
   const keys = signingKeys();
   const pageConfig = {
@@ -246,29 +223,19 @@ export function firebase(options: FirebaseUpstreamOptions): InPageUpstream {
     },
     providers,
     ...(options.tenantId !== undefined && { tenantId: options.tenantId }),
-    ...(emulator !== undefined && { emulator }),
   };
-  const refreshBase =
-    emulator === undefined
-      ? "https://securetoken.googleapis.com"
-      : `${emulator}/securetoken.googleapis.com`;
 
   return {
     kind: "in-page",
     id: "firebase",
     name: "Firebase",
-    ...(emulator !== undefined && { emulator: true }),
     csp: {
       script: ["https://www.gstatic.com", "https://apis.google.com"],
       connect: [
         "https://identitytoolkit.googleapis.com",
         "https://securetoken.googleapis.com",
-        ...(emulator === undefined ? [] : [emulator]),
       ],
-      frame: [
-        `https://${options.authDomain}`,
-        ...(emulator === undefined ? [] : [emulator]),
-      ],
+      frame: [`https://${options.authDomain}`],
     },
     script: (nonce) =>
       `<script type="module" nonce="${escapeHtml(nonce)}">${pageScript(
@@ -276,37 +243,8 @@ export function firebase(options: FirebaseUpstreamOptions): InPageUpstream {
       )}</script>`,
     verify: (proof, { fetch }) => verifyProof(proof, settings, keys, fetch),
     refresh: (tokens, { fetch }) =>
-      refreshIdToken(tokens, refreshBase, options.apiKey, fetch),
+      refreshIdToken(tokens, options.apiKey, fetch),
   };
-}
-
-/** Validates the emulator URL and returns its origin. */
-function emulatorOrigin(emulator: { url: string }): string {
-  let url: URL;
-  try {
-    url = new URL(String(emulator?.url));
-  } catch {
-    throw new TypeError(
-      "firebase emulator.url must be an absolute URL such as http://127.0.0.1:9099"
-    );
-  }
-  if (
-    (url.protocol !== "http:" && url.protocol !== "https:") ||
-    url.username !== "" ||
-    url.password !== "" ||
-    url.pathname !== "/" ||
-    url.search !== "" ||
-    url.hash !== ""
-  ) {
-    throw new TypeError(
-      "firebase emulator.url must be an origin such as http://127.0.0.1:9099"
-    );
-  }
-  // The emulator signs nothing: it must be this machine's.
-  if (!isLocalhost(url)) {
-    throw new TypeError("firebase emulator must run on a loopback address");
-  }
-  return url.origin;
 }
 
 interface VerifySettings {
@@ -315,7 +253,6 @@ interface VerifySettings {
   maxAuthAge: number;
   requireVerifiedEmail: boolean;
   tenantId: string | undefined;
-  emulator: boolean;
 }
 
 /** A refused sign-in. Its reason goes to the log and to the client. */
@@ -368,14 +305,10 @@ async function verifyProof(
   };
   let payload: JWTPayload;
   try {
-    // Emulator tokens are not signed (`alg: none`), and only emulator mode
-    // accepts them.
-    payload = settings.emulator
-      ? UnsecuredJWT.decode(idToken, claims).payload
-      : await keys.verify(idToken, fetchImpl, {
-          ...claims,
-          algorithms: ["RS256"],
-        });
+    payload = await keys.verify(idToken, fetchImpl, {
+      ...claims,
+      algorithms: ["RS256"],
+    });
   } catch (error) {
     if (error instanceof UpstreamError) throw error;
     throw refuse(joseReason(error));
@@ -556,7 +489,6 @@ async function fetchKeys(
 /** Exchanges the refresh token for a new ID token (Token Service API). */
 async function refreshIdToken(
   tokens: UpstreamTokenSet,
-  base: string,
   apiKey: string,
   fetchImpl: typeof globalThis.fetch
 ): Promise<UpstreamTokenSet> {
@@ -567,7 +499,7 @@ async function refreshIdToken(
   let response: Response;
   try {
     response = await fetchImpl(
-      `${base}/v1/token?key=${encodeURIComponent(apiKey)}`,
+      `https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(apiKey)}`,
       {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -641,7 +573,7 @@ function pageScript(config: string): string {
   return `
 import { initializeApp } from "${SDK_URL}/firebase-app.js";
 import {
-  browserPopupRedirectResolver, connectAuthEmulator, FacebookAuthProvider,
+  browserPopupRedirectResolver, FacebookAuthProvider,
   getRedirectResult, GithubAuthProvider, GoogleAuthProvider, initializeAuth,
   inMemoryPersistence, OAuthProvider, SAMLAuthProvider, signInWithPopup,
   TwitterAuthProvider,
@@ -653,7 +585,6 @@ const auth = initializeAuth(initializeApp(config.app, "mcp-use-oauth-proxy"), {
   persistence: inMemoryPersistence,
   popupRedirectResolver: browserPopupRedirectResolver,
 });
-if (config.emulator) connectAuthEmulator(auth, config.emulator, { disableWarnings: true });
 if (config.tenantId) auth.tenantId = config.tenantId;
 // Load the sign-in helpers now. Loaded on the click, they can open the
 // window too late, and the browser blocks it.

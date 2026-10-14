@@ -153,12 +153,6 @@ export interface InPageUpstream {
     frame?: readonly string[];
   };
   /**
-   * Whether the upstream accepts proofs from a local emulator that are not
-   * signed. `oauthProxy` then refuses to run unless the MCP server is on
-   * localhost.
-   */
-  emulator?: boolean;
-  /**
    * Checks the proof that the page posted.
    *
    * Throw to refuse the sign-in. The error message goes to the server log,
@@ -352,9 +346,6 @@ export function assertInPageUpstream(value: InPageUpstream): void {
   }
   if (value.refresh !== undefined && typeof value.refresh !== "function") {
     throw new TypeError("oauthProxy upstream.refresh must be a function");
-  }
-  if (value.emulator !== undefined && typeof value.emulator !== "boolean") {
-    throw new TypeError("oauthProxy upstream.emulator must be a boolean");
   }
   if (value.csp !== undefined) {
     if (value.csp === null || typeof value.csp !== "object") {

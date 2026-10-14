@@ -135,7 +135,6 @@
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "npm run typecheck && vitest run",
-    "test:firebase-emulator": "npx -y firebase-tools@15.33.0 emulators:exec --only auth --project demo-mcp-use \"vitest run oauth-proxy-firebase-emulator\"",
     "typecheck": "tsc -p tsconfig.test.json",
     "doctor": "npx react-doctor@latest"
   },

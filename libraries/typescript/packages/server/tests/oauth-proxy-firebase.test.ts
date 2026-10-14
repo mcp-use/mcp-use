@@ -3,9 +3,7 @@
  * endpoints: RS256 keys made here, the JWK set and the Token Service API
  * served through the proxy's `fetch` option. A fetch-based browser posts
  * the consent form with the proof that the page script would post after
- * the sign-in popup. The Firebase Auth emulator test covers the real token
- * shapes; this file covers what the emulator cannot show, such as refused
- * claims and revoked refresh tokens.
+ * the sign-in popup.
  */
 import {
   exportJWK,
@@ -25,7 +23,6 @@ import {
   upstreamToken,
   type FirebaseUpstreamOptions,
   type OAuthProxyOptions,
-  type OAuthProxyStorage,
   type UpstreamUser,
 } from "../src/oauth/index.js";
 import {
@@ -158,30 +155,6 @@ const { register, openConsent, allow, exchange, signIn, callTool } = oauthFlow({
   resource: RESOURCE,
   redirectUri: CLIENT_REDIRECT,
 });
-
-/** A Map-backed store, for mounts outside localhost. */
-function mapStorage(): OAuthProxyStorage {
-  const values = new Map<string, string>();
-  return {
-    get: async (key) => values.get(key),
-    set: async (key, value) => {
-      values.set(key, value);
-    },
-    delete: async (key) => {
-      values.delete(key);
-    },
-    take: async (key) => {
-      const value = values.get(key);
-      values.delete(key);
-      return value;
-    },
-    add: async (key, value) => {
-      if (values.has(key)) return false;
-      values.set(key, value);
-      return true;
-    },
-  };
-}
 
 function firebaseOptions(
   overrides: Partial<FirebaseUpstreamOptions> = {}
@@ -339,7 +312,7 @@ describe("firebase() verify", () => {
     ).rejects.toThrow("belongs to another tenant");
   });
 
-  it("refuses an alg none token when emulator mode is off", async () => {
+  it("refuses an alg none token", async () => {
     const unsigned = new UnsecuredJWT(claims()).encode();
     await expect(verify(proof(unsigned))).rejects.toThrow(
       "Firebase ID token refused"
@@ -407,7 +380,6 @@ describe("oauthProxy with firebase()", () => {
     expect(page.html.indexOf("<script")).toBeLessThan(
       page.html.indexOf("</body>")
     );
-    expect(page.html).not.toContain(`"emulator":`);
 
     const token = await idToken();
     const location = await allow(browser, page, proof(token));
@@ -699,108 +671,9 @@ describe("firebase() refresh", () => {
   });
 });
 
-// ─── Emulator mode and options ───────────────────────────────────────────
+// ─── Options ─────────────────────────────────────────────────────────────
 
-describe("firebase() emulator mode and options", () => {
-  const EMULATOR = "http://127.0.0.1:9099";
-
-  it("throws for emulator mode with a public resource", async () => {
-    const server = new MCPServer({
-      name: "notes",
-      version: "1.0.0",
-      logging: { enabled: false },
-      oauth: oauthProxy({
-        resource: "https://api.example.com/mcp",
-        upstream: firebase(firebaseOptions({ emulator: { url: EMULATOR } })),
-        secret: SECRET,
-        storage: mapStorage(),
-      }),
-    });
-    await expect(
-      server.fetch(new Request("https://api.example.com/mcp/oauth/authorize"))
-    ).rejects.toThrow("emulator mode is allowed only on localhost");
-  });
-
-  it("throws for emulator mode when listen() binds beyond loopback", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    // A localhost resource does not stop peers reaching a wildcard bind. A
-    // shared store gets past the memoryStorage() check to the emulator one.
-    const server = firebaseServer(
-      new FirebaseStub(),
-      { emulator: { url: EMULATOR } },
-      { storage: mapStorage() }
-    );
-    try {
-      await expect(server.listen(0, { host: "0.0.0.0" })).rejects.toThrow(
-        "emulator mode is allowed only on localhost: listen() on 127.0.0.1, localhost, or ::1, not 0.0.0.0"
-      );
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("runs emulator mode when listen() binds loopback", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const server = firebaseServer(new FirebaseStub(), {
-      emulator: { url: EMULATOR },
-    });
-    try {
-      await server.listen(0, { host: "127.0.0.1" });
-      expect(warn.mock.calls.flat().join(" ")).toContain("emulator mode is on");
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("accepts only a loopback emulator, given as an origin", () => {
-    for (const url of ["http://10.0.0.5:9099", "https://emulator.example"]) {
-      expect(() => firebase(firebaseOptions({ emulator: { url } }))).toThrow(
-        "loopback"
-      );
-    }
-    expect(() =>
-      firebase(firebaseOptions({ emulator: { url: `${EMULATOR}/auth` } }))
-    ).toThrow("must be an origin");
-  });
-
-  it("accepts unsigned emulator tokens on localhost and warns", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const stub = new FirebaseStub();
-    stub.answer = async () =>
-      Response.json({
-        id_token: new UnsecuredJWT(claims()).encode(),
-        refresh_token: "emulator-rt-2",
-        expires_in: "3600",
-      });
-    const server = firebaseServer(stub, { emulator: { url: EMULATOR } });
-    const browser = new Browser(server);
-    const client = await register(browser);
-    const page = await openConsent(browser, client);
-    expect(String(warn.mock.calls[0]?.join(" "))).toContain(
-      "emulator mode is on"
-    );
-    const csp = page.response.headers.get("content-security-policy")!;
-    expect(csp).toContain(
-      `connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com ${EMULATOR};`
-    );
-    expect(csp).toContain(`frame-src https://${AUTH_DOMAIN} ${EMULATOR};`);
-    expect(page.html).toContain(`"emulator":"${EMULATOR}"`);
-
-    // A signed token is not an emulator token.
-    const refused = await allow(browser, page, proof(await idToken()));
-    expect(refused.searchParams.get("error")).toBe("access_denied");
-
-    const unsigned = new UnsecuredJWT(claims({ exp: now() + 30 })).encode();
-    const tokens = await signIn(browser, client, proof(unsigned));
-    expect(stub.refreshes[0]!.url).toBe(
-      `${EMULATOR}/securetoken.googleapis.com/v1/token?key=${API_KEY}`
-    );
-    expect(
-      await toolText(await callTool(browser, "whoami", tokens.access_token!))
-    ).toMatch(new RegExp(`^${UID} `));
-    expect(stub.jwksRequests).toBe(0);
-  });
-
+describe("firebase() options", () => {
   it("validates its options", () => {
     expect(() =>
       firebase(firebaseOptions({ authDomain: `https://${AUTH_DOMAIN}` }))

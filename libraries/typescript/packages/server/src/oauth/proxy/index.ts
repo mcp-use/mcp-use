@@ -362,33 +362,6 @@ export function oauthProxy<TUser = UpstreamUser>(
         "oauthProxy consent: false is allowed only on localhost, with listen() on 127.0.0.1, localhost, or ::1"
       );
     }
-    // An emulator upstream accepts proofs that nobody signed, so anyone who
-    // reaches the server can sign in as anyone.
-    if (upstream.kind === "in-page" && upstream.emulator === true) {
-      if (!isLocalhost(host.resourceUrl)) {
-        throw new Error(
-          `oauthProxy: ${upstream.name} emulator mode is allowed only on localhost`
-        );
-      }
-      if (
-        host.mode === "listen" &&
-        !LOOPBACK_BINDS.has(host.listenHost ?? "")
-      ) {
-        throw new Error(
-          `oauthProxy: ${upstream.name} emulator mode is allowed only on localhost: ` +
-            `listen() on 127.0.0.1, localhost, or ::1, not ${host.listenHost ?? "an unknown host"}`
-        );
-      }
-      if (!building) {
-        console.warn(
-          `[mcp-use] oauthProxy: ${upstream.name} emulator mode is on. Unsigned sign-in proofs are accepted, ` +
-            "so anyone who can reach this server can sign in as any user. " +
-            (host.mode === "handler"
-              ? "Serve it on a loopback address only; never use it in production."
-              : "Never use it in production.")
-        );
-      }
-    }
     if (secrets === undefined && !building) {
       console.warn(
         "[mcp-use] oauthProxy: no secret set; using a random key for this process. " +
