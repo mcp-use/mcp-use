@@ -32,7 +32,7 @@ type OAuthAuth<TUser> = {
 - `clientId` is present when the token has a client identifier.
 - `expiresAt` is a Unix timestamp in seconds.
 - `resource` is the protected resource validated by the verifier.
-- `upstream` is set only on an OAuth Proxy server. It holds the upstream provider's token for the user; read it with `upstreamToken(ctx)` from `mcp-use/oauth`.
+- `upstream` is set only on an OAuth Proxy server. It holds the upstream provider's token for the user; read it with `upstreamToken(ctx.auth)` from `mcp-use/oauth`.
 
 ## Use provider-specific fields
 

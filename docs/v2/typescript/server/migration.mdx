@@ -725,7 +725,7 @@ GitHub and Google, with a new API and a new token model:
 - Import it from `mcp-use/oauth`. Configure the provider with `github()`,
   `google()`, or `upstream()` instead of `authEndpoint` and `tokenEndpoint`.
 - The proxy issues its own tokens. Tools read the upstream token with
-  `upstreamToken(ctx)`; `verifyToken` and `jwksVerifier` are removed.
+  `upstreamToken(ctx.auth)`; `verifyToken` and `jwksVerifier` are removed.
 - Outside localhost, the proxy requires a `secret` (or `MCP_USE_OAUTH_SECRET`)
   and a shared `storage`.
 - The upstream callback URL moves from `/oauth/callback` to
