@@ -12,6 +12,8 @@ import { createInterface } from "node:readline/promises";
 import { parseArgs, promisify } from "node:util";
 import { createGzip } from "node:zlib";
 
+import ignore, { type Ignore } from "ignore";
+
 import {
   cloudApiForOrganization,
   cloudWebUrl,
@@ -103,7 +105,8 @@ Incompatible combinations:
 Managed archive:
   Uploads the selected project without .git, dependencies, build output,
   .mcp-use, .env*, caches, coverage, OS metadata, or symbolic links.
-  The compressed archive limit is 80 MB.
+  Paths matched by the project root's .gitignore are also excluded; nested
+  .gitignore files are not read. The compressed archive limit is 80 MB.
 
 Examples:
   mcp-use deploy
@@ -1415,6 +1418,7 @@ async function installationFor(
 }
 
 async function packProject(projectRoot: string): Promise<Buffer> {
+  const ig = await loadGitIgnore(projectRoot);
   const gzip = createGzip();
   const chunks: Buffer[] = [];
   const collecting = (async () => {
@@ -1423,21 +1427,34 @@ async function packProject(projectRoot: string): Promise<Buffer> {
     }
   })();
   try {
-    await addDirectoryToArchive(gzip, projectRoot, "");
+    await addDirectoryToArchive(gzip, projectRoot, "", ig);
     await writeArchiveChunk(gzip, Buffer.alloc(1024));
     gzip.end();
   } catch (error) {
     gzip.destroy(error instanceof Error ? error : new Error(String(error)));
+    await collecting.catch(() => {});
     throw error;
   }
   await collecting;
   return Buffer.concat(chunks);
 }
 
+async function loadGitIgnore(projectRoot: string): Promise<Ignore | undefined> {
+  try {
+    const gitignorePath = join(projectRoot, ".gitignore");
+    const content = await readFile(gitignorePath, "utf8");
+    return ignore({ ignorecase: false }).add(content);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return undefined;
+  }
+}
+
 async function addDirectoryToArchive(
   gzip: ReturnType<typeof createGzip>,
   projectRoot: string,
-  relativeDirectory: string
+  relativeDirectory: string,
+  ig?: Ignore
 ): Promise<void> {
   const directory = await opendir(
     relativeDirectory === ""
@@ -1454,9 +1471,18 @@ async function addDirectoryToArchive(
         ? entry.name
         : join(relativeDirectory, entry.name);
     if (!shouldArchive(relativePath)) continue;
+    const posixPath = relativePath.replaceAll("\\", "/");
+    if (ig !== undefined) {
+      if (entry.isDirectory() && ig.ignores(`${posixPath}/`)) {
+        continue;
+      }
+      if (entry.isFile() && ig.ignores(posixPath)) {
+        continue;
+      }
+    }
     const absolutePath = join(projectRoot, relativePath);
     const stats = await lstat(absolutePath);
-    const archivePath = `app/${relativePath.replaceAll("\\", "/")}`;
+    const archivePath = `app/${posixPath}`;
     const common = {
       path: archivePath,
       mode: stats.mode & 0o777,
@@ -1465,7 +1491,7 @@ async function addDirectoryToArchive(
 
     if (stats.isDirectory()) {
       await writeTarHeader(gzip, { ...common, type: "directory", size: 0 });
-      await addDirectoryToArchive(gzip, projectRoot, relativePath);
+      await addDirectoryToArchive(gzip, projectRoot, relativePath, ig);
     } else if (stats.isFile()) {
       await writeTarHeader(gzip, {
         ...common,

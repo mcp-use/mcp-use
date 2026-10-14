@@ -1,5 +1,56 @@
 # mcp-use
 
+## 2.10.0-canary.4
+
+### Patch Changes
+
+- c64b4d4: Correct API reference comments. In `@mcp-use/client`, stdio `env` does not inherit the parent process environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, and several examples referenced fields and connectors that do not exist. In `mcp-use`, legacy stateless GET, DELETE, and HEAD requests are documented as returning `204`, the `withMcpUse` defaults match the build, and the `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` entry points now appear in the generated API reference.
+- Updated dependencies
+  - @mcp-use/cli@4.4.0-canary.2
+  - @mcp-use/inspector@20.3.20-canary.3
+
+## 2.10.0-canary.3
+
+### Minor Changes
+
+- 3e9bc30: `mcp-use build` no longer needs the server's runtime secrets. The build evaluates the entry with `MCP_USE_PHASE=build`, and the new `isBuilding()` export of `mcp-use` lets module-scope code skip reading secrets or connecting to a database while building.
+
+  `mcp-use build` also exits when the build finishes. Before, an entry that opened a connection at module scope, such as a Redis client, kept the build process running after it had printed its result. A failed build or dev start also prints the cause of a refused connection, which it used to print as an empty line.
+
+- d6ad3db: Add `oauthProxy()` to `mcp-use/oauth`: the MCP server becomes its own OAuth authorization server in front of an identity provider without dynamic client registration, such as GitHub (`github()`) or Google (`google()`), or any OAuth 2.0 provider (`upstream()`). Clients present a client ID metadata document or register (DCR), approve a consent page the server owns (it names the server by the host of its URL, for example `mcp.acme.com`), and receive the proxy's own opaque tokens. The `clients` option limits which clients may connect, by metadata document URL or origin, or by a client defined on the server. The upstream client secret and the user's upstream tokens stay on the server, and the tokens and other proxy records are stored encrypted in a shared store (`mcp-use/oauth/storage`: Upstash, Redis, Postgres, Firestore, Cloudflare D1 or Durable Object, and an in-memory store for local development). `redisStorage` takes a connected client or a function that connects one on first use. Tools read the upstream token with `upstreamToken(ctx.auth)` or `ctx.auth.upstream`. When a sign-in or refresh fails, the server log names the cause without token or code values: the provider's own error code and description, the HTTP status and content type, an `iss` that names another issuer, or the network error. When a sign-in fails, the client's `error_description` names the provider's error code. The log also reports refused client metadata documents and stored records encrypted with a secret the server no longer has. Clients that signed in through the 1.x `oauthProxy` still send the provider's client ID and the bare server origin as the resource; while registration is on, the proxy accepts both, so those users approve the consent page once and sign in again without removing the server. Inside `mcp-use build`, where `isBuilding()` is true, `oauthProxy` requires no secret, store, or upstream client credentials, and `upstashStorage` requires no URL or token.
+
+  OAuth providers can now register public HTTP routes from `setup()` with `host.route()`, read the mount mode as `host.mode` and the `listen()` bind address as `host.listenHost`, and compute `oauthMetadata` from the resolved resource URL. OAuth endpoints under the MCP path are never written to trace logs, and `oauthEnvironmentValue` no longer throws on runtimes without `process`.
+
+### Patch Changes
+
+- Updated dependencies [3e9bc30]
+- Updated dependencies [3e9bc30]
+- Updated dependencies
+  - @mcp-use/cli@4.4.0-canary.1
+  - @mcp-use/inspector@20.3.20-canary.2
+
+## 2.9.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.20-canary.1
+
+## 2.9.1-canary.1
+
+### Patch Changes
+
+- 3591976: Convert OpenAPI 3.0 boolean `exclusiveMinimum` and `exclusiveMaximum` into JSON Schema numeric bounds so `MCPServer.fromOpenAPI` accepts specs that use them instead of throwing while registering tools.
+
+## 2.9.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [884521e]
+  - @mcp-use/inspector@20.3.20-canary.0
+  - @mcp-use/cli@4.4.0-canary.0
+
 ## 2.9.0
 
 ### Minor Changes

@@ -85,6 +85,8 @@ export const examples = [
   external("auth/clerk"),
   external("auth/convex"),
   external("auth/keycloak"),
+  external("auth/oauth-proxy-firebase"),
+  external("auth/oauth-proxy-github"),
   external("auth/supabase"),
   external("auth/workos"),
   external("daytona"),

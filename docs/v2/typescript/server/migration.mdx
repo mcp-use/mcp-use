@@ -241,16 +241,16 @@ v2 request context exists only for the current request. Remove session
 assumptions from client metadata, logging, progress, notifications, and
 elicitation.
 
-| v1                          | v2                                      |
-| --------------------------- | --------------------------------------- |
-| `ctx.req`                   | `ctx.request`                           |
-| Node/Web request access     | `ctx.request.raw` for the Web `Request` |
-| `ctx.log(...)`              | `ctx.sendLog(...)`                      |
-| `ctx.client.supportsApps()` | `ctx.client.supportsViews()`            |
-| `ctx.user`                  | provider-specific `ctx.auth.user`       |
-| session metadata            | current request's `ctx.client` snapshot |
-| blocking `ctx.elicit(...)`  | keyed input-required round trip         |
-| `ctx.sample(...)`           | no server-side equivalent               |
+| v1                          | v2                                               |
+| --------------------------- | ------------------------------------------------ |
+| `ctx.req`                   | `ctx.request`                                    |
+| Node/Web request access     | `ctx.request.raw` for the Web `Request`          |
+| `ctx.log(...)`              | `ctx.sendLog(...)`                               |
+| `ctx.client.supportsApps()` | `ctx.client.supportsViews()`                     |
+| `ctx.user`                  | provider-specific `ctx.auth.user`                |
+| session metadata            | current request's `ctx.client` snapshot          |
+| blocking `ctx.elicit(...)`  | keyed input-required round trip                  |
+| blocking `ctx.sample(...)`  | keyed `inputRequired.createMessage()` round trip |
 
 `ctx.client.info()`, `capabilities()`, `can()`, `extension()`, and `user()`
 return client-declared request hints. Never use them for authorization. Use
@@ -455,8 +455,9 @@ Use the focused v2 surface:
 | widget display mode fields         | `useDisplayMode()`                                            |
 | `<McpUseProvider autoSize>`        | remove the provider; automatic resizing is enabled by default |
 
-`viewConfig` supports `autoResize` and `displayModes`. Both values below are
-the defaults, so omit the export when they are correct for the View:
+`viewConfig` supports `autoResize`, `displayModes`, and
+`preferredDisplayMode`. The values below are the defaults for `autoResize` and
+`displayModes`, so omit the export when they are correct for the View:
 
 ```tsx
 import type { ViewConfig } from "mcp-use/react";
@@ -467,8 +468,12 @@ export const viewConfig = {
 } satisfies ViewConfig;
 ```
 
-`displayModes` must include `"inline"`. Use `useSendSizeChanged()` only when
-`autoResize` is `false` and the View reports its size manually.
+`displayModes` must include `"inline"`. `preferredDisplayMode` accepts
+`"inline"` or `"fullscreen"`, has no default, and must appear in
+`displayModes`; ChatGPT may ignore it. See
+[resource display modes](/v2/typescript/mcp-apps/chatgpt-extensions#set-resource-display-modes).
+Use `useSendSizeChanged()` only when `autoResize` is `false` and the View
+reports its size manually.
 
 Compose optional presentation components such as `ThemeProvider`,
 `ViewControls`, and your own error boundary. The framework owns the connection,
@@ -540,7 +545,8 @@ function rewriteLegacyViewUri(legacyUri: string): string | undefined {
   return `${CURRENT_VIEW_PREFIX}${name}.html`;
 }
 
-server.use(server.basePath, async (c, next) => {
+// server.basePath is a plain string, so register on the Hono app directly.
+server.app.use(server.basePath, async (c, next) => {
   if (c.req.method !== 'POST') return next();
 
   const body = await c.req.raw.clone().json().catch(() => undefined);
@@ -576,7 +582,10 @@ directly. Once the new submission is approved and live, remove the middleware.
 
 Native v2 acts as an OAuth resource server backed by an external authorization
 server. Import provider adapters from `mcp-use/oauth/*`, supply their required
-locator options, and use the provider-specific `ctx.auth.user` type.
+locator options, and use the provider-specific `ctx.auth.user` type. For a
+provider without Dynamic Client Registration, such as GitHub or Google,
+`oauthProxy` makes the server its own authorization server. See
+[Migrate `oauthProxy`](#migrate-oauthproxy).
 
 Replace generic `userId` assumptions with the provider's mapped field, commonly
 `id`. Replace `getAuth`, `hasScope`, and `requireScope` with verified
@@ -589,9 +598,7 @@ v1 tool sets `_meta.securitySchemes` by hand, v2 passes it through unchanged but
 does not enforce it; declare `securitySchemes` on the tool instead. See
 [Mixed authentication](/v2/typescript/server/authentication/mixed-auth).
 
-OAuth proxy or authorization-server mode has no native v2 migration. Do not
-translate `oauthProxy`, `jwksVerifier`, or `mountOAuthProxy` as resource-server
-configuration.
+`jwksVerifier` and `mountOAuthProxy` have no v2 equivalent.
 
 v2 upstream composition accepts HTTP remotes or a ready compatible client
 connection. A v1 stdio child-process proxy requires an architecture change.
@@ -716,6 +723,26 @@ Verify the migration with a real token that a v1 client holds.
 The resource identifier is part of your public contract. Changing `MCP_URL` or
 `basePath` later changes it again and requires the same migration.
 
+### Migrate `oauthProxy`
+
+v2 keeps `oauthProxy` for providers without Dynamic Client Registration, such as
+GitHub and Google, with a new API and a new token model:
+
+- Import it from `mcp-use/oauth`. Configure the provider with `github()`,
+  `google()`, or `upstream()` instead of `authEndpoint` and `tokenEndpoint`.
+- The proxy issues its own tokens. Tools read the upstream token with
+  `upstreamToken(ctx.auth)`; `verifyToken` and `jwksVerifier` are removed.
+- Outside localhost, the proxy requires a `secret` (or `MCP_USE_OAUTH_SECRET`)
+  and a shared `storage`.
+- The upstream callback URL moves from `/oauth/callback` to
+  `/mcp/oauth/callback`.
+- Every user approves the consent page and signs in once more, in the same
+  client: v2 rejects the upstream tokens that v1 clients hold. Redirect the v1
+  `/authorize` and `/token` paths for clients that saved them.
+
+Follow [Migrate from v1 `oauthProxy`](/v2/typescript/server/authentication/providers/oauth-proxy#migrate-from-v1-oauthproxy)
+for the option mapping, a before-and-after example, and the deployment steps.
+
 ## Review v2 limitations
 
 The following v1 capabilities do not currently have direct v2 equivalents.
@@ -729,7 +756,9 @@ server.
 - Arbitrary session-targeted and post-response push are not available.
   Request-scoped custom notifications and subscription invalidations remain
   available.
-- Server-to-client sampling through `ctx.sample()` is not available.
+- Blocking server-to-client sampling through `ctx.sample()` is not available.
+  Return an `inputRequired.createMessage()` round instead; see
+  [Sampling](/v2/typescript/server/sampling).
 - The v1 roots-changed callback surface is not available.
 - Express and Connect adapters are not available. Use Hono, `server.fetch`, or
   `toNodeHandler()` from `mcp-use/node`.
@@ -743,8 +772,10 @@ explicit domain handle. Do not key business state to an MCP transport session.
 
 ### OAuth, proxy, and OpenAPI
 
-- OAuth proxy and authorization-server mode are not provided. Direct
-  resource-server authentication is implemented.
+- `oauthProxy` is available for providers without Dynamic Client
+  Registration, with a new API and its own tokens. A stand-alone authorization
+  server with its own user accounts is not provided.
+- `mountOAuthProxy`, the browser OAuth helper routes, has no equivalent.
 - Unsigned token bypasses such as `verifyJwt: false` are not supported.
 - Verify proxy requirements for upstream OAuth, templates, completions,
   subscriptions, list synchronization, sampling, and elicitation before
@@ -793,7 +824,7 @@ explicit domain handle. Do not key business state to an MCP transport session.
     replacing the test with source-text or artifact assertions.
   </Step>
   <Step title="Remove v1 leftovers">
-    Remove remaining v1 imports, helpers, widget files, session APIs, sampling
+    Remove remaining v1 imports, helpers, widget files, session APIs, `ctx.sample()`
     calls, stdio proxy configuration, and old security fields. No
     `mcp-use/server` import can stay: that subpath does not exist in v2.
   </Step>

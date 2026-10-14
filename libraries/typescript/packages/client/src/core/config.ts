@@ -115,7 +115,11 @@ interface BaseServerConfig extends CallbackConfig {
   roots?: Root[];
   /** Options forwarded to the official MCP SDK Client. */
   clientOptions?: ClientOptions;
-  /** Default timeout/cancellation options for requests. */
+  /**
+   * Request options (timeout, cancellation) for the initial `tools/list`
+   * request made while the connection initializes. They are not applied to
+   * later calls such as `callTool()`; pass options to each call instead.
+   */
   defaultRequestOptions?: RequestOptions;
 }
 
@@ -127,7 +131,11 @@ export interface StdioServerConfig extends BaseServerConfig {
   command: string;
   /** Arguments passed to {@link StdioServerConfig.command}. */
   args: string[];
-  /** Environment variables merged with the current process environment. */
+  /**
+   * Environment variables for the server process. The full parent
+   * environment is not inherited: the process receives only the MCP SDK's
+   * safe defaults (such as `PATH` and `HOME`) plus these values.
+   */
   env?: Record<string, string>;
   /** Working directory used to launch the server process. */
   cwd?: string;

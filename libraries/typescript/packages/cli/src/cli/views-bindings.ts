@@ -13,6 +13,31 @@ const DEFAULT_BASE_PATH = "/mcp";
 const BUILD_ENTRY_MCP_URL = "http://localhost:3000";
 
 /**
+ * Run `evaluate` with the environment the server entry sees during a build:
+ * `MCP_USE_PHASE=build`, which `isBuilding()` in mcp-use reads so that the
+ * entry can skip runtime secrets, and a synthetic `MCP_URL` when unset.
+ * Restores both afterwards.
+ */
+async function withBuildEnvironment<T>(evaluate: () => Promise<T>): Promise<T> {
+  const previous = {
+    MCP_URL: process.env["MCP_URL"],
+    MCP_USE_PHASE: process.env["MCP_USE_PHASE"],
+  };
+  process.env["MCP_USE_PHASE"] = "build";
+  if (previous.MCP_URL === undefined) {
+    process.env["MCP_URL"] = BUILD_ENTRY_MCP_URL;
+  }
+  try {
+    return await evaluate();
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
+/**
  * Duck-typed server shape needed for binding validation.
  *
  * @internal
@@ -28,8 +53,8 @@ interface ServerLike {
 /**
  * Import the server entry and read `basePath` from the default export.
  *
- * Does not prime views or mount the server. Sets a synthetic `MCP_URL` only
- * when unset so OAuth entries can construct during build introspection.
+ * Does not prime views or mount the server. Evaluates the entry in the build
+ * environment (see {@link withBuildEnvironment}).
  *
  * @internal
  */
@@ -42,29 +67,21 @@ async function inspectBuildEntry(
     sourcemapInterceptor: "node",
   });
 
-  const previousMcpUrl = process.env["MCP_URL"];
   try {
-    if (previousMcpUrl === undefined) {
-      process.env["MCP_URL"] = BUILD_ENTRY_MCP_URL;
-    }
+    return await withBuildEnvironment(async () => {
+      const serverModule = (await runner.import(entry)) as {
+        default?: ServerLike;
+      };
+      const server = serverModule.default;
+      if (server === null || typeof server !== "object") {
+        throw new Error(
+          "The server entry must default-export the MCPServer instance."
+        );
+      }
 
-    const serverModule = (await runner.import(entry)) as {
-      default?: ServerLike;
-    };
-    const server = serverModule.default;
-    if (server === null || typeof server !== "object") {
-      throw new Error(
-        "The server entry must default-export the MCPServer instance."
-      );
-    }
-
-    return server.basePath ?? DEFAULT_BASE_PATH;
+      return server.basePath ?? DEFAULT_BASE_PATH;
+    });
   } finally {
-    if (previousMcpUrl === undefined) {
-      delete process.env["MCP_URL"];
-    } else {
-      process.env["MCP_URL"] = previousMcpUrl;
-    }
     await runner.close();
   }
 }
@@ -109,52 +126,44 @@ export async function validateViewBindingsAtBuild(
     hmr: false,
     sourcemapInterceptor: "node",
   });
-  const previousMcpUrl = process.env["MCP_URL"];
-
   try {
-    if (previousMcpUrl === undefined) {
-      process.env["MCP_URL"] = BUILD_ENTRY_MCP_URL;
-    }
-    const serverModule = (await runner.import(entry)) as {
-      default?: ServerLike;
-    };
-    const server = serverModule.default;
-    if (server === null || typeof server !== "object") {
-      throw new Error(
-        "The server entry must default-export the MCPServer instance."
-      );
-    }
+    return await withBuildEnvironment(async () => {
+      const serverModule = (await runner.import(entry)) as {
+        default?: ServerLike;
+      };
+      const server = serverModule.default;
+      if (server === null || typeof server !== "object") {
+        throw new Error(
+          "The server entry must default-export the MCPServer instance."
+        );
+      }
 
-    if (typeof server.__primeViews !== "function") {
-      throw new Error(
-        "The entry's default export does not support __primeViews."
+      if (typeof server.__primeViews !== "function") {
+        throw new Error(
+          "The entry's default export does not support __primeViews."
+        );
+      }
+      if (
+        typeof server.__skillsConfig !== "function" ||
+        typeof server.__primeSkills !== "function"
+      ) {
+        throw new Error(
+          "The entry's default export does not support Skills over MCP."
+        );
+      }
+      const { discoverConfiguredSkills } =
+        await import("../skills/node-loader.js");
+      const skillsSnapshot = discoverConfiguredSkills(
+        server.__skillsConfig(),
+        projectRoot,
+        conventionalSkillsDirectory
       );
-    }
-    if (
-      typeof server.__skillsConfig !== "function" ||
-      typeof server.__primeSkills !== "function"
-    ) {
-      throw new Error(
-        "The entry's default export does not support Skills over MCP."
-      );
-    }
-    const { discoverConfiguredSkills } =
-      await import("../skills/node-loader.js");
-    const skillsSnapshot = discoverConfiguredSkills(
-      server.__skillsConfig(),
-      projectRoot,
-      conventionalSkillsDirectory
-    );
-    server.__primeViews(viewsManifest);
-    server.__primeSkills(skillsSnapshot);
-    server.__mount();
-    return skillsSnapshot;
+      server.__primeViews(viewsManifest);
+      server.__primeSkills(skillsSnapshot);
+      server.__mount();
+      return skillsSnapshot;
+    });
   } finally {
-    if (previousMcpUrl === undefined) {
-      delete process.env["MCP_URL"];
-    } else {
-      process.env["MCP_URL"] = previousMcpUrl;
-    }
     await runner.close();
   }
 }

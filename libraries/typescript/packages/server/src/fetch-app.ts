@@ -183,16 +183,23 @@ export function hostValidationMiddleware(hosts: string[]): FetchMiddleware {
  *
  * @param origins - Allowed origin hostnames (port-agnostic).
  * @param skipSafeMethods - When true, skip GET/HEAD (view asset GETs).
+ * @param exempt - Optional predicate for requests that do their own request
+ * validation, such as OAuth provider endpoints that browser-based clients
+ * call cross-origin.
  */
 export function originValidationMiddleware(
   origins: string[],
-  skipSafeMethods = true
+  skipSafeMethods = true,
+  exempt?: (request: Request) => boolean
 ): FetchMiddleware {
   return async (request, next) => {
     if (
       skipSafeMethods &&
       (request.method === "GET" || request.method === "HEAD")
     ) {
+      return next();
+    }
+    if (exempt?.(request) === true) {
       return next();
     }
     const rejected = originValidationResponse(request, origins);
