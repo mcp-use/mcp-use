@@ -14,7 +14,7 @@ For production, only require Initial Access Tokens after confirming that every i
 
 ## Configure the server
 
-`serverUrl` and `realm` are required. Pass them explicitly, as below, or omit them and set `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL` and `MCP_USE_OAUTH_KEYCLOAK_REALM`.
+`serverUrl` and `realm` are required. Pass them explicitly, as below, or set `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL` and `MCP_USE_OAUTH_KEYCLOAK_REALM` and call `oauthKeycloakProvider()` without them.
 
 ```bash
 KEYCLOAK_SERVER_URL=https://keycloak.example.com

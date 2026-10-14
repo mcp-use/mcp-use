@@ -19,7 +19,7 @@ The API identifier must match the resource that mcp-use resolves for token verif
 
 ## Configure the server
 
-Pass `domain` explicitly, as below, or omit it and set `MCP_USE_OAUTH_AUTH0_DOMAIN`.
+Pass `domain` explicitly, as below, or set `MCP_USE_OAUTH_AUTH0_DOMAIN` and call `oauthAuth0Provider()` without it.
 
 ```bash
 AUTH0_DOMAIN=https://your-tenant.us.auth0.com

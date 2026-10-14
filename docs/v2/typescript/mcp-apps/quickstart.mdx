@@ -30,7 +30,7 @@ npx create-mcp-use-app@latest my-mcp-app --template mcp-apps --install
 cd my-mcp-app
 ```
 
-When `--template` is passed, the scaffolder does not prompt and installs dependencies only with `--install`. If you omit `--install`, run `npm install` in the project before you start the server. The scaffolder also installs the `mcp-apps-builder` coding-agent skill, which requires Git. Pass `--no-skills` to skip it.
+With a project name and `--template`, the scaffolder does not prompt, and it installs dependencies only with `--install`. If you omit `--install`, run `npm install` in the project before you start the server. The scaffolder also installs the `mcp-apps-builder` coding-agent skill, which requires Git. Pass `--no-skills` to skip it.
 
 The template also creates `README.md`, `.gitignore`, and the installed coding-agent skills. These are the files you edit most often:
 
@@ -176,7 +176,10 @@ export default function McpApp() {
           <button
             type="button"
             disabled={pending || sayHello.isPending}
-            onClick={() => void sayHello.callTool({ name: "mcp-use" })}
+            onClick={() => {
+              // A failure also sets sayHello.error, which renders below.
+              sayHello.callTool({ name: "mcp-use" }).catch(() => {});
+            }}
           >
             {sayHello.isPending ? "Saying…" : "Say Hello"}
           </button>
