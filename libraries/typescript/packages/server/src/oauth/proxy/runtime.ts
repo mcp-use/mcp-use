@@ -316,7 +316,8 @@ export class ProxyRuntime {
 
   /**
    * Shows the consent page, bound to the transaction by a single-use CSRF
-   * cookie.
+   * cookie. The token rides in the form's action URL, so a custom page
+   * cannot leave it out.
    */
   async #consentPage(
     c: Context,
@@ -346,8 +347,10 @@ export class ProxyRuntime {
       scopes: [...upstream.scopes],
       serverHost: this.config.serverHost,
       form: {
-        action: `${this.paths.consent}?txn=${encodeURIComponent(transactionId)}`,
-        csrf,
+        action: `${this.paths.consent}?${new URLSearchParams({
+          txn: transactionId,
+          csrf,
+        })}`,
       },
     };
     const consent = this.config.consent;
@@ -362,9 +365,10 @@ export class ProxyRuntime {
 
   /** `POST /oauth/consent`: records the decision and starts the upstream round. */
   async consent(c: Context): Promise<Response> {
-    const transactionId = new URL(c.req.url).searchParams.get("txn") ?? "";
+    const query = new URL(c.req.url).searchParams;
+    const transactionId = query.get("txn") ?? "";
+    const csrf = query.get("csrf") ?? "";
     const form = await formBody(c);
-    const csrf = form.get("csrf") ?? "";
     const csrfCookie = await this.#roundCookie(
       this.#cookies.csrf,
       transactionId

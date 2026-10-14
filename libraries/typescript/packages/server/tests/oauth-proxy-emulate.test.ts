@@ -947,6 +947,28 @@ describe("oauthProxy with emulated GitHub", () => {
       await approve(browser, first);
     });
 
+    it("refuses a decision without the page's CSRF token", async () => {
+      const { server } = githubServer();
+      const browser = new Browser(server);
+      const client = await register(browser);
+
+      const page = await consentPage(browser, client);
+      const action = new URL(
+        decodeHtml(page.html.match(/action="([^"]+)"/)![1]!),
+        page.url
+      );
+      expect(action.searchParams.get("csrf")).toBeTruthy();
+      for (const csrf of [null, "forged"]) {
+        const forged = new URL(action);
+        if (csrf === null) forged.searchParams.delete("csrf");
+        else forged.searchParams.set("csrf", csrf);
+        const refused = await browser.form(forged.href, { decision: "allow" });
+        expect(refused.status).toBe(403);
+      }
+      // A refused attempt leaves the real form usable.
+      await approve(browser, page);
+    });
+
     it("keeps at most five binding and CSRF cookies, dropping the oldest", async () => {
       const { server } = githubServer();
       const browser = new Browser(server);
@@ -1698,11 +1720,6 @@ describe("oauthProxy with emulated GitHub", () => {
             "form",
             { method: "post", action: props.form.action },
             createElement("p", null, `Custom page for ${props.client.name}`),
-            createElement("input", {
-              type: "hidden",
-              name: "csrf",
-              value: props.form.csrf,
-            }),
             createElement(
               "button",
               { name: "decision", value: "allow" },

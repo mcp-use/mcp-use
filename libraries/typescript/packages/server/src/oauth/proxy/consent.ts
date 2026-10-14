@@ -9,8 +9,9 @@
  * `oauthProxy`).
  *
  * The page must render a form that posts to `form.action` with the method
- * `post`, a hidden input named `csrf` whose value is `form.csrf`, and submit
- * buttons named `decision` with the values `allow` and `deny`.
+ * `post` and submit buttons named `decision` with the values `allow` and
+ * `deny`. `form.action` carries the single-use CSRF token, so the form
+ * needs no hidden fields.
  *
  * @example
  * ```tsx
@@ -20,7 +21,6 @@
  *   return (
  *     <form method="post" action={form.action}>
  *       <p>Allow {client.name ?? "this app"} to sign in with {upstream}?</p>
- *       <input type="hidden" name="csrf" value={form.csrf} />
  *       <button name="decision" value="deny">Deny</button>
  *       <button name="decision" value="allow">Allow</button>
  *     </form>
@@ -56,12 +56,13 @@ export interface ConsentPageProps {
    * check it in the address bar.
    */
   serverHost: string;
-  /** Form target and CSRF token. */
+  /** Form target. */
   form: {
-    /** URL to post the decision to. */
+    /**
+     * URL to post the decision to. It includes the CSRF token that ties the
+     * decision to this page, so post to it unchanged.
+     */
     action: string;
-    /** Value for the hidden `csrf` input. */
-    csrf: string;
   };
 }
 
@@ -92,7 +93,6 @@ ${scopes}
 </dl>
 <p class="note">You will sign in with ${upstream}. The app can then use ${target} as you.</p>
 <form method="post" action="${escapeHtml(props.form.action)}">
-  <input type="hidden" name="csrf" value="${escapeHtml(props.form.csrf)}">
   <div class="actions">
     <button type="submit" name="decision" value="deny" class="secondary">Deny</button>
     <button type="submit" name="decision" value="allow">Allow</button>
