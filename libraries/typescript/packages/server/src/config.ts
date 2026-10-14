@@ -1,7 +1,7 @@
 import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
 
 import type { LoggingOptions } from "./logging.js";
-import type { OAuthProvider } from "./oauth/index.js";
+import type { OAuthMetadataSource, OAuthProvider } from "./oauth/index.js";
 import type { SkillsOptions } from "./skills/types.js";
 
 /**
@@ -259,8 +259,9 @@ function isOAuthProviderLike(value: unknown): boolean {
   return (
     typeof provider["createTokenVerifier"] === "function" &&
     typeof provider["mapAuthInfo"] === "function" &&
-    typeof provider["oauthMetadata"] === "object" &&
-    provider["oauthMetadata"] !== null
+    ((typeof provider["oauthMetadata"] === "object" &&
+      provider["oauthMetadata"] !== null) ||
+      typeof provider["oauthMetadata"] === "function")
   );
 }
 
@@ -358,7 +359,7 @@ export type ServerConfig<TUser = never> = BaseServerConfig &
          * that need sign-in, optional in tools whose `securitySchemes`
          * accept `noauth`.
          */
-        oauth: OAuthProvider<TUser>;
+        oauth: OAuthProvider<TUser, OAuthMetadataSource>;
         /**
          * Serve signed-out and signed-in tools from one endpoint.
          *

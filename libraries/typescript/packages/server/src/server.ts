@@ -19,7 +19,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { createServer as createNodeHttpServer } from "#mcp-use-node-http";
 import type { Server as NodeHttpServer } from "node:http";
-import { Hono, type Env, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type Env, type MiddlewareHandler } from "hono";
 
 import {
   createFaviconHandler,
@@ -100,7 +100,10 @@ import {
   resolveLocalOAuthResource,
   wrapOAuthTokenVerifier,
 } from "./oauth/internal.js";
-import type { OAuthProviderHost } from "./oauth/provider.js";
+import type {
+  OAuthProviderHost,
+  OAuthProviderRouteHandler,
+} from "./oauth/provider.js";
 import type {
   InferPromptInput,
   PromptCallback,
@@ -417,6 +420,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #oauthProviderSetupRan = false;
   /** The error from a failed setup hook, rethrown on every later mount. */
   #oauthProviderSetupFailure: { error: unknown } | undefined;
+  /** HTTP routes the OAuth provider's setup hook registered. */
+  #oauthProviderRoutes: {
+    method: "GET" | "POST" | "OPTIONS";
+    path: string;
+    handler: OAuthProviderRouteHandler;
+  }[] = [];
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
@@ -1412,7 +1421,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * first error instead of re-running a hook whose middleware and
    * instructions transforms were already partly applied.
    */
-  #runOAuthProviderSetup(resource: URL, basePath: string): void {
+  #runOAuthProviderSetup(
+    resource: URL,
+    basePath: string,
+    mode: "listen" | "handler",
+    listenHost: string | undefined
+  ): void {
     const setup = this.#config.oauth?.setup;
     if (setup === undefined || this.#oauthProviderSetupRan) return;
     if (this.#oauthProviderSetupFailure !== undefined) {
@@ -1432,6 +1446,44 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       resourceUrl: resource,
       basePath,
       mixedAuth: this.#config.mixedAuth === true,
+      mode,
+      listenHost: mode === "listen" ? listenHost : undefined,
+      route: (method, path, handler) => {
+        assertActive("route");
+        if (method !== "GET" && method !== "POST" && method !== "OPTIONS") {
+          throw new TypeError(
+            "[mcp-use] OAuthProviderHost.route() method must be GET, POST, or OPTIONS"
+          );
+        }
+        if (typeof handler !== "function") {
+          throw new TypeError(
+            "[mcp-use] OAuthProviderHost.route() handler must be a function"
+          );
+        }
+        const prefix = basePath === "/" ? "/" : `${basePath}/`;
+        if (
+          typeof path !== "string" ||
+          !path.startsWith(prefix) ||
+          path.length === prefix.length ||
+          /[?#*:]/.test(path) ||
+          path.split("/").some((segment) => segment === "." || segment === "..")
+        ) {
+          throw new TypeError(
+            `[mcp-use] OAuthProviderHost.route() path must be a literal ` +
+              `pathname under ${prefix}`
+          );
+        }
+        if (
+          this.#oauthProviderRoutes.some(
+            (route) => route.method === method && route.path === path
+          )
+        ) {
+          throw new Error(
+            `[mcp-use] OAuth provider route ${method} ${path} is already registered`
+          );
+        }
+        this.#oauthProviderRoutes.push({ method, path, handler });
+      },
       use: (pattern, handler) => {
         assertActive("use");
         this.use(
@@ -1652,7 +1704,19 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         middlewares.unshift(hostValidationMiddleware(hosts));
       }
       if (origins !== undefined) {
-        middlewares.push(originValidationMiddleware(origins));
+        // OAuth provider routes validate their own requests (PKCE, CSRF
+        // tokens, binding cookies), and MCP clients call the token and
+        // registration endpoints cross-origin.
+        middlewares.push(
+          originValidationMiddleware(origins, true, (request) => {
+            if (this.#oauthProviderRoutes.length === 0) return false;
+            const pathname = new URL(request.url).pathname;
+            return this.#oauthProviderRoutes.some(
+              (route) =>
+                route.method === request.method && route.path === pathname
+            );
+          })
+        );
       }
       if (hosts === undefined) {
         if (mode === "listen") {
@@ -1680,7 +1744,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         // #handler is still unset, so their registrations pass the same
         // pre-start checks as user registrations, and before view-binding
         // validation below so provider items are included.
-        this.#runOAuthProviderSetup(resource, basePath);
+        this.#runOAuthProviderSetup(resource, basePath, mode, listenHost);
+        // Provider routes (for example authorization endpoints) land ahead of
+        // the OAuth gate and the application's routes, so they stay public
+        // and the application cannot shadow them.
+        for (const route of this.#oauthProviderRoutes) {
+          httpApp.on(route.method, route.path, (context) =>
+            route.handler(context as unknown as Context)
+          );
+        }
       }
 
       for (const group of this.#settings?.layout ?? []) {

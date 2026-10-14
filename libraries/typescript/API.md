@@ -36,6 +36,12 @@ Import: `@mcp-use/agent` · `@mcp-use/agent/langchain`.
 
 Import: `@mcp-use/tunnel`.
 
+## Sign users in with GitHub or Google
+
+{@link mcp-use.oauth.oauthProxy | oauthProxy} · {@link mcp-use.oauth.upstreamToken | upstreamToken} · {@link mcp-use.oauth/storage | Storage adapters}
+
+Import: `mcp-use/oauth` · `mcp-use/oauth/storage`.
+
 ## Server integrations
 
 {@link mcp-use.oauth | OAuth configuration}, {@link mcp-use.next | Next.js}, {@link mcp-use.tanstack-start | TanStack Start}, {@link mcp-use.vite | Vite plugin}, {@link mcp-use.node-bridge | Node.js bridge}, and {@link mcp-use.landing | server landing page}.

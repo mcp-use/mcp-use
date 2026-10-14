@@ -6,8 +6,12 @@ import {
 } from "@modelcontextprotocol/server";
 
 import { getRequestBag, type FetchMiddleware } from "../fetch-app.js";
-import { getOAuthProviderOptions, wrapOAuthTokenVerifier } from "./internal.js";
-import type { OAuthProvider } from "./provider.js";
+import {
+  getOAuthProviderOptions,
+  resolveOAuthMetadata,
+  wrapOAuthTokenVerifier,
+} from "./internal.js";
+import type { OAuthMetadataSource, OAuthProvider } from "./provider.js";
 
 /**
  * Fetch middleware that requires a bearer token for a canonical resource.
@@ -17,7 +21,7 @@ import type { OAuthProvider } from "./provider.js";
  * @param resource - Canonical public MCP endpoint URL.
  */
 export function bearerAuth<TUser>(
-  provider: OAuthProvider<TUser>,
+  provider: OAuthProvider<TUser, OAuthMetadataSource>,
   resource: URL
 ): FetchMiddleware {
   const options = getOAuthProviderOptions(provider);
@@ -47,13 +51,14 @@ export function bearerAuth<TUser>(
  * @param resource - Canonical public MCP endpoint URL.
  */
 export function oauthMetadata<TUser>(
-  provider: OAuthProvider<TUser>,
+  provider: OAuthProvider<TUser, OAuthMetadataSource>,
   resource: URL
 ): FetchMiddleware {
   const options = getOAuthProviderOptions(provider);
+  const metadata = resolveOAuthMetadata(provider, resource);
   return async (request, next) => {
     const response = oauthMetadataResponse(request, {
-      oauthMetadata: options.oauthMetadata,
+      oauthMetadata: metadata,
       resourceServerUrl: resource,
       ...(options.scopesSupported !== undefined && {
         scopesSupported: [...options.scopesSupported],

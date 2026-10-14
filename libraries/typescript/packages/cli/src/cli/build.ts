@@ -316,6 +316,14 @@ async function buildView(
  */
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();
+  // Vite's dev server, which evaluates the entry below, sets NODE_ENV to
+  // development when it is unset, and every later build in this process
+  // would then bundle React's development build: views would ship it, and
+  // server JSX would call `jsxDEV`, which production React leaves undefined.
+  // Set it before the project `.env` loads, as `mcp-use start` does, so a
+  // `.env` that sets NODE_ENV=development cannot undo it. An explicit shell
+  // NODE_ENV still wins.
+  process.env["NODE_ENV"] ??= "production";
   loadProjectEnv(options.cwd, "production");
   const sourceRoot =
     options.mcpDir === undefined

@@ -11,7 +11,7 @@
     "v2": "pnpm run mcp-use:v2"
   },
   "dependencies": {
-    "mcp-use": "^2.0.4",
+    "mcp-use": "^2.8.2",
     "zod": "^4.2.0"
   },
   "devDependencies": {

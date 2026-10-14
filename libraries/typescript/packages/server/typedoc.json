@@ -5,6 +5,7 @@
     "src/react/index.ts",
     "src/landing.ts",
     "src/oauth/index.ts",
+    "src/oauth/storage.ts",
     "src/oauth/clerk.ts",
     "src/oauth/auth0.ts",
     "src/oauth/workos.ts",

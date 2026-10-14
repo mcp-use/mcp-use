@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, parse } from "node:path";
-import { main } from "./index.js";
+import { runBin } from "./index.js";
 
 declare const __MCP_USE_CLI_VERSION__: string;
 
@@ -33,14 +33,6 @@ function installedFrameworkVersion(): string | undefined {
   return undefined;
 }
 
-main(process.argv.slice(2), {
+runBin(process.argv.slice(2), {
   frameworkVersion: installedFrameworkVersion() ?? __MCP_USE_CLI_VERSION__,
-}).then(
-  (code) => {
-    process.exitCode = code;
-  },
-  (error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-);
+});

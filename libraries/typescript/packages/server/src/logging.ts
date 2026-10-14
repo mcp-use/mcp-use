@@ -33,7 +33,11 @@ import {
   isBufferedResponse,
   trackBufferedResponse,
 } from "./buffered-response.js";
-import { getRequestBag, type FetchMiddleware } from "./fetch-app.js";
+import {
+  getRequestBag,
+  pathUnderBase,
+  type FetchMiddleware,
+} from "./fetch-app.js";
 
 /** Verbosity of the request logger. */
 export type LogLevel = "info" | "debug" | "trace";
@@ -718,7 +722,12 @@ export function requestLogger(
 
     logLine(response.status, detail, suffix);
 
-    if (level === "trace") {
+    // OAuth endpoints under the MCP path (the OAuth proxy's authorization
+    // server) carry codes, tokens, and cookies: never dump them.
+    const oauthEndpoint =
+      options.mcpPath !== undefined &&
+      pathname.startsWith(pathUnderBase(options.mcpPath, "oauth/"));
+    if (level === "trace" && !oauthEndpoint) {
       await printTraceDump(response, requestHeaders, requestBody, !streaming);
     }
 
