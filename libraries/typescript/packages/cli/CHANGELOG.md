@@ -1,5 +1,20 @@
 # @mcp-use/cli
 
+## 4.4.0
+
+### Minor Changes
+
+- aa78231: Apply `.gitignore` rules by default when packaging projects for managed deployments (`mcp-use deploy --no-github`), supporting standard ignore semantics including wildcards, directory rules, and negation while preserving baseline cloud exclusions.
+
+### Patch Changes
+
+- aa78231: `mcp-use build` no longer needs the server's runtime secrets. The build evaluates the entry with `MCP_USE_PHASE=build`, and the new `isBuilding()` export of `mcp-use` lets module-scope code skip reading secrets or connecting to a database while building.
+
+  `mcp-use build` also exits when the build finishes. Before, an entry that opened a connection at module scope, such as a Redis client, kept the build process running after it had printed its result. A failed build or dev start also prints the cause of a refused connection, which it used to print as an empty line.
+
+- aa78231: `mcp-use build` now builds for production when `NODE_ENV` is unset. Before, the dev server that evaluates the entry set `NODE_ENV=development` for the rest of the build, so views shipped React's development build, and server-side JSX compiled to `jsxDEV`, which fails under `mcp-use start`. The entry is therefore also evaluated with `NODE_ENV=production` during the build.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 4.4.0-canary.2
 
 ### Patch Changes
