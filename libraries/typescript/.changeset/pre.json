@@ -11,7 +11,9 @@
     "@mcp-use/tunnel": "0.2.2"
   },
   "changesets": [
+    "anthropic-empty-tool-result",
     "openapi-exclusive-bounds",
+    "propagated-0f3dc2a2a6980cf5",
     "propagated-73aa1a1894ad56a2",
     "smart-deploy-gitignore"
   ]
