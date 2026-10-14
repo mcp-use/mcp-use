@@ -90,24 +90,11 @@ The example passes the list to the `clients` option. While it is set:
 
 The list controls which apps connect, not which GitHub users sign in.
 
-## Custom consent page
+## Consent page
 
 Before it sends anyone to GitHub, the proxy asks them to approve the app that
-started the sign-in. The example replaces the built-in page with its own:
-`src/consent/consent-page.tsx`, passed to `oauthProxy` as `consent.page`.
-
-- The proxy renders the component on the server for each sign-in, with the
-  app's name, whether its identity is verified, the client ID, where the
-  browser returns, and the scopes. The page is static HTML: no hooks, no
-  event handlers.
-- The page must post a form to `form.action` with the hidden `csrf` input and
-  a `decision` button for `allow` and one for `deny`.
-- The page's CSS is a string in `src/consent/styles.ts`, which the component
-  renders into a `<style>` tag. The proxy's Content Security Policy allows
-  inline styles only: no scripts, stylesheets, or web fonts.
-- Rendering needs `react` and `react-dom` at runtime.
-
-To see the page without a client, run `pnpm dev` and open this URL, which
+started the sign-in. To see the page without a client, run `pnpm dev` and
+open this URL, which
 starts a sign-in as ChatGPT (its metadata document lists that redirect URI):
 
 ```text

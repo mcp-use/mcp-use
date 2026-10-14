@@ -797,12 +797,6 @@ importers:
       mcp-use:
         specifier: workspace:*
         version: link:../../..
-      react:
-        specifier: ^19.2.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.4(react@19.2.4)
       redis:
         specifier: ^6.2.1
         version: 6.3.0(@opentelemetry/api@1.9.1)
@@ -813,12 +807,6 @@ importers:
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
-      '@types/react':
-        specifier: ^19.2.7
-        version: 19.2.17
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.3(@types/react@19.2.17)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
