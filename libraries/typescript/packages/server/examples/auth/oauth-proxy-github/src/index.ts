@@ -86,9 +86,10 @@ server.tool(
     annotations: { readOnlyHint: true },
   },
   async (_args, ctx) => {
-    // upstreamToken(ctx) is the user's GitHub token, which the proxy keeps on
-    // the server. The MCP client only ever holds the proxy's own token.
-    const octokit = new Octokit({ auth: upstreamToken(ctx) });
+    // upstreamToken(ctx.auth) is the user's GitHub token, which the proxy
+    // keeps on the server. The MCP client only ever holds the proxy's own
+    // token.
+    const octokit = new Octokit({ auth: upstreamToken(ctx.auth) });
     const { data: user } = await octokit.rest.users.getAuthenticated();
     const data = {
       login: user.login,
@@ -117,7 +118,7 @@ server.tool(
     annotations: { readOnlyHint: true },
   },
   async ({ limit }, ctx) => {
-    const octokit = new Octokit({ auth: upstreamToken(ctx) });
+    const octokit = new Octokit({ auth: upstreamToken(ctx.auth) });
     const { data: repositories } =
       await octokit.rest.repos.listForAuthenticatedUser({
         sort: "updated",

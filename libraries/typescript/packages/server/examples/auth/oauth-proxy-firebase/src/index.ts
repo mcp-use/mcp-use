@@ -91,7 +91,7 @@ server.tool(
     // fields of Google's userinfo response.
     const { subject, profile } = ctx.auth.user;
     // The proxy keeps the user's Google access token on the server and
-    // refreshes it before it expires. upstreamToken(ctx) returns it.
+    // refreshes it before it expires. upstreamToken(ctx.auth) returns it.
     const expiresAt = ctx.auth.upstream?.expiresAt;
     const data = {
       subject,

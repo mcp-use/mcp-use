@@ -12,7 +12,7 @@ OAuth authorization server in front of GitHub:
 4. The client receives the server's own tokens. The GitHub client secret and
    the user's GitHub token never leave the server.
 
-Tools call the GitHub API as the user with `upstreamToken(ctx)`. The example
+Tools call the GitHub API as the user with `upstreamToken(ctx.auth)`. The example
 has two tools: `whoami` and `list-repositories`. It requests only the
 `read:user` scope, so `list-repositories` shows public repositories; add `repo`
 to the scopes in `src/index.ts` to include private ones.
