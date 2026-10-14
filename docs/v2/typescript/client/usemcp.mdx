@@ -100,6 +100,10 @@ discovery. With the default explicit browser flow, a wire-level OAuth challenge
 from a protected operation prepares the auth action; call `authenticate()` and
 retry that operation. Tool-level `isError` results do not trigger OAuth.
 
+To clear a server's OAuth credentials and sign in again, for example to switch
+accounts, call `reauthenticateServer(id)` from `useMcpClient()`. See
+[Reauthenticate a server](/v2/typescript/client/authentication#react-reauthenticate-a-server).
+
 ## OAuth callback
 
 Create a route (default: `/oauth/callback`):

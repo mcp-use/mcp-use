@@ -129,6 +129,53 @@ if (result.status === "available") console.log(result.claims.email);
 See [OAuth UserInfo](/v2/typescript/client/usemcp#oauth-userinfo) for the
 options, state details, and a React example.
 
+## React: reauthenticate a server
+
+Call `reauthenticateServer(id)` from `useMcpClient()` when a server managed by
+`McpClientProvider` needs a fresh sign-in, for example after the user revokes
+access, a refresh token stops working, or the user wants to switch accounts.
+It disconnects the server, clears its stored OAuth credentials, reconnects it,
+and starts authorization once the new connection reaches `pending_auth`, or
+`ready` with unauthenticated mixed auth.
+
+```tsx
+import { useMcpClient, useMcpServer } from "@mcp-use/client/react";
+
+function SignInAgain({ serverId }: { serverId: string }) {
+  const { reauthenticateServer } = useMcpClient();
+  const server = useMcpServer(serverId);
+
+  return (
+    <>
+      <button onClick={() => void reauthenticateServer(serverId)}>
+        Sign in again
+      </button>
+      {server?.state === "authenticating" && server.authUrl && (
+        <a href={server.authUrl} target="_blank" rel="noreferrer">
+          Popup blocked? Continue signing in
+        </a>
+      )}
+    </>
+  );
+}
+```
+
+- The promise resolves once the reconnection is prepared, not when the user
+  finishes signing in. Read `server.state` and `server.authorization` for the
+  result.
+- Authorization starts after the reconnect, outside the click that triggered
+  it, so browsers may block the popup. Render `server.authUrl` as a fallback
+  link, as above, or set `useRedirectFlow: true`.
+- If the reconnected server does not need interactive OAuth (it does not use
+  OAuth, a custom `authProvider` still holds credentials, or the connection
+  fails), no sign-in starts and the request is discarded. A later reconnect
+  does not start one either.
+- Concurrent calls for the same server share one operation.
+- The promise rejects for an unknown server id. It also rejects if
+  disconnecting fails, in which case the server reconnects with its
+  credentials intact, or if the server is removed during teardown, in which
+  case `removeServer`'s `clearCredentials` option decides what is kept.
+
 ## Pre-registered clients
 
 The `MCPClient` configuration uses
