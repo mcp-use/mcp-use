@@ -200,6 +200,44 @@ describe("useMcp connection metadata", () => {
     );
   });
 
+  it.each([
+    [
+      "mixed auth",
+      {
+        mode: "mixed",
+        authenticated: false,
+        resource: "https://example.com/mcp",
+      },
+    ],
+    ["no OAuth", undefined],
+  ] as const)(
+    "reports settled optional OAuth discovery after ready (%s)",
+    async (_label, discovered) => {
+      const onSettled = vi.fn();
+      const { getResult } = await renderFor(
+        "modern",
+        false,
+        {
+          _onAuthorizationDiscoverySettled: onSettled,
+        } as unknown as Partial<UseMcpOptions>,
+        (connection) => {
+          Object.assign(connection, {
+            discoverAuthorization: vi.fn().mockResolvedValue(discovered),
+          });
+        }
+      );
+
+      // Discovery starts after the ready state has had a chance to paint.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+
+      expect(getResult().state).toBe("ready");
+      expect(getResult().authorization).toEqual(discovered);
+      expect(onSettled).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it("stays ready when optional OAuth token projection fails", async () => {
     authProvider.tokens.mockRejectedValueOnce(new Error("storage unavailable"));
 

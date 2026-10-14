@@ -12,6 +12,7 @@ const disconnectSpies: Array<ReturnType<typeof vi.fn>> = [];
 const clearStorageSpies: Array<ReturnType<typeof vi.fn>> = [];
 const authenticateSpies: Array<ReturnType<typeof vi.fn>> = [];
 let latestClient: ReturnType<typeof useMcpClient> | null = null;
+let settleAuthorizationDiscovery: (() => void) | undefined;
 let mockState:
   | "discovering"
   | "pending_auth"
@@ -38,7 +39,8 @@ vi.mock("../../../src/react/useMcp.js", () => {
   const log: unknown[] = [];
 
   return {
-    useMcp: () => {
+    useMcp: (options: { _onAuthorizationDiscoverySettled?: () => void }) => {
+      settleAuthorizationDiscovery = options._onAuthorizationDiscoverySettled;
       const disconnect = React.useMemo(() => vi.fn(), []);
       const clearStorage = React.useMemo(() => vi.fn(), []);
       const authenticate = React.useMemo(
@@ -121,6 +123,7 @@ describe("McpClientProvider metadata-only updates", () => {
     clearStorageSpies.length = 0;
     authenticateSpies.length = 0;
     latestClient = null;
+    settleAuthorizationDiscovery = undefined;
     mockState = "ready";
     mockProtocolEra = "legacy";
     mockInstructions = "legacy instructions";
@@ -499,6 +502,26 @@ describe("McpClientProvider metadata-only updates", () => {
       expect(authenticateSpies[1]).toHaveBeenCalledTimes(1);
     });
 
+    it("waits for optional OAuth discovery before deciding on a ready replacement", async () => {
+      const { rerender } = await renderProvider();
+
+      mockState = "discovering";
+      await reauthenticate();
+
+      // Mixed auth is discovered after the anonymous connection is ready.
+      mockState = "ready";
+      await rerender();
+      expect(authenticateSpies[1]).not.toHaveBeenCalled();
+
+      mockAuthorization = { mode: "mixed", authenticated: false };
+      await act(async () => {
+        settleAuthorizationDiscovery?.();
+      });
+      await rerender();
+
+      expect(authenticateSpies[1]).toHaveBeenCalledTimes(1);
+    });
+
     it.each(["ready", "failed", "authenticating"] as const)(
       "drops the request when the replacement settles in %s",
       async (settledState) => {
@@ -508,6 +531,9 @@ describe("McpClientProvider metadata-only updates", () => {
         await reauthenticate();
         mockState = settledState;
         await rerender();
+        await act(async () => {
+          settleAuthorizationDiscovery?.();
+        });
 
         // A later reconnect that needs authorization must not start an
         // unrequested popup or redirect.

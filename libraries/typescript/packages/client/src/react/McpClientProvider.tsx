@@ -65,9 +65,10 @@ export interface McpClientContextType {
    * Disconnect, clear persisted OAuth credentials, and remount a managed
    * server. The replacement starts a fresh authorization flow as soon as OAuth
    * discovery reaches an authenticatable state (`pending_auth`, or `ready`
-   * with unauthenticated mixed authorization). If discovery settles in any
-   * other state, for example because the server does not use OAuth, the
-   * request is dropped and no later reconnect starts authorization.
+   * with unauthenticated mixed authorization once optional OAuth discovery
+   * finishes). If discovery settles in any other state, for example because
+   * the server does not use OAuth, the request is dropped and no later
+   * reconnect starts authorization.
    *
    * The promise covers preparation of the replacement, not completion of the
    * browser authorization flow. Observe the server state for the final result.
@@ -330,6 +331,14 @@ function McpServerWrapper({
     onGlobalElicitationRequest,
   });
 
+  // Optional OAuth discovery finishes after `ready`. A pending
+  // reauthentication waits for it before deciding whether to authenticate.
+  const [authorizationDiscoverySettled, setAuthorizationDiscoverySettled] =
+    useState(false);
+  const handleAuthorizationDiscoverySettled = useCallback(() => {
+    setAuthorizationDiscoverySettled(true);
+  }, []);
+
   // Use the core useMcp hook with our callbacks
   const mcp = useMcp({
     ...mcpOptions,
@@ -337,6 +346,7 @@ function McpServerWrapper({
     onSampling: queues.onSampling,
     onElicitation: queues.onElicitation,
     wrapTransport: combinedWrapTransport,
+    _onAuthorizationDiscoverySettled: handleAuthorizationDiscoverySettled,
   });
 
   useEffect(() => {
@@ -384,8 +394,14 @@ function McpServerWrapper({
       return;
     }
 
-    // Wait for the replacement's first discovery to settle.
-    if (mcp.state === "discovering") {
+    // Wait for the replacement's first discovery to settle. A `ready`
+    // connection without authorization may still be discovering mixed auth.
+    if (
+      mcp.state === "discovering" ||
+      (mcp.state === "ready" &&
+        mcp.authorization === undefined &&
+        !authorizationDiscoverySettled)
+    ) {
       return;
     }
 
@@ -416,6 +432,7 @@ function McpServerWrapper({
     mcp.state,
     mcp.authorization,
     mcp.authenticate,
+    authorizationDiscoverySettled,
     reauthenticationRequest,
     onReauthenticationHandled,
   ]);
@@ -1058,6 +1075,7 @@ export function McpClientProvider({
       // Invalidate preparation before any asynchronous teardown. An older
       // reauthentication must never remount a server after it was removed.
       reauthenticationOperationsRef.current.delete(id);
+      delete nextReauthenticationRequestRef.current[id];
 
       setServers((prev) => prev.filter((s) => s.id !== id));
       setServerConfigs((prev) => prev.filter((s) => s.id !== id));

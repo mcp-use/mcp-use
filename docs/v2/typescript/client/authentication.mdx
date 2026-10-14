@@ -139,22 +139,38 @@ and starts authorization once the new connection reaches `pending_auth`, or
 `ready` with unauthenticated mixed auth.
 
 ```tsx
+import { useState } from "react";
 import { useMcpClient, useMcpServer } from "@mcp-use/client/react";
 
 function SignInAgain({ serverId }: { serverId: string }) {
   const { reauthenticateServer } = useMcpClient();
   const server = useMcpServer(serverId);
+  const [error, setError] = useState<string>();
+
+  const signInAgain = () => {
+    setError(undefined);
+    reauthenticateServer(serverId).catch((cause: unknown) => {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    });
+  };
+
+  // Keep the prepared URL reachable while sign-in is in progress or still
+  // needed, for example after a blocked popup times out.
+  const needsSignIn =
+    server?.state === "authenticating" ||
+    server?.state === "pending_auth" ||
+    (server?.authorization?.mode === "mixed" &&
+      !server.authorization.authenticated);
 
   return (
     <>
-      <button onClick={() => void reauthenticateServer(serverId)}>
-        Sign in again
-      </button>
-      {server?.state === "authenticating" && server.authUrl && (
+      <button onClick={signInAgain}>Sign in again</button>
+      {needsSignIn && server?.authUrl && (
         <a href={server.authUrl} target="_blank" rel="noreferrer">
           Popup blocked? Continue signing in
         </a>
       )}
+      {error && <p role="alert">{error}</p>}
     </>
   );
 }
