@@ -171,8 +171,9 @@ function SignInAgain({ serverId }: { serverId: string }) {
   fails), no sign-in starts and the request is discarded. A later reconnect
   does not start one either.
 - Concurrent calls for the same server share one operation.
-- The promise rejects for an unknown server id. It also rejects if
-  disconnecting fails, in which case the server reconnects with its
+- The promise rejects for an unknown server id, or for a server that has not
+  published its state yet (for example, immediately after `addServer`). It
+  also rejects if disconnecting fails, in which case the server reconnects with its
   credentials intact, or if the server is removed during teardown, in which
   case `removeServer`'s `clearCredentials` option decides what is kept.
 
