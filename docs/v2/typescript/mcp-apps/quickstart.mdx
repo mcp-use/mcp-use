@@ -12,8 +12,9 @@ This guide creates a local server with:
 
 - an MCP endpoint at `http://localhost:3000/mcp`
 - an Inspector at `http://localhost:3000/mcp/inspector`
-- a `search-fruits` tool that returns a view
-- a React view at `views/product-search-result/view.tsx`
+- a `show-app` tool that returns a view
+- a `say-hello` tool that the view calls
+- a React view at `views/my-view/view.tsx`
 
 ## Prerequisites
 
@@ -22,31 +23,36 @@ This guide creates a local server with:
 
 ## Create the project
 
-Run the MCP Apps template:
+Run the MCP Apps template and install its dependencies:
 
 ```bash
-npx create-mcp-use-app my-widget-server --template mcp-apps
-cd my-widget-server
+npx create-mcp-use-app@latest my-mcp-app --template mcp-apps --install
+cd my-mcp-app
 ```
 
-The template creates more files for assets, view components, and local tooling. These are the files you edit most often:
+When `--template` is passed, the scaffolder does not prompt and installs dependencies only with `--install`. If you omit `--install`, run `npm install` in the project before you start the server. The scaffolder also installs the `mcp-apps-builder` coding-agent skill, which requires Git. Pass `--no-skills` to skip it.
+
+The template also creates `README.md`, `.gitignore`, and the installed coding-agent skills. These are the files you edit most often:
 
 ```text
-my-widget-server/
+my-mcp-app/
 ├── index.ts
 ├── mcp-env.d.ts
 ├── views/
-│   └── product-search-result/
+│   └── my-view/
 │       ├── view.tsx
-│       ├── components/
-│       └── hooks/
+│       ├── view.css
+│       ├── icons.tsx
+│       ├── MeshGradient.tsx
+│       └── Tooltip.tsx
 ├── public/
-│   ├── favicon.ico
 │   ├── icon.svg
-│   └── fruits/
+│   └── logo-mcp-use.svg
 ├── package.json
 └── tsconfig.json
 ```
+
+`public/icon.svg` is the server icon declared in `index.ts`. The view renders `public/logo-mcp-use.svg` with the `Image` component from `mcp-use/react`, which resolves root-relative paths against the `public/` folder.
 
 ## Run the server
 
@@ -60,99 +66,136 @@ This starts the MCP server, view build pipeline, and Inspector. Keep the process
 
 ## Inspect the view tool
 
-Open `index.ts` and find the `search-fruits` tool. The template includes server branding, 16 fruits, and a second `get-fruit-details` tool. This excerpt shows the view-bound path you need to understand first.
+Open `index.ts` and find the `show-app` tool. The template also configures server branding and registers a second tool, `say-hello`, without a view. This excerpt shows the view-bound path you need to understand first.
 
 ```typescript
-// index.ts excerpt; server, fruits, and z are defined above.
-export const searchFruits = server.tool(
+// index.ts excerpt; server and z are defined above.
+const showAppInputSchema = z.object({
+  appName: z
+    .string()
+    .optional()
+    .describe(
+      "Optional title shown in the MCP App card instead of the default",
+    ),
+});
+
+const showAppOutputSchema = z.object({
+  message: z.string().describe("Message to display in the MCP App"),
+});
+
+export const showApp = server.tool(
   {
-    name: "search-fruits",
-    title: "Search fruits",
-    description: "Search for fruits and display the results in a view",
-    inputSchema: z.object({
-      query: z.string().optional().describe("Search query to filter fruits"),
-    }),
-    outputSchema: z.object({
-      query: z.string(),
-      results: z.array(
-        z.object({
-          fruit: z.string(),
-          color: z.string(),
-        }),
-      ),
-    }),
+    name: "show-app",
+    title: "Show MCP App",
+    description: "Display the MCP App starter view",
+    inputSchema: showAppInputSchema,
+    outputSchema: showAppOutputSchema,
+    view: {
+      name: "my-view",
+      description: "MCP App starter card with interactive demo hooks",
+      prefersBorder: false,
+      csp: {
+        resourceDomains: [
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
+        ],
+      },
+    },
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
       openWorldHint: false,
     },
-    view: {
-      name: "product-search-result",
-      description: "Product search results with carousel and details",
-      prefersBorder: true,
-    },
   },
-  ({ query = "" }) => {
-    const results = fruits.filter(
-      (fruit) =>
-        query === "" || fruit.fruit.toLowerCase().includes(query.toLowerCase()),
-    );
+  async ({ appName }, ctx) => {
+    // Brief delay so the pending skeleton is visible during dev/inspector demos.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    const data = { query, results };
+    console.log(`The app name was: ${appName}`);
+    const data = { message: `The MCP App starter for ${appName} is ready!` };
 
     return {
-      content: [
-        {
-          type: "text",
-          text: `Found ${results.length} fruits matching "${query || "all"}"`,
-        },
-      ],
+      content: [{ type: "text", text: data.message }],
       structuredContent: data,
     };
   },
 );
-
-export default server;
 ```
 
-`view.name` must match the folder under `views/`. In this template, `product-search-result` maps to `views/product-search-result/view.tsx`.
+`view.name` must match the folder under `views/`. In this template, `my-view` maps to `views/my-view/view.tsx`.
 
-The `structuredContent` object becomes view rendering data via `useToolContext()`. The `content` array is the short text result the model can read.
+A view-bound tool must declare an `outputSchema`. The `structuredContent` object becomes view rendering data via `useToolContext()`. The `content` array is the short text result the model can read.
+
+`view.csp` allows the Google Fonts stylesheet that `view.css` imports. See [Content Security Policy](/v2/typescript/mcp-apps/content-security-policy) for the other domain categories.
+
+The `say-hello` tool returns `{ greeting }` in `structuredContent` and has no view. The view calls it with `useCallTool()`.
+
+Both tools are assigned to exported constants. The generated `mcp-env.d.ts` reads these exports to type `useToolContext<"show-app">()` and `useCallTool("say-hello")` in the view.
 
 ## Inspect the React view
 
-Open `views/product-search-result/view.tsx`. The view reads the tool result with `useToolContext()`.
+Open `views/my-view/view.tsx`. The view reads the tool invocation with `useToolContext()` and wraps its content in `ThemeProvider`, which applies the host theme.
 
-The generated view includes a carousel, detail panel, display-mode controls, favorites, and tool calls. This excerpt shows the core data access pattern.
+The generated view also shows host context, display-mode buttons, external links, a follow-up message button, and a `set-counter` tool that the host can call while the view is mounted. This condensed excerpt keeps the template's data access and the **Update State** and **Say Hello** controls, without styling and decorative markup.
 
 ```tsx
-import { useToolContext } from "mcp-use/react";
+import {
+  ModelContext,
+  ThemeProvider,
+  useCallTool,
+  useToolContext,
+} from "mcp-use/react";
+import { useState } from "react";
 
-export default function ProductSearchResult() {
-  const { status, error, toolOutput } = useToolContext<"search-fruits">();
+export default function McpApp() {
+  const view = useToolContext<"show-app">();
+  const sayHello = useCallTool("say-hello");
+  const [count, setCount] = useState(0);
 
-  if (status === "pending") {
-    return <div className="p-4">Searching…</div>;
-  }
-
-  if (status === "error") {
-    return <div className="p-4">{error.message}</div>;
-  }
-
-  const { query, results } = toolOutput;
+  const pending = view.status === "pending";
+  const callResult = sayHello.data?.structuredContent?.greeting;
 
   return (
-    <div className="p-4">
-      <h2>
-        Results for "{query || "all"}" ({results.length})
-      </h2>
-      {/* carousel, details, accordion … */}
-    </div>
+    <ThemeProvider>
+      {view.status === "error" ? (
+        <>
+          <h1>Failed to load MCP App</h1>
+          <p>{view.error.message}</p>
+        </>
+      ) : (
+        <>
+          {!pending && <ModelContext content={`MCP App counter: ${count}`} />}
+          <h1>{view.toolInput?.appName?.trim() || "MCP App"}</h1>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setCount((c) => c + 1)}
+          >
+            Update State {count}
+          </button>
+          <button
+            type="button"
+            disabled={pending || sayHello.isPending}
+            onClick={() => void sayHello.callTool({ name: "mcp-use" })}
+          >
+            {sayHello.isPending ? "Saying…" : "Say Hello"}
+          </button>
+          {!pending && callResult !== undefined && (
+            <p>Tool Response: {callResult}</p>
+          )}
+          {!pending && sayHello.error !== undefined && (
+            <p role="alert">{sayHello.error.message}</p>
+          )}
+        </>
+      )}
+    </ThemeProvider>
   );
 }
 ```
 
-Views can render before the tool finishes. Check `status === "pending"` before reading `toolOutput`.
+Views can render before the tool finishes. While `status` is `"pending"`, `toolInput` can hold partial arguments, so the heading reads `appName` from it. The starter view does not render the tool output. After you check `status === "ready"`, `view.toolOutput.message` holds the message from `structuredContent`.
+
+`ModelContext` describes the current counter to the model. See [Model context](/v2/typescript/mcp-apps/model-context) for the available channels.
 
 ## Verify in the Inspector
 
@@ -160,14 +203,15 @@ Use the Inspector to confirm that the server and view work.
 
 1. Open `http://localhost:3000/mcp/inspector`.
 2. Go to the **Tools** tab.
-3. Select `search-fruits`.
-4. Run the tool with `{ "query": "a" }` or `{}`.
-5. Confirm that the view renders below the tool result.
+3. Select `show-app`.
+4. Run the tool with `{ "appName": "My App" }`. Without `appName`, the result message contains `undefined`.
+5. Confirm that the view renders below the tool result and its heading shows "My App". The handler waits 1.5 seconds, so the view can show a loading skeleton first.
+6. Select **Say Hello** in the view. Confirm that it shows `Tool Response: Hello, mcp-use!`.
 
 If the tool runs but no view appears, check that `view.name` exactly matches the folder under `views/` and that the handler returns `structuredContent`.
 
 ## Next steps
 
 - Use [`useToolContext()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usetoolcontext) to read tool input, output, and lifecycle status.
-- Use [`useCallTool()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usecalltool) when a view needs to call another MCP tool.
+- Use [`useCallTool()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usecalltool) when a view needs to call another MCP tool. See [Interactivity](/v2/typescript/mcp-apps/interactivity) for follow-up messages, external links, display modes, and view tools.
 - Configure [Content Security Policy](/v2/typescript/mcp-apps/content-security-policy) before loading external APIs, images, scripts, embeds, or static assets.

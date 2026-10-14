@@ -14,7 +14,10 @@
     "src/oauth/scalekit.ts",
     "src/oauth/convex.ts",
     "src/node-bridge.ts",
-    "src/next/index.ts"
+    "src/next/index.ts",
+    "src/vite/index.ts",
+    "src/tanstack-start/index.ts",
+    "src/tanstack-start/vite.ts"
   ],
   "entryPointStrategy": "resolve",
   "tsconfig": "tsconfig.json",

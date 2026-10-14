@@ -271,7 +271,7 @@ export abstract class BaseMCPClient {
    * Creates a connector from server configuration.
    *
    * This abstract method must be implemented by platform-specific subclasses
-   * to create the appropriate connector type (Stdio, HTTP, WebSocket, etc.)
+   * to create the appropriate connector type (stdio or HTTP)
    * based on the server configuration and runtime environment.
    *
    * @param serverConfig - Server configuration object

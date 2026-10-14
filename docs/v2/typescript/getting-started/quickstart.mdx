@@ -28,21 +28,24 @@ generated project includes a server, two tools, and a React View.
 
 <CodeGroup>
 ```bash npm
-npx create-mcp-use-app@latest my-mcp-app --template mcp-apps
+npx create-mcp-use-app@latest my-mcp-app --template mcp-apps --install
 ```
 
 ```bash pnpm
-pnpm dlx create-mcp-use-app@latest my-mcp-app --template mcp-apps
+pnpm dlx create-mcp-use-app@latest my-mcp-app --template mcp-apps --install
 ```
 
 ```bash bun
-bunx create-mcp-use-app@latest my-mcp-app --template mcp-apps
+bunx create-mcp-use-app@latest my-mcp-app --template mcp-apps --install
 ```
 
 </CodeGroup>
 
-The scaffolder can install dependencies and the `mcp-apps-builder` coding-agent
-skill. Accept the defaults when prompted.
+When `--template` is passed, the scaffolder does not prompt. `--install`
+installs dependencies with the package manager that ran the command; without
+it, run `npm install`, `pnpm install`, or `bun install` in the project before
+starting the server. The scaffolder also installs the `mcp-apps-builder`
+coding-agent skill, which requires Git. Pass `--no-skills` to skip it.
 
 ## Run the development server
 
@@ -204,24 +207,29 @@ npx mcp-use client local tools list
 
 ## Deploy the project
 
-Deploy the generated project to Manufact:
+Sign in to Manufact, then deploy the generated project. `deploy` does not sign
+you in; without saved credentials or `MCP_USE_API_KEY`, it exits with
+`Not logged in`.
 
 <CodeGroup>
 ```bash npm
+npx mcp-use login
 npm run deploy
 ```
 
 ```bash pnpm
+pnpm exec mcp-use login
 pnpm run deploy
 ```
 
 ```bash bun
+bunx mcp-use login
 bun run deploy
 ```
 
 </CodeGroup>
 
-The first deployment signs you in and links the local project. See the
+The first deployment links the local project. See the
 [Manufact deployment guide](/v2/typescript/server/deployment/mcp-use) for
 environment variables, regions, and subsequent deployments.
 

@@ -197,7 +197,8 @@ OAuth requests through the configured `oauthProxyUrl`; it does not expose
 ## Manual browser authorization
 
 Construct a `BrowserOAuthClientProvider` with `preventAutoAuth: true` and pass it
-to the browser client when you need to present the authorization URL yourself:
+to the browser client when you need to present the authorization URL yourself.
+Set `useRedirectFlow: true` when you navigate the current page to that URL:
 
 ```typescript
 import {
@@ -208,7 +209,7 @@ import {
 
 const authProvider = new BrowserOAuthClientProvider(
   "https://api.example.com/mcp",
-  { preventAutoAuth: true }
+  { preventAutoAuth: true, useRedirectFlow: true }
 );
 const client = new MCPClient({
   mcpServers: {
@@ -236,6 +237,11 @@ It is kept in memory only, so start a new authorization attempt after a page
 reload. The auto-provisioned browser provider also accepts
 `oauth.preventAutoAuth`, but an explicit provider gives your application access
 to the prepared URL.
+
+The provider records the flow type when it prepares the URL. With
+`useRedirectFlow: true`, the callback page that calls `onMcpAuthorization()`
+returns to the page that started authorization. Without it, the callback treats
+the navigation as a popup and leaves the user on the callback page.
 
 ## Bearer tokens
 

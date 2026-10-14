@@ -18,7 +18,7 @@ For example, if the deployed origin is `https://mcp.example.com` and the default
 
 ## Configure the server
 
-Pass the AuthKit subdomain explicitly. The provider does not read WorkOS environment variables and does not accept a separate `audience` option.
+Pass the AuthKit subdomain explicitly, as below, or omit it and set `MCP_USE_OAUTH_WORKOS_SUBDOMAIN`. The provider does not accept a separate `audience` option.
 
 ```bash
 WORKOS_SUBDOMAIN=your-company.authkit.app

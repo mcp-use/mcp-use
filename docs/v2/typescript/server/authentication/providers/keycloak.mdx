@@ -14,7 +14,7 @@ For production, only require Initial Access Tokens after confirming that every i
 
 ## Configure the server
 
-`serverUrl` and `realm` are required. They are not read from the environment by the provider.
+`serverUrl` and `realm` are required. Pass them explicitly, as below, or omit them and set `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL` and `MCP_USE_OAUTH_KEYCLOAK_REALM`.
 
 ```bash
 KEYCLOAK_SERVER_URL=https://keycloak.example.com
@@ -42,6 +42,14 @@ export default server;
 ```
 
 There is no Keycloak provider `audience` option. Verification is bound to the resolved MCP resource, so configure Keycloak to issue access tokens for that resource.
+
+<Warning>
+  When `MCP_USE_OAUTH_KEYCLOAK_AUDIENCE` is set and you don't pass `resource`,
+  the provider uses its value as the MCP resource, overriding `MCP_URL`. It must
+  be the full MCP endpoint URL, such as `https://mcp.example.com/mcp`, with a
+  path equal to the server's `basePath`, or the `MCPServer` constructor throws.
+  Unset it if it still holds a client ID or another audience value.
+</Warning>
 
 ## Use roles and permissions
 

@@ -143,9 +143,9 @@ interface BaseServerConfig {
    *
    * `"stateless"` answers each legacy request with a fresh instance over a
    * session-less streamable HTTP transport (2025 session operations — GET and
-   * DELETE — get `405`). `"reject"` is modern-only strict: legacy-classified
-   * requests are refused with the unsupported-protocol-version error naming
-   * the supported revisions.
+   * DELETE — and HEAD probes get an empty `204`). `"reject"` is modern-only
+   * strict: legacy-classified requests are refused with the
+   * unsupported-protocol-version error naming the supported revisions.
    *
    * @defaultValue `"stateless"`
    */

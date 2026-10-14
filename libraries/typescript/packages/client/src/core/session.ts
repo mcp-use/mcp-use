@@ -122,7 +122,7 @@ export interface MCPConnectionInfo {
 export class MCPConnection {
   /**
    * The underlying connector managing the transport layer.
-   * This is the Stdio, HTTP, or WebSocket connector handling actual communication.
+   * This is the stdio or HTTP connector handling actual communication.
    */
   readonly connector: BaseConnector;
 
@@ -135,12 +135,12 @@ export class MCPConnection {
   /**
    * Creates a new MCP session.
    *
-   * @param connector - The connector to use for communication (Stdio, HTTP, WebSocket)
+   * @param connector - The connector to use for communication (stdio or HTTP)
    * @param autoConnect - Whether to automatically connect during initialization (default: true)
    *
    * @example
    * ```typescript
-   * const connector = new HttpConnector({ url: 'http://localhost:3000/mcp' });
+   * const connector = new HttpConnector('http://localhost:3000/mcp');
    * const session = new MCPSession(connector);
    * await session.initialize(); // Auto-connects and initializes
    * ```
@@ -161,9 +161,9 @@ export class MCPConnection {
   /**
    * Establishes the connection to the MCP server.
    *
-   * This method starts the underlying transport (spawns process for Stdio,
-   * opens WebSocket, etc.) but does not perform the MCP initialization
-   * handshake. Call {@link initialize} after connecting.
+   * This method starts the underlying transport (spawns the process for
+   * stdio, opens the HTTP transport) but does not perform the MCP
+   * initialization handshake. Call {@link initialize} after connecting.
    *
    * @returns Promise that resolves when connected
    *

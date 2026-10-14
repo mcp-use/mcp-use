@@ -27,12 +27,20 @@ const onElicitation: OnElicitationCallback = async (params) => {
   return acceptWithDefaults(params);
 };
 
-const client = new MCPClient(config, { onElicitation });
+const client = new MCPClient(
+  { mcpServers: { demo: { url: "http://localhost:3000/mcp" } } },
+  { onElicitation },
+);
 ```
+
+The second constructor argument is available only in the Node.js entry. In a
+browser build, set `onElicitation` at the top level of the configuration or on
+an individual server configuration instead.
 
 ## Helpers
 
-Import from `@mcp-use/client`:
+These helpers are exported only by the Node.js entry of `@mcp-use/client`. The
+browser entry and `@mcp-use/client/react` do not export them.
 
 | Helper | Purpose |
 | ------ | ------- |
@@ -44,10 +52,27 @@ Import from `@mcp-use/client`:
 
 ## React
 
+The helpers above are not available in a browser build, so handle the request
+directly. This handler accepts form requests with their schema defaults:
+
 ```tsx
+import { useMcp, type ElicitResult } from "@mcp-use/client/react";
+
 const mcp = useMcp({
   url: "http://localhost:3000/mcp",
-  onElicitation: (params) => acceptWithDefaults(params),
+  onElicitation: async (params): Promise<ElicitResult> => {
+    if (params.mode === "url") {
+      window.open(params.url, "_blank", "noopener");
+      return { action: "accept" };
+    }
+    const content: NonNullable<ElicitResult["content"]> = {};
+    for (const [name, field] of Object.entries(
+      params.requestedSchema.properties
+    )) {
+      if (field.default !== undefined) content[name] = field.default;
+    }
+    return { action: "accept", content };
+  },
 });
 ```
 

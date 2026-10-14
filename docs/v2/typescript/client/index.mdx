@@ -5,9 +5,10 @@ description: "Connect a TypeScript app to MCP servers and call tools, resources,
 icon: "router"
 ---
 
-`@mcp-use/client` connects your app to one or more MCP servers. It negotiates the
-server's supported MCP protocol automatically and exposes the same connection
-API across sessionful and sessionless servers.
+`@mcp-use/client` connects your app to one or more MCP servers. HTTP connections
+negotiate the server's supported MCP protocol automatically; stdio connections
+default to the sessionful protocol unless you set `protocolNegotiation`. The
+same connection API works across sessionful and sessionless servers.
 
 ## Install
 

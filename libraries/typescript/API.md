@@ -38,7 +38,7 @@ Import: `@mcp-use/tunnel`.
 
 ## Server integrations
 
-{@link mcp-use.oauth | OAuth configuration}, {@link mcp-use.next | Next.js}, {@link mcp-use.node-bridge | Node.js bridge}, and {@link mcp-use.landing | server landing page}.
+{@link mcp-use.oauth | OAuth configuration}, {@link mcp-use.next | Next.js}, {@link mcp-use.tanstack-start | TanStack Start}, {@link mcp-use.vite | Vite plugin}, {@link mcp-use.node-bridge | Node.js bridge}, and {@link mcp-use.landing | server landing page}.
 
 ## Finding a symbol
 

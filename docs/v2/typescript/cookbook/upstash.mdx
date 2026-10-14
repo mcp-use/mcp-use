@@ -51,9 +51,9 @@ MCP_USE_UPSTASH_REDIS_REST_TOKEN=your-rest-token
 
 Keep `.env` out of version control. Both values stay on the server.
 
-Add the highlighted middleware to your existing server, or copy this complete example into `src/index.ts`. It checks only `generate_report`; other tools and tool discovery continue normally.
+Add the highlighted middleware to your existing server, or copy this complete example into your server entry (`index.ts` in a project created with `create-mcp-use-app`). It checks only `generate_report`; other tools and tool discovery continue normally.
 
-```typescript src/index.ts highlight={1-2,12-68}
+```typescript index.ts highlight={1-2,12-68}
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { MCPServer } from "mcp-use";

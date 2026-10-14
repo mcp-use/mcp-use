@@ -104,10 +104,11 @@ mcp-use dev --tunnel
 - Address precedence is `--port` / `--host`, then `PORT` / `HOST`, then the defaults. `dev` does not import the server until after its listener is chosen, so it cannot use a server-configured address.
 - The Inspector supplied by `mcp-use` is mounted at `/mcp/inspector` and opens automatically unless `--no-open` is set.
 - Inspector UI, proxy, and OAuth routes remain local-only. A public tunnel exposes the MCP endpoint but returns `404` for `/mcp/inspector`.
-- The command sets `NODE_ENV=development`, sets `PORT`, and sets `MCP_URL` to the tunnel URL or local server URL when `MCP_URL` is not already set.
+- The command sets `NODE_ENV=development` when it is not already set and sets `PORT` to the chosen listener port before importing the entry.
+- When `MCP_URL` is unset and the listener binds a loopback host, the command sets `MCP_URL` to `http://localhost:<port>` only while it imports the entry, so module-scope OAuth configuration sees the local origin. Request handlers and tool code do not see this value, and `--tunnel` never sets `MCP_URL`.
 - Source changes reload the exported server without dropping the long-lived HTTP listener. View modules use Vite HMR when views exist at startup.
 - Adding the first view to a project that started with none requires restarting `mcp-use dev`.
-- `mcp-use dev` writes development session metadata to `.mcp-use/sessions.json`.
+- `mcp-use dev` keeps its Vite cache in `.mcp-use/cache/` and the tunnel subdomain in `.mcp-use/state/tunnel.json`.
 - See [Tunneling reference](#tunneling-reference) for the lifecycle and limits of `--tunnel`.
 
 ## `typecheck`
@@ -247,29 +248,32 @@ See the [Tunneling guide](/tunneling/index) for client setup and testing workflo
 **Syntax:**
 
 ```bash
-mcp-use deploy [options]
+mcp-use deploy [path] [options]
 ```
+
+`[path]` is the project directory. It defaults to the current directory.
 
 **Options:**
 
 | Option                    | Description                                                                            | Default            |
 | ------------------------- | -------------------------------------------------------------------------------------- | ------------------ |
 | `--open`                  | Open the deployment in a browser after a successful deploy.                            | Disabled           |
-| `--name <name>`           | Deployment or server name.                                                             | Auto-generated     |
-| `--new`                   | Create a new deployment instead of reusing the linked project.                         | Disabled           |
+| `--name <name>`           | Server name. Also names the GitHub repository when the CLI creates one.                | GitHub repository name; with `--no-github`, the `package.json` name or directory name |
+| `--new`                   | Create a new server instead of reusing the linked project.                             | Disabled           |
 | `--env <key=value>`       | Environment variable assignment. Repeatable.                                           | None               |
 | `--env-file <path>`       | Load environment variables from a `.env` file.                                         | None               |
-| `--branch <name>`         | Branch to deploy. Also scopes env sync to that branch preview environment.             | Current git branch |
+| `--branch <name>`         | Branch to deploy. Also scopes env sync to that branch preview environment.             | Current git branch; `main` with `--no-github` |
 | `--root-dir <path>`       | Root directory inside the repository for monorepos.                                    | Repository root    |
 | `--org <slug-or-id>`      | Target organization.                                                                   | Active org         |
-| `-y, --yes`               | Skip confirmation prompts.                                                             | Disabled           |
+| `-y, --yes`               | Accept confirmation prompts and authorize Git and repository changes: creating a private GitHub repository, committing and pushing uncommitted changes, and selecting the default GitHub App installation. | Disabled           |
 | `--region <region>`       | Deployment region: `US`, `EU`, or `APAC`.                                              | `US`               |
 | `--build-command <cmd>`   | Build command override.                                                                | Auto-detected      |
 | `--start-command <cmd>`   | Start command override.                                                                | Auto-detected      |
 | `--dockerfile <path>`     | Non-default Dockerfile path, relative to `--root-dir` or repository root.              | None               |
-| `--watch-paths <glob>`    | Only auto-deploy when matching files change. Repeatable. Set on new-server creation for monorepos. | All changes        |
-| `--wait-for-ci`           | Hold GitHub auto-deploys until other check runs pass. Set on new-server creation.      | Disabled           |
+| `--watch-paths <glob>`    | Only auto-deploy when matching files change. Repeatable. GitHub only.                  | All changes        |
+| `--wait-for-ci`           | Hold GitHub auto-deploys until other check runs pass. GitHub only.                     | Disabled           |
 | `--no-github`             | Upload local source without connecting GitHub.                                         | Disabled           |
+| `--json`                  | Emit exactly one JSON result or error. Never prompts or opens a browser; cannot be combined with `--open`. | Human-readable text |
 
 **Examples:**
 
@@ -287,11 +291,12 @@ mcp-use deploy --org manufact-inc --region EU --yes
 
 **Notes and behavior:**
 
-- The default path deploys from GitHub and prompts to install or connect the GitHub App when needed.
+- The default path deploys from GitHub. If the organization has no GitHub App installation, the command exits with `github_installation_required` and a link to the dashboard settings. If the project has no GitHub `origin`, an interactive run offers to create a private repository, initialize Git, commit, and push to `main`. If the working tree has uncommitted changes, it offers to commit and push them with `git add .`. `--yes` authorizes these Git changes without prompting.
 - `--no-github` packs and uploads local source to a platform-managed repository.
 - Redeploys of a project already linked to a platform-managed server auto-detect the upload path. `--no-github` is only required on the first deploy for that path.
-- The command writes `.mcp-use/project.json` to link the local project to the cloud server.
-- The CLI adds `.mcp-use/` to `.gitignore` when it writes a project link.
+- The command writes `.mcp-use/cloud/link.json` to link the local project to the cloud server.
+- When it writes the project link, the CLI adds `.mcp-use/` to the repository's local `.git/info/exclude` if that file exists. It writes `.mcp-use/` to `.gitignore` only when it creates a new repository.
+- On a redeploy of a linked server, the supplied `--name`, `--branch`, `--region`, `--root-dir`, `--build-command`, `--start-command`, `--dockerfile`, `--watch-paths`, and `--wait-for-ci` values update that server's configuration before the deployment starts.
 - Environment variables passed through `--env` and `--env-file` are synced to the target branch preview environment when `--branch` is set.
 
 ## Authentication commands
@@ -345,7 +350,11 @@ mcp-use login --api-key mcp_... --org my-org
 mcp-use whoami
 ```
 
-**Options:** None.
+**Options:**
+
+| Option   | Description                                     | Default             |
+| -------- | ----------------------------------------------- | ------------------- |
+| `--json` | Emit a machine-readable identity object.        | Human-readable text |
 
 **Examples:**
 
@@ -639,17 +648,17 @@ mcp-use screenshot --mcp https://example.com/mcp --tool show-app \
 | `PORT`                      | `dev`, `start`, server runtime            | Server port when `--port` is not provided. `dev` sets it to the resolved listener port before importing the entry; `start` reads it before importing the built entry.                                       | `3000`                              |
 | `HOST`                      | `dev`, `start`, server runtime            | Bind host when `--host` is not provided. `start` and direct `listen()` fall back to `config.host` before `127.0.0.1`.                                                                                       | `127.0.0.1`                         |
 | `NODE_ENV`                  | `dev`, `start`, widget builds             | Runtime environment. `dev` sets `development`; `start` sets `production`.                                                                                                                                   | Command-specific                    |
-| `MCP_URL`                   | `dev`, `start`, server runtime            | **Server public origin** (`.origin` only). OAuth resource URL, CSP `connectDomains`, dev HMR websocket. Lower priority than `CSP_URLS`. Preserved when already set.                                         | Local server URL or tunnel URL      |
+| `MCP_URL`                   | server runtime, `dev`                     | **Server public origin**, such as `https://mcp.example.com`. OAuth resource URL, CSP `connectDomains`, dev HMR websocket. With OAuth configured, a value with a path, query, or credentials makes the server constructor throw; views and CSP use only its origin. Lower priority than `CSP_URLS`. `dev` sets it only while importing the entry on loopback binds; `start` never sets it. | None (request origin)               |
 | `MCP_ASSETS_URL`            | `build`, server runtime                   | **Assets URL prefix** (origin + optional path) for view JS/CSS and `public/`. Falls back to `MCP_URL` origin. When set at build, manifest paths become full CDN URLs (path segment from server `basePath`). | None (falls back to server origin)  |
 | `CSP_URLS`                  | server runtime                            | Comma-separated CSP domain shortcut — applied to all four MCP Apps categories when per-category vars are unset. Higher priority than `MCP_URL` auto-append.                                                 | None                                |
 | `CSP_CONNECT_DOMAINS`       | server runtime                            | Overrides `CSP_URLS` for `connectDomains`                                                                                                                                                                   | None                                |
 | `CSP_RESOURCE_DOMAINS`      | server runtime                            | Overrides `CSP_URLS` for `resourceDomains`                                                                                                                                                                  | None                                |
 | `CSP_FRAME_DOMAINS`         | server runtime                            | Overrides `CSP_URLS` for `frameDomains`                                                                                                                                                                     | None                                |
 | `CSP_BASE_URI_DOMAINS`      | server runtime                            | Overrides `CSP_URLS` for `baseUriDomains`                                                                                                                                                                   | None                                |
-| `MCP_WEB_URL`               | `login`, cloud auth                       | Manufact web URL for auth pages.                                                                                                                                                                            | `https://manufact.com`              |
-| `MCP_API_URL`               | `login`, cloud API config                 | Manufact API URL. The CLI normalizes it to include `/api/v1`.                                                                                                                                               | `https://cloud.manufact.com/api/v1` |
-| `MCP_USE_API_KEY`           | `login`                                   | API key for non-interactive login.                                                                                                                                                                          | None                                |
-| `MCP_USE_API`               | Tunnel cleanup and local tunnel API calls | Tunnel service API base used by integrated tunnel cleanup paths.                                                                                                                                            | `https://local.mcp-use.run`         |
+| `MCP_USE_CLOUD_WEB_URL`     | `deploy`                                  | Manufact web URL for dashboard and GitHub settings links.                                                                                                                                                   | `https://manufact.com`              |
+| `MCP_USE_CLOUD_API_URL`     | `login` and all cloud commands            | Manufact API URL. Takes precedence over `MCP_API_URL`. The CLI normalizes it to include `/api/v1`.                                                                                                          | `https://cloud.manufact.com/api/v1` |
+| `MCP_API_URL`               | `login` and all cloud commands            | Fallback Manufact API URL when `MCP_USE_CLOUD_API_URL` is unset.                                                                                                                                            | `https://cloud.manufact.com/api/v1` |
+| `MCP_USE_API_KEY`           | `login` and all cloud commands            | API key for non-interactive login. Cloud commands (`deploy`, `servers`, `deployments`, `org`, `whoami`) use it directly and prefer it over the saved credential.                                           | None                                |
 | `MCP_USE_WS_RELAY`          | `dev --tunnel`, `start --tunnel`          | WebSocket relay API origin used when creating authenticated local tunnels.                                                                                                                                  | `https://api.tunnel.mcp-use.run`    |
 | `MCP_USE_CHROME_PATH`       | `screenshot`                              | Chrome executable path for screenshots.                                                                                                                                                                     | Auto-detected                       |
 | `PUPPETEER_EXECUTABLE_PATH` | `screenshot`                              | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |
