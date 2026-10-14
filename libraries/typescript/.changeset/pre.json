@@ -12,8 +12,12 @@
   },
   "changesets": [
     "anthropic-empty-tool-result",
+    "build-exits-when-done",
+    "build-production-node-env",
+    "oauth-proxy-authorization-server",
     "openapi-exclusive-bounds",
     "propagated-0f3dc2a2a6980cf5",
+    "propagated-33b08412bc180c88",
     "propagated-73aa1a1894ad56a2",
     "smart-deploy-gitignore"
   ]
