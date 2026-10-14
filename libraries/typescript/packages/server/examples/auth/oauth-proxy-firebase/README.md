@@ -86,19 +86,18 @@ cp .env.example .env
 
 Set `MCP_USE_FIREBASE_API_KEY`, `MCP_USE_FIREBASE_AUTH_DOMAIN`,
 `MCP_USE_FIREBASE_PROJECT_ID`, and `MCP_USE_OAUTH_SECRET`
-(`openssl rand -base64 32`). Then start the server:
+(`openssl rand -base64 32`). The server keeps sign-ins in Firestore, so it
+also needs Google credentials: set `MCP_USE_FIREBASE_SERVICE_ACCOUNT` to a
+service account key file (see
+[Store sign-ins in Firestore](#store-sign-ins-in-firestore)). If your
+organization does not allow service account keys, keep sign-ins in the
+Firestore emulator instead: start it with
+`npx -y firebase-tools@15.33.0 emulators:start --only firestore --project <project-id>`
+and set `MCP_USE_FIRESTORE_EMULATOR_URL=http://127.0.0.1:8080`. Then start the
+server:
 
 ```sh
 pnpm dev
-```
-
-On localhost the example keeps sign-ins in memory. They end when the server
-restarts or reloads after a file change. To keep them, run Redis 6.2 or later
-and set `MCP_USE_REDIS_URL`:
-
-```sh
-docker run --rm -p 6379:6379 redis:7
-MCP_USE_REDIS_URL=redis://localhost:6379
 ```
 
 Connect an MCP client to `http://localhost:3000/mcp`, for example:
@@ -134,6 +133,9 @@ MCP_USE_FIREBASE_AUTH_EMULATOR_URL=http://127.0.0.1:9099
 MCP_USE_FIRESTORE_EMULATOR_URL=http://127.0.0.1:8080
 ```
 
+The server then keeps sign-ins in the Firestore emulator, which needs no
+credentials.
+
 Then run `pnpm dev` and connect a client. **Allow** opens the emulator's
 sign-in window, where you add an account with made-up details. The Firestore
 emulator applies `firestore.rules`, which `firebase.json` names. Add notes in
@@ -148,6 +150,42 @@ listens on a loopback address), and logs a warning. `mcp-use dev` listens on
 emulator is on.
 The server never reads `FIREBASE_AUTH_EMULATOR_HOST`. The emulator's sign-in
 window loads `https://apis.google.com`, so it needs internet access.
+
+## Store sign-ins in Firestore
+
+`oauthProxy` keeps pending sign-ins, one-time codes, and the users' tokens in
+a store. This example keeps them in the project's Firestore, with
+`firestoreStorage` from `mcp-use/oauth/storage`:
+
+```ts
+import { cert, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { firestoreStorage } from "mcp-use/oauth/storage";
+
+const app = initializeApp({ projectId, credential: cert(serviceAccountPath) });
+const storage = firestoreStorage({ firestore: getFirestore(app) });
+```
+
+The store writes one document per key to the `mcp_use_oauth` collection, which
+Firestore creates on the first write. The values are encrypted with
+`MCP_USE_OAUTH_SECRET`.
+
+- **Credentials.** The store uses `firebase-admin`. On Cloud Run, Cloud
+  Functions, and App Hosting it signs in as the service account of the
+  runtime, and needs no setting. Elsewhere, create a key in **Project
+  settings** > **Service accounts** > **Generate new private key**, keep it
+  out of the repository, and set `MCP_USE_FIREBASE_SERVICE_ACCOUNT` to its
+  path. A `firebase login` does not give the server credentials.
+- **Security rules.** The Admin SDK bypasses security rules. `firestore.rules`
+  matches only `users/{uid}/notes`, so no client can read or write
+  `mcp_use_oauth`. Keep it that way if you change the rules.
+- **Expired documents.** The store ignores expired documents, but Firestore
+  keeps them until they are deleted. `firestore.indexes.json` sets a TTL policy
+  on `expiresAt` so Firestore deletes them. TTL policies need the Blaze plan:
+
+  ```sh
+  npx -y firebase-tools@15.33.0 deploy --only firestore:indexes --project <project-id>
+  ```
 
 ## Using Firebase from a tool
 
@@ -228,8 +266,9 @@ Web clients need a public HTTPS URL, and a public server needs a shared store:
 2. Set `MCP_URL` to the public origin, with no path.
 3. Add the host of `MCP_URL` to the authorized domains of Firebase
    Authentication.
-4. Set `MCP_USE_REDIS_URL` to a Redis 6.2 or later that every instance can
-   reach, for example `rediss://default:<password>@<host>:6379`.
+4. Give the server Google credentials (see
+   [Store sign-ins in Firestore](#store-sign-ins-in-firestore)). Every
+   instance shares the Firestore store.
 
 Without a shared store and a secret, `oauthProxy` refuses to start outside
 localhost: sign-ins, one-time codes, and tokens must be visible to every

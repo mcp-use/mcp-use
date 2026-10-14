@@ -1,12 +1,8 @@
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { isBuilding, MCPServer } from "mcp-use";
-import {
-  firebase,
-  memoryStorage,
-  oauthProxy,
-  upstreamToken,
-} from "mcp-use/oauth";
-import { redisStorage } from "mcp-use/oauth/storage";
-import { createClient } from "redis";
+import { firebase, oauthProxy, upstreamToken } from "mcp-use/oauth";
+import { firestoreStorage } from "mcp-use/oauth/storage";
 import { z } from "zod";
 
 import { ConsentPage } from "./consent/consent-page.js";
@@ -25,24 +21,6 @@ function optionalEnv(name: string): string | undefined {
   return value === undefined || value === "" ? undefined : value;
 }
 
-// Redis (6.2 or later) when one is configured. Otherwise memory, which
-// oauthProxy accepts only while the server runs on localhost.
-const redisUrl = optionalEnv("MCP_USE_REDIS_URL");
-const storage =
-  redisUrl === undefined
-    ? memoryStorage()
-    : // A function connects on the first sign-in, not when the server starts,
-      // so a build or a cold start does not wait on Redis.
-      redisStorage(() =>
-        createClient({ url: redisUrl })
-          // Without an error listener, a dropped connection crashes the
-          // process. With one, node-redis logs it here and reconnects.
-          .on("error", (error: unknown) => {
-            console.error("Redis error:", error);
-          })
-          .connect()
-      );
-
 const allowedClients = optionalEnv("MCP_USE_ALLOWED_CLIENTS")
   ?.split(",")
   .map((entry) => entry.trim())
@@ -53,10 +31,35 @@ const projectId = requireEnv("MCP_USE_FIREBASE_PROJECT_ID");
 // oauthProxy then refuses to run anywhere but localhost. Keep the server on
 // a loopback address, with no tunnel, while it is set.
 const authEmulator = optionalEnv("MCP_USE_FIREBASE_AUTH_EMULATOR_URL");
+const firestoreEmulator = optionalEnv("MCP_USE_FIRESTORE_EMULATOR_URL");
 const firestoreOrigin = (
-  optionalEnv("MCP_USE_FIRESTORE_EMULATOR_URL") ??
-  "https://firestore.googleapis.com"
+  firestoreEmulator ?? "https://firestore.googleapis.com"
 ).replace(/\/+$/, "");
+
+if (firestoreEmulator !== undefined) {
+  // The Admin SDK finds the emulator only through this variable, and needs
+  // no credentials for it.
+  process.env["FIRESTORE_EMULATOR_HOST"] = new URL(firestoreEmulator).host;
+}
+// A service account key file. Without one, the Admin SDK uses the service
+// account of the runtime on Cloud Run or Cloud Functions.
+const serviceAccount = optionalEnv("MCP_USE_FIREBASE_SERVICE_ACCOUNT");
+// `mcp-use dev` runs this file again after each change, in the same process,
+// where the app from the previous run still exists.
+const app =
+  getApps().length > 0
+    ? getApp()
+    : initializeApp({
+        projectId,
+        ...(serviceAccount !== undefined && {
+          credential: cert(serviceAccount),
+        }),
+      });
+
+// Sign-ins, one-time codes, and tokens live in the mcp_use_oauth collection.
+// The Admin SDK bypasses security rules. It connects on the first sign-in, so
+// a build or a cold start does not wait on Firestore.
+const storage = firestoreStorage({ firestore: getFirestore(app) });
 
 const server = new MCPServer({
   name: "oauth-proxy-firebase-example",

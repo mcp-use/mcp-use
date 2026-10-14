@@ -125,6 +125,9 @@ overrides:
   smol-toml: ^1.7.1
 
 allowBuilds:
+  # firebase-admin pulls it in. Its postinstall only bakes a web app config
+  # from FIREBASE_WEBAPP_CONFIG for the browser SDK, which no package uses.
+  "@firebase/util": false
   "@tailwindcss/oxide": true
   esbuild: true
   # protobufjs only checks dependency version conventions during postinstall.
