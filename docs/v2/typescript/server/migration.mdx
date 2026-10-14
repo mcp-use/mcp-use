@@ -576,7 +576,10 @@ directly. Once the new submission is approved and live, remove the middleware.
 
 Native v2 acts as an OAuth resource server backed by an external authorization
 server. Import provider adapters from `mcp-use/oauth/*`, supply their required
-locator options, and use the provider-specific `ctx.auth.user` type.
+locator options, and use the provider-specific `ctx.auth.user` type. For a
+provider without Dynamic Client Registration, such as GitHub or Google,
+`oauthProxy` makes the server its own authorization server. See
+[Migrate `oauthProxy`](#migrate-oauthproxy).
 
 Replace generic `userId` assumptions with the provider's mapped field, commonly
 `id`. Replace `getAuth`, `hasScope`, and `requireScope` with verified
@@ -589,9 +592,7 @@ v1 tool sets `_meta.securitySchemes` by hand, v2 passes it through unchanged but
 does not enforce it; declare `securitySchemes` on the tool instead. See
 [Mixed authentication](/v2/typescript/server/authentication/mixed-auth).
 
-OAuth proxy or authorization-server mode has no native v2 migration. Do not
-translate `oauthProxy`, `jwksVerifier`, or `mountOAuthProxy` as resource-server
-configuration.
+`jwksVerifier` and `mountOAuthProxy` have no v2 equivalent.
 
 v2 upstream composition accepts HTTP remotes or a ready compatible client
 connection. A v1 stdio child-process proxy requires an architecture change.
@@ -716,6 +717,26 @@ Verify the migration with a real token that a v1 client holds.
 The resource identifier is part of your public contract. Changing `MCP_URL` or
 `basePath` later changes it again and requires the same migration.
 
+### Migrate `oauthProxy`
+
+v2 keeps `oauthProxy` for providers without Dynamic Client Registration, such as
+GitHub and Google, with a new API and a new token model:
+
+- Import it from `mcp-use/oauth`. Configure the provider with `github()`,
+  `google()`, or `upstream()` instead of `authEndpoint` and `tokenEndpoint`.
+- The proxy issues its own tokens. Tools read the upstream token with
+  `upstreamToken(ctx.auth)`; `verifyToken` and `jwksVerifier` are removed.
+- Outside localhost, the proxy requires a `secret` (or `MCP_USE_OAUTH_SECRET`)
+  and a shared `storage`.
+- The upstream callback URL moves from `/oauth/callback` to
+  `/mcp/oauth/callback`.
+- Every user approves the consent page and signs in once more, in the same
+  client: v2 rejects the upstream tokens that v1 clients hold. Redirect the v1
+  `/authorize` and `/token` paths for clients that saved them.
+
+Follow [Migrate from v1 `oauthProxy`](/v2/typescript/server/authentication/providers/oauth-proxy#migrate-from-v1-oauthproxy)
+for the option mapping, a before-and-after example, and the deployment steps.
+
 ## Review v2 limitations
 
 The following v1 capabilities do not currently have direct v2 equivalents.
@@ -743,8 +764,10 @@ explicit domain handle. Do not key business state to an MCP transport session.
 
 ### OAuth, proxy, and OpenAPI
 
-- OAuth proxy and authorization-server mode are not provided. Direct
-  resource-server authentication is implemented.
+- `oauthProxy` is available for providers without Dynamic Client
+  Registration, with a new API and its own tokens. A stand-alone authorization
+  server with its own user accounts is not provided.
+- `mountOAuthProxy`, the browser OAuth helper routes, has no equivalent.
 - Unsigned token bypasses such as `verifyJwt: false` are not supported.
 - Verify proxy requirements for upstream OAuth, templates, completions,
   subscriptions, list synchronization, sampling, and elicitation before

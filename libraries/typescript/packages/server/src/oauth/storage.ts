@@ -183,7 +183,10 @@ export interface PostgresLikeClient {
   query(
     text: string,
     values?: unknown[]
-  ): Promise<{ rows: Record<string, unknown>[] }>;
+  ): Promise<{
+    /** Result rows, one object per row keyed by column name. */
+    rows: Record<string, unknown>[];
+  }>;
 }
 
 /** Options for {@link postgresStorage}. */
@@ -311,6 +314,7 @@ export interface FirestoreLikeTransaction {
 export interface FirestoreLikeDatabase {
   /** Gets a collection. */
   collection(path: string): {
+    /** Gets a reference to the document with this ID. */
     doc(id: string): FirestoreLikeDocumentReference;
   };
   /** Runs a function in a transaction, retrying it on contention. */
@@ -443,8 +447,11 @@ function expiresAtMillis(data: Record<string, unknown> | undefined): number {
 export interface D1LikeDatabase {
   /** Prepares a statement. */
   prepare(query: string): {
+    /** Binds the statement's `?1`, `?2`, … parameters. */
     bind(...values: unknown[]): {
+      /** Runs the statement and returns its first row, or `null`. */
       first<T = Record<string, unknown>>(): Promise<T | null>;
+      /** Runs the statement without returning rows. */
       run(): Promise<unknown>;
     };
   };
@@ -456,6 +463,7 @@ export interface DurableObjectNamespaceLike {
   idFromName(name: string): unknown;
   /** Gets a stub for an object ID. */
   get(id: never): {
+    /** Sends a request to the object. */
     fetch(input: string, init?: RequestInit): Promise<Response>;
   };
 }
