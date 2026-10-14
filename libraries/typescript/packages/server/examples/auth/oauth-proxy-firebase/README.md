@@ -40,15 +40,11 @@ In the [Firebase console](https://console.firebase.google.com/):
    npx -y firebase-tools@15.33.0 deploy --only firestore:rules --project <project-id>
    ```
 
-The server reaches Firestore with `firebase-admin`, which finds Google
-credentials on its own: the service account of the runtime on Cloud Run,
-Cloud Functions, or App Hosting. On your machine, sign in once with the
-[gcloud CLI](https://cloud.google.com/sdk/docs/install):
-
-```sh
-gcloud auth application-default login
-gcloud auth application-default set-quota-project <project-id>
-```
+The server reaches Firestore with `firebase-admin`. On Cloud Run, Cloud
+Functions, or App Hosting, it uses the runtime's service account. Anywhere
+else, generate a key in **Project settings** > **Service accounts** >
+**Generate new private key**, save it outside the repository, and set
+`MCP_USE_FIREBASE_CREDENTIALS` to its path.
 
 The web API key is not a secret, but the server uses it to refresh ID tokens.
 If you restrict the key, allow the Identity Toolkit API and the Token Service
@@ -60,8 +56,8 @@ API, and do not restrict it to HTTP referrers.
 cp .env.example .env
 ```
 
-Set the three `MCP_USE_FIREBASE_*` values from step 1, and
-`MCP_USE_OAUTH_SECRET` (`openssl rand -base64 32`). Then start the server:
+Set the `MCP_USE_FIREBASE_*` values from above, and `MCP_USE_OAUTH_SECRET`
+(`openssl rand -base64 32`). Then start the server:
 
 ```sh
 pnpm dev

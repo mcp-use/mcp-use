@@ -1,4 +1,4 @@
-import { getApps, initializeApp } from "firebase-admin/app";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { isBuilding, MCPServer } from "mcp-use";
 import { firebase, oauthProxy } from "mcp-use/oauth";
@@ -25,10 +25,17 @@ const allowedClients = optionalEnv("MCP_USE_ALLOWED_CLIENTS")
   .filter((entry) => entry !== "");
 
 const projectId = requireEnv("MCP_USE_FIREBASE_PROJECT_ID");
+// A service account key file. Unset, the Admin SDK uses the credentials of
+// the runtime, such as the service account on Cloud Run.
+const credentials = optionalEnv("MCP_USE_FIREBASE_CREDENTIALS");
 
-// The Admin SDK finds Google credentials on its own. `mcp-use dev` reruns
-// this file after each change, so reuse the app it made.
-const app = getApps()[0] ?? initializeApp({ projectId });
+// `mcp-use dev` reruns this file after each change. Reuse the app it made.
+const app =
+  getApps()[0] ??
+  initializeApp({
+    projectId,
+    ...(credentials !== undefined && { credential: cert(credentials) }),
+  });
 const db = getFirestore(app);
 
 const server = new MCPServer({
