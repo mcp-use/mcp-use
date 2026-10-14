@@ -139,7 +139,7 @@ Register exactly one callback URL with the upstream provider:
 <public origin><basePath>/oauth/callback
 ```
 
-With the default `basePath` of `/mcp`, that is `https://mcp.example.com/mcp/oauth/callback` in production and `http://localhost:3000/mcp/oauth/callback` locally. Set `MCP_URL` to the public origin (no path) when the server runs behind a tunnel, a proxy, or a deployment URL, so that the proxy builds the same callback URL that you registered.
+With the default `basePath` of `/mcp`, that is `https://mcp.example.com/mcp/oauth/callback` in production and `http://localhost:3000/mcp/oauth/callback` locally. 
 
 The proxy serves all of its endpoints under `<basePath>/oauth/`:
 
@@ -323,11 +323,8 @@ oauthProxy({
 | `listen()` on a localhost resource, bound to `127.0.0.1`, `localhost`, or `::1` | Optional (memory default) | Optional (random key per process) |
 | `mcp-use dev` on localhost                                   | Required: pass `memoryStorage()` or a shared store | Required                     |
 | Any other deployment, tunnel, or public URL                  | Required: a shared store  | Required                       |
-| `mcp-use build`                                              | Not checked               | Not checked                    |
 
 `oauthProxy` throws when the server mounts without a required `storage` or `secret`. `memoryStorage()` is refused outside localhost. Without a secret, the proxy logs a warning and uses a random key, so sign-ins end when the process stops.
-
-`mcp-use build` evaluates your entry file but serves no requests, so the proxy skips the storage, secret, and upstream credential checks while `isBuilding()` from `mcp-use` returns `true`. Set the variables where the built server runs.
 
 ## Set and rotate the secret
 

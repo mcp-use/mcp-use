@@ -54,7 +54,7 @@ const storage = upstashStorage({
 });
 ```
 
-`upstashStorage` needs only `fetch`. Pass a `fetch` option to use a custom implementation. During `mcp-use build`, a missing `url` or `token` is not an error.
+`upstashStorage` needs only `fetch`. Pass a `fetch` option to use a custom implementation.
 
 ## Redis
 
@@ -72,7 +72,7 @@ const storage = redisStorage(() =>
 );
 ```
 
-With a function, the adapter connects on the first storage call, not when the module loads. `mcp-use build` and serverless cold starts then never wait on Redis. Concurrent first calls share one connection attempt, and a failed attempt is retried on the next call. A wrong URL therefore shows up at the first sign-in, not at startup.
+With a function, the adapter connects on the first storage call, not when the module loads, so serverless cold starts never wait on Redis. Concurrent first calls share one connection attempt, and a failed attempt is retried on the next call. A wrong URL therefore shows up at the first sign-in, not at startup.
 
 The adapter uses `GETDEL` and `SET NX EX`, which need Redis 6.2 or later.
 
