@@ -313,6 +313,23 @@ function requireOAuthAuthInfo<TUser>(
   }
 }
 
+/** @internal Projects verified SDK auth information into the public ctx.auth shape. */
+export function toOAuthAuth<TUser>(
+  authInfo: AuthInfo | undefined
+): OAuthAuth<TUser> {
+  requireOAuthAuthInfo<TUser>(authInfo);
+  return {
+    user: authInfo.extra.user,
+    payload: authInfo.extra.payload,
+    accessToken: authInfo.token,
+    scopes: [...authInfo.scopes],
+    permissions: [...authInfo.extra.permissions],
+    ...(authInfo.clientId.length > 0 && { clientId: authInfo.clientId }),
+    expiresAt: authInfo.expiresAt,
+    ...(authInfo.resource !== undefined && { resource: authInfo.resource }),
+  };
+}
+
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
@@ -538,18 +555,7 @@ export function toRequestContext<TEnv extends Env = Env>(
 export function toAuthenticatedRequestContext<TUser, TEnv extends Env = Env>(
   ctx: ServerContext
 ): RequestContext<TUser, true, TEnv> {
-  const authInfo = ctx.http?.authInfo;
-  requireOAuthAuthInfo<TUser>(authInfo);
   return Object.assign(toRequestContext<TEnv>(ctx), {
-    auth: {
-      user: authInfo.extra.user,
-      payload: authInfo.extra.payload,
-      accessToken: authInfo.token,
-      scopes: [...authInfo.scopes],
-      permissions: [...authInfo.extra.permissions],
-      ...(authInfo.clientId.length > 0 && { clientId: authInfo.clientId }),
-      expiresAt: authInfo.expiresAt,
-      ...(authInfo.resource !== undefined && { resource: authInfo.resource }),
-    },
+    auth: toOAuthAuth<TUser>(ctx.http?.authInfo),
   });
 }
