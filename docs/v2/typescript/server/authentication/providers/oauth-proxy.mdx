@@ -14,14 +14,6 @@ If your provider supports Dynamic Client Registration (DCR), use a [built-in pro
 
 The proxy sits between two OAuth relationships. Toward MCP clients, it is the authorization server: it identifies clients, shows a consent page, and issues its own access and refresh tokens. Toward the upstream provider, it is a confidential OAuth client with one registered callback URL.
 
-```mermaid
-flowchart TB
-  C["MCP client"] -- "mcp_at_ / mcp_rt_" --> S["Your MCP server<br/>oauthProxy"]
-  S -- "one OAuth app" --> U["Upstream provider"]
-  S <--> D[("Shared storage")]
-  S -- "upstreamToken(ctx)" --> A["Upstream API"]
-```
-
 | Who holds it                | Credential                                                                                   |
 | --------------------------- | -------------------------------------------------------------------------------------------- |
 | MCP client                  | The proxy's access token (`mcp_at_…`) and refresh token (`mcp_rt_…`)                         |
