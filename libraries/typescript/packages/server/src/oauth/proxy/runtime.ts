@@ -219,11 +219,15 @@ export class ProxyRuntime {
         "The request has no client_id."
       );
     }
-    const client = await resolveClient(this.config.clients, clientId);
+    const requestedRedirect = query.get("redirect_uri");
+    const client = await resolveClient(
+      this.config.clients,
+      clientId,
+      requestedRedirect
+    );
     if (typeof client === "string") {
       return this.#errorPage(c, 400, "Unknown app", client);
     }
-    const requestedRedirect = query.get("redirect_uri");
     const redirectUri =
       requestedRedirect ??
       (client.redirectUris.length === 1 ? client.redirectUris[0] : undefined);
@@ -1315,9 +1319,12 @@ export class ProxyRuntime {
     }
     const strip = (pathname: string): string =>
       pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
+    // The 1.x proxy named the bare origin as its resource, and clients
+    // signed in then may still send it.
     return (
       url.origin === this.config.resource.origin &&
-      strip(url.pathname) === strip(this.config.resource.pathname)
+      (strip(url.pathname) === strip(this.config.resource.pathname) ||
+        strip(url.pathname) === "/")
     );
   }
 

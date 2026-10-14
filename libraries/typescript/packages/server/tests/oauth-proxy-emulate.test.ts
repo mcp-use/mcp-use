@@ -1133,6 +1133,64 @@ describe("oauthProxy with emulated GitHub", () => {
     ).toBe("invalid_target");
   });
 
+  it("signs in a client from the 1.x proxy, which registered with the GitHub client ID", async () => {
+    const { server } = githubServer();
+    const browser = new Browser(server);
+    const v1Client = {
+      clientId: GITHUB_CLIENT_ID,
+      redirectUri: CLIENT_REDIRECT,
+    };
+    const { code, verifier } = await signIn(browser, v1Client, "hubot");
+    const tokens = await exchange(browser, v1Client, code, verifier);
+    expect(tokens.status).toBe(200);
+    expect(
+      (await refresh(browser, GITHUB_CLIENT_ID, tokens.body.refresh_token!))
+        .status
+    ).toBe(200);
+
+    const { challenge } = await pkcePair();
+    const authorize = (params: Record<string, string>) =>
+      browser.request(
+        `${RESOURCE}/oauth/authorize?${new URLSearchParams({
+          response_type: "code",
+          client_id: GITHUB_CLIENT_ID,
+          code_challenge: challenge,
+          code_challenge_method: "S256",
+          ...params,
+        })}`
+      );
+    // The 1.x proxy named the bare origin as its resource.
+    expect(
+      (await authorize({ redirect_uri: CLIENT_REDIRECT, resource: ORIGIN }))
+        .status
+    ).toBe(200);
+    // With no stored record, the request must name a safe redirect URI.
+    const noRedirect = await authorize({});
+    expect(noRedirect.status).toBe(400);
+    expect(noRedirect.headers.get("location")).toBeNull();
+    const unsafe = await authorize({ redirect_uri: "http://evil.example/cb" });
+    expect(unsafe.status).toBe(400);
+    expect(unsafe.headers.get("location")).toBeNull();
+
+    // With registration off, the GitHub client ID is an unknown client.
+    const listed = new Browser(
+      githubServer({
+        clients: [{ clientId: "acme-cli", redirectUris: [CLIENT_REDIRECT] }],
+      }).server
+    );
+    const refused = await listed.request(
+      `${RESOURCE}/oauth/authorize?${new URLSearchParams({
+        response_type: "code",
+        client_id: GITHUB_CLIENT_ID,
+        redirect_uri: CLIENT_REDIRECT,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+      })}`
+    );
+    expect(refused.status).toBe(400);
+    expect(await refused.text()).toContain("unknown client_id");
+  });
+
   it("rejects registrations with unsafe redirect URIs", async () => {
     const { server } = githubServer();
     const browser = new Browser(server);

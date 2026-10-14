@@ -582,6 +582,7 @@ describe("oauth proxy access-token checks", () => {
           fetchCimd: async () => {
             throw new Error("unused");
           },
+          upstreamClientId: "id",
         },
         upstream: github({ clientId: "id", clientSecret: "secret" }),
         fetch: async () => {

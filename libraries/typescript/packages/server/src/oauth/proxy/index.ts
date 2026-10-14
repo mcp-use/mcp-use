@@ -383,6 +383,7 @@ export function oauthProxy<TUser = UpstreamUser>(
           fetchImpl,
           options.fetch === undefined ? defaultHostResolver : false
         ),
+        upstreamClientId: upstream.clientId,
       },
       upstream,
       fetch: fetchImpl,

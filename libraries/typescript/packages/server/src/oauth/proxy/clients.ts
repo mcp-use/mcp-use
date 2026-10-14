@@ -323,6 +323,13 @@ export interface ClientResolver {
   allow: ClientAllowlist | undefined;
   dcr: boolean;
   fetchCimd: (url: string) => Promise<ClientRecord>;
+  /**
+   * Client ID of the OAuth app at the provider. The 1.x `oauthProxy`
+   * answered every registration with it, so clients signed in before the
+   * upgrade still send it. While `dcr` is on, it is treated as a client
+   * registered with the redirect URI of the request.
+   */
+  upstreamClientId: string;
 }
 
 /**
@@ -332,7 +339,10 @@ export interface ClientResolver {
  * registration ends its existing sign-ins too.
  */
 export function isClientAdmitted(
-  resolver: Pick<ClientResolver, "configured" | "allow" | "dcr">,
+  resolver: Pick<
+    ClientResolver,
+    "configured" | "allow" | "dcr" | "upstreamClientId"
+  >,
   clientId: string
 ): boolean {
   if (isCimdClientId(clientId)) {
@@ -344,17 +354,27 @@ export function isClientAdmitted(
     );
   }
   if (resolver.configured.has(clientId)) return true;
-  return resolver.dcr && clientId.startsWith("mcp_client_");
+  return (
+    resolver.dcr &&
+    (clientId.startsWith("mcp_client_") ||
+      clientId === resolver.upstreamClientId)
+  );
 }
 
 /**
  * @internal Resolves a client_id: a CIMD URL first, then a configured
  * client, then a registered one. Returns an error message when the client
  * is unknown or not allowed.
+ *
+ * `redirectUri` is the one the request names. A client from the 1.x proxy
+ * (see {@link ClientResolver.upstreamClientId}) has no stored record, so it
+ * resolves to a record for that redirect URI alone. That admits no more
+ * than registration does, which takes any client's redirect URIs.
  */
 export async function resolveClient(
   resolver: ClientResolver,
-  clientId: string
+  clientId: string,
+  redirectUri?: string | null
 ): Promise<ClientRecord | string> {
   if (isCimdClientId(clientId)) {
     // Check the allowlist before fetching, so an unlisted client never
@@ -387,6 +407,14 @@ export async function resolveClient(
       keys.client(clientId)
     );
     if (isClientRecord(registered)) return registered;
+  }
+  if (resolver.dcr && clientId === resolver.upstreamClientId) {
+    if (typeof redirectUri !== "string") {
+      return "redirect_uri is required for this client";
+    }
+    const problem = redirectUriProblem(redirectUri);
+    if (problem !== undefined) return problem;
+    return { clientId, redirectUris: [redirectUri], source: "dcr" };
   }
   return "unknown client_id";
 }
