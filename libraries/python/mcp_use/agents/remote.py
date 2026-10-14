@@ -294,6 +294,8 @@ class RemoteAgent:
 
                 elif event.startswith("9:"):  # Tool call event
                     steps_taken += 1
+                    # Text from a turn that calls a tool is not the final answer.
+                    final_result = None
                     logger.debug(f"Tool call executed, total steps: {steps_taken}")
 
                 elif event.startswith("d:"):  # Finish event
