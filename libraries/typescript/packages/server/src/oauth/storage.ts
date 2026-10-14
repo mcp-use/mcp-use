@@ -8,7 +8,7 @@
  * @packageDocumentation
  */
 import { isBuilding } from "../build-phase.js";
-import { isRecord } from "./guards.js";
+import { isRecord, trimTrailingSlashes } from "./guards.js";
 import type { OAuthProxyStorage } from "./proxy/storage.js";
 
 export { memoryStorage, type OAuthProxyStorage } from "./proxy/storage.js";
@@ -45,7 +45,7 @@ export function upstashStorage(
   ) {
     throw new TypeError("upstashStorage requires url and token");
   }
-  const url = String(options?.url).replace(/\/+$/, "");
+  const url = trimTrailingSlashes(String(options?.url));
   const fetchImpl =
     options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const command = async (args: (string | number)[]): Promise<unknown> => {

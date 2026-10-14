@@ -1,4 +1,4 @@
-import { isRecord } from "../guards.js";
+import { isRecord, trimTrailingSlashes } from "../guards.js";
 import { assertEndpoint, upstream, type RedirectUpstream } from "./upstream.js";
 
 /** Options for {@link github}. */
@@ -60,8 +60,8 @@ export function github(options: GitHubUpstreamOptions): RedirectUpstream {
   if (options.apiUrl !== undefined) {
     assertEndpoint(options.apiUrl, "github apiUrl");
   }
-  const baseUrl = trimSlash(options.baseUrl ?? "https://github.com");
-  const apiUrl = trimSlash(
+  const baseUrl = trimTrailingSlashes(options.baseUrl ?? "https://github.com");
+  const apiUrl = trimTrailingSlashes(
     options.apiUrl ??
       (options.baseUrl !== undefined ? baseUrl : "https://api.github.com")
   );
@@ -138,7 +138,9 @@ export interface GoogleUpstreamOptions {
  */
 export function google(options: GoogleUpstreamOptions): RedirectUpstream {
   const base =
-    options.baseUrl === undefined ? undefined : trimSlash(options.baseUrl);
+    options.baseUrl === undefined
+      ? undefined
+      : trimTrailingSlashes(options.baseUrl);
   const userinfo =
     base === undefined
       ? "https://openidconnect.googleapis.com/v1/userinfo"
@@ -201,8 +203,4 @@ function pick(
     if (source[key] !== undefined) result[key] = source[key];
   }
   return result;
-}
-
-function trimSlash(value: string): string {
-  return value.replace(/\/+$/, "");
 }

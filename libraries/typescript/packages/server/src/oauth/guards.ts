@@ -3,6 +3,16 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+/**
+ * @internal Removes trailing slashes. A loop instead of `/\/+$/`, which
+ * backtracks quadratically on long runs of `/`.
+ */
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end--;
+  return value.slice(0, end);
+}
+
 /** @internal Checks if a URL points to localhost or a loopback address. */
 export function isLocalhost(url: URL): boolean {
   const hostname = url.hostname.toLowerCase();
