@@ -636,4 +636,25 @@ describe("main", () => {
     const output = errors.mock.calls.flat().join("\n");
     expect(output).toMatch(/Entry not found/);
   });
+
+  it("prints the inner errors of an entry's empty AggregateError", async () => {
+    // Node's connection-refused error, as a Redis client throws it when the
+    // entry connects at module scope and the database is unreachable.
+    const cwd = await mkdtemp(join(tmpdir(), "mcp-use-bin-aggregate-"));
+    try {
+      await writeFile(
+        join(cwd, "index.ts"),
+        'throw new AggregateError([new Error("connect ECONNREFUSED ::1:6390"), new Error("connect ECONNREFUSED 127.0.0.1:6390")], "");\n'
+      );
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+      await expect(
+        main(["build", "--path", cwd, "--entry", "index.ts"])
+      ).resolves.toBe(1);
+      expect(errors.mock.calls.flat().join("\n")).toContain(
+        "connect ECONNREFUSED ::1:6390; connect ECONNREFUSED 127.0.0.1:6390"
+      );
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
 });

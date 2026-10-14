@@ -4,4 +4,5 @@
  * @internal
  */
 export { main } from "./bin/main.js";
+export { runBin } from "./bin/run.js";
 export type { CliMainOptions } from "./bin/main.js";
