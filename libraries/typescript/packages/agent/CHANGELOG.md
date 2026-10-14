@@ -1,5 +1,13 @@
 # @mcp-use/agent
 
+## 2.0.23
+
+### Patch Changes
+
+- aa78231: Fall back to `"[no content]"` when tool result content is an empty string in Anthropic provider, preventing HTTP 400 Bad Request errors from the Anthropic Messages API.
+- Updated dependencies [aa78231]
+  - @mcp-use/client@2.4.3
+
 ## 2.0.23-canary.1
 
 ### Patch Changes
