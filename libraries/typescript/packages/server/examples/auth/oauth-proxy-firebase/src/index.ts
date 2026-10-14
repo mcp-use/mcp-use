@@ -25,15 +25,9 @@ const allowedClients = optionalEnv("MCP_USE_ALLOWED_CLIENTS")
   .filter((entry) => entry !== "");
 
 const projectId = requireEnv("MCP_USE_FIREBASE_PROJECT_ID");
-// The Firebase emulators, for local development. Unset, the server uses the
-// real Firebase project.
-const authEmulator = optionalEnv("MCP_USE_FIREBASE_AUTH_EMULATOR_URL");
-const firestoreEmulator = optionalEnv("MCP_USE_FIRESTORE_EMULATOR_URL");
-if (firestoreEmulator !== undefined) {
-  process.env["FIRESTORE_EMULATOR_HOST"] = new URL(firestoreEmulator).host;
-}
 
-// `mcp-use dev` reruns this file after each change. Reuse the app it made.
+// The Admin SDK finds Google credentials on its own. `mcp-use dev` reruns
+// this file after each change, so reuse the app it made.
 const app = getApps()[0] ?? initializeApp({ projectId });
 const db = getFirestore(app);
 
@@ -54,7 +48,6 @@ const server = new MCPServer({
       providers: ["google.com"],
       // whoami returns the email address, so only verified ones sign in.
       requireVerifiedEmail: true,
-      ...(authEmulator !== undefined && { emulator: { url: authEmulator } }),
     }),
     // Sign-ins and tokens live in the mcp_use_oauth collection, encrypted
     // with MCP_USE_OAUTH_SECRET.

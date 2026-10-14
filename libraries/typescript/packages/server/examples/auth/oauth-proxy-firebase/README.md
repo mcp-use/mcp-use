@@ -25,45 +25,12 @@ The Admin SDK bypasses security rules, so the tools build every path from
 `ctx.auth.user.subject`, the verified Firebase uid. `firestore.rules` gives
 clients no access at all.
 
-## Run locally
-
-The example runs against the Firebase emulators, with no Firebase project or
-credentials. The Firestore emulator needs Java 21 or later.
-
-```sh
-npx -y firebase-tools@15.33.0 emulators:start --project demo-mcp-use
-```
-
-In another terminal:
-
-```sh
-cp .env.example .env   # then set MCP_USE_OAUTH_SECRET: openssl rand -base64 32
-pnpm dev
-```
-
-Connect an MCP client to `http://localhost:3000/mcp`, for example:
-
-```sh
-claude mcp add --transport http firebase-proxy http://localhost:3000/mcp
-```
-
-Click **Allow** on the consent page. The emulator's sign-in window opens: add
-an account with any name and email. Then call `whoami`, `add-note`, and
-`list-notes`. The Emulator UI at `http://127.0.0.1:4000` shows the notes and
-the proxy's records.
-
-The Auth emulator issues unsigned ID tokens, so anyone who can reach the server
-could sign in as any user. While `MCP_USE_FIREBASE_AUTH_EMULATOR_URL` is set,
-`oauthProxy` therefore runs only on localhost. Do not open a tunnel or listen
-on `0.0.0.0` with the emulators on.
-
-## Use a real Firebase project
+## Set up a Firebase project
 
 In the [Firebase console](https://console.firebase.google.com/):
 
 1. Add a web app to the project (**Project settings** > **General** > **Your
-   apps**) and copy its `apiKey`, `authDomain`, and `projectId` into `.env`.
-   Remove the two emulator URLs.
+   apps**) and copy its `apiKey`, `authDomain`, and `projectId`.
 2. In **Authentication** > **Sign-in method**, enable **Google**.
 3. In **Authentication** > **Settings** > **Authorized domains**, add the
    server's host. `localhost` is there by default.
@@ -75,12 +42,39 @@ In the [Firebase console](https://console.firebase.google.com/):
 
 The server reaches Firestore with `firebase-admin`, which finds Google
 credentials on its own: the service account of the runtime on Cloud Run,
-Cloud Functions, or App Hosting, or `gcloud auth application-default login`
-on your machine.
+Cloud Functions, or App Hosting. On your machine, sign in once with the
+[gcloud CLI](https://cloud.google.com/sdk/docs/install):
+
+```sh
+gcloud auth application-default login
+gcloud auth application-default set-quota-project <project-id>
+```
 
 The web API key is not a secret, but the server uses it to refresh ID tokens.
 If you restrict the key, allow the Identity Toolkit API and the Token Service
 API, and do not restrict it to HTTP referrers.
+
+## Run locally
+
+```sh
+cp .env.example .env
+```
+
+Set the three `MCP_USE_FIREBASE_*` values from step 1, and
+`MCP_USE_OAUTH_SECRET` (`openssl rand -base64 32`). Then start the server:
+
+```sh
+pnpm dev
+```
+
+Connect an MCP client to `http://localhost:3000/mcp`, for example:
+
+```sh
+claude mcp add --transport http firebase-proxy http://localhost:3000/mcp
+```
+
+Click **Allow** on the consent page and sign in with Google. Then call
+`whoami`, `add-note`, and `list-notes`.
 
 ## Where sign-ins are stored
 
@@ -106,7 +100,7 @@ for details.
 
 ## Connect Claude.ai or ChatGPT
 
-Web clients need a public HTTPS URL, so use a real Firebase project:
+Web clients need a public HTTPS URL:
 
 1. Expose the server, for example with `pnpm dev --tunnel` or a deployment.
 2. Set `MCP_URL` to the public origin, with no path.
