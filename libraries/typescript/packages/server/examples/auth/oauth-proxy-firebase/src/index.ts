@@ -1,7 +1,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { isBuilding, MCPServer } from "mcp-use";
-import { firebase, oauthProxy } from "mcp-use/oauth";
+import { google, oauthProxy } from "mcp-use/oauth";
 import { firestoreStorage } from "mcp-use/oauth/storage";
 import { z } from "zod";
 
@@ -41,20 +41,16 @@ const db = getFirestore(app);
 const server = new MCPServer({
   name: "oauth-proxy-firebase-example",
   version: "1.0.0",
-  title: "Firebase OAuth proxy example",
+  title: "Google OAuth proxy example with Firestore",
   description:
-    "Signs users in with Firebase Authentication through the server's own authorization server and keeps their notes in Firestore.",
+    "Signs users in with Google through the server's own authorization server and keeps their notes in Firestore.",
   publicLandingPage: true,
   oauth: oauthProxy({
-    upstream: firebase({
-      apiKey: requireEnv("MCP_USE_FIREBASE_API_KEY"),
-      authDomain: requireEnv("MCP_USE_FIREBASE_AUTH_DOMAIN"),
-      projectId,
-      // Sign-in providers enabled in the Firebase console. Allow opens the
-      // first one in a popup.
-      providers: ["google.com"],
-      // whoami returns the email address, so only verified ones sign in.
-      requireVerifiedEmail: true,
+    // An OAuth client of the Firebase project's Google Cloud project. Its
+    // redirect URI must be <MCP_URL>/mcp/oauth/callback.
+    upstream: google({
+      clientId: requireEnv("MCP_USE_GOOGLE_CLIENT_ID"),
+      clientSecret: requireEnv("MCP_USE_GOOGLE_CLIENT_SECRET"),
     }),
     // Sign-ins and tokens live in the mcp_use_oauth collection, encrypted
     // with MCP_USE_OAUTH_SECRET.
@@ -63,7 +59,7 @@ const server = new MCPServer({
   }),
 });
 
-/** Reads a string field of the Firebase profile that the proxy keeps. */
+/** Reads a string field of the Google profile that the proxy keeps. */
 function profileString(
   profile: Record<string, unknown>,
   field: string
@@ -73,13 +69,12 @@ function profileString(
 }
 
 const whoamiOutputSchema = z.object({
-  uid: z.string(),
+  subject: z.string(),
   email: z.string().nullable(),
   emailVerified: z.boolean(),
   name: z.string().nullable(),
-  provider: z.string().nullable(),
   mcpClient: z.string().nullable(),
-  idTokenExpiresAt: z.string().nullable(),
+  googleTokenExpiresAt: z.string().nullable(),
 });
 
 server.tool(
@@ -87,25 +82,24 @@ server.tool(
     name: "whoami",
     title: "Who am I",
     description:
-      "Return the signed-in Firebase user and the MCP client that connected.",
+      "Return the signed-in Google user and the MCP client that connected.",
     outputSchema: whoamiOutputSchema,
     annotations: { readOnlyHint: true },
   },
   async (_args, ctx) => {
-    // The subject is the Firebase uid. The profile holds the claims of the
-    // ID token the user signed in with.
+    // The subject is the Google account's `sub`. The profile holds the
+    // fields of Google's userinfo response.
     const { subject, profile } = ctx.auth.user;
-    // The proxy keeps the user's ID token on the server and refreshes it
-    // before it expires. upstreamToken(ctx) returns it.
+    // The proxy keeps the user's Google access token on the server and
+    // refreshes it before it expires. upstreamToken(ctx) returns it.
     const expiresAt = ctx.auth.upstream?.expiresAt;
     const data = {
-      uid: subject,
+      subject,
       email: profileString(profile, "email"),
       emailVerified: profile["email_verified"] === true,
       name: profileString(profile, "name"),
-      provider: profileString(profile, "sign_in_provider"),
       mcpClient: ctx.auth.clientId ?? null,
-      idTokenExpiresAt:
+      googleTokenExpiresAt:
         expiresAt === undefined
           ? null
           : new Date(expiresAt * 1000).toISOString(),
@@ -119,10 +113,10 @@ server.tool(
 
 /**
  * The signed-in user's notes. The Admin SDK bypasses security rules, so
- * every query starts from the verified uid.
+ * every query starts from the verified Google subject.
  */
-function notesOf(uid: string) {
-  return db.collection(`users/${uid}/notes`);
+function notesOf(subject: string) {
+  return db.collection(`users/${subject}/notes`);
 }
 
 server.tool(
