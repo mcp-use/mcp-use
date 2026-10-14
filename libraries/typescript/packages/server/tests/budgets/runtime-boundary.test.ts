@@ -4,9 +4,9 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
-const loader = fileURLToPath(
-  new URL("./module-trace-loader.mjs", import.meta.url)
-);
+// --experimental-loader takes a URL. A Windows path such as D:\... would be
+// read as a URL with a "d:" scheme.
+const loader = new URL("./module-trace-loader.mjs", import.meta.url).href;
 const entry = fileURLToPath(new URL("../../dist/index.js", import.meta.url));
 
 interface Resolution {
