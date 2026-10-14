@@ -59,6 +59,25 @@ describe("Anthropic: tool_result content", () => {
     expect(block.type).toBe("tool_result");
     expect(block.content).toBe("hello");
   });
+
+  it("falls back to a placeholder for empty-string tool_result.content", () => {
+    // Issue #2692: the Anthropic API rejects tool_result.content: "" with
+    // "text cannot be empty", so void tool results need the same placeholder
+    // that the array path and the other providers already use.
+    const messages: ProviderMessage[] = [
+      {
+        role: "tool",
+        toolCallId: "call_empty",
+        toolName: "delete-file",
+        toolResult: { content: [] },
+        content: "",
+      },
+    ];
+    const out = toAnthropicMessages(messages) as any[];
+    const block = out[0].content[0];
+    expect(block.type).toBe("tool_result");
+    expect(block.content).toBe("[no content]");
+  });
 });
 
 describe("OpenAI: tool message + follow-up user with image_url", () => {

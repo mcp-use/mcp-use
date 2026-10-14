@@ -65,7 +65,9 @@ function toAnthropicToolResultContent(
   content: string | ContentPart[]
 ): unknown {
   if (typeof content === "string") {
-    return content;
+    // The Messages API rejects an empty tool_result string ("text cannot be
+    // empty"), so void results get the same placeholder as the block path.
+    return content || "[no content]";
   }
   const blocks: unknown[] = [];
   for (const p of content) {
