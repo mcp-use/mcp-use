@@ -824,7 +824,7 @@ explicit domain handle. Do not key business state to an MCP transport session.
     replacing the test with source-text or artifact assertions.
   </Step>
   <Step title="Remove v1 leftovers">
-    Remove remaining v1 imports, helpers, widget files, session APIs, sampling
+    Remove remaining v1 imports, helpers, widget files, session APIs, `ctx.sample()`
     calls, stdio proxy configuration, and old security fields. No
     `mcp-use/server` import can stay: that subpath does not exist in v2.
   </Step>

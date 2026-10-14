@@ -162,10 +162,11 @@ export class MCPConnection {
   /**
    * Establishes the connection to the MCP server.
    *
-   * This method starts the underlying transport (spawns the process for
-   * stdio, opens the HTTP transport) and performs the MCP initialization
-   * handshake through the SDK client. Call {@link initialize} afterwards to
-   * cache the server's capabilities, server info, and tools.
+   * For stdio and HTTP connectors, this method starts the underlying
+   * transport (spawns the process for stdio, opens the HTTP transport) and
+   * performs the MCP initialization handshake through the SDK client. Call
+   * {@link initialize} afterwards to cache the server's capabilities, server
+   * info, and tools.
    *
    * @returns Promise that resolves when connected
    *

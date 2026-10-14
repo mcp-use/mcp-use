@@ -22,7 +22,7 @@ import {
 
 const onElicitation: OnElicitationCallback = async (params) => {
   if (params.mode === "url") {
-    // The tool call is retried as soon as this returns, so accept only after
+    // The tool call continues as soon as this returns, so accept only after
     // the user has finished the external flow.
     console.log(`Visit: ${params.url}`);
     const prompt = createInterface({ input: stdin, output: stdout });
@@ -71,7 +71,7 @@ const mcp = useMcp({
   onElicitation: async (params): Promise<ElicitResult> => {
     if (params.mode === "url") {
       window.open(params.url, "_blank", "noopener");
-      // The tool call is retried as soon as this resolves, so accept only
+      // The tool call continues as soon as this resolves, so accept only
       // after the user confirms they finished the external flow.
       const finished = window.confirm(
         `${params.message}\n\nSelect OK after you finish in the new tab.`

@@ -46,7 +46,7 @@ export default server;
   When `MCP_USE_OAUTH_AUTH0_AUDIENCE` is set and you don't pass `resource`, the
   provider uses its value as the MCP resource, overriding `MCP_URL`. It must be
   the full MCP endpoint URL, such as `https://mcp.example.com/mcp`, with a path
-  equal to the server's `basePath`, or the `MCPServer` constructor throws. Unset
+  equal to the server's `basePath`, or the server throws at startup. Unset
   it if it still holds a different Auth0 API identifier.
 </Warning>
 
