@@ -9,6 +9,7 @@ const LABELS = {
   "mcp-use.index": "Server API",
   "mcp-use.react": "MCP Apps · React hooks & components",
   "mcp-use.oauth": "OAuth configuration",
+  "mcp-use.oauth_storage": "OAuth proxy storage",
   "mcp-use.landing": "Server landing page",
   "mcp-use.node-bridge": "Node.js bridge",
   "mcp-use.next": "Next.js integration",
@@ -30,8 +31,11 @@ function decorate(item) {
   const key = item.path?.replace(/^modules\//, "").replace(/\.html$/, "");
   const children = item.children?.map(decorate);
   if (key === "mcp-use.oauth" && children) {
-    const providers = children.filter((child) =>
-      child.path?.startsWith("modules/mcp-use.oauth_")
+    // Every `mcp-use/oauth/*` entry point is a provider except storage.
+    const providers = children.filter(
+      (child) =>
+        child.path?.startsWith("modules/mcp-use.oauth_") &&
+        child.path !== "modules/mcp-use.oauth_storage.html"
     );
     const rest = children.filter((child) => !providers.includes(child));
     if (providers.length)

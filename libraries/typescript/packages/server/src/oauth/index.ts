@@ -1,5 +1,9 @@
 /**
- * OAuth resource-server helpers and provider configuration for mcp-use.
+ * OAuth resource-server helpers and provider configuration for mcp-use, and
+ * {@link oauthProxy}, which makes the MCP server its own authorization server
+ * in front of an identity provider without dynamic client registration, such
+ * as GitHub or Google. Storage adapters for the proxy are in
+ * `mcp-use/oauth/storage`.
  *
  * @packageDocumentation
  */
