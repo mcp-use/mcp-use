@@ -129,10 +129,6 @@ The proxy runs its own PKCE round with the upstream provider, so an intercepted 
   </Step>
 </Steps>
 
-<Note>
-  `mcp-use dev` uses the next free port when port 3000 is taken. The proxy then sends that port's callback URL to Google, which refuses it with `redirect_uri_mismatch` unless the OAuth client lists it. Free port 3000, or add the printed port's `/mcp/oauth/callback` URL to the OAuth client.
-</Note>
-
 The complete [Google example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/oauth-proxy-firebase) keeps sign-ins in Firestore with `firestoreStorage` and stores each user's notes under their Google subject.
 
 ## Register the callback URL
