@@ -17,12 +17,14 @@ Firebase on the server's consent page:
    leave the server, which refreshes the ID token before it expires.
 
 Tools read the user's Firebase ID token with `upstreamToken(ctx)`. The example
-has two tools:
+has three tools:
 
 - `whoami` returns the Firebase uid, email, and sign-in provider from
   `ctx.auth`.
 - `list-notes` reads `users/{uid}/notes` from Firestore with the user's ID
   token, so Firestore applies its security rules to that user.
+- `add-note` adds a note with a `title` and a `text` to `users/{uid}/notes`,
+  the same way.
 
 ## Set up Firebase
 
@@ -75,8 +77,8 @@ Deploy them with the Firebase CLI:
 npx -y firebase-tools@15.33.0 deploy --only firestore:rules --project <project-id>
 ```
 
-To try `list-notes`, add documents with a `title` and a `text` field to
-`users/<uid>/notes`. `whoami` shows the uid.
+To try `list-notes`, add a note with `add-note`, or add documents with a
+`title` and a `text` field to `users/<uid>/notes`. `whoami` shows the uid.
 
 ## Run locally
 
@@ -108,7 +110,8 @@ claude mcp add --transport http firebase-proxy http://localhost:3000/mcp
 
 The client opens the consent page. Click **Allow**, and sign in with Google in
 the window that opens. If the browser blocks the window, allow pop-ups for the
-page and click **Allow** again. Then call `whoami` and `list-notes`.
+page and click **Allow** again. Then call `whoami`, `add-note`, and
+`list-notes`.
 
 ## Run against the Firebase emulators
 

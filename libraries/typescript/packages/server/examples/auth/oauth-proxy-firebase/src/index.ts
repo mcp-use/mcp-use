@@ -161,8 +161,40 @@ function firestoreValue(value: unknown): unknown {
   }
 }
 
+/** The REST URL of the user's notes collection. */
+function notesUrl(uid: string): URL {
+  return new URL(
+    `${firestoreOrigin}/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}/notes`
+  );
+}
+
+/** A Firestore REST document as a plain note. */
+function toNote(document: {
+  name: string;
+  fields?: Record<string, unknown>;
+  updateTime?: string;
+}) {
+  return {
+    id: document.name.slice(document.name.lastIndexOf("/") + 1),
+    ...Object.fromEntries(
+      Object.entries(document.fields ?? {}).map(([field, value]) => [
+        field,
+        firestoreValue(value),
+      ])
+    ),
+    ...(document.updateTime !== undefined && {
+      updated: document.updateTime,
+    }),
+  };
+}
+
 /** Why Firestore refused the request, in words that say what to change. */
-function firestoreError(status: number, message: string, uid: string): string {
+function firestoreError(
+  status: number,
+  message: string,
+  uid: string,
+  access: "read" | "write"
+): string {
   const path = `users/${uid}/notes`;
   switch (status) {
     case 401:
@@ -171,7 +203,7 @@ function firestoreError(status: number, message: string, uid: string): string {
       // A rules denial says "Missing or insufficient permissions."; a
       // disabled Firestore API is a 403 too, with another message.
       return /insufficient permissions/i.test(message)
-        ? `The Firestore security rules do not let this user read ${path}. Deploy firestore.rules from this example. Firestore said: ${message}`
+        ? `The Firestore security rules do not let this user ${access} ${path}. Deploy firestore.rules from this example. Firestore said: ${message}`
         : `Firestore refused the request: ${message}`;
     case 404:
       return `Project ${projectId} has no default Firestore database. Create one in the Firebase console (Firestore Database > Create database). Firestore said: ${message}`;
@@ -193,9 +225,7 @@ server.tool(
   },
   async ({ limit }, ctx) => {
     const uid = ctx.auth.user.subject;
-    const url = new URL(
-      `${firestoreOrigin}/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}/notes`
-    );
+    const url = notesUrl(uid);
     url.searchParams.set("pageSize", String(limit));
     // upstreamToken(ctx) is the user's Firebase ID token, which the proxy
     // keeps on the server and refreshes. Sent as a bearer token, it makes
@@ -220,7 +250,8 @@ server.tool(
             text: firestoreError(
               response.status,
               body.error?.message ?? response.statusText,
-              uid
+              uid,
+              "read"
             ),
           },
         ],
@@ -228,28 +259,76 @@ server.tool(
       };
     }
     // An empty or missing collection is a 200 with no documents.
-    const notes = (body.documents ?? []).map((document) => ({
-      id: document.name.slice(document.name.lastIndexOf("/") + 1),
-      ...Object.fromEntries(
-        Object.entries(document.fields ?? {}).map(([field, value]) => [
-          field,
-          firestoreValue(value),
-        ])
-      ),
-      ...(document.updateTime !== undefined && {
-        updated: document.updateTime,
-      }),
-    }));
+    const notes = (body.documents ?? []).map(toNote);
     return {
       content: [
         {
           type: "text",
           text:
             notes.length === 0
-              ? `No notes. Add documents to users/${uid}/notes in Firestore.`
+              ? `No notes. Add one with add-note, or add documents to users/${uid}/notes in Firestore.`
               : JSON.stringify(notes, null, 2),
         },
       ],
+    };
+  }
+);
+
+server.tool(
+  {
+    name: "add-note",
+    title: "Add note",
+    description:
+      "Add a note for the signed-in user in Firestore (users/{uid}/notes). Firestore checks its security rules as that user.",
+    inputSchema: z.object({
+      title: z.string().min(1).max(200),
+      text: z.string().max(10_000).default(""),
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ title, text }, ctx) => {
+    const uid = ctx.auth.user.subject;
+    // Firestore picks the document ID. The ID token makes the write the
+    // user's own, so the security rules decide whether it is allowed.
+    const response = await fetch(notesUrl(uid), {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${upstreamToken(ctx)}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        fields: {
+          title: { stringValue: title },
+          text: { stringValue: text },
+        },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      name?: string;
+      fields?: Record<string, unknown>;
+      updateTime?: string;
+      error?: { message?: string };
+    };
+    if (!response.ok || body.name === undefined) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: firestoreError(
+              response.status,
+              body.error?.message ?? response.statusText,
+              uid,
+              "write"
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+    const note = toNote({ ...body, name: body.name });
+    return {
+      content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
     };
   }
 );
