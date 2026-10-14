@@ -4,9 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": [
-      "ES2024",
-      "DOM",
-      "DOM.Iterable"
+      "ES2024"
     ],
     "types": [
       "node"
@@ -20,8 +18,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "resolveJsonModule": true,
-    "jsx": "react-jsx"
+    "resolveJsonModule": true
   },
   "include": [
     "mcp-env.d.ts",

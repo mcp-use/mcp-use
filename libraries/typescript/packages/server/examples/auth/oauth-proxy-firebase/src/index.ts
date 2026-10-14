@@ -5,8 +5,6 @@ import { firebase, oauthProxy } from "mcp-use/oauth";
 import { firestoreStorage } from "mcp-use/oauth/storage";
 import { z } from "zod";
 
-import { ConsentPage } from "./consent/consent-page.js";
-
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (value !== undefined && value !== "") return value;
@@ -61,8 +59,6 @@ const server = new MCPServer({
     // Sign-ins and tokens live in the mcp_use_oauth collection, encrypted
     // with MCP_USE_OAUTH_SECRET.
     storage: firestoreStorage({ firestore: db }),
-    // A custom consent page: src/consent/consent-page.tsx.
-    consent: { page: ConsentPage },
     ...(allowedClients !== undefined && { clients: allowedClients }),
   }),
 });

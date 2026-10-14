@@ -104,22 +104,6 @@ document URLs or HTTPS origins. Dynamic client registration is then off. See
 the [GitHub example](../oauth-proxy-github/README.md#allow-only-some-clients)
 for details.
 
-## Custom consent page
-
-`src/consent/consent-page.tsx` replaces the built-in consent page, passed to
-`oauthProxy` as `consent.page`. The proxy renders it on the server for each
-sign-in.
-
-- The page posts a form to `form.action` with the hidden `csrf` input and a
-  `decision` button for `allow` and one for `deny`. The proxy's script opens
-  the sign-in window when **Allow** is clicked, and submits the form once the
-  user is signed in.
-- `consent` is `false` when the user already approved the app. The page then
-  shows only the sign-in button.
-- The page's CSS is a string in `src/consent/styles.ts`, rendered into a
-  `<style>` tag. The page's Content Security Policy allows inline styles and
-  only scripts with the page's `nonce`.
-
 ## Connect Claude.ai or ChatGPT
 
 Web clients need a public HTTPS URL, so use a real Firebase project:
