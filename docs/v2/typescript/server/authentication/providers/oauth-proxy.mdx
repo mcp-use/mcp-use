@@ -68,7 +68,7 @@ sequenceDiagram
 9. The user signs in to the upstream provider and approves the OAuth app.
 10. The upstream provider redirects the browser to `/mcp/oauth/callback` with a code.
 11. The proxy checks that the callback belongs to the browser that approved consent, using a signed cookie.
-12. The proxy exchanges the code on the server with the client secret and its PKCE verifier, then reads the user, for example from GitHub's `/user`.
+12. The proxy exchanges the code on the server with the client secret and its PKCE verifier, then reads the user, for example from Google's userinfo endpoint.
 13. The proxy redirects the browser to the client's redirect URI with a one-time code and the client's original `state`.
 14. The client receives the code.
 15. The client exchanges the code at `/mcp/oauth/token` with its PKCE verifier.
@@ -77,35 +77,36 @@ sequenceDiagram
 
 The proxy runs its own PKCE round with the upstream provider, so an intercepted upstream authorization code is useless to anyone but the proxy.
 
-## Set up a GitHub sign-in
+## Set up a Google sign-in
 
 <Steps>
-  <Step title="Create a GitHub OAuth app">
-    In [GitHub Developer settings](https://github.com/settings/developers), choose **OAuth Apps** > **New OAuth App**. Set the callback URL to the proxy's callback: `http://localhost:3000/mcp/oauth/callback` for local development. GitHub never sees the MCP client's own redirect URI, so this one URL serves every client.
-
-    Turn on **Expire user access tokens** so that GitHub issues refresh tokens. The proxy then refreshes the GitHub token on the server.
+  <Step title="Configure the Google Auth Platform">
+    In the [Google Cloud console](https://console.cloud.google.com/auth/overview), open **Google Auth Platform** for your project and set up the app's branding and audience. While the publishing status is **Testing**, add each Google account that signs in under **Audience** > **Test users**.
+  </Step>
+  <Step title="Create an OAuth client">
+    Under **Clients**, create a client of type **Web application**. Add the proxy's callback as an **Authorized redirect URI**: `http://localhost:3000/mcp/oauth/callback` for local development. Google never sees the MCP client's own redirect URI, so this one URL serves every client. Copy the client ID and the client secret.
   </Step>
   <Step title="Set the environment">
     ```bash .env
-    GITHUB_CLIENT_ID=Iv1.0123456789abcdef
-    GITHUB_CLIENT_SECRET=0123456789abcdef0123456789abcdef01234567
-    # At least 32 characters: openssl rand -base64 32
-    MCP_USE_OAUTH_SECRET=6Jz0x3oNq1y8wK2mVd5rTb7hLp9cFs4eGa0iUn3kQ2c=
+    # The OAuth client from the previous step.
+    GOOGLE_CLIENT_ID=
+    GOOGLE_CLIENT_SECRET=
+    # At least 32 characters. Generate one with: openssl rand -base64 32
+    MCP_USE_OAUTH_SECRET=
     ```
   </Step>
   <Step title="Configure the server">
     ```typescript src/index.ts
     import { MCPServer } from "mcp-use";
-    import { github, memoryStorage, oauthProxy, upstreamToken } from "mcp-use/oauth";
+    import { google, memoryStorage, oauthProxy } from "mcp-use/oauth";
 
     const server = new MCPServer({
-      name: "github-tools",
+      name: "google-tools",
       version: "1.0.0",
       oauth: oauthProxy({
-        upstream: github({
-          clientId: process.env.GITHUB_CLIENT_ID!,
-          clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-          scopes: ["read:user"],
+        upstream: google({
+          clientId: process.env.GOOGLE_CLIENT_ID!,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
         }),
         // The secret defaults to MCP_USE_OAUTH_SECRET.
         // memoryStorage() works on localhost only. See "Choose storage" below.
@@ -114,16 +115,11 @@ The proxy runs its own PKCE round with the upstream provider, so an intercepted 
     });
 
     server.tool(
-      { name: "whoami", description: "Return the signed-in GitHub login." },
+      { name: "whoami", description: "Return the signed-in Google account." },
       async (_input, ctx) => {
-        const response = await fetch("https://api.github.com/user", {
-          headers: {
-            authorization: `Bearer ${upstreamToken(ctx)}`,
-            "user-agent": "github-tools",
-          },
-        });
-        const user = (await response.json()) as { login: string };
-        return { content: [{ type: "text", text: user.login }] };
+        // The profile holds the fields of Google's userinfo response.
+        const { name, email } = ctx.auth.user.profile;
+        return { content: [{ type: "text", text: `${String(name)} <${String(email)}>` }] };
       },
     );
 
@@ -134,18 +130,18 @@ The proxy runs its own PKCE round with the upstream provider, so an intercepted 
     Run `mcp-use dev` and connect a client to `http://localhost:3000/mcp`:
 
     ```bash
-    claude mcp add --transport http github-tools http://localhost:3000/mcp
+    claude mcp add --transport http google-tools http://localhost:3000/mcp
     ```
 
-    The client opens the consent page, then GitHub. After sign-in, call `whoami`.
+    The client opens the consent page, then Google. After sign-in, call `whoami`.
   </Step>
 </Steps>
 
 <Note>
-  `mcp-use dev` uses the next free port when port 3000 is taken. The proxy then sends that port's callback URL to GitHub, which refuses it unless the OAuth app lists it. Free port 3000, or add the printed port's `/mcp/oauth/callback` URL to the OAuth app.
+  `mcp-use dev` uses the next free port when port 3000 is taken. The proxy then sends that port's callback URL to Google, which refuses it with `redirect_uri_mismatch` unless the OAuth client lists it. Free port 3000, or add the printed port's `/mcp/oauth/callback` URL to the OAuth client.
 </Note>
 
-The complete example, with Redis storage and an Octokit client, is in [`examples/auth/oauth-proxy-github`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/oauth-proxy-github).
+The complete [Google example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/oauth-proxy-firebase) keeps sign-ins in Firestore with `firestoreStorage` and stores each user's notes under their Google subject.
 
 ## Register the callback URL
 
@@ -172,23 +168,44 @@ The server publishes protected resource metadata that names itself as the author
 
 ## Use the upstream token in tools
 
-`upstreamToken(ctx)` returns the upstream access token for the signed-in user. It throws when the request is not signed in through `oauthProxy`, so a library such as Octokit never silently calls the API anonymously.
+`upstreamToken(ctx)` returns the upstream access token for the signed-in user. It throws when the request is not signed in through `oauthProxy`, so a tool never calls the upstream API without the user's token.
+
+This tool lists the user's next Google Calendar events. Enable the Google Calendar API in the Google Cloud project, and request its scope from Google:
 
 ```typescript
-import { Octokit } from "@octokit/rest";
+upstream: google({
+  clientId: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  scopes: ["email", "profile", "https://www.googleapis.com/auth/calendar.readonly"],
+}),
+```
+
+Then call the Calendar API with the user's Google token:
+
+```typescript
 import { upstreamToken } from "mcp-use/oauth";
 
 server.tool(
-  { name: "list-repositories", description: "List the user's recent repositories." },
+  { name: "upcoming-events", description: "List the user's next 10 calendar events." },
   async (_input, ctx) => {
-    const octokit = new Octokit({ auth: upstreamToken(ctx) });
-    const { data } = await octokit.rest.repos.listForAuthenticatedUser({
-      sort: "updated",
-      per_page: 10,
+    const params = new URLSearchParams({
+      timeMin: new Date().toISOString(),
+      maxResults: "10",
+      singleEvents: "true",
+      orderBy: "startTime",
     });
-    return {
-      content: [{ type: "text", text: data.map((repo) => repo.full_name).join("\n") }],
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+      { headers: { authorization: `Bearer ${upstreamToken(ctx)}` } },
+    );
+    if (!response.ok) throw new Error(`Google Calendar returned ${response.status}`);
+    const { items } = (await response.json()) as {
+      items: { summary?: string; start: { dateTime?: string; date?: string } }[];
     };
+    const lines = items.map(
+      (event) => `${event.start.dateTime ?? event.start.date} ${event.summary ?? "(no title)"}`,
+    );
+    return { content: [{ type: "text", text: lines.join("\n") || "No upcoming events." }] };
   },
 );
 ```
@@ -207,7 +224,7 @@ Keep the upstream token on the server. Do not return it in tool results, views, 
 | `ctx.auth.payload`      | `{ sub, client_id, scope, provider, profile }`                                          |
 | `ctx.auth.permissions`  | Always `[]`. Derive permissions in `mapUser` or in your tools                           |
 
-`subject` is the provider's stable user ID: the numeric GitHub user ID, or the OpenID Connect `sub` for Google. It is never an email address or a login name, which can change. Use `subject` as the key for any data you store per user.
+`subject` is the provider's stable user ID: the OpenID Connect `sub` for Google, or the numeric user ID for GitHub. It is never an email address or a login name, which can change. Use `subject` as the key for any data you store per user.
 
 ### Map the user
 
@@ -215,11 +232,11 @@ Pass `mapUser` to shape `ctx.auth.user`, for example to match the `id` field tha
 
 ```typescript
 oauthProxy({
-  upstream: github({ clientId, clientSecret }),
+  upstream: google({ clientId, clientSecret }),
   mapUser: (user) => ({
     id: user.subject,
-    login: String(user.profile.login),
     email: typeof user.profile.email === "string" ? user.profile.email : undefined,
+    emailVerified: user.profile.email_verified === true,
   }),
 });
 ```
@@ -230,30 +247,37 @@ oauthProxy({
 
 | Upstream                  | Function     | Subject                     | Profile fields                                           |
 | ------------------------- | ------------ | --------------------------- | -------------------------------------------------------- |
-| GitHub and GitHub Enterprise Server | `github()`   | Numeric GitHub user ID      | `id`, `login`, `name`, `email`, `avatar_url`             |
 | Google                    | `google()`   | OpenID Connect `sub`        | `sub`, `email`, `email_verified`, `name`, `picture`, `hd` |
+| GitHub and GitHub Enterprise Server | `github()`   | Numeric GitHub user ID      | `id`, `login`, `name`, `email`, `avatar_url`             |
 | Any OAuth 2.0 provider    | `upstream()` | What your `fetchUser` returns | What your `fetchUser` returns                          |
 
 ### Google
 
-Create an OAuth client of type **Web application** in the Google Cloud console and add `<public origin>/mcp/oauth/callback` as an authorized redirect URI.
-
-```typescript
-import { google, oauthProxy } from "mcp-use/oauth";
-
-oauthProxy({
-  upstream: google({
-    clientId: process.env.GOOGLE_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    // openid is always added. Default: ["openid", "email", "profile"].
-    scopes: ["email", "profile"],
-  }),
-});
-```
+`google()` always requests `openid` and, by default, `email` and `profile`. Add Google API scopes to `scopes` as your tools need them.
 
 `google()` requests offline access, so Google returns a refresh token and the proxy refreshes Google tokens on the server. If Google returns no refresh token and none is stored for the user, the proxy sends the user through Google consent once more.
 
-The [Firebase example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/oauth-proxy-firebase) signs users in with `google()`, keeps sign-ins in Firestore with `firestoreStorage`, and stores each user's notes under their Google subject.
+While the app's publishing status is **Testing**, Google expires refresh tokens after 7 days unless the app requests only the `openid`, `email`, and `profile` scopes. Users then sign in again. Publish the app to remove the limit.
+
+### GitHub
+
+In [GitHub Developer settings](https://github.com/settings/developers), choose **OAuth Apps** > **New OAuth App**, and set the callback URL to `<public origin>/mcp/oauth/callback`. Turn on **Expire user access tokens** so that GitHub issues refresh tokens; the proxy then refreshes the GitHub token on the server.
+
+```typescript
+import { github, oauthProxy } from "mcp-use/oauth";
+
+oauthProxy({
+  upstream: github({
+    clientId: process.env.GITHUB_CLIENT_ID!,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    // Default: ["read:user"]. Add "repo" for private repositories.
+    scopes: ["read:user"],
+  }),
+  storage,
+});
+```
+
+For GitHub Enterprise Server, set `baseUrl` to the web host, and `apiUrl` when the REST API lives elsewhere. The [GitHub example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/oauth-proxy-github) calls the GitHub API as the user with Octokit and keeps sign-ins in Redis.
 
 ### Any OAuth 2.0 provider
 
@@ -290,11 +314,11 @@ oauthProxy({
 The proxy keeps clients, sign-in state, one-time codes, grants, and upstream tokens between requests, so it needs a store that every instance of the server shares. The proxy encrypts every value with your `secret` before the store sees it, and stores only SHA-256 hashes of tokens in keys.
 
 ```typescript
-import { oauthProxy, github } from "mcp-use/oauth";
+import { google, oauthProxy } from "mcp-use/oauth";
 import { upstashStorage } from "mcp-use/oauth/storage";
 
 oauthProxy({
-  upstream: github({ clientId, clientSecret }),
+  upstream: google({ clientId, clientSecret }),
   storage: upstashStorage({
     url: process.env.UPSTASH_REDIS_REST_URL!,
     token: process.env.UPSTASH_REDIS_REST_TOKEN!,
@@ -424,7 +448,7 @@ The page is never hydrated, and its Content Security Policy allows inline styles
 
 The proxy's own scopes are separate from the upstream scopes:
 
-- **Upstream scopes** (`github({ scopes })`) are what the proxy requests from the provider on every sign-in.
+- **Upstream scopes** (`google({ scopes })`) are what the proxy requests from the provider on every sign-in.
 - **Proxy scopes** (`scopesSupported` or `requiredScopes`) are what the proxy advertises and grants to MCP clients. Requested scopes that the proxy does not know are dropped, not rejected, because clients often send upstream scope names such as `read:user`. When no known scope is left, the grant gets every supported scope.
 
 | Item                          | Lifetime                                                                        |
