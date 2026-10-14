@@ -94,6 +94,12 @@ type UseMcpInternalOptions = UseMcpOptions & {
     icons?: Array<{ src: string; mimeType?: string }>;
     icon?: string;
   };
+  /**
+   * Called when optional OAuth discovery after `ready` finishes, whether or
+   * not it found authorization metadata. `McpClientProvider` uses it to hold a
+   * pending reauthentication until mixed auth is known.
+   */
+  _onAuthorizationDiscoverySettled?: () => void;
 };
 
 /**
@@ -480,6 +486,11 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   hasSamplingCallbackRef.current = onSampling !== undefined;
   hasElicitationCallbackRef.current = onElicitation !== undefined;
   onNotificationRef.current = onNotification;
+  const onAuthorizationDiscoverySettledRef = useRef(
+    options._onAuthorizationDiscoverySettled
+  );
+  onAuthorizationDiscoverySettledRef.current =
+    options._onAuthorizationDiscoverySettled;
 
   // Stable proxies passed to addServer notification wiring. Capability
   // advertisement uses current presence at connect time; once wired, reverse
@@ -1263,19 +1274,36 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             return;
           }
           const authorizationDiscovery = connection.discoverAuthorization?.();
-          if (authorizationDiscovery) {
-            void authorizationDiscovery.then((discovered) => {
+          if (!authorizationDiscovery) {
+            onAuthorizationDiscoverySettledRef.current?.();
+            return;
+          }
+          void authorizationDiscovery.then(
+            (discovered) => {
               if (
-                !discovered ||
                 !isMountedRef.current ||
                 connectionRef.current !== connection
               ) {
                 return;
               }
-              authorizationRef.current = discovered;
-              setAuthorization(discovered);
-            });
-          }
+              if (discovered) {
+                authorizationRef.current = discovered;
+                setAuthorization(discovered);
+              }
+              // Settle in the same tick as the authorization update so
+              // observers see both together.
+              onAuthorizationDiscoverySettledRef.current?.();
+            },
+            (error: unknown) => {
+              addLog("debug", "Optional OAuth discovery failed:", error);
+              if (
+                isMountedRef.current &&
+                connectionRef.current === connection
+              ) {
+                onAuthorizationDiscoverySettledRef.current?.();
+              }
+            }
+          );
         };
         if (typeof globalThis.requestAnimationFrame === "function") {
           globalThis.requestAnimationFrame(() => {

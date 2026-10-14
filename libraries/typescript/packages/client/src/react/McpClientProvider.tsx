@@ -61,6 +61,24 @@ export interface McpClientContextType {
     id: string,
     options: Partial<McpServerConfig>
   ) => Promise<void>;
+  /**
+   * Disconnect, clear persisted OAuth credentials, and remount a managed
+   * server. The replacement starts a fresh authorization flow as soon as OAuth
+   * discovery reaches an authenticatable state (`pending_auth`, or `ready`
+   * with unauthenticated mixed authorization once optional OAuth discovery
+   * finishes). If discovery settles in any other state, for example because
+   * the server does not use OAuth, the request is dropped and no later
+   * reconnect starts authorization.
+   *
+   * The promise covers preparation of the replacement, not completion of the
+   * browser authorization flow. Observe the server state for the final result.
+   *
+   * Authorization starts after asynchronous teardown and discovery, outside
+   * the user gesture that triggered it. With the popup flow, browsers may
+   * block the popup; render the server's `authUrl` as a fallback link, or use
+   * `useRedirectFlow`.
+   */
+  reauthenticateServer: (id: string) => Promise<void>;
   /** Returns a managed server by ID. */
   getServer: (id: string) => McpServer | undefined;
   /** Whether storage has finished loading (true if no storage provider) */
@@ -170,6 +188,8 @@ interface McpServerWrapperProps {
   ) => Promise<void>;
   onUpdateDisplayName: (id: string, displayName: string) => Promise<void>;
   onReconnect: (id: string) => Promise<void>;
+  reauthenticationRequest?: number;
+  onReauthenticationHandled: (id: string, request: number) => void;
   rpcWrapTransport?: (transport: Transport, serverId: string) => Transport;
   onGlobalSamplingRequest?: (
     request: PendingSamplingRequest,
@@ -216,6 +236,8 @@ function McpServerWrapper({
   onUpdateConfig,
   onUpdateDisplayName,
   onReconnect,
+  reauthenticationRequest,
+  onReauthenticationHandled,
   rpcWrapTransport,
   onGlobalSamplingRequest,
   onGlobalElicitationRequest,
@@ -309,6 +331,14 @@ function McpServerWrapper({
     onGlobalElicitationRequest,
   });
 
+  // Optional OAuth discovery finishes after `ready`. A pending
+  // reauthentication waits for it before deciding whether to authenticate.
+  const [authorizationDiscoverySettled, setAuthorizationDiscoverySettled] =
+    useState(false);
+  const handleAuthorizationDiscoverySettled = useCallback(() => {
+    setAuthorizationDiscoverySettled(true);
+  }, []);
+
   // Use the core useMcp hook with our callbacks
   const mcp = useMcp({
     ...mcpOptions,
@@ -316,6 +346,7 @@ function McpServerWrapper({
     onSampling: queues.onSampling,
     onElicitation: queues.onElicitation,
     wrapTransport: combinedWrapTransport,
+    _onAuthorizationDiscoverySettled: handleAuthorizationDiscoverySettled,
   });
 
   useEffect(() => {
@@ -353,6 +384,58 @@ function McpServerWrapper({
   );
 
   const reconnect = useCallback(() => onReconnect(id), [id, onReconnect]);
+
+  const handledReauthenticationRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (
+      reauthenticationRequest === undefined ||
+      handledReauthenticationRef.current === reauthenticationRequest
+    ) {
+      return;
+    }
+
+    // Wait for the replacement's first discovery to settle. A `ready`
+    // connection without authorization may still be discovering mixed auth.
+    if (
+      mcp.state === "discovering" ||
+      (mcp.state === "ready" &&
+        mcp.authorization === undefined &&
+        !authorizationDiscoverySettled)
+    ) {
+      return;
+    }
+
+    // The request is consumed by whichever state discovery settles in. A
+    // replacement that needs no interactive OAuth (no OAuth, credentials kept
+    // by a custom auth provider, auto-auth already started, or a failure) must
+    // drop it, or a much later reconnect that reaches pending_auth would start
+    // an unrequested popup or full-page redirect.
+    handledReauthenticationRef.current = reauthenticationRequest;
+    onReauthenticationHandled(id, reauthenticationRequest);
+
+    const canAuthenticate =
+      mcp.state === "pending_auth" ||
+      (mcp.state === "ready" &&
+        mcp.authorization?.mode === "mixed" &&
+        !mcp.authorization.authenticated);
+
+    if (!canAuthenticate) {
+      providerLogger.debug(
+        `[McpClientProvider] Reauthentication of "${id}" settled in state "${mcp.state}" without interactive OAuth`
+      );
+      return;
+    }
+
+    void mcp.authenticate();
+  }, [
+    id,
+    mcp.state,
+    mcp.authorization,
+    mcp.authenticate,
+    authorizationDiscoverySettled,
+    reauthenticationRequest,
+    onReauthenticationHandled,
+  ]);
 
   // Update parent when state changes
   const onUpdateRef = useRef(onUpdate);
@@ -654,6 +737,13 @@ export function McpClientProvider({
   const [serverRevisions, setServerRevisions] = useState<
     Record<string, number>
   >({});
+  const [reauthenticationRequests, setReauthenticationRequests] = useState<
+    Record<string, number>
+  >({});
+  const reauthenticationOperationsRef = useRef(
+    new Map<string, { request: number; promise: Promise<void> }>()
+  );
+  const nextReauthenticationRequestRef = useRef<Record<string, number>>({});
   const [storageLoaded, setStorageLoaded] = useState(false);
   const didLoadInitialServers = useRef(false);
 
@@ -982,9 +1072,19 @@ export function McpClientProvider({
       //    a different component (`McpClientProvider`)".
       const captured = serversRef.current.find((s) => s.id === id);
 
+      // Invalidate preparation before any asynchronous teardown. An older
+      // reauthentication must never remount a server after it was removed.
+      reauthenticationOperationsRef.current.delete(id);
+      delete nextReauthenticationRequestRef.current[id];
+
       setServers((prev) => prev.filter((s) => s.id !== id));
       setServerConfigs((prev) => prev.filter((s) => s.id !== id));
       setServerRevisions((prev) => {
+        const { [id]: _removed, ...remaining } = prev;
+        return remaining;
+      });
+      setReauthenticationRequests((prev) => {
+        if (prev[id] === undefined) return prev;
         const { [id]: _removed, ...remaining } = prev;
         return remaining;
       });
@@ -1073,6 +1173,95 @@ export function McpClientProvider({
     [serverConfigs]
   );
 
+  const handleReauthenticationHandled = useCallback(
+    (id: string, request: number) => {
+      setReauthenticationRequests((prev) => {
+        if (prev[id] !== request) return prev;
+        const { [id]: _handled, ...remaining } = prev;
+        return remaining;
+      });
+    },
+    []
+  );
+
+  const reauthenticateServer = useCallback(
+    (id: string): Promise<void> => {
+      const currentConfig = serverConfigs.find((server) => server.id === id);
+      if (!currentConfig) {
+        return Promise.reject(
+          new Error(`Cannot reauthenticate unknown MCP server "${id}"`)
+        );
+      }
+
+      const existing = reauthenticationOperationsRef.current.get(id);
+      if (existing) {
+        return existing.promise;
+      }
+
+      const captured = serversRef.current.find((server) => server.id === id);
+      if (!captured) {
+        return Promise.reject(
+          new Error(`MCP server "${id}" is not mounted yet`)
+        );
+      }
+
+      const request = (nextReauthenticationRequestRef.current[id] ?? 0) + 1;
+      nextReauthenticationRequestRef.current[id] = request;
+      const operation = { request, promise: Promise.resolve() };
+
+      operation.promise = (async () => {
+        let prepared = false;
+        let invalidated = false;
+        try {
+          // Teardown must finish before credentials are removed and the
+          // replacement wrapper is mounted, or the old connection can race it.
+          await captured.disconnect();
+          // Removal during teardown cancels the operation. Credentials then
+          // follow removeServer's own clearCredentials choice.
+          if (reauthenticationOperationsRef.current.get(id) === operation) {
+            captured.clearStorage();
+            prepared = true;
+          }
+        } finally {
+          // Removal invalidates the marker. In that case the old operation must
+          // not resurrect the deleted server after its disconnect settles.
+          if (reauthenticationOperationsRef.current.get(id) !== operation) {
+            invalidated = true;
+          } else {
+            // Always remount after a partial teardown failure so callers are
+            // not left with a disconnected wrapper. Only a fully prepared
+            // replacement receives the one-shot interactive OAuth request.
+            setServers((prev) => prev.filter((server) => server.id !== id));
+            setServerRevisions((prev) => ({
+              ...prev,
+              [id]: (prev[id] ?? 0) + 1,
+            }));
+            if (prepared) {
+              setReauthenticationRequests((prev) => ({
+                ...prev,
+                [id]: request,
+              }));
+            }
+          }
+        }
+
+        if (invalidated) {
+          throw new Error(
+            `MCP server "${id}" was removed during reauthentication`
+          );
+        }
+      })().finally(() => {
+        if (reauthenticationOperationsRef.current.get(id) === operation) {
+          reauthenticationOperationsRef.current.delete(id);
+        }
+      });
+
+      reauthenticationOperationsRef.current.set(id, operation);
+      return operation.promise;
+    },
+    [serverConfigs]
+  );
+
   const updateServerMetadata = useCallback(
     async (id: string, metadata: { name: string }) => {
       return new Promise<void>((resolve) => {
@@ -1124,6 +1313,7 @@ export function McpClientProvider({
       removeServer,
       updateServerMetadata,
       updateServer,
+      reauthenticateServer,
       getServer,
       storageLoaded,
     }),
@@ -1133,6 +1323,7 @@ export function McpClientProvider({
       removeServer,
       updateServerMetadata,
       updateServer,
+      reauthenticateServer,
       getServer,
       storageLoaded,
     ]
@@ -1205,6 +1396,8 @@ export function McpClientProvider({
               updateServerMetadata(id, { name: displayName })
             }
             onReconnect={reconnectServer}
+            reauthenticationRequest={reauthenticationRequests[config.id]}
+            onReauthenticationHandled={handleReauthenticationHandled}
             rpcWrapTransport={rpcWrapTransport}
             onGlobalSamplingRequest={onSamplingRequest}
             onGlobalElicitationRequest={onElicitationRequest}
