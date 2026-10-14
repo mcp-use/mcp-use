@@ -397,9 +397,7 @@ describe("oauthProxy with firebase()", () => {
     expect(page.html).toContain('name="decision" value="deny"');
     // The Firebase token passes through this page, so the copy does not
     // claim that it stays on the server.
-    expect(page.html).toContain(
-      "The app never sees your Firebase credentials."
-    );
+    expect(page.html).toContain("The app can then use localhost:4320 as you.");
     expect(page.html).not.toContain("stay on the server");
     expect(page.html).toContain(`<script type="module" nonce="${nonce}">`);
     expect(page.html).toContain(

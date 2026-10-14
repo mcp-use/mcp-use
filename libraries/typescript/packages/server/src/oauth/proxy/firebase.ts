@@ -687,7 +687,7 @@ function showError(form, text) {
     box = document.createElement("p");
     box.setAttribute("role", "alert");
     box.setAttribute("data-mcp-use-error", "");
-    box.style.cssText = "color:#b42318;font-size:13px;margin:0 0 12px";
+    box.style.cssText = "color:var(--error,#b42318);font-size:13px;margin:0 0 12px";
     form.prepend(box);
   }
   box.textContent = text;
