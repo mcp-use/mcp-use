@@ -28,6 +28,7 @@ import {
   sha256,
   timingSafeEqual,
 } from "../src/oauth/proxy/crypto.js";
+import { upstreamToken } from "../src/oauth/proxy/index.js";
 import { github } from "../src/oauth/proxy/providers.js";
 import { keys } from "../src/oauth/proxy/records.js";
 import {
@@ -1041,5 +1042,19 @@ describe("oauth proxy storage adapters", () => {
       []
     );
     expect(entries.size).toBe(1002);
+  });
+});
+
+describe("upstreamToken", () => {
+  it("returns the upstream access token of ctx.auth", () => {
+    expect(
+      upstreamToken({ upstream: { accessToken: "gho_a", scopes: [] } })
+    ).toBe("gho_a");
+  });
+
+  it("throws on a request without an oauthProxy sign-in", () => {
+    // ctx.auth is undefined on an unauthenticated mixedAuth request.
+    expect(() => upstreamToken(undefined)).toThrow("No upstream token");
+    expect(() => upstreamToken({})).toThrow("No upstream token");
   });
 });

@@ -227,7 +227,7 @@ export type OAuthProxyProvider<TUser> = OAuthProvider<
  *
  * server.tool({ name: "whoami" }, async (_input, ctx) => {
  *   const response = await fetch("https://api.github.com/user", {
- *     headers: { authorization: `Bearer ${upstreamToken(ctx)}` },
+ *     headers: { authorization: `Bearer ${upstreamToken(ctx.auth)}` },
  *   });
  *   return { content: [{ type: "text", text: (await response.json()).login }] };
  * });
@@ -523,14 +523,15 @@ function registerRoutes<TUser>(
  * Keep the token on the server: do not return it in tool results, views,
  * or `_meta`.
  *
- * @param ctx - The tool, resource, or prompt context.
+ * @param auth - The request's auth, `ctx.auth` in a tool, resource, or
+ * prompt. `undefined` on a request without a sign-in.
  * @returns The upstream access token.
  * @throws If the request is not signed in through {@link oauthProxy}.
  */
-export function upstreamToken(ctx: {
-  auth?: { upstream?: OAuthUpstreamToken } | undefined;
-}): string {
-  const token = ctx.auth?.upstream?.accessToken;
+export function upstreamToken(
+  auth: { upstream?: OAuthUpstreamToken } | undefined
+): string {
+  const token = auth?.upstream?.accessToken;
   if (typeof token !== "string") {
     throw new Error(
       "No upstream token: this request is not signed in through oauthProxy"

@@ -577,7 +577,7 @@ function githubServer(
     }),
   });
   server.tool({ name: "whoami" }, async (_input, ctx) => {
-    const token = upstreamToken(ctx);
+    const token = upstreamToken(ctx.auth);
     toolTokens.push(token);
     const response = await fetch(`${githubEmulator.url}/user`, {
       headers: { authorization: `Bearer ${token}` },
@@ -1751,7 +1751,7 @@ function googleServer(
     }),
   });
   server.tool({ name: "whoami" }, async (_input, ctx) => {
-    const token = upstreamToken(ctx);
+    const token = upstreamToken(ctx.auth);
     toolTokens.push(token);
     const response = await fetch(`${googleEmulator.url}/oauth2/v2/userinfo`, {
       headers: { authorization: `Bearer ${token}` },
