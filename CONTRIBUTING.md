@@ -319,13 +319,12 @@ Commit the generated `.changeset/*.md` file with your changes.
 
 ## Pull Request Process
 
-### 1. Check for Existing Work
+> [!NOTE]
+> Before you start, search [open pull requests](https://github.com/mcp-use/mcp-use/pulls) for the issue you want to work on. If a PR for that issue is already open, don't open a new one. Help on the existing PR instead: review it, test it, leave suggestions, or offer commits to the author.
+>
+> If the existing PR has gone inactive and the author doesn't respond to a comment, ask a maintainer on the PR or in [Discord](https://discord.gg/XkNkSkMz3V) before taking it over.
 
-Before you start, search [open pull requests](https://github.com/mcp-use/mcp-use/pulls) for the issue you want to work on. If a PR for that issue is already open, don't open a new one. Help on the existing PR instead: review it, test it, leave suggestions, or offer commits to the author.
-
-If the existing PR has gone inactive and the author doesn't respond to a comment, ask a maintainer on the PR or in [Discord](https://discord.gg/XkNkSkMz3V) before taking it over.
-
-### 2. Create a Branch
+### 1. Create a Branch
 
 ```bash
 # Create a feature branch from main
@@ -341,14 +340,14 @@ git checkout -b fix/python/bug-description
 git checkout -b fix/typescript/bug-description
 ```
 
-### 3. Make Your Changes
+### 2. Make Your Changes
 
 - Write clean, well-documented code
 - Follow the coding standards for the language
 - Add tests for new functionality
 - Update documentation if needed
 
-### 4. Commit Your Changes
+### 3. Commit Your Changes
 
 We recommend (but don't strictly enforce) conventional commit format:
 
@@ -361,7 +360,7 @@ git commit -m "docs: update installation instructions"
 
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-### 5. Before Pushing
+### 4. Before Pushing
 
 **For Python changes:**
 ```bash
@@ -380,7 +379,7 @@ pnpm build
 pnpm changeset  # Create a changeset if not done yet
 ```
 
-### 6. Push and Create PR
+### 5. Push and Create PR
 
 ```bash
 git push origin your-branch-name
