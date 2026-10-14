@@ -22,13 +22,10 @@ import {
   type ClientResolver,
 } from "./clients.js";
 import {
-  inPageCsp,
   PAGE_CSP,
   renderCustomConsentPage,
   renderDefaultConsentPage,
-  renderDefaultSignInPage,
   renderErrorPage,
-  withScript,
   type ConsentPageProps,
 } from "./consent.js";
 import {
@@ -54,9 +51,6 @@ import {
   printable,
   refreshUpstreamTokens,
   UpstreamError,
-  UpstreamRefreshError,
-  type InPageProps,
-  type InPageUpstream,
   type Upstream,
   type UpstreamTokenSet,
   type UpstreamUser,
@@ -138,8 +132,7 @@ class GrantError extends Error {
 /** @internal Fields the verifier adds to `AuthInfo.extra`. */
 export interface ProxyAuthExtra {
   upstreamUser: UpstreamUser;
-  /** Absent when an in-page upstream issued no tokens. */
-  upstream?: { accessToken: string; scopes: string[]; expiresAt?: number };
+  upstream: { accessToken: string; scopes: string[]; expiresAt?: number };
   userKey: string;
 }
 
@@ -295,13 +288,9 @@ export class ProxyRuntime {
     );
 
     if (await this.#skipConsent(c, client, redirectUri)) {
-      // The provider's sign-in window opens only on a click, so an in-page
-      // upstream shows a page with just the sign-in button.
-      return this.config.upstream.kind === "in-page"
-        ? this.#consentPage(c, transactionId, client, redirectUri, false)
-        : this.#startUpstream(c, transactionId, transaction);
+      return this.#startUpstream(c, transactionId, transaction);
     }
-    return this.#consentPage(c, transactionId, client, redirectUri, true);
+    return this.#consentPage(c, transactionId, client, redirectUri);
   }
 
   async #skipConsent(
@@ -323,15 +312,13 @@ export class ProxyRuntime {
 
   /**
    * Shows the consent page, bound to the transaction by a single-use CSRF
-   * cookie. For an in-page upstream, `ask` is false when the consent step
-   * was skipped: the page then shows only the sign-in button.
+   * cookie.
    */
   async #consentPage(
     c: Context,
     transactionId: string,
     client: ClientRecord,
-    redirectUri: string,
-    ask: boolean
+    redirectUri: string
   ): Promise<Response> {
     const csrf = randomToken(24);
     await this.#setRoundCookie(
@@ -352,51 +339,19 @@ export class ProxyRuntime {
       },
       redirectHost: redirectHost(redirectUri),
       upstream: upstream.name,
-      scopes: upstream.kind === "redirect" ? [...upstream.scopes] : [],
+      scopes: [...upstream.scopes],
       serverHost: this.config.serverHost,
       form: {
         action: `${this.paths.consent}?txn=${encodeURIComponent(transactionId)}`,
         csrf,
       },
     };
-    if (upstream.kind === "in-page") {
-      return this.#signInPage(c, upstream, props, ask);
-    }
     const consent = this.config.consent;
     const html =
       consent !== false && consent.page !== undefined
         ? await renderCustomConsentPage(consent.page, props)
         : renderDefaultConsentPage(props);
     return this.#html(c, 200, html);
-  }
-
-  /**
-   * The consent page of an in-page upstream, with the upstream's script
-   * added. Its policy allows the script by nonce and the origins the
-   * upstream names. It sends no Cross-Origin-Opener-Policy: the provider's
-   * sign-in window reports back through `window.opener`.
-   */
-  async #signInPage(
-    c: Context,
-    upstream: InPageUpstream,
-    consentProps: ConsentPageProps,
-    ask: boolean
-  ): Promise<Response> {
-    const nonce = randomToken(16);
-    const props: InPageProps = { ...consentProps, nonce, consent: ask };
-    const consent = this.config.consent;
-    const html =
-      consent !== false && consent.page !== undefined
-        ? await renderCustomConsentPage(consent.page, props)
-        : ask
-          ? renderDefaultConsentPage(props)
-          : renderDefaultSignInPage(props);
-    return this.#html(
-      c,
-      200,
-      withScript(html, upstream.script(nonce)),
-      inPageCsp(upstream.csp, nonce)
-    );
   }
 
   // ─── POST /consent ───────────────────────────────────────────────────
@@ -446,62 +401,8 @@ export class ProxyRuntime {
         }),
       });
     }
-    const upstream = this.config.upstream;
-    if (upstream.kind === "in-page") {
-      return this.#inPageSignIn(
-        c,
-        transactionId,
-        transaction,
-        upstream,
-        form.get("proof") ?? ""
-      );
-    }
     await this.#rememberIfAsked(c, transaction);
     return this.#startUpstream(c, transactionId, transaction);
-  }
-
-  /**
-   * Checks the proof that an in-page upstream's script posted with the
-   * Allow decision, then issues the code. The CSRF cookie was spent above,
-   * so the proof is accepted once.
-   */
-  async #inPageSignIn(
-    c: Context,
-    transactionId: string,
-    transaction: TransactionRecord,
-    upstream: InPageUpstream,
-    proof: string
-  ): Promise<Response> {
-    let result: { user: UpstreamUser; tokens?: UpstreamTokenSet };
-    try {
-      result = await upstream.verify(proof, { fetch: this.config.fetch });
-      if (
-        typeof result?.user?.subject !== "string" ||
-        result.user.subject === ""
-      ) {
-        throw new Error("verify returned no subject");
-      }
-    } catch (error) {
-      console.error(
-        `[mcp-use] oauthProxy: ${upstream.name} sign-in failed:`,
-        describe(error)
-      );
-      return this.#finish(
-        c,
-        transactionId,
-        transaction,
-        signInFailure(upstream.name, error)
-      );
-    }
-    // Remember only a sign-in that succeeded.
-    await this.#rememberIfAsked(c, transaction);
-    return this.#completeSignIn(
-      c,
-      transactionId,
-      transaction,
-      result.user,
-      result.tokens ?? { accessToken: "", scopes: [] }
-    );
   }
 
   async #rememberIfAsked(
@@ -543,9 +444,6 @@ export class ProxyRuntime {
     extraParams: Readonly<Record<string, string>> = {}
   ): Promise<Response> {
     const upstream = this.config.upstream;
-    if (upstream.kind !== "redirect") {
-      throw new Error("An in-page upstream has no upstream redirect");
-    }
     const state = randomToken(32);
     await this.config.store.set(
       keys.upstreamState(await sha256(state)),
@@ -583,14 +481,6 @@ export class ProxyRuntime {
   /** `GET /oauth/callback`: finishes the upstream round and issues a code. */
   async callback(c: Context): Promise<Response> {
     const upstream = this.config.upstream;
-    if (upstream.kind !== "redirect") {
-      return this.#errorPage(
-        c,
-        400,
-        "Sign-in failed",
-        "This server does not use a sign-in callback."
-      );
-    }
     const params = new URL(c.req.url).searchParams;
     const state = params.get("state");
     if (state === null || state === "") {
@@ -1190,17 +1080,13 @@ export class ProxyRuntime {
     }
     const extra: ProxyAuthExtra = {
       upstreamUser: upstream.user,
-      // An in-page upstream whose `verify` returned no tokens stores an
-      // empty access token; tools then get none.
-      ...(upstream.tokens.accessToken !== "" && {
-        upstream: {
-          accessToken: upstream.tokens.accessToken,
-          scopes: [...upstream.tokens.scopes],
-          ...(upstream.tokens.expiresAt !== undefined && {
-            expiresAt: upstream.tokens.expiresAt,
-          }),
-        },
-      }),
+      upstream: {
+        accessToken: upstream.tokens.accessToken,
+        scopes: [...upstream.tokens.scopes],
+        ...(upstream.tokens.expiresAt !== undefined && {
+          expiresAt: upstream.tokens.expiresAt,
+        }),
+      },
       userKey: grant.userKey,
     };
     return {
@@ -1241,10 +1127,6 @@ export class ProxyRuntime {
     }
     const refreshToken = record.tokens.refreshToken;
     if (refreshToken === undefined) return record;
-    const provider = this.config.upstream;
-    if (provider.kind === "in-page" && provider.refresh === undefined) {
-      return record;
-    }
 
     const lock = await this.#tryLock(keys.upstreamLock(record.userKey));
     if (lock === undefined) {
@@ -1271,22 +1153,16 @@ export class ProxyRuntime {
       if (current.version !== record.version) return current;
       let tokens: UpstreamTokenSet;
       try {
-        tokens =
-          provider.kind === "in-page"
-            ? await provider.refresh!(current.tokens, {
-                fetch: this.config.fetch,
-              })
-            : await refreshUpstreamTokens(
-                provider,
-                this.config.fetch,
-                refreshToken
-              );
+        tokens = await refreshUpstreamTokens(
+          this.config.upstream,
+          this.config.fetch,
+          refreshToken
+        );
       } catch (error) {
         if (
-          (error instanceof UpstreamError &&
-            !error.transient &&
-            error.code === "invalid_grant") ||
-          (error instanceof UpstreamRefreshError && error.revoked)
+          error instanceof UpstreamError &&
+          !error.transient &&
+          error.code === "invalid_grant"
         ) {
           console.warn(
             `[mcp-use] oauthProxy: ${describe(error)}. The user's sign-ins end; they must sign in again.`
@@ -1537,14 +1413,9 @@ export class ProxyRuntime {
     c.header("x-content-type-options", "nosniff");
   }
 
-  #html(
-    c: Context,
-    status: 200 | 400 | 403,
-    html: string,
-    csp: string = PAGE_CSP
-  ): Response {
+  #html(c: Context, status: 200 | 400 | 403, html: string): Response {
     this.#headers(c);
-    c.header("content-security-policy", csp);
+    c.header("content-security-policy", PAGE_CSP);
     c.header("x-frame-options", "DENY");
     return c.html(html, status);
   }
@@ -1649,9 +1520,6 @@ function sleep(ms: number): Promise<void> {
 export function describe(error: unknown): string {
   if (error instanceof UpstreamError) {
     return `${error.message}${error.detail === undefined ? "" : ` (${error.detail})`}`;
-  }
-  if (error instanceof UpstreamRefreshError) {
-    return error.message;
   }
   if (!(error instanceof Error)) return String(error);
   let text = error.stack ?? `${error.name}: ${error.message}`;

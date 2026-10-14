@@ -32,7 +32,6 @@ import {
   type OAuthProxyStorage,
 } from "./storage.js";
 import {
-  assertInPageUpstream,
   assertRedirectUpstream,
   type Upstream,
   type UpstreamUser,
@@ -56,9 +55,7 @@ export interface OAuthProxyConsentOptions {
    * React component that replaces the built-in consent page. It is rendered
    * on the server with `react-dom/server`, so it needs the `react` and
    * `react-dom` packages. See {@link ConsentPageProps} for the form it must
-   * render. With an in-page upstream such as `firebase()`, it receives
-   * {@link InPageProps}, and the proxy adds the upstream's sign-in script
-   * after it.
+   * render.
    */
   page?: (props: ConsentPageProps) => unknown;
 }
@@ -183,7 +180,7 @@ export type OAuthProxyProvider<TUser> = OAuthProvider<
 /**
  * Creates an OAuth provider that makes the MCP server its own authorization
  * server, in front of an identity provider that does not support dynamic
- * client registration (for example GitHub, Google, or Firebase Auth).
+ * client registration (for example GitHub or Google).
  *
  * MCP clients discover the server's own endpoints, register (or present a
  * client ID metadata document), and sign in through
@@ -195,9 +192,7 @@ export type OAuthProxyProvider<TUser> = OAuthProvider<
  *
  * Register `https://<your server><base path>/oauth/callback` (for example
  * `https://api.example.com/mcp/oauth/callback`) as the callback URL of the
- * upstream OAuth app. An in-page upstream such as `firebase()` has no
- * callback: the user signs in with the provider's browser SDK on the
- * consent page, and the page posts the result with the decision.
+ * upstream OAuth app.
  *
  * @typeParam TUser - Application user type exposed as `ctx.auth.user`.
  * @param options - Upstream provider, secret, storage, and consent settings.
@@ -245,15 +240,12 @@ export function oauthProxy<TUser = UpstreamUser>(
     throw new TypeError("oauthProxy requires options");
   }
   const upstream = options.upstream;
-  if (upstream?.kind === "in-page") {
-    assertInPageUpstream(upstream);
-  } else if (upstream?.kind === "redirect") {
-    assertRedirectUpstream(upstream);
-  } else {
+  if (upstream?.kind !== "redirect") {
     throw new TypeError(
-      "oauthProxy upstream must be github(), google(), firebase(), or upstream({...})"
+      "oauthProxy upstream must be github(), google(), or upstream({...})"
     );
   }
+  assertRedirectUpstream(upstream);
 
   const configuredSecret =
     options.secret ?? oauthEnvironmentValue("MCP_USE_OAUTH_SECRET");
@@ -525,8 +517,7 @@ function registerRoutes<TUser>(
 
 /**
  * Reads the upstream provider's access token for the signed-in user, for
- * example to call the GitHub API as that user from a tool. With
- * `firebase()`, it is the user's Firebase ID token.
+ * example to call the GitHub API as that user from a tool.
  *
  * Keep the token on the server: do not return it in tool results, views,
  * or `_meta`.
@@ -555,12 +546,8 @@ export type {
   GitHubUpstreamOptions,
   GoogleUpstreamOptions,
 } from "./providers.js";
-export { firebase, type FirebaseUpstreamOptions } from "./firebase.js";
 export {
   upstream,
-  UpstreamRefreshError,
-  type InPageProps,
-  type InPageUpstream,
   type RedirectUpstream,
   type Upstream,
   type UpstreamOptions,

@@ -2142,24 +2142,6 @@ describe("oauthProxy production guards", () => {
         clients: [{ clientId: "app", redirectUris: ["data:text/html,hi"] }],
       })
     ).toThrow("oauthProxy clients:");
-    const inPage = {
-      kind: "in-page" as const,
-      id: "firebase",
-      name: "Firebase",
-      script: () => "",
-      verify: async () => ({ user: { subject: "u", profile: {} } }),
-    };
-    expect(() => oauthProxy({ upstream: inPage })).not.toThrow();
-    expect(() =>
-      oauthProxy({
-        upstream: { ...inPage, verify: undefined as never },
-      })
-    ).toThrow("upstream.verify must be a function");
-    expect(() =>
-      oauthProxy({
-        upstream: { ...inPage, csp: { script: ["https://a.example; x"] } },
-      })
-    ).toThrow("upstream.csp.script");
     expect(() =>
       github({
         clientId: "a",
