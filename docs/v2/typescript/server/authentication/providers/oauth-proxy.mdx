@@ -401,7 +401,7 @@ The proxy shows a consent page before it sends the user upstream. The page names
 
 ### Render a custom consent page
 
-`consent.page` takes a React component that the proxy renders on the server with `react-dom/server`, so install `react` and `react-dom`. The component receives `ConsentPageProps` and must render a form that posts to `form.action` with a hidden `csrf` input and two `decision` buttons:
+`consent.page` takes a React component that the proxy renders on the server with `react-dom/server`, so install `react` and `react-dom`. The component receives `ConsentPageProps` and must render a form that posts to `form.action` with two `decision` buttons. `form.action` already carries the CSRF token, so post to it unchanged and add no hidden fields:
 
 ```tsx src/consent.tsx
 import type { ConsentPageProps } from "mcp-use/oauth";
@@ -412,7 +412,6 @@ export function Consent({ client, serverHost, upstream, scopes, form }: ConsentP
       <h1>Allow {client.name ?? "this app"} to connect to {serverHost}?</h1>
       <p>You will sign in with {upstream}. Scopes: {scopes.join(", ") || "none"}.</p>
       <form method="post" action={form.action}>
-        <input type="hidden" name="csrf" value={form.csrf} />
         <button name="decision" value="deny">Deny</button>
         <button name="decision" value="allow">Allow</button>
       </form>
