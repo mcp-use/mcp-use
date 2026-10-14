@@ -84,10 +84,10 @@ export default server;
 
 Set `legacy` on `MCPServer` to decide whether the endpoint accepts older MCP protocol requests.
 
-| Value         | Behavior                                                                                                                                                         |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"stateless"` | Default. Accept modern requests and serve each 2025-era request independently without creating a session. Legacy GET and DELETE session operations return `405`. |
-| `"reject"`    | Accept only the modern protocol. Older requests fail with an unsupported-protocol-version error.                                                                 |
+| Value         | Behavior                                                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"stateless"` | Default. Accept modern requests and serve each 2025-era request independently without creating a session. Legacy GET and DELETE session operations, and HEAD probes, return an empty `204`. |
+| `"reject"`    | Accept only the modern protocol. Older requests fail with an unsupported-protocol-version error.                                                                                            |
 
 Use `"stateless"` while clients are migrating. Use `"reject"` when every client connecting to the endpoint supports the modern protocol.
 

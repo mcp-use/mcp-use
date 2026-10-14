@@ -40,7 +40,7 @@ Ensure your project emits ESM and your bundler respects the package's `node` and
 | `useMcp` and `McpClientProvider` from `mcp-use/react` | `@mcp-use/client/react` | React connection management |
 | `MCPAgent` and `PROMPTS` from `mcp-use` | `@mcp-use/agent` | Native agent |
 | LangChain agent compatibility and `ServerManager` | `@mcp-use/agent/langchain` | Optional LangChain integration |
-| Widget compatibility hooks | `mcp-use/react` View hooks | Code running inside MCP App Views |
+| Widget hooks such as `useWidget` (removed) | `mcp-use/react` View hooks | Code running inside MCP App Views |
 | `MCPServer` and server capabilities | `mcp-use` | MCP server |
 
 ```typescript
@@ -62,8 +62,9 @@ entry points. Import `ServerManager` only from the LangChain entry.
 
 ### Removed client subpaths
 
-The client package exports only its conditional root and `./react` entry.
-Replace these removed imports:
+The client package exports its conditional root, the `./react` entry, and a
+`./sandbox` entry for the MCP Apps sandbox proxy document. Replace these removed
+imports:
 
 | Removed import | Use instead |
 | -------------- | ----------- |
@@ -133,7 +134,12 @@ const client = new MCPClient({
 });
 ```
 
-The client CLI uses the same three modes:
+The accepted values are `"auto"`, `"legacy"`, and `{ pin: "2026-07-28" }`.
+There is no `"modern"` value; pin the modern protocol version to use the
+sessionless protocol without fallback.
+
+The client CLI exposes the same choices as `--protocol auto`, `legacy`, and
+`modern`. Its `modern` mode uses `{ pin: "2026-07-28" }`:
 
 ```bash
 mcp-use client connect demo https://api.example.com/mcp --protocol auto
@@ -141,8 +147,7 @@ mcp-use client connect legacy https://legacy.example.com/mcp --protocol legacy
 mcp-use client connect modern https://modern.example.com/mcp --protocol modern
 ```
 
-The accepted values are `auto`, `legacy`, and `modern`. There is no
-`--negotiate` flag.
+There is no `--negotiate` flag.
 
 ## 5. Rename client configuration
 
@@ -155,9 +160,13 @@ Search your client configuration for the removed 1.x names and update them:
 | `auth_token` | `authToken` |
 | `customHeaders` | `headers` |
 | `clientConfig` | `clientInfo` |
-| `debug` | `logLevel` |
+| `debug` | `logLevel` on `useMcp` |
 | `BrowserTelemetry` | `Telemetry` |
 | `ResourceTemplate` client type | `ResourceTemplateType` |
+
+`MCPClient` has no `logLevel` option. Set `MCP_USE_LOG_LEVEL` (for example
+`debug`; `DEBUG=2` also works) in the environment, or assign `logger.level` on
+the `logger` exported by `@mcp-use/client`.
 
 Sampling, elicitation, and notification callbacks can be set as global client
 defaults or on an individual server configuration. Per-server callbacks take
@@ -218,9 +227,11 @@ Move connection management to `@mcp-use/client/react`:
 `@mcp-use/client/react` also exports `ViewRenderer` for a host application that
 renders MCP App Views.
 
-Code running inside a View stays in `mcp-use/react`, but should use focused View
-hooks such as `useToolContext`, `useCallTool`, and `useViewState`. Compatibility
-hooks such as `useWidget` are deprecated.
+Code running inside a View stays in `mcp-use/react`, but must use focused View
+hooks such as `useToolContext`, `useCallTool`, and `useViewState`. The widget
+hooks `useWidget`, `useWidgetProps`, and `useWidgetState` were removed; see the
+[server migration guide](/v2/typescript/server/migration) for their
+replacements.
 
 ## 8. Replace removed low-level exports
 
@@ -247,8 +258,9 @@ prompt, middleware, authentication, and deployment APIs against the
 
 Interactive results use MCP Apps Views. Bind a View to a tool, return
 model-facing `content` and View props in `structuredContent`, and consume the
-result with focused hooks such as `useToolContext`. Deprecated widget helpers
-exist only for compatibility. Follow the
+result with focused hooks such as `useToolContext`. The widget hooks were
+removed; the deprecated `widget()` response helper remains only for
+compatibility. Follow the
 [MCP Apps guide](/v2/typescript/mcp-apps) before updating interactive UI code.
 
 ## 10. Check Inspector callback URLs
@@ -292,7 +304,7 @@ URLs.
   </Step>
   <Step title="Update Views">
     Separate React connection management from code that runs inside an MCP App
-    View, then replace deprecated widget compatibility hooks.
+    View, then replace the removed widget hooks with View hooks.
   </Step>
   <Step title="Verify each environment">
     Type-check Node, browser, and React entry points independently, then connect

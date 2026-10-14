@@ -116,6 +116,8 @@ For another authorization server, `oauthCustomProvider` separates verification f
 ```typescript
 import { MCPServer } from "mcp-use";
 import {
+  OAuthError,
+  OAuthErrorCode,
   oauthCustomProvider,
   type OAuthAuthInfo,
   type OAuthMetadata,
@@ -147,7 +149,10 @@ const server = new MCPServer({
     createTokenVerifier: (resource) => ({
       async verifyAccessToken(token) {
         if (token !== demoAccessToken) {
-          throw new Error("Invalid access token");
+          throw new OAuthError(
+            OAuthErrorCode.InvalidToken,
+            "Invalid access token",
+          );
         }
 
         return {
@@ -192,7 +197,7 @@ const server = new MCPServer({
 
 This fixed-token verifier keeps the example small and is only suitable for local testing. In production, validate the token signature, issuer, expiry, and MCP resource, or introspect an opaque token with the authorization server.
 
-`createTokenVerifier` receives the canonical MCP resource. `mapAuthInfo` runs only after SDK auth information has been verified and must return `{ user, payload, permissions }`. It does not rewrite `ctx.auth.scopes`; those come from the verifier's verified auth info.
+`createTokenVerifier` receives the canonical MCP resource. The verifier rejects a token by throwing `OAuthError` with `OAuthErrorCode.InvalidToken`, so the client gets `401` with a `WWW-Authenticate` challenge, or, for a ChatGPT `tools/call` request, an `isError` tool result carrying the same challenge (see [Mixed auth](/v2/typescript/server/authentication/mixed-auth)). An error that is not an `OAuthError` is answered with `500`. The auth information it returns must carry `resource` as a `URL` matching that resource, `clientId` as a string (`""` when the token has no client), and `expiresAt` in Unix seconds in the future. `mapAuthInfo` runs only after SDK auth information has been verified and must return `{ user, payload, permissions }`. It does not rewrite `ctx.auth.scopes`; those come from the verifier's verified auth info.
 
 ## Next steps
 

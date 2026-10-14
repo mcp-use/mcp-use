@@ -13,10 +13,10 @@ Expose a `greet` tool at `/api/mcp` in your existing TanStack Start app. TanStac
 
 ## Add the integration
 
-Install the canary release of mcp-use, which includes the TanStack Start adapter, and Zod in your project:
+Install mcp-use, which includes the TanStack Start adapter, and Zod in your project:
 
 ```bash
-npm install mcp-use@canary zod
+npm install mcp-use zod
 ```
 
 If your app does not already use Nitro 3, install the version used by the example for the Node.js server build:
@@ -163,4 +163,4 @@ Run the tool. It returns `Hello, Ada!`.
 
 Use your app's port if it differs from `3000`. MCP views share the application's browser environment for React Fast Refresh and CSS HMR. Server edits replace the MCP instance and interrupt active requests; failed edits retain the last working instance. View registrations and skills refresh without restarting Vite. Configure React, CSS and aliases in the main Vite config.
 
-See the [complete TanStack Start example](https://github.com/mcp-use/mcp-use/tree/canary/libraries/typescript/packages/server/examples/tanstack-start) for a runnable application with a shared UI card, an OAuth discovery route, and production build instructions.
+See the [complete TanStack Start example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/tanstack-start) for a runnable application with a shared UI card, an OAuth discovery route, and production build instructions.

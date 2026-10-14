@@ -52,9 +52,9 @@ MCP_USE_SENTRY_DSN=https://your-public-key@your-ingest-host/your-project-id
 
 Keep `.env` out of version control. Initialize Sentry once in your server entry point, then add the middleware below. If your application already initializes Sentry, reuse that initialization rather than calling `Sentry.init()` again.
 
-Copy this complete example into `src/index.ts`, or keep your existing tools and add the initialization and middleware:
+Copy this complete example into your server entry (`index.ts` in a project created with `create-mcp-use-app`), or keep your existing tools and add the initialization and middleware:
 
-```typescript src/index.ts
+```typescript index.ts
 import * as Sentry from "@sentry/node";
 import { MCPServer } from "mcp-use";
 import { z } from "zod";
