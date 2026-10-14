@@ -592,24 +592,42 @@ export default server;
     Replace every `ctx.auth.accessToken` that calls the upstream API with
     `upstreamToken(ctx)`.
   </Step>
-  <Step title="Plan for one more sign-in per user">
-    Tell users that each MCP client asks them to sign in again once.
+  <Step title="Redirect the v1 endpoint paths">
+    v1 served `/authorize` and `/token` at the root of the server. v2 serves
+    them under the MCP path, for example `/mcp/oauth/authorize`. Some clients
+    saved the v1 URLs when they signed in and keep calling them. Redirect both
+    paths to the v2 endpoints:
+
+    ```typescript src/index.ts
+    server.get("/authorize", (c) =>
+      c.redirect(`/mcp/oauth/authorize${new URL(c.req.url).search}`)
+    );
+    server.post("/token", (c) => c.redirect("/mcp/oauth/token", 307));
+    ```
   </Step>
 </Steps>
 
-<Warning>
-  Every v1 connection must sign in again. v1 clients hold upstream tokens,
-  which v2 rejects with 401 because it accepts only tokens it issued. v1
-  client registrations do not carry over either: v1 handed every client the
-  upstream `clientId`, which v2 does not know. A client that keeps its v1
-  registration shows **Unknown app**; remove the server from the client and add
-  it again so that it registers with v2.
-</Warning>
+### What users see after the upgrade
 
-The v2 proxy's endpoints also moved under the MCP path, for example
-`/mcp/oauth/authorize` and `/mcp/oauth/token`. Clients that follow the 401
-challenge read the new endpoints from the server's metadata, so you do not
-configure them.
+Each user approves the consent page and signs in with the provider once more,
+in the same MCP client. Nobody needs to remove the server from a client or add
+it again:
+
+1. The client's next request carries its v1 token, which is the provider's
+   token. v2 accepts only tokens it issued, so it answers 401.
+2. The client tries to refresh. v2 does not know the v1 refresh token, so the
+   refresh fails and the client starts a new sign-in.
+3. The client still sends the `client_id` that v1 gave it, which is the
+   provider's `clientId`. v2 accepts it with the redirect URI of the request and
+   shows the consent page. For these clients, `ctx.auth.clientId` is the
+   provider's `clientId`.
+
+<Warning>
+  v2 accepts the v1 `client_id` only while `dcr` is on, which is the default
+  when `clients` is not set. With `clients` set, a client from v1 shows
+  **Unknown app**, and the user must remove the server from the client and add
+  it again.
+</Warning>
 
 For the rest of the v1 to v2 upgrade, see [Migrate to v2](/v2/typescript/server/migration).
 

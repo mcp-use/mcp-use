@@ -730,8 +730,9 @@ GitHub and Google, with a new API and a new token model:
   and a shared `storage`.
 - The upstream callback URL moves from `/oauth/callback` to
   `/mcp/oauth/callback`.
-- Every user signs in again once: v2 rejects the upstream tokens that v1
-  clients hold.
+- Every user approves the consent page and signs in once more, in the same
+  client: v2 rejects the upstream tokens that v1 clients hold. Redirect the v1
+  `/authorize` and `/token` paths for clients that saved them.
 
 Follow [Migrate from v1 `oauthProxy`](/v2/typescript/server/authentication/providers/oauth-proxy#migrate-from-v1-oauthproxy)
 for the option mapping, a before-and-after example, and the deployment steps.
