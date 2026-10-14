@@ -1,0 +1,213 @@
+---
+title: "OAuth Proxy storage"
+description: "Choose and configure shared storage for oauthProxy in a TypeScript MCP server: Upstash, Redis, Postgres, Firestore, Cloudflare D1 or Durable Objects, or your own adapter."
+icon: "database"
+---
+
+`oauthProxy` needs one store that every instance of your MCP server shares. Pass it as the `storage` option. Adapters for common databases are in `mcp-use/oauth/storage`; each one takes a client or binding that your application already has, so mcp-use adds no database dependency.
+
+| Adapter             | Backend                                        | Runtimes                                  |
+| ------------------- | ---------------------------------------------- | ----------------------------------------- |
+| `upstashStorage`    | Upstash Redis over its REST API                | Any runtime with `fetch`: Node.js, Vercel, Cloudflare Workers |
+| `redisStorage`      | Redis 6.2 or later, through node-redis or ioredis | Node.js, Bun                           |
+| `postgresStorage`   | One Postgres table, through `pg` or a compatible client | Node.js, Bun                     |
+| `firestoreStorage`  | One Firestore collection, through `firebase-admin` or `@google-cloud/firestore` | Node.js |
+| `cloudflareStorage` | A D1 database or a Durable Object              | Cloudflare Workers                        |
+| `memoryStorage`     | Process memory                                 | Local development only                    |
+
+## What the proxy stores
+
+The proxy encrypts every value with a key derived from your `secret` before the store sees it. Keys hold SHA-256 hashes of tokens, never the tokens themselves, so a leaked store holds no usable token without the secret.
+
+One completed sign-in writes these records:
+
+| Key                        | Holds                                                     | Lifetime                                   |
+| -------------------------- | --------------------------------------------------------- | ------------------------------------------ |
+| `txn:<id>`                 | One sign-in in progress: the client, redirect URI, PKCE challenge, and state | 10 minutes                |
+| `code:<hash>`              | One-time authorization code for the client                | 60 seconds, deleted when used              |
+| `grant:<id>`               | One signed-in client of one user                          | 30 days, extended on each refresh          |
+| `at:<hash>`                | One proxy access token                                    | `accessTokenTtl` (default 1 hour)          |
+| `rt:<hash>`                | One proxy refresh token                                   | 30 days                                    |
+| `up:<provider>:<subject>`  | The user's upstream tokens and profile, shared by all of their grants | 60 days after the last write   |
+| `client:<id>`              | A client registered through dynamic client registration   | 365 days                                   |
+
+Every key starts with `mcp-use:oauth:` and a hash of the MCP resource URL, so several MCP servers can share one database without seeing each other's records. A `client:` record exists only for clients that registered through dynamic client registration. The proxy also writes short-lived markers and locks (`codeused:`, `ustate:`, `revoked:`, `lock:`), which expire within an hour.
+
+## Adapter requirements
+
+A store must:
+
+- be shared by every instance of the server, because a sign-in can start on one instance and finish on another;
+- expire each value after the `ttlSeconds` it was written with;
+- implement `take` (read and delete) and `add` (write if absent) atomically. One-time codes and sign-in states depend on `take`, and refresh locks depend on `add`.
+
+Workers KV alone does not qualify: it has no atomic read-and-delete, so two requests could spend one authorization code. Use D1 or a Durable Object on Cloudflare.
+
+## Upstash
+
+```typescript
+import { upstashStorage } from "mcp-use/oauth/storage";
+
+const storage = upstashStorage({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
+```
+
+`upstashStorage` needs only `fetch`. Pass a `fetch` option to use a custom implementation. During `mcp-use build`, a missing `url` or `token` is not an error.
+
+## Redis
+
+Pass a connected node-redis or ioredis client, or a function that connects one:
+
+```typescript
+import { createClient } from "redis";
+import { redisStorage } from "mcp-use/oauth/storage";
+
+const storage = redisStorage(() =>
+  createClient({ url: process.env.REDIS_URL })
+    // Without an error listener, a dropped connection crashes the process.
+    .on("error", (error) => console.error("Redis error:", error))
+    .connect(),
+);
+```
+
+With a function, the adapter connects on the first storage call, not when the module loads. `mcp-use build` and serverless cold starts then never wait on Redis. Concurrent first calls share one connection attempt, and a failed attempt is retried on the next call. A wrong URL therefore shows up at the first sign-in, not at startup.
+
+The adapter uses `GETDEL` and `SET NX EX`, which need Redis 6.2 or later.
+
+## Postgres
+
+```typescript
+import pg from "pg";
+import { postgresStorage } from "mcp-use/oauth/storage";
+
+const storage = postgresStorage({
+  client: new pg.Pool({ connectionString: process.env.DATABASE_URL }),
+  // Default: "mcp_use_oauth"
+  table: "mcp_use_oauth",
+});
+```
+
+The adapter creates the table on first use:
+
+```sql
+CREATE TABLE IF NOT EXISTS mcp_use_oauth (
+  key text PRIMARY KEY,
+  value text NOT NULL,
+  expires_at timestamptz NOT NULL
+);
+```
+
+`take` uses `DELETE … RETURNING`. Expired rows are deleted in the background on about 1% of writes. `table` must be a plain SQL identifier.
+
+## Firestore
+
+```typescript
+import { initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { firestoreStorage } from "mcp-use/oauth/storage";
+
+initializeApp();
+const storage = firestoreStorage({
+  firestore: getFirestore(),
+  // Default: "mcp_use_oauth"
+  collection: "mcp_use_oauth",
+});
+```
+
+Each key is one document with a `value` field and an `expiresAt` timestamp. `take` and `add` run in transactions. The adapter ignores expired documents, but Firestore keeps them until they are deleted: add a [TTL policy](https://firebase.google.com/docs/firestore/ttl) on the `expiresAt` field of the collection.
+
+`firestoreStorage` uses the server SDK, which needs Node.js. It does not run on Cloudflare Workers or other edge runtimes. The Admin SDK bypasses security rules, so the collection needs no rules of its own.
+
+## Cloudflare
+
+### D1
+
+```typescript
+import { cloudflareStorage } from "mcp-use/oauth/storage";
+
+// env.DB is a D1 binding from wrangler.jsonc.
+const storage = cloudflareStorage({ d1: env.DB, table: "mcp_use_oauth" });
+```
+
+The adapter creates its table on first use and stores expiry as Unix milliseconds.
+
+### Durable Object
+
+A Durable Object processes one request at a time, which makes every operation atomic. Export `OAuthProxyDurableObject` from your Worker and bind it:
+
+```typescript src/worker.ts
+import { cloudflareStorage } from "mcp-use/oauth/storage";
+
+export { OAuthProxyDurableObject } from "mcp-use/oauth/storage";
+
+const storage = cloudflareStorage({ durableObject: env.OAUTH });
+```
+
+```jsonc wrangler.jsonc
+{
+  "durable_objects": {
+    "bindings": [{ "name": "OAUTH", "class_name": "OAuthProxyDurableObject" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OAuthProxyDurableObject"] }]
+}
+```
+
+Every key goes to one object named `mcp-use-oauth`. The object deletes expired entries in pages of 1,000 every 200 writes.
+
+## Memory
+
+`memoryStorage()` keeps values in process memory. Its state is lost on restart and is not shared between instances, so `oauthProxy` accepts it only when the MCP resource is on localhost. A `listen()` on a loopback address uses it by default when you pass no `storage`. Under `mcp-use dev`, pass it explicitly:
+
+```typescript
+import { memoryStorage } from "mcp-use/oauth";
+
+oauthProxy({ upstream, storage: memoryStorage() });
+```
+
+Every reload of `mcp-use dev` starts a new process, so sign-ins end on each file change. Use Redis locally to keep them.
+
+## Write your own adapter
+
+Implement `OAuthProxyStorage`. Values and keys are strings, and `ttlSeconds` is always a positive integer:
+
+```typescript
+import type { OAuthProxyStorage } from "mcp-use/oauth";
+
+export function myStorage(db: MyDatabase): OAuthProxyStorage {
+  return {
+    // The value, or undefined when it is absent or expired.
+    get: (key) => db.get(key),
+    // Replace any current value.
+    set: (key, value, ttlSeconds) => db.set(key, value, { ttlSeconds }),
+    // Deleting an absent key is not an error.
+    delete: (key) => db.delete(key),
+    // Read and delete in one atomic step. Two concurrent calls must never both get the value.
+    take: (key) => db.getAndDelete(key),
+    // Write only when the key is absent, atomically. true when written, false when the key exists.
+    add: (key, value, ttlSeconds) => db.insertIfAbsent(key, value, { ttlSeconds }),
+  };
+}
+```
+
+A store that is not atomic breaks one-time codes: a replayed authorization code could be exchanged twice. Test `take` and `add` under concurrency before you deploy.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="OAuth Proxy"
+    icon="shuffle"
+    href="/v2/typescript/server/authentication/providers/oauth-proxy"
+  >
+    Configure the upstream provider, clients, and consent page.
+  </Card>
+  <Card
+    title="API reference"
+    icon="terminal"
+    href="https://api-reference.mcp-use.com/modules/mcp-use.oauth_storage.html"
+  >
+    Every adapter, option, and client interface.
+  </Card>
+</CardGroup>

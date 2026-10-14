@@ -330,6 +330,14 @@
                           "v2/typescript/server/authentication/user-context",
                           "v2/typescript/server/authentication/mixed-auth",
                           {
+                            "group": "OAuth Proxy",
+                            "icon": "shuffle",
+                            "pages": [
+                              "v2/typescript/server/authentication/providers/oauth-proxy",
+                              "v2/typescript/server/authentication/providers/oauth-proxy-storage"
+                            ]
+                          },
+                          {
                             "group": "OAuth Providers",
                             "icon": "plug",
                             "pages": [
