@@ -58,7 +58,8 @@ export function mcpUseLandingPlugin(options: {
 
 /** Development SSR module pairing `landing.tsx` with its data setter. */
 export const VIRTUAL_LANDING_SSR_ID = "virtual:mcp-use/landing-ssr";
-const RESOLVED_LANDING_SSR_ID = `\0${VIRTUAL_LANDING_SSR_ID}`;
+/** Module graph id of the SSR entry: the root of the page's import graph. */
+export const RESOLVED_LANDING_SSR_ID = `\0${VIRTUAL_LANDING_SSR_ID}`;
 
 /**
  * Serve `landing.tsx` together with `__withLandingData` to the dev module

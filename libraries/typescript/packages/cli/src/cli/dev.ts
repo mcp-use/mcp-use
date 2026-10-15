@@ -29,7 +29,12 @@ import { isDeepStrictEqual } from "node:util";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import type { ComponentType } from "react";
-import { createServer, createServerModuleRunner, normalizePath } from "vite";
+import {
+  createServer,
+  createServerModuleRunner,
+  normalizePath,
+  type Plugin,
+} from "vite";
 // Bundled into the lazy dev chunk; keeping this build input in devDependencies
 // prevents the standalone CLI from installing the full SDK dependency tree.
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -61,8 +66,13 @@ import {
   DEV_LANDING_ENTRY,
   mcpUseLandingPlugin,
   mcpUseLandingSsrPlugin,
+  RESOLVED_LANDING_SSR_ID,
   VIRTUAL_LANDING_SSR_ID,
 } from "./landing-client.js";
+import {
+  createLandingDataKeysCollector,
+  type LandingDataKey,
+} from "./landing-data-keys.js";
 import { createDevApiHandler } from "./dev-api.js";
 import {
   loadProjectInspector,
@@ -162,7 +172,10 @@ interface ServerLike {
   __primeSkills(snapshot: SkillsSnapshot | undefined): void;
   __skillsConfig(): boolean | SkillsOptions | undefined;
   __primeLandingPage?(options: {
-    render: (data: unknown) => string | Promise<string>;
+    load: () => Promise<{
+      render: (data: unknown) => string | Promise<string>;
+      dataKeys: readonly LandingDataKey[];
+    }>;
     entry: string;
     css?: readonly string[];
     scripts?: readonly string[];
@@ -175,6 +188,8 @@ interface ServerLike {
 interface LandingRenderer {
   component: ComponentType;
   withLandingData: <T>(data: unknown, render: () => T) => T;
+  /** Lists the component's module graph imports a hook for. */
+  dataKeys: LandingDataKey[];
 }
 
 /**
@@ -484,6 +499,35 @@ export async function runDev(options: DevOptions): Promise<void> {
   const projectViteConfig =
     viewsAtStartup || currentLandingPath !== undefined ? userViteConfig : false;
 
+  // Runs in the SSR environment: the server renders the page, and must know
+  // which lists to ship, before the browser has requested any module.
+  const landingDataKeys = createLandingDataKeysCollector({
+    environment: "ssr",
+  });
+  // Keys of the last landing HTML served. An open page holds only these lists.
+  let shippedLandingDataKeys: readonly LandingDataKey[] | undefined;
+  const landingDataKeysReloadPlugin: Plugin = {
+    name: "mcp-use-landing-data-keys-reload",
+    applyToEnvironment(environment) {
+      return environment.name === "client";
+    },
+    async hotUpdate({ file }) {
+      const shipped = shippedLandingDataKeys;
+      if (
+        shipped === undefined ||
+        !ssrEnvironment.moduleGraph.getModulesByFile(file)?.size
+      ) {
+        return undefined;
+      }
+      const keys = await currentLandingDataKeys();
+      if (keys.every((key) => shipped.includes(key))) return undefined;
+      // Fast Refresh would run the newly imported hook against data shipped
+      // without its list; a reload fetches HTML that includes it.
+      this.environment.hot.send({ type: "full-reload" });
+      return [];
+    },
+  };
+
   const devClientEndpoint = resolveDevClientEndpoint(
     host,
     port,
@@ -551,6 +595,8 @@ export async function runDev(options: DevOptions): Promise<void> {
         getLandingPath: () =>
           existsSync(landingSourcePath) ? landingSourcePath : undefined,
       }),
+      landingDataKeys.plugin,
+      landingDataKeysReloadPlugin,
       react(),
     ],
     server: {
@@ -592,6 +638,13 @@ export async function runDev(options: DevOptions): Promise<void> {
     sourcemapInterceptor: "node",
   });
   const projectRequire = createRequire(join(options.cwd, "package.json"));
+  // Keys of the landing page's current SSR module graph. Modules the render
+  // has not loaded (lazy imports) or that changed since are transformed first.
+  const currentLandingDataKeys = (): Promise<LandingDataKey[]> =>
+    landingDataKeys.reachableFrom(
+      ssrEnvironment.moduleGraph.getModuleById(RESOLVED_LANDING_SSR_ID),
+      (node) => ssrEnvironment.transformRequest(node.url)
+    );
 
   const importServer = async (
     viewsSnapshot: DiscoveredView[],
@@ -660,41 +713,55 @@ export async function runDev(options: DevOptions): Promise<void> {
         const { renderToString } = projectRequire(
           "react-dom/server"
         ) as typeof import("react-dom/server");
-        // The component and the `mcp-use/landing` instance its hooks read
-        // are kept as a pair, so a fallback render still feeds the hooks.
+        // The component, the `mcp-use/landing` instance its hooks read, and
+        // the lists its imports need are kept together, so a fallback render
+        // still feeds the hooks the data its own imports asked for.
         let lastWorking: LandingRenderer | undefined;
-        server.__primeLandingPage({
-          render: async (data) => {
-            try {
-              const moduleExports = (await runner.import(
-                VIRTUAL_LANDING_SSR_ID
-              )) as { default?: unknown; __withLandingData?: unknown };
-              if (typeof moduleExports.default !== "function") {
-                throw new Error(
-                  "landing.tsx must default-export a React component"
-                );
-              }
-              if (typeof moduleExports.__withLandingData !== "function") {
-                throw new Error(
-                  "The installed mcp-use does not support landing hooks; upgrade mcp-use."
-                );
-              }
-              lastWorking = {
-                component: moduleExports.default as ComponentType,
-                withLandingData:
-                  moduleExports.__withLandingData as LandingRenderer["withLandingData"],
-              };
-            } catch (error) {
-              if (lastWorking === undefined) throw error;
-              console.error(
-                "[mcp-use] landing update failed; serving last working page",
-                error
+        const loadLanding = async (): Promise<LandingRenderer> => {
+          try {
+            const moduleExports = (await runner.import(
+              VIRTUAL_LANDING_SSR_ID
+            )) as { default?: unknown; __withLandingData?: unknown };
+            if (typeof moduleExports.default !== "function") {
+              throw new Error(
+                "landing.tsx must default-export a React component"
               );
             }
-            const { component, withLandingData } = lastWorking;
-            return withLandingData(data, () =>
-              renderToString(react.createElement(component))
+            if (typeof moduleExports.__withLandingData !== "function") {
+              throw new Error(
+                "The installed mcp-use does not support landing hooks; upgrade mcp-use."
+              );
+            }
+            lastWorking = {
+              component: moduleExports.default as ComponentType,
+              withLandingData:
+                moduleExports.__withLandingData as LandingRenderer["withLandingData"],
+              dataKeys: await currentLandingDataKeys(),
+            };
+          } catch (error) {
+            if (lastWorking === undefined) throw error;
+            console.error(
+              "[mcp-use] landing update failed; serving last working page",
+              error
             );
+          }
+          return lastWorking;
+        };
+        server.__primeLandingPage({
+          // Loaded before each render, so the keys follow edits that add or
+          // drop a hook import, and stay paired with the component they
+          // came from even when another request reloads the page meanwhile.
+          load: async () => {
+            const { component, withLandingData, dataKeys } =
+              await loadLanding();
+            shippedLandingDataKeys = dataKeys;
+            return {
+              dataKeys,
+              render: (data) =>
+                withLandingData(data, () =>
+                  renderToString(react.createElement(component))
+                ),
+            };
           },
           entry: DEV_LANDING_ENTRY,
           scripts: ["/@vite/client"],
@@ -926,6 +993,13 @@ export async function runDev(options: DevOptions): Promise<void> {
       return;
     }
     if (isViewPath(file, options.cwd, viewsDirectory)) {
+      // A view-tree module the landing page imports: like landing.tsx, it is
+      // re-imported on the next HTML request.
+      if (
+        ssrEnvironment.moduleGraph.getModulesByFile(normalizePath(file))?.size
+      ) {
+        runner.evaluatedModules.clear();
+      }
       const view = currentViews.find(
         (entry) => normalizePath(entry.entryPath) === normalizePath(file)
       );

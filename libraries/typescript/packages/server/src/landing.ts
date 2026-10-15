@@ -365,18 +365,42 @@ export interface LandingPageOptions {
   iconType?: string;
 }
 
-/** Built or development rendering supplied by the CLI. @internal */
-export interface LandingPageRegistration {
+/** A landing page's server renderer and the lists it reads. @internal */
+export interface LandingPageRenderer {
   /**
    * Server-render the body component. The CLI-generated renderer exposes
    * `data` to the landing hooks with `__withLandingData`.
    */
   render: (data: LandingData) => string | Promise<string>;
   /**
-   * Optional lists the page reads through hooks. Each listed key is included
-   * in the rendered and serialized data; omit to include every list.
+   * Lists the page reads through hooks, found from its imports at build or
+   * dev time. Only listed keys are included in the rendered and serialized
+   * data; `server` always is.
    */
-  dataKeys?: readonly LandingDataKey[];
+  dataKeys: readonly LandingDataKey[];
+}
+
+/** Development source of a landing renderer, loaded for each render. @internal */
+export interface LandingPageLoader {
+  /**
+   * Load the current version of the page before each render. A render uses
+   * the keys and the component of one load, so an edit that lands mid-render
+   * cannot pair a newly imported hook with data that lacks its list.
+   */
+  load: () => Promise<LandingPageRenderer>;
+}
+
+/**
+ * Built or development rendering supplied by the CLI: a fixed renderer for
+ * a built page, or a loader for a dev server.
+ *
+ * @internal
+ */
+export type LandingPageRegistration = LandingPageAssets &
+  (LandingPageRenderer | LandingPageLoader);
+
+/** Browser assets and serving options of a CLI-supplied landing page. @internal */
+export interface LandingPageAssets {
   /** Browser hydration module: full URL, root path, or landing-relative path. */
   entry: string;
   /** Browser stylesheet URLs, with the same path rules as `entry`. */
