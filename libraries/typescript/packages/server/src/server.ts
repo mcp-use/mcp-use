@@ -813,13 +813,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         "Cannot prime landing page twice on one server instance."
       );
     }
+    const renders =
+      "load" in registration
+        ? typeof registration.load === "function"
+        : typeof registration.render === "function" &&
+          Array.isArray(registration.dataKeys);
     if (
-      typeof registration.render !== "function" ||
+      !renders ||
       typeof registration.entry !== "string" ||
       registration.entry.length === 0
     ) {
       throw new TypeError(
-        "Landing page requires a renderer and browser entry URL."
+        "Landing page requires a renderer, data keys, and browser entry URL."
       );
     }
     this.#landingPage = registration;

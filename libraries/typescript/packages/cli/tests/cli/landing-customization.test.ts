@@ -135,6 +135,50 @@ function testIdText(html: string, testId: string): string | undefined {
     ?.replaceAll("<!-- -->", "");
 }
 
+/** Sorted top-level keys of the page's serialized landing data. */
+function landingDataKeys(html: string): string[] {
+  const json =
+    /<script id="mcp-use-landing-data" type="application\/json">(.*?)<\/script>/s.exec(
+      html
+    )?.[1];
+  expect(json).toBeDefined();
+  return Object.keys(JSON.parse(json!) as object).sort();
+}
+
+/**
+ * A page that reads only server info itself and renders a prompt list child
+ * after hydration, so no hook of the child runs during the server render.
+ */
+const keyedLandingSource = (extra = ""): string =>
+  `import { useEffect, useState } from "react";
+import { useServerInfo } from "mcp-use/landing";
+import { Prompts } from "./landing-prompts";
+${extra}
+export default function Landing() {
+  const { name } = useServerInfo();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return <main data-testid="keyed-landing">
+    <h1>{name}</h1>
+    {hydrated && <Prompts />}
+  </main>;
+}
+`;
+
+/** Write {@link keyedLandingSource} and its conditionally rendered child. */
+function writeKeyedLanding(cwd: string): void {
+  writeLanding(cwd);
+  writeFileSync(join(cwd, "landing.tsx"), keyedLandingSource());
+  writeFileSync(
+    join(cwd, "landing-prompts.tsx"),
+    `import { usePromptList } from "mcp-use/landing";
+export function Prompts() {
+  return <p data-testid="prompts">{usePromptList().map((prompt) => prompt.name).join(",")}</p>;
+}
+`
+  );
+}
+
 function writeLanding(cwd: string, mcpRoot = cwd): void {
   mkdirSync(mcpRoot, { recursive: true });
   for (const dependency of ["react", "react-dom"]) {
@@ -342,6 +386,160 @@ export default function Landing() {
     });
     expect(testIdText(fallbackHtml, "heading")).toBe("Second fixture-basic");
     expect(testIdText(fallbackHtml, "nested-tools")).toBe("add");
+  }, 60_000);
+
+  it("ships in dev only the lists the current landing import graph reads", async () => {
+    const cwd = copyFixture("landing-dev-data-keys");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    writeKeyedLanding(cwd);
+    const url = await startDev(cwd);
+
+    // The child that reads prompts renders only after hydration, so the key
+    // comes from its import, not from a hook call during the server render.
+    const first = await (await htmlRequest(url)).text();
+    expect(first).toContain('data-testid="keyed-landing"');
+    expect(first).not.toContain('data-testid="prompts"');
+    expect(landingDataKeys(first)).toEqual(["prompts", "server"]);
+
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      keyedLandingSource(`import { useToolList } from "mcp-use/landing";
+export function ToolCount() {
+  return <p>{useToolList().length}</p>;
+}`)
+    );
+    await waitFor(async () => {
+      const html = await (await htmlRequest(url)).text();
+      return landingDataKeys(html).includes("tools") ? true : undefined;
+    });
+    expect(landingDataKeys(await (await htmlRequest(url)).text())).toEqual([
+      "prompts",
+      "server",
+      "tools",
+    ]);
+
+    // Dropping the child's import stops shipping its list, although the
+    // child module itself is unchanged and its transform stays cached.
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      `import { useServerInfo } from "mcp-use/landing";
+export default function Landing() {
+  return <main data-testid="keyed-landing">{useServerInfo().name}</main>;
+}
+`
+    );
+    await waitFor(async () => {
+      const html = await (await htmlRequest(url)).text();
+      return landingDataKeys(html).join() === "server" ? true : undefined;
+    });
+  }, 60_000);
+
+  it("reloads an open dev page instead of hot-updating in a hook its data lacks", async () => {
+    const cwd = copyFixture("landing-dev-data-keys-reload");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    writeKeyedLanding(cwd);
+    const url = await startDev(cwd);
+    const { origin, port } = new URL(url);
+    expect(landingDataKeys(await (await htmlRequest(url)).text())).toEqual([
+      "prompts",
+      "server",
+    ]);
+    // Load the client graph the way the open page does; Fast Refresh then
+    // accepts edits to the child.
+    for (const path of [
+      "/@id/__x00__virtual:mcp-use/landing",
+      "/landing.tsx",
+    ]) {
+      expect((await fetch(`${origin}${path}`)).status).toBe(200);
+    }
+    const child = await fetch(`${origin}/landing-prompts.tsx`);
+    expect(await child.text()).toContain("RefreshRuntime");
+
+    const messages: { type: string }[] = [];
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+    ws.addEventListener("message", (event) => {
+      messages.push(JSON.parse(String(event.data)) as { type: string });
+    });
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener("open", () => resolve());
+      ws.addEventListener("error", () =>
+        reject(new Error("HMR websocket failed to connect"))
+      );
+    });
+    cleanups.push(() => ws.close());
+
+    // An edit that needs no new list stays a hot update.
+    writeFileSync(
+      join(cwd, "landing-prompts.tsx"),
+      `import { usePromptList } from "mcp-use/landing";
+export function Prompts() {
+  return <p data-testid="prompts">{usePromptList().length}</p>;
+}
+`
+    );
+    await waitFor(async () =>
+      messages.some((message) => message.type === "update") ? true : undefined
+    );
+    expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
+
+    // A newly imported hook reloads the page, whose HTML ships its list.
+    writeFileSync(
+      join(cwd, "landing-prompts.tsx"),
+      `import { usePromptList, useToolList } from "mcp-use/landing";
+export function Prompts() {
+  return <p data-testid="prompts">{usePromptList().length}{useToolList().length}</p>;
+}
+`
+    );
+    await waitFor(async () =>
+      messages.some((message) => message.type === "full-reload")
+        ? true
+        : undefined
+    );
+    expect(landingDataKeys(await (await htmlRequest(url)).text())).toEqual([
+      "prompts",
+      "server",
+      "tools",
+    ]);
+  }, 60_000);
+
+  it("ships in dev the list a lazily imported child reads", async () => {
+    const cwd = copyFixture("landing-dev-lazy-data-keys");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    writeLanding(cwd);
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      `import { lazy, Suspense, useEffect, useState } from "react";
+import { useServerInfo } from "mcp-use/landing";
+const Resources = lazy(() => import("./landing-resources"));
+export default function Landing() {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return <main data-testid="lazy-landing">
+    {useServerInfo().name}
+    {hydrated && <Suspense><Resources /></Suspense>}
+  </main>;
+}
+`
+    );
+    writeFileSync(
+      join(cwd, "landing-resources.tsx"),
+      `import { useResourceList } from "mcp-use/landing";
+export default function Resources() {
+  return <p>{useResourceList().length}</p>;
+}
+`
+    );
+    const url = await startDev(cwd);
+
+    // The server render never runs the dynamic import, so the child is
+    // transformed for its imports before the keys are resolved.
+    const html = await (await htmlRequest(url)).text();
+    expect(html).toContain('data-testid="lazy-landing"');
+    expect(landingDataKeys(html)).toEqual(["resources", "server"]);
   }, 60_000);
 
   it("keeps the project Vite config off tool-only dev servers until restart", async () => {
@@ -632,5 +830,25 @@ export default function Landing() {
         }),
       ]),
     });
+  }, 90_000);
+
+  it("builds a page that ships only the lists its import graph reads", async () => {
+    const cwd = copyFixture("landing-build-data-keys");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    writeKeyedLanding(cwd);
+
+    await runBuild({ cwd });
+    const started = await runStart({
+      cwd,
+      port: await getFreePort(),
+      host: "127.0.0.1",
+    });
+    cleanups.push(() => started.close());
+
+    const html = await (await htmlRequest(started.url)).text();
+    expect(html).toContain('data-testid="keyed-landing"');
+    expect(html).not.toContain('data-testid="prompts"');
+    expect(landingDataKeys(html)).toEqual(["prompts", "server"]);
   }, 90_000);
 });

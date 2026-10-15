@@ -16,12 +16,6 @@ import { resolveAssetsBase, resolveServerOrigin } from "./views/origin.js";
 
 const MAX_CACHED_DOCUMENTS = 32;
 
-const ALL_DATA_KEYS: readonly LandingDataKey[] = [
-  "tools",
-  "prompts",
-  "resources",
-];
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -189,14 +183,17 @@ export async function createLandingPageResponse(
         description: definition.description,
       }),
     }));
-  // Ship only the lists the custom page reads; the built-in page shows all.
-  const dataKeys = new Set(registration?.dataKeys ?? ALL_DATA_KEYS);
-  const landingData = (): LandingData => ({
-    server,
-    ...(dataKeys.has("tools") && { tools: listTools() }),
-    ...(dataKeys.has("prompts") && { prompts: listPrompts() }),
-    ...(dataKeys.has("resources") && { resources: listResources() }),
-  });
+  // Ship only the lists the custom page imports a hook for; the built-in
+  // page shows all of them.
+  const landingData = (keys: readonly LandingDataKey[]): LandingData => {
+    const dataKeys = new Set(keys);
+    return {
+      server,
+      ...(dataKeys.has("tools") && { tools: listTools() }),
+      ...(dataKeys.has("prompts") && { prompts: listPrompts() }),
+      ...(dataKeys.has("resources") && { resources: listResources() }),
+    };
+  };
   const html =
     registration === undefined
       ? generateLandingPage({
@@ -212,18 +209,21 @@ export async function createLandingPageResponse(
             const cached =
               registration.dev === true ? undefined : cache?.get(key);
             if (cached !== undefined) return cached;
-            const data = landingData();
-            const rendering = Promise.resolve(registration.render(data)).then(
-              (markup) =>
-                renderDocument(
-                  data,
-                  markup,
-                  registration,
-                  origin,
-                  assetsBase,
-                  basePath
-                )
-            );
+            const rendering = (async () => {
+              const { render, dataKeys } =
+                "load" in registration
+                  ? await registration.load()
+                  : registration;
+              const data = landingData(dataKeys);
+              return renderDocument(
+                data,
+                await render(data),
+                registration,
+                origin,
+                assetsBase,
+                basePath
+              );
+            })();
             if (registration.dev !== true && cache !== undefined) {
               if (cache.size >= MAX_CACHED_DOCUMENTS) {
                 const oldest = cache.keys().next().value;

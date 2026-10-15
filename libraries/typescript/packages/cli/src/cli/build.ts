@@ -25,6 +25,10 @@ import { build, type Plugin } from "vite";
 import { discoverEntry } from "./entry.js";
 import { mcpUseLandingPlugin, VIRTUAL_LANDING_ID } from "./landing-client.js";
 import {
+  createLandingDataKeysCollector,
+  type LandingDataKey,
+} from "./landing-data-keys.js";
+import {
   loadProjectEnv,
   nextStandaloneAliases,
   nextStandaloneCompatPlugin,
@@ -68,6 +72,8 @@ interface BuiltLanding {
   source: string;
   entry: string;
   css: string[];
+  /** Lists the page's modules import a hook for, sorted. */
+  dataKeys: LandingDataKey[];
 }
 
 async function copyPublicAssets(cwd: string, outputDir: string): Promise<void> {
@@ -146,6 +152,7 @@ async function writeWrapperEntry(
             `  render: (data) => __withLandingData(data, () => renderToString(createElement(LandingPage))),`,
             `  entry: ${JSON.stringify(landing.entry)},`,
             `  css: ${JSON.stringify(landing.css)},`,
+            `  dataKeys: ${JSON.stringify(landing.dataKeys)},`,
             `  projectRoot: fileURLToPath(new URL("../../", import.meta.url)),`,
             `});`,
           ]),
@@ -181,8 +188,8 @@ async function buildClientBundle(options: {
   sourceMaps: boolean;
   /** Keep the output in memory as one chunk instead of writing files. */
   inline: boolean;
-  /** Resolves the virtual entry named by `input`. */
-  plugin: Plugin;
+  /** Resolve the virtual entry named by `input`, plus bundle-specific hooks. */
+  plugins: Plugin[];
   /** Rollup input map: output chunk name to virtual entry id. */
   input: Record<string, string>;
   /** Names the bundle in build errors, e.g. `view "weather"`. */
@@ -200,7 +207,7 @@ async function buildClientBundle(options: {
       alias: { tailwindcss: resolveTailwindCss() },
     },
     oxc: { jsx: { runtime: "automatic" } },
-    plugins: [tailwindcss(), react(), options.plugin],
+    plugins: [tailwindcss(), react(), ...options.plugins],
     build: {
       outDir: options.outDir,
       emptyOutDir: true,
@@ -287,6 +294,7 @@ async function buildLanding(
     sourceMaps: boolean;
   }
 ): Promise<BuiltLanding> {
+  const dataKeys = createLandingDataKeysCollector({ environment: "client" });
   const bundle = await buildClientBundle({
     cwd: options.cwd,
     cacheDir: options.cacheDir,
@@ -294,11 +302,19 @@ async function buildLanding(
     userViteConfig: options.userViteConfig,
     sourceMaps: options.sourceMaps,
     inline: false,
-    plugin: mcpUseLandingPlugin({ getLandingPath: () => source }),
+    plugins: [
+      mcpUseLandingPlugin({ getLandingPath: () => source }),
+      dataKeys.plugin,
+    ],
     input: { landing: VIRTUAL_LANDING_ID },
     label: "the landing page",
   });
-  return { source, entry: bundle.entry, css: bundle.css };
+  return {
+    source,
+    entry: bundle.entry,
+    css: bundle.css,
+    dataKeys: dataKeys.all(),
+  };
 }
 
 function readBuildAssetsBase(): string | undefined {
@@ -392,7 +408,7 @@ async function buildView(
     userViteConfig: options.userViteConfig,
     sourceMaps: options.sourceMaps,
     inline: options.inline,
-    plugin: mcpUseViewsPlugin({ getViews: () => [view] }),
+    plugins: [mcpUseViewsPlugin({ getViews: () => [view] })],
     input: { [view.name]: virtualViewId(view.name) },
     label: `view "${view.name}"`,
   });

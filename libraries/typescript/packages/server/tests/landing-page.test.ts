@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { MCPServer } from "../src/index.js";
-import { generateLandingPage, type LandingData } from "../src/landing.js";
+import {
+  generateLandingPage,
+  type LandingData,
+  type LandingDataKey,
+} from "../src/landing.js";
 import { oauthCustomProvider, type OAuthMetadata } from "../src/oauth/index.js";
 import { createLandingAssetsHandler } from "../src/views/routes.js";
 
@@ -185,6 +189,7 @@ describe("MCPServer landing page routing", () => {
         });
         return `<main>${data.server.name}</main>`;
       },
+      dataKeys: ["tools", "prompts", "resources"],
       entry: "assets/entry.js",
       css: ["assets/entry.css"],
     });
@@ -290,6 +295,62 @@ describe("MCPServer landing page routing", () => {
     expect(rendered).toEqual(JSON.parse(json!));
   });
 
+  it("loads the page before every uncached render and keeps its keys with its renderer", async () => {
+    const server = track(
+      new MCPServer({ name: "live-keys-landing", version: "1.0.0" })
+    );
+    server.tool({ name: "weather" }, async () => ({ content: [] }));
+    server.prompt({ name: "plan" }, async () => ({ messages: [] }));
+    const keys: LandingDataKey[][] = [["prompts"], []];
+    const rendered: { version: number; data: LandingData }[] = [];
+    let loads = 0;
+    server.__primeLandingPage({
+      load: async () => {
+        const version = ++loads;
+        return {
+          dataKeys: keys.shift() ?? [],
+          render: (data) => {
+            rendered.push({ version, data });
+            return "<main>Live</main>";
+          },
+        };
+      },
+      entry: "assets/entry.js",
+      dev: true,
+    });
+    const request = htmlRequest("https://server.example.test/mcp");
+    await Promise.all([server.fetch(request), server.fetch(request)]);
+    expect(
+      rendered
+        .map(({ version, data }) => [version, Object.keys(data).sort()])
+        .sort()
+    ).toEqual([
+      [1, ["prompts", "server"]],
+      [2, ["server"]],
+    ]);
+    expect(rendered.find(({ version }) => version === 1)?.data.prompts).toEqual(
+      [{ name: "plan" }]
+    );
+  });
+
+  it("rejects a registration without data keys", () => {
+    const server = track(
+      new MCPServer({ name: "keyless-landing", version: "1.0.0" })
+    );
+    expect(() =>
+      server.__primeLandingPage({
+        render: () => "<main>Keyless</main>",
+        entry: "assets/entry.js",
+      } as unknown as Parameters<typeof server.__primeLandingPage>[0])
+    ).toThrow(TypeError);
+    expect(() =>
+      server.__primeLandingPage({
+        load: "not a function",
+        entry: "assets/entry.js",
+      } as unknown as Parameters<typeof server.__primeLandingPage>[0])
+    ).toThrow(TypeError);
+  });
+
   it("serves landing bundles and project public files on a custom base path", async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "mcp-landing-"));
     directories.push(projectRoot);
@@ -308,6 +369,7 @@ describe("MCPServer landing page routing", () => {
     );
     server.__primeLandingPage({
       render: () => "<main>Assets</main>",
+      dataKeys: [],
       entry: "assets/entry.js",
       projectRoot,
     });
@@ -509,6 +571,7 @@ describe("publicLandingPage OAuth behavior", () => {
     const protectedServer = oauthServer();
     protectedServer.__primeLandingPage({
       render: () => "<main>Custom OAuth</main>",
+      dataKeys: [],
       entry: "assets/entry.js",
     });
     const protectedHandler = protectedServer.fetch;
@@ -524,6 +587,7 @@ describe("publicLandingPage OAuth behavior", () => {
     const publicServer = oauthServer(true);
     publicServer.__primeLandingPage({
       render: () => "<main>Public Custom</main>",
+      dataKeys: [],
       entry: "assets/entry.js",
     });
     const publicHandler = publicServer.fetch;
