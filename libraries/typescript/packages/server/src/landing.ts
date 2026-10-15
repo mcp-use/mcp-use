@@ -1,13 +1,29 @@
 /**
- * Generate an HTML landing page for an MCP server endpoint.
+ * Landing-page APIs for MCP server endpoints.
  *
- * The rendered page includes server metadata and connection instructions for
- * supported MCP clients.
+ * Exports the hooks a CLI-discovered `landing.tsx` uses to read server data,
+ * and the built-in HTML page used when a project has no `landing.tsx`. This
+ * module does not import React.
  *
  * @packageDocumentation
  */
 
+import type { LandingData, LandingDataKey } from "./landing-data.js";
 import type { EmbeddedViewAssets } from "./views/types.js";
+
+export {
+  __setLandingData,
+  __withLandingData,
+  usePromptList,
+  useResourceList,
+  useServerInfo,
+  useToolList,
+} from "./landing-data.js";
+export type {
+  LandingData,
+  LandingDataKey,
+  LandingServerInfo,
+} from "./landing-data.js";
 
 /**
  * Escapes HTML special characters to prevent XSS in user-provided content.
@@ -349,24 +365,18 @@ export interface LandingPageOptions {
   iconType?: string;
 }
 
-/** Props passed to a CLI-discovered `landing.tsx` component. */
-export interface LandingPageProps extends LandingPageOptions {
-  /** Absolute prefix for project `public/` files, including a configured CDN. */
-  publicBaseUrl: string;
-  /** The server's configured website, when present. */
-  websiteUrl?: string;
-  /** Registered tools, including their protocol names and display metadata. */
-  tools: readonly LandingPageTool[];
-  /** Registered prompts, including their protocol names and display metadata. */
-  prompts: readonly LandingPagePrompt[];
-  /** Registered static resources. */
-  resources: readonly LandingPageResource[];
-}
-
 /** Built or development rendering supplied by the CLI. @internal */
 export interface LandingPageRegistration {
-  /** Server-render the body component with request-resolved props. */
-  render: (props: LandingPageProps) => string | Promise<string>;
+  /**
+   * Server-render the body component. The CLI-generated renderer exposes
+   * `data` to the landing hooks with `__withLandingData`.
+   */
+  render: (data: LandingData) => string | Promise<string>;
+  /**
+   * Optional lists the page reads through hooks. Each listed key is included
+   * in the rendered and serialized data; omit to include every list.
+   */
+  dataKeys?: readonly LandingDataKey[];
   /** Browser hydration module: full URL, root path, or landing-relative path. */
   entry: string;
   /** Browser stylesheet URLs, with the same path rules as `entry`. */

@@ -134,6 +134,7 @@ async function writeWrapperEntry(
             `import LandingPage from ${JSON.stringify(landing.source)};`,
             `import { createElement } from "react";`,
             `import { renderToString } from "react-dom/server";`,
+            `import { __withLandingData } from "mcp-use/landing";`,
             `import { fileURLToPath } from "node:url";`,
           ]),
       `server[registerViews](${manifestJson});`,
@@ -142,7 +143,7 @@ async function writeWrapperEntry(
         ? []
         : [
             `server.__primeLandingPage({`,
-            `  render: (props) => renderToString(createElement(LandingPage, props)),`,
+            `  render: (data) => __withLandingData(data, () => renderToString(createElement(LandingPage))),`,
             `  entry: ${JSON.stringify(landing.entry)},`,
             `  css: ${JSON.stringify(landing.css)},`,
             `  projectRoot: fileURLToPath(new URL("../../", import.meta.url)),`,

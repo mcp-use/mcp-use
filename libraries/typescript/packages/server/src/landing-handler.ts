@@ -1,16 +1,26 @@
 import {
   generateLandingPage,
   type LandingPageOptions,
-  type LandingPageProps,
   type LandingPageRegistration,
   type LandingPagePrompt,
   type LandingPageResource,
   type LandingPageTool,
 } from "./landing.js";
+import type {
+  LandingData,
+  LandingDataKey,
+  LandingServerInfo,
+} from "./landing-data.js";
 import type { ServerBranding } from "./branding.js";
 import { resolveAssetsBase, resolveServerOrigin } from "./views/origin.js";
 
 const MAX_CACHED_DOCUMENTS = 32;
+
+const ALL_DATA_KEYS: readonly LandingDataKey[] = [
+  "tools",
+  "prompts",
+  "resources",
+];
 
 function escapeHtml(value: string): string {
   return value
@@ -41,16 +51,17 @@ function assetUrl(
 }
 
 function renderDocument(
-  props: LandingPageProps,
+  data: LandingData,
   markup: string,
   registration: LandingPageRegistration,
   serverOrigin: string,
   assetsBase: string,
   basePath: string
 ): string {
-  const name = props.title ?? props.name;
+  const { server } = data;
+  const name = server.title ?? server.name;
   const description =
-    props.description ||
+    server.description ||
     `${name} MCP Server — Connect with Claude Code, Cursor, and VS Code. Model Context Protocol server.`;
   const title = `${name} MCP Server — Connect with Claude Code, Cursor & VS Code`;
   const scripts = [...(registration.scripts ?? []), registration.entry]
@@ -65,14 +76,14 @@ function renderDocument(
         `<link rel="stylesheet" href="${escapeHtml(assetUrl(value, serverOrigin, assetsBase, basePath))}">`
     )
     .join("\n");
-  const icon = props.iconUrl
-    ? `<link rel="icon"${props.iconType ? ` type="${escapeHtml(props.iconType)}"` : ""} href="${escapeHtml(props.iconUrl)}">`
+  const icon = server.iconUrl
+    ? `<link rel="icon"${server.iconType ? ` type="${escapeHtml(server.iconType)}"` : ""} href="${escapeHtml(server.iconUrl)}">`
     : "";
   const jsonLd = serializeScriptJson({
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     name,
-    softwareVersion: props.version,
+    softwareVersion: server.version,
     description,
     applicationCategory: "DeveloperApplication",
   });
@@ -96,7 +107,7 @@ ${stylesheets}
 </head>
 <body>
 <div id="mcp-use-landing-root">${markup}</div>
-<script id="mcp-use-landing-props" type="application/json">${serializeScriptJson(props)}</script>
+<script id="mcp-use-landing-data" type="application/json">${serializeScriptJson(data)}</script>
 ${scripts}
 </body>
 </html>`;
@@ -134,10 +145,14 @@ export async function createLandingPageResponse(
   const url = new URL(basePath, `${origin}/`).href;
   const assetsBase = resolveAssetsBase(request);
   const basePrefix = basePath === "/" ? "" : basePath;
-  const props: LandingPageProps = {
-    ...config,
+  const server: LandingServerInfo = {
+    name: config.name,
+    ...(config.title !== undefined && { title: config.title }),
+    version: config.version,
+    ...(config.description !== undefined && {
+      description: config.description,
+    }),
     url,
-    publicBaseUrl: `${assetsBase}${basePrefix}/_mcp-use/public/`,
     ...(branding.websiteUrl !== undefined && {
       websiteUrl: branding.websiteUrl,
     }),
@@ -147,32 +162,49 @@ export async function createLandingPageResponse(
         iconType: branding.faviconMimeType,
       }),
     }),
-    tools: Array.from(tools, ({ definition }) => ({
+    publicBaseUrl: `${assetsBase}${basePrefix}/_mcp-use/public/`,
+  };
+  const listTools = (): LandingPageTool[] =>
+    Array.from(tools, ({ definition }) => ({
       name: definition.name,
       ...(definition.title !== undefined && { title: definition.title }),
       ...(definition.description !== undefined && {
         description: definition.description,
       }),
-    })),
-    prompts: Array.from(prompts, ({ definition }) => ({
+    }));
+  const listPrompts = (): LandingPagePrompt[] =>
+    Array.from(prompts, ({ definition }) => ({
       name: definition.name,
       ...(definition.title !== undefined && { title: definition.title }),
       ...(definition.description !== undefined && {
         description: definition.description,
       }),
-    })),
-    resources: Array.from(resources, ({ definition }) => ({
+    }));
+  const listResources = (): LandingPageResource[] =>
+    Array.from(resources, ({ definition }) => ({
       uri: definition.uri,
       ...(definition.name !== undefined && { name: definition.name }),
       ...(definition.title !== undefined && { title: definition.title }),
       ...(definition.description !== undefined && {
         description: definition.description,
       }),
-    })),
-  };
+    }));
+  // Ship only the lists the custom page reads; the built-in page shows all.
+  const dataKeys = new Set(registration?.dataKeys ?? ALL_DATA_KEYS);
+  const landingData = (): LandingData => ({
+    server,
+    ...(dataKeys.has("tools") && { tools: listTools() }),
+    ...(dataKeys.has("prompts") && { prompts: listPrompts() }),
+    ...(dataKeys.has("resources") && { resources: listResources() }),
+  });
   const html =
     registration === undefined
-      ? generateLandingPage(props)
+      ? generateLandingPage({
+          ...server,
+          tools: listTools(),
+          prompts: listPrompts(),
+          resources: listResources(),
+        })
       : request.method === "HEAD"
         ? undefined
         : await (async () => {
@@ -180,10 +212,11 @@ export async function createLandingPageResponse(
             const cached =
               registration.dev === true ? undefined : cache?.get(key);
             if (cached !== undefined) return cached;
-            const rendering = Promise.resolve(registration.render(props)).then(
+            const data = landingData();
+            const rendering = Promise.resolve(registration.render(data)).then(
               (markup) =>
                 renderDocument(
-                  props,
+                  data,
                   markup,
                   registration,
                   origin,
