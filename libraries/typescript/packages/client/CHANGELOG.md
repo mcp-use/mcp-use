@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.4.4-canary.0
+
+### Patch Changes
+
+- b2f55fc: Send `Mcp-Param-*` headers for tool parameters annotated with `x-mcp-header` when calling tools from a browser. The SDK only mirrors these parameters outside browsers, so browser clients such as the Inspector sent the value in the request body only and servers requiring the header rejected the call.
+
 ## 2.4.3
 
 ### Patch Changes
