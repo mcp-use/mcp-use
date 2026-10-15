@@ -8,6 +8,7 @@
  * the page.
  */
 
+import { getInstallTargets, type InstallTargets } from "./install-targets.js";
 import type {
   LandingPagePrompt,
   LandingPageResource,
@@ -156,6 +157,32 @@ export function usePromptList(): readonly LandingPagePrompt[] {
  */
 export function useResourceList(): readonly LandingPageResource[] {
   return readLandingList("useResourceList", "resources");
+}
+
+/**
+ * Read the links and commands that add this server to MCP clients in
+ * `landing.tsx`.
+ *
+ * Same as {@link getInstallTargets} with the server's `title` (falling back
+ * to its protocol `name`) and request-resolved MCP endpoint `url`, so the
+ * client entries match the ones the built-in landing page creates.
+ *
+ * @returns One install target per client, in display order.
+ * @throws When called outside a component rendered by `landing.tsx`.
+ *
+ * @example
+ * ```tsx
+ * import { useInstallTargets } from "mcp-use/landing";
+ *
+ * export function Install() {
+ *   const install = useInstallTargets();
+ *   return <a href={install.cursor.deeplink}>Add to {install.cursor.label}</a>;
+ * }
+ * ```
+ */
+export function useInstallTargets(): InstallTargets {
+  const { url, name, title } = readLandingData("useInstallTargets").server;
+  return getInstallTargets({ url, name: title ?? name });
 }
 
 /**

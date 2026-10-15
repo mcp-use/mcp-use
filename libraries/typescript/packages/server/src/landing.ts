@@ -2,18 +2,32 @@
  * Landing-page APIs for MCP server endpoints.
  *
  * Exports the hooks a CLI-discovered `landing.tsx` uses to read server data,
- * and the built-in HTML page used when a project has no `landing.tsx`. This
- * module does not import React.
+ * the client install links it and other pages can show, and the built-in
+ * HTML page used when a project has no `landing.tsx`. This module does not
+ * import React.
  *
  * @packageDocumentation
  */
 
+import { getInstallTargets } from "./install-targets.js";
 import type { LandingData, LandingDataKey } from "./landing-data.js";
 import type { EmbeddedViewAssets } from "./views/types.js";
 
+export { getInstallTargets } from "./install-targets.js";
+export type {
+  ChatGPTInstallTarget,
+  ClaudeCodeInstallTarget,
+  CursorInstallTarget,
+  InspectorInstallTarget,
+  InstallTargets,
+  InstallTargetServer,
+  VSCodeInsidersInstallTarget,
+  VSCodeInstallTarget,
+} from "./install-targets.js";
 export {
   __setLandingData,
   __withLandingData,
+  useInstallTargets,
   usePromptList,
   useResourceList,
   useServerInfo,
@@ -42,86 +56,6 @@ function serializeScriptJson(value: unknown): string {
   return JSON.stringify(value)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e");
-}
-
-/**
- * Sanitizes a server name for use in filenames and URLs.
- * Replaces non-alphanumeric characters with underscores and converts to lowercase.
- */
-function sanitizeServerName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9-_]/g, "_").toLowerCase();
-}
-
-/**
- * Generates a Cursor deep link for installing an MCP server.
- * The config is base64-encoded JSON containing the server URL.
- */
-function generateCursorDeepLink(url: string, name: string): string {
-  const config = { url };
-  const configJson = JSON.stringify(config);
-
-  // Use Buffer in Node.js or btoa in browser-like environments
-  const base64Config =
-    typeof Buffer !== "undefined"
-      ? Buffer.from(configJson).toString("base64")
-      : btoa(configJson);
-
-  const sanitizedName = sanitizeServerName(name);
-  return `cursor://anysphere.cursor-deeplink/mcp/install?config=${encodeURIComponent(base64Config)}&name=${encodeURIComponent(sanitizedName)}`;
-}
-
-/**
- * Generates a VS Code deep link for installing an MCP server.
- * The config is URL-encoded JSON containing the server URL.
- */
-function generateVSCodeDeepLink(url: string, name: string): string {
-  const config = {
-    url,
-    name: sanitizeServerName(name),
-    type: "http",
-  };
-  const configJson = JSON.stringify(config);
-  const urlEncodedConfig = encodeURIComponent(configJson);
-  return `vscode:mcp/install?${urlEncodedConfig}`;
-}
-
-/**
- * Generates a VS Code Insiders deep link for installing an MCP server.
- * The config is URL-encoded JSON containing the server URL.
- */
-function generateVSCodeInsidersDeepLink(url: string, name: string): string {
-  const config = {
-    url,
-    name: sanitizeServerName(name),
-    type: "http",
-  };
-  const configJson = JSON.stringify(config);
-  const urlEncodedConfig = encodeURIComponent(configJson);
-  return `vscode-insiders:mcp/install?${urlEncodedConfig}`;
-}
-
-/**
- * Generates a Claude Code CLI command for adding an MCP server.
- */
-function generateClaudeCommand(url: string, name: string): string {
-  const sanitizedName = sanitizeServerName(name);
-  const quotedUrl = `'${url.replace(/'/g, "'\\''")}'`;
-  return `claude mcp add --transport http "${sanitizedName}" ${quotedUrl}`;
-}
-
-/** Hosted Manufact Inspector base (same as cloud deploy “Open in new tab”). */
-const MANUFACT_INSPECTOR_ORIGIN = "https://inspector.manufact.com";
-
-/**
- * Deep link to hosted Manufact Inspector with this MCP server URL pre-filled
- * and the Chat tab selected (`tab=chat`).
- */
-function getManufactInspectorUrl(serverUrl: string): string {
-  const params = new URLSearchParams({
-    autoConnect: serverUrl,
-    tab: "chat",
-  });
-  return `${MANUFACT_INSPECTOR_ORIGIN}/inspector?${params.toString()}`;
 }
 
 function getPublicChatUrls(serverUrl: string): {
@@ -447,12 +381,15 @@ export function generateLandingPage(options: LandingPageOptions): string {
     iconType,
   } = options;
   const name = title ?? protocolName;
-  const cursorDeepLink = generateCursorDeepLink(url, name);
-  const vscodeDeepLink = generateVSCodeDeepLink(url, name);
-  const vscodeInsidersDeepLink = generateVSCodeInsidersDeepLink(url, name);
-  const claudeCommand = generateClaudeCommand(url, name);
-  const manufactInspectorUrl = getManufactInspectorUrl(url);
+  const install = getInstallTargets({ url, name });
   const { chatUrl, readyUrl } = getPublicChatUrls(url);
+  // Each step is "Heading: instruction"; the page bolds the heading.
+  const chatgptStepsHtml = install.chatgpt.steps
+    .map((step) => {
+      const split = step.indexOf(": ");
+      return `<li><strong>${escapeHtml(step.slice(0, split))}:</strong> ${escapeHtml(step.slice(split + 2))}</li>`;
+    })
+    .join("\n          ");
 
   const safeName = escapeHtml(name);
   const safeDescription = description ? escapeHtml(description) : "";
@@ -881,7 +818,7 @@ a:hover { text-decoration: underline; }
           </div>
           <div class="hero-cta-row">
             <a id="public-chat-link" href="${escapeHtml(chatUrl)}" data-ready-url="${escapeHtml(readyUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer" hidden style="display:none">Go to chat</a>
-            <a id="inspector-link" href="${escapeHtml(manufactInspectorUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer">Open in Inspector</a>
+            <a id="inspector-link" href="${escapeHtml(install.inspector.url)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer">Open in Inspector</a>
           </div>
           <div class="hero-powered">
             <span>Powered by</span>
@@ -914,7 +851,7 @@ a:hover { text-decoration: underline; }
         <h3>Install in Claude Code</h3>
         <p>Run this command in your terminal:</p>
         <div class="code-block">
-          <pre data-copy="${escapeHtml(claudeCommand)}">${escapeHtml(claudeCommand)}</pre>
+          <pre data-copy="${escapeHtml(install.claudeCode.command)}">${escapeHtml(install.claudeCode.command)}</pre>
           <button type="button" class="copy-btn" aria-label="Copy"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
         </div>
       </div>
@@ -922,30 +859,28 @@ a:hover { text-decoration: underline; }
       <div id="panel-cursor" class="tab-panel">
         <h3>Install in Cursor</h3>
         <p>Click the button below to add this MCP server to Cursor:</p>
-        <a href="${cursorDeepLink}" class="install-btn">Open in Cursor</a>
+        <a href="${install.cursor.deeplink}" class="install-btn">Open in Cursor</a>
         <p>Or add manually: Settings → MCP → Add server</p>
       </div>
 
       <div id="panel-vscode" class="tab-panel">
         <h3>Install in VS Code</h3>
         <p>Click the button below to add this MCP server to VS Code:</p>
-        <a href="${vscodeDeepLink}" class="install-btn">Open in VS Code</a>
+        <a href="${install.vscode.deeplink}" class="install-btn">Open in VS Code</a>
         <p>Or add manually: Settings → MCP → Add server</p>
       </div>
 
       <div id="panel-vscode-insiders" class="tab-panel">
         <h3>Install in VS Code Insiders</h3>
         <p>Click the button below to add this MCP server to VS Code Insiders:</p>
-        <a href="${vscodeInsidersDeepLink}" class="install-btn">Open in VS Code Insiders</a>
+        <a href="${install.vscodeInsiders.deeplink}" class="install-btn">Open in VS Code Insiders</a>
         <p>Or add manually: Settings → MCP → Add server</p>
       </div>
 
       <div id="panel-chatgpt" class="tab-panel">
         <h3>Connect with ChatGPT</h3>
         <ol class="steps">
-          <li><strong>Enable Developer Mode:</strong> Settings → Connectors → Advanced → Developer mode</li>
-          <li><strong>Import this MCP server:</strong> Go to Connectors tab and add: ${escapeHtml(url)}</li>
-          <li><strong>Use in conversations:</strong> Choose the MCP server from the Plus menu</li>
+          ${chatgptStepsHtml}
         </ol>
       </div>
     </div>
