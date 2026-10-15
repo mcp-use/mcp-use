@@ -232,17 +232,41 @@ function isClientPackageMissing(error: unknown): boolean {
   return false;
 }
 
-function spawnAndWait(
+/**
+ * Quote one argument for `cmd.exe`. Inside double quotes `cmd.exe` keeps `^`,
+ * `|`, `&`, `<` and `>` literally, so a semver range such as `^2.0.0` or
+ * `^2.0.1 || ^2.1.0` reaches the package manager unchanged. Arguments are
+ * package names, version ranges and fixed subcommands, which never contain
+ * `"` or `%`.
+ */
+function quoteWindowsShellArg(arg: string): string {
+  return `"${arg}"`;
+}
+
+/** @internal Exported for tests that run a fake package manager. */
+export function spawnAndWait(
   command: string,
   args: string[],
   cwd: string
 ): Promise<number> {
   return new Promise((resolveCode, reject) => {
-    const child = spawn(command, args, {
-      cwd,
-      stdio: "inherit",
-      shell: process.platform === "win32",
-    });
+    // npm and pnpm are .cmd shims on Windows, which Node only runs through a
+    // shell. Pass them as one command string: Node warns (DEP0190) when an
+    // args array is combined with `shell: true`. Quote each argument, or
+    // `cmd.exe` strips the `^` from version ranges and treats `||` as an
+    // operator.
+    const isWindows = process.platform === "win32";
+    const child = spawn(
+      isWindows
+        ? [command, ...args.map(quoteWindowsShellArg)].join(" ")
+        : command,
+      isWindows ? [] : args,
+      {
+        cwd,
+        stdio: "inherit",
+        shell: isWindows,
+      }
+    );
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       resolveCode(signal === "SIGINT" ? 130 : (code ?? 1));
