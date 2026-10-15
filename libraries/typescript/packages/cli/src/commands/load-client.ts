@@ -177,27 +177,38 @@ async function importClientModule(): Promise<ClientPackage> {
   return import("@mcp-use/client");
 }
 
-/** @internal Imported from project `node_modules` after auto-install. */
+/**
+ * @internal Imported from project `node_modules` after auto-install.
+ *
+ * Imports the installed entry file directly instead of resolving the package
+ * name. The failed `import("@mcp-use/client")` that triggered the install
+ * leaves Node 24 with a cached "no package.json" for the package directory,
+ * so resolving the name again in this process lands on a nonexistent
+ * `index.js`. `import.meta.resolve` also ignores its parent argument unless
+ * Node runs with `--experimental-import-meta-resolve`.
+ */
 export async function importProjectClientModule(
   projectRoot: string
 ): Promise<ClientPackage> {
-  disableBrokenNodeLocalStorage();
-  const parent = pathToFileURL(join(projectRoot, "package.json")).href;
-  const resolved = await import.meta.resolve(CLIENT_PACKAGE, parent);
-  return import(resolved) as Promise<ClientPackage>;
+  return importInstalledClientModule(projectRoot);
 }
 
 async function importSandboxClientModule(): Promise<ClientPackage> {
+  return importInstalledClientModule(CLIENT_SDK_DIR);
+}
+
+async function importInstalledClientModule(
+  installRoot: string
+): Promise<ClientPackage> {
   disableBrokenNodeLocalStorage();
   const entry = join(
-    CLIENT_SDK_DIR,
+    installRoot,
     "node_modules",
     CLIENT_PACKAGE,
     "dist",
     "index.js"
   );
-  const mod = (await import(pathToFileURL(entry).href)) as ClientPackage;
-  return mod;
+  return import(pathToFileURL(entry).href) as Promise<ClientPackage>;
 }
 
 /**
