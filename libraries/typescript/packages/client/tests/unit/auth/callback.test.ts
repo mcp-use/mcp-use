@@ -185,6 +185,32 @@ describe("onMcpAuthorization", () => {
     expect(localStorage.getItem(stateKey)).toBeNull();
   });
 
+  it("returns the authorization response to the opener without exchanging it", async () => {
+    storeState({ completeAuthorizationInOpener: true });
+    setCallbackUrl(
+      `code=authorization-code&iss=https%3A%2F%2Fauth.example.com&state=${state}`
+    );
+    const { onMcpAuthorization } =
+      await import("../../../src/auth/callback.js");
+
+    await onMcpAuthorization();
+
+    expect(mocks.providerConstructor).not.toHaveBeenCalled();
+    expect(mocks.finishAuth).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith(
+      {
+        type: "mcp_auth_callback",
+        success: true,
+        state,
+        serverUrlHash: "server-hash",
+        authorizationCode: "authorization-code",
+        issuer: "https://auth.example.com",
+      },
+      window.location.origin
+    );
+    expect(localStorage.getItem(stateKey)).toBeNull();
+  });
+
   it("decrypts a persisted state record before completing the callback", async () => {
     const storedState: StoredState = {
       expiry: Date.now() + 60_000,

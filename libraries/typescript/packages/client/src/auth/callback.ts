@@ -11,6 +11,8 @@ import { LocalStorageKVStore } from "./storage.js";
 interface AuthCallbackMeta {
   state?: string | null;
   serverUrlHash?: string | null;
+  authorizationCode?: string | null;
+  issuer?: string | null;
 }
 
 let inFlightCallback: Promise<void> | null = null;
@@ -30,6 +32,10 @@ function buildCallbackPayload(
     ...(success ? {} : { error: error ?? "Unknown error" }),
     ...(meta.state ? { state: meta.state } : {}),
     ...(meta.serverUrlHash ? { serverUrlHash: meta.serverUrlHash } : {}),
+    ...(meta.authorizationCode
+      ? { authorizationCode: meta.authorizationCode }
+      : {}),
+    ...(meta.issuer ? { issuer: meta.issuer } : {}),
   };
 }
 
@@ -236,6 +242,28 @@ async function completeAuthorization(): Promise<void> {
 
     if (!storedState.providerOptions) {
       throw new Error("Stored OAuth state is missing provider options.");
+    }
+
+    if (storedState.completeAuthorizationInOpener) {
+      const oauthError = callbackParams.get("error");
+      if (oauthError) {
+        throw new Error(
+          callbackParams.get("error_description") ??
+            `OAuth authorization failed: ${oauthError}`
+        );
+      }
+      const authorizationCode = callbackParams.get("code");
+      if (!authorizationCode) {
+        throw new Error("OAuth callback is missing the authorization code.");
+      }
+      await stateStore.remove(stateKey);
+      signalResult(true, undefined, storedState, {
+        state,
+        serverUrlHash: storedState.serverUrlHash,
+        authorizationCode,
+        issuer: callbackParams.get("iss"),
+      });
+      return;
     }
 
     const { serverUrl, ...providerOptions } = storedState.providerOptions;
