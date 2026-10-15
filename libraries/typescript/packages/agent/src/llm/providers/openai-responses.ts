@@ -277,7 +277,13 @@ export async function* streamResponsesTurn(
 
   const callBuffers = new Map<
     string,
-    { index: number; name: string; argsJson: string; started: boolean }
+    {
+      index: number;
+      name: string;
+      callId: string;
+      argsJson: string;
+      started: boolean;
+    }
   >();
   let nextIndex = 0;
   let completedOutput: unknown[] = [];
@@ -304,16 +310,30 @@ export async function* streamResponsesTurn(
     if (type === "response.output_item.added") {
       const item = parsed.item as Record<string, unknown> | undefined;
       if (item?.type === "function_call") {
+        // The Responses API identifies this item as `id` (fc_...) here and
+        // keys the function_call_arguments delta/done events by `item_id`.
+        // `call_id` is the id the tool loop uses, so expose it as toolCallId.
+        const itemId = typeof item.id === "string" ? item.id : undefined;
         const callId =
-          typeof item.call_id === "string" ? item.call_id : `call_${nextIndex}`;
+          typeof item.call_id === "string"
+            ? item.call_id
+            : (itemId ?? `call_${nextIndex}`);
         const name = typeof item.name === "string" ? item.name : "";
         const idx = nextIndex++;
-        callBuffers.set(callId, {
+        const buffer = {
           index: idx,
           name,
+          callId,
           argsJson: "",
           started: true,
-        });
+        };
+        // Prefix the map keys: a nonstandard producer can hand out an
+        // item id that equals another call's call_id, and unprefixed keys
+        // would let the second call's entry overwrite the first. The call:
+        // alias goes in unconditionally, since arguments events may key on
+        // call_id when item_id is absent or empty.
+        if (itemId) callBuffers.set(`item:${itemId}`, buffer);
+        callBuffers.set(`call:${callId}`, buffer);
         yield {
           type: "tool-call-start",
           index: idx,
@@ -325,36 +345,58 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.delta") {
-      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      // These events carry `item_id`, not `call_id`.
+      const eventKey =
+        typeof parsed.item_id === "string" && parsed.item_id !== ""
+          ? `item:${parsed.item_id}`
+          : typeof parsed.call_id === "string"
+            ? `call:${parsed.call_id}`
+            : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
-      const buf = callBuffers.get(callId);
+      const buf = callBuffers.get(eventKey);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
         yield {
           type: "tool-call-args-delta",
           index: buf.index,
-          toolCallId: callId,
+          toolCallId: buf.callId,
           toolName: buf.name,
           argsDelta: delta,
         };
+      } else if (!buf) {
+        // An unmatched key means the stream surprised us the way the old
+        // keying did; say so instead of discarding the arguments quietly.
+        console.warn(
+          `[openai-responses] dropping ${delta.length} characters for unknown function_call item "${eventKey}"`,
+        );
       }
       continue;
     }
 
     if (type === "response.function_call_arguments.done") {
-      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      // These events carry `item_id`, not `call_id`.
+      const eventKey =
+        typeof parsed.item_id === "string" && parsed.item_id !== ""
+          ? `item:${parsed.item_id}`
+          : typeof parsed.call_id === "string"
+            ? `call:${parsed.call_id}`
+            : "";
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";
-      const buf = callBuffers.get(callId);
+      const buf = callBuffers.get(eventKey);
       if (buf) {
         if (argsRaw) buf.argsJson = argsRaw;
         yield {
           type: "tool-call-ready",
           index: buf.index,
-          toolCallId: callId,
+          toolCallId: buf.callId,
           toolName: buf.name,
           args: parseArgs(buf.argsJson || argsRaw),
         };
+      } else {
+        console.warn(
+          `[openai-responses] dropping function_call_arguments.done for unknown item "${eventKey}"`,
+        );
       }
       continue;
     }
