@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { MCPServer } from "../src/index.js";
 import { generateLandingPage } from "../src/landing.js";
 import { oauthCustomProvider, type OAuthMetadata } from "../src/oauth/index.js";
+import { createLandingAssetsHandler } from "../src/views/routes.js";
 
 const servers: MCPServer<unknown>[] = [];
 const directories: string[] = [];
@@ -277,12 +278,64 @@ describe("MCPServer landing page routing", () => {
     );
     expect(publicAsset.status).toBe(200);
     expect(await publicAsset.text()).toBe("<svg></svg>");
-    const traversal = await server.fetch(
+  });
+
+  it("rejects encoded traversal out of the landing bundle directory", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "mcp-landing-"));
+    directories.push(projectRoot);
+    const bundleDir = join(projectRoot, ".mcp-use/build/landing/assets");
+    await mkdir(bundleDir, { recursive: true });
+    await writeFile(join(bundleDir, "entry.js"), "export {};");
+    await writeFile(join(projectRoot, ".mcp-use/build/secret.txt"), "secret");
+    const handler = createLandingAssetsHandler("/mcp", { projectRoot });
+
+    const served = await handler(
       new Request(
-        "https://server.example.test/api/mcp/_mcp-use/landing/%2e%2e/entry.js"
+        "https://server.example.test/mcp/_mcp-use/landing/assets/entry.js"
       )
     );
-    expect(traversal.status).toBe(404);
+    expect(served.status).toBe(200);
+    // `%2f` survives URL parsing, so only the handler's own decoding and
+    // segment checks keep this inside `.mcp-use/build/landing/`.
+    for (const path of ["..%2fsecret.txt", "assets%2f..%2f..%2fsecret.txt"]) {
+      const response = await handler(
+        new Request(`https://server.example.test/mcp/_mcp-use/landing/${path}`)
+      );
+      expect(response.status).toBe(404);
+    }
+  });
+
+  it("serves embedded landing assets decoded once per file", async () => {
+    const handler = createLandingAssetsHandler("/mcp", {
+      assets: {
+        "assets/entry.js": {
+          body: btoa("export const embedded = true;"),
+          contentType: "application/javascript",
+        },
+      },
+    });
+    const url =
+      "https://server.example.test/mcp/_mcp-use/landing/assets/entry.js";
+    const decodeSpy = vi.spyOn(globalThis, "atob");
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await handler(new Request(url));
+        expect(response.status).toBe(200);
+        expect(response.headers.get("content-type")).toBe(
+          "application/javascript"
+        );
+        expect(await response.text()).toBe("export const embedded = true;");
+      }
+      expect(decodeSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      decodeSpy.mockRestore();
+    }
+    const missing = await handler(
+      new Request(
+        "https://server.example.test/mcp/_mcp-use/landing/assets/other.js"
+      )
+    );
+    expect(missing.status).toBe(404);
   });
 
   it("serves GET/HEAD HTML at a custom base path and preserves protocol probes", async () => {
