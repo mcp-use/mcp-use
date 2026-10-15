@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { MCPServer } from "../src/index.js";
 import {
   generateLandingPage,
+  getInstallTargets,
   type LandingData,
   type LandingDataKey,
 } from "../src/landing.js";
@@ -123,6 +124,55 @@ describe("generateLandingPage", () => {
       name: "Weather </script><script>alert(1)</script>",
       description: "Forecasts <b>without markup</b>",
     });
+  });
+
+  it("takes its install links and steps from getInstallTargets", () => {
+    const html = generateLandingPage({
+      name: "weather",
+      version: "1.0.0",
+      url: "https://example.com/mcp",
+    });
+    const install = getInstallTargets({
+      url: "https://example.com/mcp",
+      name: "weather",
+    });
+
+    expect(html).toContain(
+      `<a href="${install.cursor.deeplink}" class="install-btn">Open in Cursor</a>`
+    );
+    expect(html).toContain(
+      `<a href="${install.vscode.deeplink}" class="install-btn">Open in VS Code</a>`
+    );
+    expect(html).toContain(
+      `<a href="${install.vscodeInsiders.deeplink}" class="install-btn">Open in VS Code Insiders</a>`
+    );
+    expect(html).toContain(
+      `<pre data-copy="claude mcp add --transport http &quot;weather&quot; &#39;https://example.com/mcp&#39;">`
+    );
+    expect(html).toContain(
+      `<a id="inspector-link" href="https://inspector.manufact.com/inspector?autoConnect=https%3A%2F%2Fexample.com%2Fmcp&amp;tab=chat"`
+    );
+    // The panel markup predates getInstallTargets and must not change.
+    expect(html).toContain(`<ol class="steps">
+          <li><strong>Enable Developer Mode:</strong> Settings → Connectors → Advanced → Developer mode</li>
+          <li><strong>Import this MCP server:</strong> Go to Connectors tab and add: https://example.com/mcp</li>
+          <li><strong>Use in conversations:</strong> Choose the MCP server from the Plus menu</li>
+        </ol>`);
+  });
+
+  it("names install targets after the title when one is set", () => {
+    const html = generateLandingPage({
+      name: "weather",
+      title: "Weather Service",
+      version: "1.0.0",
+      url: "https://example.com/mcp",
+    });
+    const { cursor } = getInstallTargets({
+      url: "https://example.com/mcp",
+      name: "Weather Service",
+    });
+    expect(html).toContain(`href="${cursor.deeplink}"`);
+    expect(html).toContain("&quot;weather_service&quot;");
   });
 
   it("encodes client install values for their destination contexts", () => {

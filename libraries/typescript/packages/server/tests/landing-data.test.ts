@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   __setLandingData,
   __withLandingData,
+  getInstallTargets,
   type LandingData,
+  useInstallTargets,
   usePromptList,
   useResourceList,
   useServerInfo,
@@ -44,6 +46,21 @@ describe("landing hooks", () => {
     }));
     expect(read).toEqual(fullData);
     expect(read.server).toBe(server);
+  });
+
+  it("build install targets from the server title or name and URL", () => {
+    expect(() => useInstallTargets()).toThrow(
+      "useInstallTargets() was called outside the landing page."
+    );
+    const titled: LandingData = {
+      server: { ...server, title: "Weather Service" },
+    };
+    expect(__withLandingData(titled, () => useInstallTargets())).toEqual(
+      getInstallTargets({ url: server.url, name: "Weather Service" })
+    );
+    expect(__withLandingData({ server }, () => useInstallTargets())).toEqual(
+      getInstallTargets({ url: server.url, name: server.name })
+    );
   });
 
   it("throw a named error for a list missing from the data", () => {
@@ -90,6 +107,7 @@ describe("landing hooks", () => {
       "../src/landing.ts",
       "../src/landing-data.ts",
       "../src/landing-handler.ts",
+      "../src/install-targets.ts",
     ]) {
       const source = readFileSync(new URL(file, import.meta.url), "utf8");
       expect(source).not.toMatch(/from\s+["']react/);
