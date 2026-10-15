@@ -6,6 +6,7 @@
  * evaluate Vite or an unrelated command implementation.
  */
 import { resolve } from "node:path";
+import { withProductionShutdownDeadline } from "../internal/shutdown.js";
 
 import {
   parseArgs,
@@ -306,16 +307,24 @@ async function startCommand(args: ParsedArgs): Promise<number> {
   const shutdown = (): void => {
     if (closing) return;
     closing = true;
-    started.close().then(
-      () => process.exit(0),
-      (error: unknown) => {
+    void (async () => {
+      let exitCode = 0;
+      try {
+        await withProductionShutdownDeadline(() => started.close());
+      } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        exitCode = 1;
+      } finally {
+        process.off("SIGINT", shutdown);
+        process.off("SIGTERM", shutdown);
       }
-    );
+      process.exit(exitCode);
+    })();
   };
-  process.once("SIGINT", shutdown);
-  process.once("SIGTERM", shutdown);
+  // Terminal process groups and package managers can deliver the same signal
+  // twice. Keep swallowing duplicates until cleanup settles or its deadline.
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
   return 0;
 }
 

@@ -48,6 +48,7 @@ import {
 } from "../bin/args.js";
 import { discoverEntry } from "./entry.js";
 import { resolveDevClientEndpoint } from "./dev-client-endpoint.js";
+import { createDevTeardown, type DevResources } from "./dev-teardown.js";
 import {
   loadProjectEnv,
   nextStandaloneCompatPlugin,
@@ -353,6 +354,27 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  * re-exported from the package's "." entry.
  */
 export async function runDev(options: DevOptions): Promise<void> {
+  const resources: DevResources = {};
+  const teardown = createDevTeardown(resources);
+  try {
+    await runOwnedDev(options, resources, teardown);
+  } catch (error) {
+    try {
+      await teardown();
+    } catch {
+      // Every registered resource was attempted. Keep the startup/runtime
+      // failure primary even if its cleanup also failed.
+    }
+    throw error;
+  }
+}
+
+/** Run dev with resource ownership established before any startup work. */
+async function runOwnedDev(
+  options: DevOptions,
+  resources: DevResources,
+  teardown: () => Promise<void>
+): Promise<void> {
   process.env.MCP_USE_DEV_CLI = "1";
   const paths = resolveWorkspacePaths(options.cwd);
   const eventBus = new InMemoryServerEventBus((error) => {
@@ -376,6 +398,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   // below) — one port total, so several `mcp-use dev` processes coexist
   // without websocket port collisions.
   const httpServer = createNodeServer();
+  resources.httpServer = httpServer;
 
   const { port, requested } = await resolvePort(
     resolvePreferredPort(options.port),
@@ -501,12 +524,14 @@ export async function runDev(options: DevOptions): Promise<void> {
       ...nextStandaloneSsrOptions(options.cwd),
     },
   });
+  resources.vite = vite;
 
   const ssrEnvironment = vite.environments.ssr;
   const runner = createServerModuleRunner(ssrEnvironment, {
     hmr: false,
     sourcemapInterceptor: "node",
   });
+  resources.runner = runner;
 
   const importServer = async (
     viewsSnapshot: DiscoveredView[]
@@ -623,7 +648,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   let currentHandler: WebHandler;
   let basePath: string;
   let currentSkillsDirectory: string | undefined;
-  try {
+  {
     const {
       server,
       skillsDirectory,
@@ -645,10 +670,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     currentHandler = async (request) => server.fetch(request);
     currentSkillsDirectory = skillsDirectory;
     frontendConfigs = candidateFrontendConfigs;
-  } catch (error) {
-    await runner.close();
-    await vite.close();
-    throw error;
   }
 
   let desiredRevision = 0;
@@ -820,6 +841,22 @@ export async function runDev(options: DevOptions): Promise<void> {
   // A `change` event cannot add or remove a view directory, so only
   // `add`/`unlink` rescan `views/` — content edits never pay for the
   // synchronous filesystem walk in discoverViews().
+  resources.stopWatching = [
+    () => {
+      if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
+      if (viewsDiscoveryTimer !== undefined) clearTimeout(viewsDiscoveryTimer);
+      if (reloadTimer !== undefined) clearTimeout(reloadTimer);
+    },
+    () => {
+      vite.watcher.off("change", onSsrFileEvent);
+    },
+    () => {
+      vite.watcher.off("add", onFileAddOrUnlink);
+    },
+    () => {
+      vite.watcher.off("unlink", onFileAddOrUnlink);
+    },
+  ];
   vite.watcher.on("change", onSsrFileEvent);
   vite.watcher.on("add", onFileAddOrUnlink);
   vite.watcher.on("unlink", onFileAddOrUnlink);
@@ -833,6 +870,7 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
   const tunnelManager = createTunnelManager(paths.tunnel);
+  resources.stopTunnel = () => tunnelManager.stop();
 
   // Vite owns the upgrade listener and validates Host before our HTTP request
   // guard runs. The public tunnel has already been validated by the proxy and
@@ -895,34 +933,6 @@ export async function runDev(options: DevOptions): Promise<void> {
       })
     );
     return true;
-  };
-
-  /**
-   * Tear down everything the running dev process owns, in dependency order:
-   * watcher subscriptions, tunnel, HTTP listener, module runner, Vite.
-   */
-  const teardown = async (): Promise<void> => {
-    if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
-    if (viewsDiscoveryTimer !== undefined) clearTimeout(viewsDiscoveryTimer);
-    vite.watcher.off("change", onSsrFileEvent);
-    vite.watcher.off("add", onFileAddOrUnlink);
-    vite.watcher.off("unlink", onFileAddOrUnlink);
-    if (reloadTimer !== undefined) clearTimeout(reloadTimer);
-    await tunnelManager.stop();
-    // Stop accepting new connections first, then terminate the long-lived
-    // transports that would otherwise keep the close callback pending:
-    // closeAllConnections() ends active MCP subscription streams, while
-    // vite.close() below owns upgraded HMR WebSockets.
-    const httpClosed = new Promise<void>((resolve, reject) => {
-      httpServer.close((error) => {
-        if (error !== undefined) reject(error);
-        else resolve();
-      });
-    });
-    httpServer.closeAllConnections();
-    await runner.close();
-    await vite.close();
-    await httpClosed;
   };
 
   const devFetch = createDevApiHandler(
@@ -1061,13 +1071,8 @@ export async function runDev(options: DevOptions): Promise<void> {
   }
 
   if (options.tunnel === true) {
-    try {
-      const { url } = await tunnelManager.start(port);
-      console.log(`  ➜ Tunnel:        ${url}${basePath}`);
-    } catch (error) {
-      await teardown();
-      throw error;
-    }
+    const { url } = await tunnelManager.start(port);
+    console.log(`  ➜ Tunnel:        ${url}${basePath}`);
   }
 
   // Auto-open the inspector — unless disabled (`--no-open`) or stdout is not
@@ -1099,6 +1104,7 @@ export async function runDev(options: DevOptions): Promise<void> {
           // tunnel release) finishes, then restore the default signal action.
           process.off("SIGINT", shutdown);
           process.off("SIGTERM", shutdown);
+          options.signal?.removeEventListener("abort", shutdown);
         }
       })();
     };
