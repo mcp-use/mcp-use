@@ -7,6 +7,8 @@
  * @packageDocumentation
  */
 
+import type { EmbeddedViewAssets } from "./views/types.js";
+
 /**
  * Escapes HTML special characters to prevent XSS in user-provided content.
  */
@@ -376,7 +378,7 @@ export interface LandingPageRegistration {
   /** Project directory containing `.mcp-use/build/landing` and `public`. */
   projectRoot?: string;
   /** Optional embedded files, keyed by paths relative to the landing root. */
-  assets?: Readonly<Record<string, { body: string; contentType: string }>>;
+  assets?: EmbeddedViewAssets;
 }
 
 /**

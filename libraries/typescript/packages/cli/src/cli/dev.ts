@@ -465,6 +465,12 @@ export async function runDev(options: DevOptions): Promise<void> {
   // with zero views needs a dev-server restart to pick up its first view.
   const viewsAtStartup = currentViews.length > 0;
   const userViteConfig = resolveUserViteConfig(options.cwd);
+  // The project's Vite config targets browser code and is applied to the
+  // server entry too. Tool-only projects keep the SSR graph isolated from it;
+  // a landing.tsx added later still gets the framework's own React and
+  // Tailwind plugins, and picks up the project config on the next restart.
+  const projectViteConfig =
+    viewsAtStartup || currentLandingPath !== undefined ? userViteConfig : false;
 
   const devClientEndpoint = resolveDevClientEndpoint(
     host,
@@ -474,9 +480,7 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const vite = await createServer({
     root: options.cwd,
-    // A landing.tsx can appear after startup; its imports must still resolve
-    // with the project's aliases and CSS plugins from the initial Vite config.
-    configFile: userViteConfig,
+    configFile: projectViteConfig,
     envDir: false,
     logLevel: "warn",
     cacheDir: paths.cache,
@@ -811,6 +815,16 @@ export async function runDev(options: DevOptions): Promise<void> {
           eventBus.publish({ kind: "resources_list_changed" });
           if (landingChanged) {
             vite.ws.send({ type: "full-reload" });
+            if (
+              landingSnapshot !== undefined &&
+              projectViteConfig === false &&
+              userViteConfig !== false
+            ) {
+              console.log(
+                `[mcp-use] landing.tsx added — restart mcp-use dev to apply ` +
+                  `${relative(options.cwd, userViteConfig)} to it`
+              );
+            }
           }
           console.log("[mcp-use] reloaded server entry");
           return;

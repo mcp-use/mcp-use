@@ -2,6 +2,8 @@
 
 import type { Plugin } from "vite";
 
+import { VIEW_REACT_DEDUPE } from "./views-plugin.js";
+
 /** Stable virtual entry used by the production client build and dev server. */
 export const VIRTUAL_LANDING_ID = "virtual:mcp-use/landing";
 const RESOLVED_LANDING_ID = `\0${VIRTUAL_LANDING_ID}`;
@@ -20,6 +22,10 @@ export function mcpUseLandingPlugin(options: {
 }): Plugin {
   return {
     name: "mcp-use-landing",
+    config() {
+      // One React copy for the component and the hydration entry, as views do.
+      return { resolve: { dedupe: VIEW_REACT_DEDUPE } };
+    },
     applyToEnvironment(environment) {
       return environment.name === "client";
     },

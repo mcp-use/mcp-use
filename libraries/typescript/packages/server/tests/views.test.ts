@@ -6,7 +6,14 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+  existsSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   afterAll,
@@ -22,6 +29,8 @@ import { z } from "zod";
 import { MCPServer, registerViews } from "../src/index.js";
 import type { MetaObject } from "../src/index.js";
 import { synthesizeViewDocument } from "../src/views/document.js";
+import { createViewAssetsHandler } from "../src/views/routes.js";
+import type { ExternalViewManifestEntry } from "../src/views/types.js";
 import { buildToolUiMeta } from "../src/views/wire.js";
 
 const UI_CAPABILITIES = {
@@ -1183,6 +1192,54 @@ describe("views HTTP routes", () => {
       expect(publicFile.headers["access-control-allow-origin"]).toBe("*");
     } finally {
       rmSync(publicPath, { force: true });
+    }
+  });
+});
+
+describe("views bundle asset handler", () => {
+  it("keeps encoded traversal inside the requested view bundle", async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), "mcp-view-assets-"));
+    try {
+      const viewsRoot = join(projectRoot, ".mcp-use/build/views");
+      for (const name of ["a", "b"]) {
+        mkdirSync(join(viewsRoot, name, "assets"), { recursive: true });
+        writeFileSync(join(viewsRoot, name, "assets/entry.js"), "export {};");
+      }
+      mkdirSync(join(viewsRoot, "public"), { recursive: true });
+      writeFileSync(join(viewsRoot, "public/file.txt"), "public");
+      const external: ExternalViewManifestEntry = {
+        kind: "external",
+        entry: "assets/entry.js",
+        css: [],
+      };
+      const handler = createViewAssetsHandler(
+        "/mcp",
+        new Map([
+          ["a", external],
+          ["b", external],
+        ]),
+        { projectRoot }
+      );
+      if (handler === undefined) {
+        throw new Error("expected a view assets handler");
+      }
+      const get = (path: string) =>
+        handler(
+          new Request(`https://server.example.test/mcp/_mcp-use/views/${path}`)
+        );
+
+      expect((await get("a/assets/entry.js")).status).toBe(200);
+      // `%2f` survives URL parsing, so only the handler's own decoding and
+      // segment checks keep requests inside `.mcp-use/build/views/<name>/`.
+      for (const path of [
+        "a/..%2fb%2fassets%2fentry.js",
+        "a/assets%2f..%2f..%2fpublic%2ffile.txt",
+        "a%2f..%2fb/assets/entry.js",
+      ]) {
+        expect((await get(path)).status).toBe(404);
+      }
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
     }
   });
 });

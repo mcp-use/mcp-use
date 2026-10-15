@@ -9,6 +9,7 @@ import type { EmbeddedViewAssets, ViewManifestEntry } from "./types.js";
 const PUBLIC_BUILD_DIR = ".mcp-use/build/views/public";
 const PUBLIC_DEV_DIR = "public";
 const VIEW_ASSETS_BUILD_ROOT = ".mcp-use/build/views";
+const LANDING_ASSETS_BUILD_ROOT = ".mcp-use/build/landing";
 
 const decodedAssets = new WeakMap<object, Uint8Array<ArrayBuffer>>();
 
@@ -49,6 +50,73 @@ function serveEmbeddedAsset(
 }
 
 /**
+ * Serve generated client-bundle files under `${basePath}/<route>/…`: from
+ * embedded assets when supplied (each decoded once), otherwise from
+ * `<projectRoot>/<directory>` on disk.
+ *
+ * Node filesystem modules load only on the first disk request so the library
+ * entry stays edge-safe for `server.fetch` deployments.
+ */
+function createBundleAssetsHandler(
+  basePath: string,
+  route: string,
+  directory: string,
+  options: {
+    projectRoot?: string;
+    deferCors?: boolean;
+    assets?: EmbeddedViewAssets;
+    /** Rejects encoded paths, relative to `directory`, outside the bundle. */
+    accepts?: (path: string) => boolean;
+  }
+): FetchHandler {
+  const prefix = pathUnderBase(basePath, route);
+  const projectRoot = options.projectRoot ?? process.cwd();
+
+  return async (request) => {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Method Not Allowed", { status: 405 });
+    }
+    if (!matchesPathPrefix(request, prefix)) {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    const encodedPath = pathnameOf(request).slice(prefix.length + 1);
+    if (encodedPath === "" || options.accepts?.(encodedPath) === false) {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    if (options.assets !== undefined) {
+      return serveEmbeddedAsset(
+        options.assets,
+        encodedPath,
+        request,
+        options.deferCors
+      );
+    }
+
+    let path: string;
+    try {
+      path = decodeURIComponent(encodedPath);
+    } catch {
+      return new Response("Not Found", { status: 404 });
+    }
+    const [{ join }, { resolvePublicFilePath, servePublicFile }] =
+      await Promise.all([import("node:path"), import("./public-route.js")]);
+    const diskPath = await resolvePublicFilePath(
+      join(projectRoot, directory),
+      path
+    );
+    if (diskPath === null) {
+      return new Response("Not Found", { status: 404 });
+    }
+    return await servePublicFile(diskPath, {
+      ...(options.deferCors === true && { deferCors: true }),
+      ...(request.method === "HEAD" && { head: true }),
+    });
+  };
+}
+
+/**
  * Fetch handler for built view bundles under
  * `${basePath}/_mcp-use/views/<name>/…`.
  *
@@ -73,52 +141,49 @@ export function createViewAssetsHandler(
     return undefined;
   }
 
-  const assetsPrefix = pathUnderBase(basePath, "_mcp-use/views");
-  const projectRoot = options?.projectRoot ?? process.cwd();
+  return createBundleAssetsHandler(
+    basePath,
+    "_mcp-use/views",
+    VIEW_ASSETS_BUILD_ROOT,
+    {
+      ...options,
+      accepts: (path) => {
+        const slash = path.indexOf("/");
+        if (slash <= 0 || slash === path.length - 1) {
+          return false;
+        }
+        return views.get(path.slice(0, slash))?.kind === "external";
+      },
+    }
+  );
+}
 
-  return async (request) => {
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      return new Response("Method Not Allowed", { status: 405 });
-    }
-    if (!matchesPathPrefix(request, assetsPrefix)) {
-      return new Response("Not Found", { status: 404 });
-    }
-
-    const pathname = pathnameOf(request);
-    const remainder = pathname.slice(assetsPrefix.length + 1);
-    const slash = remainder.indexOf("/");
-    if (slash <= 0 || slash === remainder.length - 1) {
-      return new Response("Not Found", { status: 404 });
-    }
-
-    const viewName = remainder.slice(0, slash);
-    const subpath = remainder.slice(slash + 1);
-    const entry = views.get(viewName);
-    if (entry === undefined || entry.kind !== "external") {
-      return new Response("Not Found", { status: 404 });
-    }
-
-    if (options?.assets !== undefined) {
-      return serveEmbeddedAsset(
-        options.assets,
-        remainder,
-        request,
-        options.deferCors
-      );
-    }
-
-    const [{ join }, { resolvePublicFilePath, servePublicFile }] =
-      await Promise.all([import("node:path"), import("./public-route.js")]);
-    const viewRoot = join(projectRoot, VIEW_ASSETS_BUILD_ROOT, viewName);
-    const diskPath = await resolvePublicFilePath(viewRoot, subpath);
-    if (diskPath === null) {
-      return new Response("Not Found", { status: 404 });
-    }
-    return await servePublicFile(diskPath, {
-      ...(options?.deferCors === true && { deferCors: true }),
-      ...(request.method === "HEAD" && { head: true }),
-    });
-  };
+/**
+ * Fetch handler for the built landing-page hydration bundle under
+ * `${basePath}/_mcp-use/landing/…`, sharing the view bundle code path.
+ *
+ * Production only — dev serves the landing entry through Vite middleware.
+ *
+ * @param basePath - MCP mount prefix (e.g. `/mcp`).
+ * @param options - `projectRoot` defaults to `process.cwd()`; `assets` keys
+ *   are paths relative to `.mcp-use/build/landing/`.
+ *
+ * @internal
+ */
+export function createLandingAssetsHandler(
+  basePath: string,
+  options?: {
+    projectRoot?: string;
+    deferCors?: boolean;
+    assets?: EmbeddedViewAssets;
+  }
+): FetchHandler {
+  return createBundleAssetsHandler(
+    basePath,
+    "_mcp-use/landing",
+    LANDING_ASSETS_BUILD_ROOT,
+    options ?? {}
+  );
 }
 
 /**

@@ -57,9 +57,67 @@ const require = createRequire(import.meta.url);
 const cleanups: (() => Promise<void> | void)[] = [];
 
 afterEach(async () => {
-  while (cleanups.length > 0) await cleanups.pop()?.();
-  vi.restoreAllMocks();
+  const errors: unknown[] = [];
+  try {
+    while (cleanups.length > 0) {
+      try {
+        await cleanups.pop()?.();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  } finally {
+    vi.restoreAllMocks();
+  }
+  if (errors.length === 1) {
+    throw errors[0];
+  }
+  if (errors.length > 1) {
+    throw new AggregateError(errors, "test cleanup failed");
+  }
 });
+
+/** Set MCP_ASSETS_URL for one test and restore it during cleanup. */
+function useBuildAssetsUrl(value: string | undefined): void {
+  const previous = process.env["MCP_ASSETS_URL"];
+  if (value === undefined) delete process.env["MCP_ASSETS_URL"];
+  else process.env["MCP_ASSETS_URL"] = value;
+  cleanups.push(() => {
+    if (previous === undefined) delete process.env["MCP_ASSETS_URL"];
+    else process.env["MCP_ASSETS_URL"] = previous;
+  });
+}
+
+/** Import a built entry and render its landing page without MCP_ASSETS_URL. */
+async function fetchBuiltLanding(cwd: string, path = "/mcp"): Promise<string> {
+  const entry = join(cwd, ".mcp-use", "build", "index.js");
+  const module = (await import(pathToFileURL(entry).href)) as {
+    default: { fetch(request: Request): Promise<Response> };
+  };
+  const previous = process.env["MCP_ASSETS_URL"];
+  delete process.env["MCP_ASSETS_URL"];
+  try {
+    const response = await module.default.fetch(
+      new Request(`http://localhost:4333${path}`, {
+        headers: { accept: "text/html" },
+      })
+    );
+    expect(response.status).toBe(200);
+    return await response.text();
+  } finally {
+    if (previous !== undefined) process.env["MCP_ASSETS_URL"] = previous;
+  }
+}
+
+function landingAssetUrls(html: string): {
+  script: string | undefined;
+  css: string | undefined;
+} {
+  return {
+    script: /<script type="module" src="([^"]+)"/.exec(html)?.[1],
+    css: /<link rel="stylesheet" href="([^"]+)"/.exec(html)?.[1],
+  };
+}
 
 function writeLanding(cwd: string, mcpRoot = cwd): void {
   mkdirSync(mcpRoot, { recursive: true });
@@ -102,8 +160,11 @@ function htmlRequest(
   return fetch(url, { method, headers: { accept: "text/html" } });
 }
 
-async function startDev(cwd: string, mcpDir?: string): Promise<string> {
-  const lines: string[] = [];
+async function startDev(
+  cwd: string,
+  mcpDir?: string,
+  lines: string[] = []
+): Promise<string> {
   const log = vi
     .spyOn(console, "log")
     .mockImplementation((...args: unknown[]) => {
@@ -200,6 +261,55 @@ describe("CLI landing.tsx", () => {
         ? true
         : undefined;
     });
+  }, 60_000);
+
+  it("keeps the project Vite config off tool-only dev servers until restart", async () => {
+    const cwd = copyFixture("landing-tool-only-vite-config");
+    cleanups.push(() => removeDir(cwd));
+    const marker = "__mcpUseLandingViteConfigLoads";
+    const globals = globalThis as Record<string, unknown>;
+    delete globals[marker];
+    cleanups.push(() => {
+      delete globals[marker];
+    });
+    writeFileSync(
+      join(cwd, "vite.config.mts"),
+      `globalThis.${marker} = (globalThis.${marker} ?? 0) + 1;\nexport default {};\n`
+    );
+    const lines: string[] = [];
+    const url = await startDev(cwd, undefined, lines);
+    expect(globals[marker]).toBeUndefined();
+
+    writeLanding(cwd);
+    await waitFor(async () => {
+      const html = await (await htmlRequest(url)).text();
+      return html.includes('data-testid="custom-landing"') ? true : undefined;
+    });
+    expect(lines).toContain(
+      "[mcp-use] landing.tsx added — restart mcp-use dev to apply vite.config.mts to it"
+    );
+    expect(globals[marker]).toBeUndefined();
+  }, 60_000);
+
+  it("loads the project Vite config when landing.tsx exists at dev startup", async () => {
+    const cwd = copyFixture("landing-startup-vite-config");
+    cleanups.push(() => removeDir(cwd));
+    const marker = "__mcpUseLandingStartupViteConfigLoads";
+    const globals = globalThis as Record<string, unknown>;
+    delete globals[marker];
+    cleanups.push(() => {
+      delete globals[marker];
+    });
+    writeFileSync(
+      join(cwd, "vite.config.mts"),
+      `globalThis.${marker} = (globalThis.${marker} ?? 0) + 1;\nexport default {};\n`
+    );
+    writeLanding(cwd);
+    const url = await startDev(cwd);
+    expect(globals[marker]).toBe(1);
+    expect(await (await htmlRequest(url)).text()).toContain(
+      'data-testid="custom-landing"'
+    );
   }, 60_000);
 
   it("finds landing.tsx under --mcp-dir in dev", async () => {
@@ -307,6 +417,100 @@ describe("CLI landing.tsx", () => {
     );
     expect(await first.text()).toContain("http://localhost:4111/mcp");
     expect(await second.text()).toContain("http://localhost:4222/mcp");
+  }, 90_000);
+
+  it("bakes MCP_ASSETS_URL into landing assets of a tool-only build", async () => {
+    const cwd = copyFixture("landing-cdn-tools");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    const indexPath = join(cwd, "src", "index.ts");
+    writeFileSync(
+      indexPath,
+      readFileSync(indexPath, "utf8").replace(
+        'description: "A custom landing fixture."',
+        'description: "A custom landing fixture.", basePath: "/api/mcp"'
+      )
+    );
+    writeLanding(cwd);
+    useBuildAssetsUrl("https://cdn.example.test/bucket/");
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+
+    await runBuild({ cwd });
+
+    const { script, css } = landingAssetUrls(
+      await fetchBuiltLanding(cwd, "/api/mcp")
+    );
+    const prefix = "https://cdn.example.test/bucket/api/mcp/_mcp-use/landing/";
+    expect(script?.slice(0, prefix.length)).toBe(prefix);
+    expect(script).toMatch(/\/assets\/[^/]+\.js$/);
+    expect(css?.slice(0, prefix.length)).toBe(prefix);
+    expect(css).toMatch(/\/assets\/[^/]+\.css$/);
+    expect(
+      existsSync(
+        join(cwd, ".mcp-use/build/landing", script!.slice(prefix.length))
+      )
+    ).toBe(true);
+    expect(lines).toContain(
+      `[mcp-use] MCP_ASSETS_URL set — publish .mcp-use/build/landing/ at ${prefix}`
+    );
+  }, 90_000);
+
+  it("bakes MCP_ASSETS_URL into landing assets built alongside views", async () => {
+    const cwd = copyFixture("landing-cdn-views", "views");
+    cleanups.push(() => removeDir(cwd));
+    writeLanding(cwd);
+    useBuildAssetsUrl("https://cdn.example.test/bucket");
+
+    await runBuild({ cwd });
+
+    const { script, css } = landingAssetUrls(await fetchBuiltLanding(cwd));
+    const prefix = "https://cdn.example.test/bucket/mcp/_mcp-use/landing/";
+    expect(script?.slice(0, prefix.length)).toBe(prefix);
+    expect(script).toMatch(/\/assets\/[^/]+\.js$/);
+    expect(css?.slice(0, prefix.length)).toBe(prefix);
+    expect(css).toMatch(/\/assets\/[^/]+\.css$/);
+    const entryCode = readFileSync(
+      join(cwd, ".mcp-use/build/index.js"),
+      "utf8"
+    );
+    expect(entryCode).toContain(
+      "https://cdn.example.test/bucket/mcp/_mcp-use/views/product-search-result/assets/"
+    );
+  }, 90_000);
+
+  it("keeps MCP_ASSETS_URL on landing assets when views are inlined", async () => {
+    const cwd = copyFixture("landing-cdn-views-inline", "views");
+    cleanups.push(() => removeDir(cwd));
+    writeLanding(cwd);
+    useBuildAssetsUrl("https://cdn.example.test/bucket");
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+
+    await runBuild({ cwd, inline: true });
+
+    const { script, css } = landingAssetUrls(await fetchBuiltLanding(cwd));
+    const prefix = "https://cdn.example.test/bucket/mcp/_mcp-use/landing/";
+    expect(script?.slice(0, prefix.length)).toBe(prefix);
+    expect(css?.slice(0, prefix.length)).toBe(prefix);
+    const entryCode = readFileSync(
+      join(cwd, ".mcp-use/build/index.js"),
+      "utf8"
+    );
+    expect(entryCode).toMatch(/"kind"\s*:\s*"inline"/);
+    expect(entryCode).not.toContain(
+      "https://cdn.example.test/bucket/mcp/_mcp-use/views/"
+    );
+    const publishLines = lines.filter((line) =>
+      line.startsWith("[mcp-use] MCP_ASSETS_URL set")
+    );
+    expect(publishLines).toEqual([
+      `[mcp-use] MCP_ASSETS_URL set — publish .mcp-use/build/landing/ at ${prefix}`,
+    ]);
   }, 90_000);
 
   it("keeps MCP views available when a custom landing is built alongside them", async () => {

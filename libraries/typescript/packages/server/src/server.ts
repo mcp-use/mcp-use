@@ -30,7 +30,6 @@ import {
 } from "./branding.js";
 import { assertServerConfig, type ServerConfig } from "./config.js";
 import { resolveListenHost, resolveListenPort } from "./listen-address.js";
-import { createLandingAssetsHandler } from "./landing-assets.js";
 import type { LandingPageRegistration } from "./landing.js";
 import { toNodeHandler } from "./node-bridge.js";
 import {
@@ -154,6 +153,7 @@ import type {
   ViewResourceFacts,
 } from "./views/types.js";
 import {
+  createLandingAssetsHandler,
   createViewPublicHandler,
   createViewAssetsHandler,
   registerViews,
@@ -1949,11 +1949,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
 
       if (this.#landingPage !== undefined && this.#landingPage.dev !== true) {
-        const landingAssetsHandler = createLandingAssetsHandler(
-          basePath,
-          this.#landingPage,
-          deferViewCors
-        );
+        const landingAssetsHandler = createLandingAssetsHandler(basePath, {
+          projectRoot: this.#landingPage.projectRoot ?? this.#viewsProjectRoot,
+          deferCors: deferViewCors,
+          ...(this.#landingPage.assets !== undefined && {
+            assets: this.#landingPage.assets,
+          }),
+        });
         this.app.on(
           ["GET", "HEAD"],
           `${nestedBasePath}/_mcp-use/landing/*`,
