@@ -509,6 +509,22 @@ describe("views server core (e2e over HTTP)", () => {
     });
   });
 
+  it("copies the view description to openai/widgetDescription on list and read", async () => {
+    const { resources } = await plainClient.listResources();
+    const view = resources.find(
+      (r) => r.uri === "ui://views/product-search-result.html"
+    );
+    expect(view?._meta?.["openai/widgetDescription"]).toBe(
+      "Product search results grid"
+    );
+    const read = await plainClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(read.contents[0]?._meta?.["openai/widgetDescription"]).toBe(
+      "Product search results grid"
+    );
+  });
+
   it("emits ui meta on resources/read content items for plain clients too", async () => {
     const read = await plainClient.readResource({
       uri: "ui://views/product-search-result.html",
@@ -680,6 +696,7 @@ describe("views server core (e2e over HTTP)", () => {
       (r) => r.uri === "ui://views/app-only-view.html"
     );
     expect(appOnly?.description).toBeUndefined();
+    expect(appOnly?._meta).not.toHaveProperty("openai/widgetDescription");
     const ui = appOnly?._meta?.["ui"] as Record<string, unknown> | undefined;
     expect(ui).toMatchObject({
       csp: {
