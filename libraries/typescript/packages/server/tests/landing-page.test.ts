@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { MCPServer } from "../src/index.js";
-import { generateLandingPage } from "../src/landing.js";
+import { generateLandingPage, type LandingData } from "../src/landing.js";
 import { oauthCustomProvider, type OAuthMetadata } from "../src/oauth/index.js";
 import { createLandingAssetsHandler } from "../src/views/routes.js";
 
@@ -155,7 +155,7 @@ describe("generateLandingPage", () => {
 });
 
 describe("MCPServer landing page routing", () => {
-  it("renders a custom shell with serialized props and caches by URL and asset base", async () => {
+  it("renders a custom shell with serialized data and caches by URL and asset base", async () => {
     const originalAssetsUrl = process.env["MCP_ASSETS_URL"];
     const server = track(
       new MCPServer({
@@ -170,17 +170,20 @@ describe("MCPServer landing page routing", () => {
     }));
     const renders: string[] = [];
     server.__primeLandingPage({
-      render: (props) => {
-        renders.push(props.url);
-        expect(props).toMatchObject({
-          name: "custom-landing",
-          title: "Custom <Landing>",
-          websiteUrl: "https://example.test",
+      render: (data) => {
+        renders.push(data.server.url);
+        expect(data).toMatchObject({
+          server: {
+            name: "custom-landing",
+            title: "Custom <Landing>",
+            version: "2.0.0",
+            websiteUrl: "https://example.test",
+          },
           tools: [{ name: "weather", title: "Weather" }],
           prompts: [],
           resources: [],
         });
-        return `<main>${props.name}</main>`;
+        return `<main>${data.server.name}</main>`;
       },
       entry: "assets/entry.js",
       css: ["assets/entry.css"],
@@ -206,18 +209,24 @@ describe("MCPServer landing page routing", () => {
       );
       expect(html).toContain("Custom &lt;Landing&gt;");
       const json = html.match(
-        /<script id="mcp-use-landing-props" type="application\/json">(.*?)<\/script>/s
+        /<script id="mcp-use-landing-data" type="application\/json">(.*?)<\/script>/s
       )?.[1];
       expect(json).toBeDefined();
-      expect(JSON.parse(json!)).toMatchObject({
-        url: "https://server.example.test/mcp",
-        title: "Custom <Landing>",
-        publicBaseUrl:
-          "https://cdn-one.example.test/prefix/mcp/_mcp-use/public/",
+      expect(JSON.parse(json!)).toEqual({
+        server: {
+          name: "custom-landing",
+          title: "Custom <Landing>",
+          version: "2.0.0",
+          url: "https://server.example.test/mcp",
+          websiteUrl: "https://example.test",
+          publicBaseUrl:
+            "https://cdn-one.example.test/prefix/mcp/_mcp-use/public/",
+        },
+        tools: [{ name: "weather", title: "Weather" }],
+        prompts: [],
+        resources: [],
       });
-      expect(JSON.parse(json!).tools).toEqual([
-        { name: "weather", title: "Weather" },
-      ]);
+      expect(json).not.toContain("<");
 
       await server.fetch(request);
       expect(renders).toHaveLength(1);
@@ -239,6 +248,46 @@ describe("MCPServer landing page routing", () => {
       if (originalAssetsUrl === undefined) delete process.env["MCP_ASSETS_URL"];
       else process.env["MCP_ASSETS_URL"] = originalAssetsUrl;
     }
+  });
+
+  it("renders and serializes only the lists named by dataKeys", async () => {
+    const server = track(
+      new MCPServer({ name: "keyed-landing", version: "1.0.0" })
+    );
+    server.tool(
+      { name: "weather", description: "Ends </script><script>alert(1)" },
+      async () => ({ content: [] })
+    );
+    server.prompt({ name: "plan" }, async () => ({ messages: [] }));
+    let rendered: LandingData | undefined;
+    server.__primeLandingPage({
+      render: (data) => {
+        rendered = data;
+        return "<main>Keyed</main>";
+      },
+      dataKeys: ["tools"],
+      entry: "assets/entry.js",
+    });
+    const html = await (
+      await server.fetch(htmlRequest("https://server.example.test/mcp"))
+    ).text();
+    const json = html.match(
+      /<script id="mcp-use-landing-data" type="application\/json">(.*?)<\/script>/s
+    )?.[1];
+    expect(json).toBeDefined();
+    expect(json).not.toContain("</script>");
+    expect(JSON.parse(json!)).toEqual({
+      server: {
+        name: "keyed-landing",
+        version: "1.0.0",
+        url: "https://server.example.test/mcp",
+        publicBaseUrl: "https://server.example.test/mcp/_mcp-use/public/",
+      },
+      tools: [
+        { name: "weather", description: "Ends </script><script>alert(1)" },
+      ],
+    });
+    expect(rendered).toEqual(JSON.parse(json!));
   });
 
   it("serves landing bundles and project public files on a custom base path", async () => {

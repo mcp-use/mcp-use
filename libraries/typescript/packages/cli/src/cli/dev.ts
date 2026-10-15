@@ -57,7 +57,12 @@ import {
 } from "./next-compat.js";
 import { resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
-import { DEV_LANDING_ENTRY, mcpUseLandingPlugin } from "./landing-client.js";
+import {
+  DEV_LANDING_ENTRY,
+  mcpUseLandingPlugin,
+  mcpUseLandingSsrPlugin,
+  VIRTUAL_LANDING_SSR_ID,
+} from "./landing-client.js";
 import { createDevApiHandler } from "./dev-api.js";
 import {
   loadProjectInspector,
@@ -157,13 +162,19 @@ interface ServerLike {
   __primeSkills(snapshot: SkillsSnapshot | undefined): void;
   __skillsConfig(): boolean | SkillsOptions | undefined;
   __primeLandingPage?(options: {
-    render: (props: unknown) => string | Promise<string>;
+    render: (data: unknown) => string | Promise<string>;
     entry: string;
     css?: readonly string[];
     scripts?: readonly string[];
     dev?: boolean;
     projectRoot?: string;
   }): void;
+}
+
+/** A loaded `landing.tsx` component and the data setter its hooks read. */
+interface LandingRenderer {
+  component: ComponentType;
+  withLandingData: <T>(data: unknown, render: () => T) => T;
 }
 
 /**
@@ -500,10 +511,24 @@ export async function runDev(options: DevOptions): Promise<void> {
     // Tool-only projects do not load a browser view graph. Avoid starting a
     // dependency optimizer for them: on Windows its background cache commit
     // can otherwise outlive Vite shutdown and race fixture/project cleanup.
+    // `mcp-use/landing` holds the data store that both the hydration entry and
+    // the page's hooks read. It has no imports, so serving it as plain ESM
+    // gives both one module URL and avoids a lazy optimizer discovery (and
+    // the full reload that follows) on the first landing request.
     ...(viewsAtStartup
-      ? { optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS }
+      ? {
+          optimizeDeps: {
+            ...VIEW_REACT_OPTIMIZE_DEPS,
+            exclude: [...VIEW_REACT_OPTIMIZE_DEPS.exclude, "mcp-use/landing"],
+          },
+        }
       : currentLandingPath !== undefined
-        ? { optimizeDeps: { include: ["react", "react-dom/client"] } }
+        ? {
+            optimizeDeps: {
+              include: ["react", "react-dom/client"],
+              exclude: ["mcp-use/landing"],
+            },
+          }
         : {}),
     oxc: { jsx: { runtime: "automatic" } },
     plugins: [
@@ -521,6 +546,10 @@ export async function runDev(options: DevOptions): Promise<void> {
         getLandingPath: () =>
           existsSync(landingSourcePath) ? landingSourcePath : undefined,
         dev: true,
+      }),
+      mcpUseLandingSsrPlugin({
+        getLandingPath: () =>
+          existsSync(landingSourcePath) ? landingSourcePath : undefined,
       }),
       react(),
     ],
@@ -631,32 +660,40 @@ export async function runDev(options: DevOptions): Promise<void> {
         const { renderToString } = projectRequire(
           "react-dom/server"
         ) as typeof import("react-dom/server");
-        let lastWorkingComponent: ComponentType<unknown> | undefined;
+        // The component and the `mcp-use/landing` instance its hooks read
+        // are kept as a pair, so a fallback render still feeds the hooks.
+        let lastWorking: LandingRenderer | undefined;
         server.__primeLandingPage({
-          render: async (props) => {
+          render: async (data) => {
             try {
-              const moduleExports = (await runner.import(landingSnapshot)) as {
-                default?: unknown;
-              };
+              const moduleExports = (await runner.import(
+                VIRTUAL_LANDING_SSR_ID
+              )) as { default?: unknown; __withLandingData?: unknown };
               if (typeof moduleExports.default !== "function") {
                 throw new Error(
                   "landing.tsx must default-export a React component"
                 );
               }
-              lastWorkingComponent =
-                moduleExports.default as ComponentType<unknown>;
+              if (typeof moduleExports.__withLandingData !== "function") {
+                throw new Error(
+                  "The installed mcp-use does not support landing hooks; upgrade mcp-use."
+                );
+              }
+              lastWorking = {
+                component: moduleExports.default as ComponentType,
+                withLandingData:
+                  moduleExports.__withLandingData as LandingRenderer["withLandingData"],
+              };
             } catch (error) {
-              if (lastWorkingComponent === undefined) throw error;
+              if (lastWorking === undefined) throw error;
               console.error(
                 "[mcp-use] landing update failed; serving last working page",
                 error
               );
             }
-            return renderToString(
-              react.createElement(
-                lastWorkingComponent!,
-                props as Record<string, unknown>
-              )
+            const { component, withLandingData } = lastWorking;
+            return withLandingData(data, () =>
+              renderToString(react.createElement(component))
             );
           },
           entry: DEV_LANDING_ENTRY,

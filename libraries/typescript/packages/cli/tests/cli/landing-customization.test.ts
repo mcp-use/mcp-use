@@ -34,10 +34,19 @@ vi.mock("@mcp-use/tunnel", () => ({
 }));
 
 const landingSource = `import { useState } from "react";
-import type { LandingPageProps } from "mcp-use/landing";
+import {
+  usePromptList,
+  useResourceList,
+  useServerInfo,
+  useToolList,
+} from "mcp-use/landing";
 import "./landing.css";
 
-export default function Landing({ url, name, title, version, description, tools, prompts, resources }: LandingPageProps) {
+export default function Landing() {
+  const { url, name, title, version, description } = useServerInfo();
+  const tools = useToolList();
+  const prompts = usePromptList();
+  const resources = useResourceList();
   const [clicks, setClicks] = useState(0);
   return <main data-testid="custom-landing" className="custom-landing">
     <h1>{title ?? name}</h1>
@@ -117,6 +126,13 @@ function landingAssetUrls(html: string): {
     script: /<script type="module" src="([^"]+)"/.exec(html)?.[1],
     css: /<link rel="stylesheet" href="([^"]+)"/.exec(html)?.[1],
   };
+}
+
+/** Text of the element with `data-testid`, without React's text separators. */
+function testIdText(html: string, testId: string): string | undefined {
+  return new RegExp(`data-testid="${testId}">(.*?)</`)
+    .exec(html)?.[1]
+    ?.replaceAll("<!-- -->", "");
 }
 
 function writeLanding(cwd: string, mcpRoot = cwd): void {
@@ -230,7 +246,7 @@ describe("CLI landing.tsx", () => {
       return html.includes('data-testid="custom-landing"') ? html : undefined;
     });
     expect(customHtml).toContain('id="mcp-use-landing-root"');
-    expect(customHtml).toContain('id="mcp-use-landing-props"');
+    expect(customHtml).toContain('id="mcp-use-landing-data"');
     expect(customHtml).toContain("Fixture Custom");
     expect(customHtml).toContain("A custom landing fixture.");
     expect(customHtml).toContain("docs://fixture");
@@ -261,6 +277,71 @@ describe("CLI landing.tsx", () => {
         ? true
         : undefined;
     });
+  }, 60_000);
+
+  it("feeds hooks in dev through the module instance landing.tsx imports", async () => {
+    const cwd = copyFixture("landing-dev-hooks");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    writeLanding(cwd);
+    writeFileSync(
+      join(cwd, "landing-tools.tsx"),
+      `import { useToolList } from "mcp-use/landing";
+export function Tools() {
+  return <p data-testid="nested-tools">{useToolList().map((tool) => tool.name).join(",")}</p>;
+}
+`
+    );
+    const landingWithHeading = (heading: string): string =>
+      `import { useServerInfo } from "mcp-use/landing";
+import { Tools } from "./landing-tools";
+export default function Landing() {
+  const { name, url } = useServerInfo();
+  return <main data-testid="hooks-landing">
+    <h1 data-testid="heading">${heading} {name}</h1>
+    <p data-testid="endpoint">{url}</p>
+    <Tools />
+  </main>;
+}
+`;
+    writeFileSync(join(cwd, "landing.tsx"), landingWithHeading("First"));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const url = await startDev(cwd);
+
+    const first = await (await htmlRequest(url)).text();
+    expect(testIdText(first, "heading")).toBe("First fixture-basic");
+    expect(testIdText(first, "endpoint")).toBe(url);
+    expect(testIdText(first, "nested-tools")).toBe("add");
+
+    // An edit clears the runner's modules: the setter must come from the
+    // re-evaluated mcp-use/landing that the new landing.tsx hooks read.
+    writeFileSync(join(cwd, "landing.tsx"), landingWithHeading("Second"));
+    const second = await waitFor(async () => {
+      const html = await (await htmlRequest(url)).text();
+      return testIdText(html, "heading") === "Second fixture-basic"
+        ? html
+        : undefined;
+    });
+    expect(testIdText(second, "nested-tools")).toBe("add");
+
+    // A broken edit keeps serving the last working component with its data.
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      "export default 'not a component';\n"
+    );
+    const fallbackHtml = await waitFor(async () => {
+      const response = await htmlRequest(url);
+      const html = await response.text();
+      return errors.mock.calls.some(
+        ([message]) =>
+          message ===
+          "[mcp-use] landing update failed; serving last working page"
+      ) && response.status === 200
+        ? html
+        : undefined;
+    });
+    expect(testIdText(fallbackHtml, "heading")).toBe("Second fixture-basic");
+    expect(testIdText(fallbackHtml, "nested-tools")).toBe("add");
   }, 60_000);
 
   it("keeps the project Vite config off tool-only dev servers until restart", async () => {
@@ -355,7 +436,15 @@ describe("CLI landing.tsx", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain('data-testid="custom-landing"');
-    expect(html).toContain('id="mcp-use-landing-props"');
+    expect(html).toContain('id="mcp-use-landing-data"');
+    expect(testIdText(html, "endpoint")).toBe(started.url);
+    expect(testIdText(html, "identity")).toBe(
+      "fixture-basic 1.0.0 A custom landing fixture."
+    );
+    expect(testIdText(html, "tools")).toBe("add");
+    expect(testIdText(html, "prompts")).toBe("plan");
+    expect(testIdText(html, "resources")).toBe("docs://fixture");
+    expect(html).toContain("<h1>Fixture Custom</h1>");
     const script =
       /<script[^>]+type="module"[^>]+src="([^"]+)"/.exec(html)?.[1] ??
       /<script[^>]+src="([^"]+)"[^>]+type="module"/.exec(html)?.[1];
@@ -363,6 +452,7 @@ describe("CLI landing.tsx", () => {
     const scriptResponse = await fetch(new URL(script!, started.url));
     expect(scriptResponse.status).toBe(200);
     expect(scriptResponse.headers.get("content-type")).toMatch(/javascript/);
+    expect(await scriptResponse.text()).toContain("mcp-use-landing-data");
 
     const css = /<link[^>]+href="([^"]+\.css)"/.exec(html)?.[1];
     expect(css).toBeDefined();
