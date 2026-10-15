@@ -105,11 +105,15 @@ Client metadata and middleware state belong to the current request only.
 
 ## Add an OAuth scope guard
 
-Configure OAuth before reading `ctx.auth`. Middleware on an authenticated
-server receives verified provider identity and scopes.
+Configure OAuth before reading `ctx.auth`. In MCP middleware, `ctx.auth` is
+the verified token's SDK `AuthInfo`, not the `ctx.auth` that tool callbacks
+receive. It is optional: it is `undefined` when the request carried no token,
+such as a signed-out call on a `mixedAuth` server. Its `scopes` and `clientId`
+are top-level fields, and the provider's mapped user is at
+`ctx.auth.extra.user`, typed as `unknown`.
 
 ```typescript
-import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
+import { oauthAuth0Provider, type Auth0OAuthUser } from "mcp-use/oauth/auth0";
 
 const domain = process.env.AUTH0_DOMAIN;
 if (!domain) throw new Error("AUTH0_DOMAIN is required");
@@ -122,11 +126,9 @@ const authenticatedServer = new MCPServer({
 
 authenticatedServer.use("mcp:tools/call", async (ctx, next) => {
   const requiredScope = `tools:call:${ctx.params.name}`;
+  const scopes = ctx.auth?.scopes ?? [];
 
-  if (
-    !ctx.auth.scopes.includes(requiredScope) &&
-    !ctx.auth.scopes.includes("tools:*")
-  ) {
+  if (!scopes.includes(requiredScope) && !scopes.includes("tools:*")) {
     throw new Error(`Insufficient scope. Required: ${requiredScope}`);
   }
 
@@ -145,7 +147,11 @@ shared backend.
 
 ```typescript
 authenticatedServer.use("mcp:tools/call", async (ctx, next) => {
-  const key = `user:${ctx.auth.user.id}`;
+  // Middleware is not typed with the provider's user, so narrow it here.
+  const user = ctx.auth?.extra?.user as Auth0OAuthUser | undefined;
+  if (!user) throw new Error("Sign-in required.");
+
+  const key = `user:${user.id}`;
 
   if (!(await rateLimiter.take(key, 30, "1m"))) {
     throw new Error("Rate limit exceeded.");
@@ -155,7 +161,7 @@ authenticatedServer.use("mcp:tools/call", async (ctx, next) => {
 });
 ```
 
-Use `ctx.auth.clientId` when the limit should apply to an OAuth client rather
+Use `ctx.auth?.clientId` when the limit should apply to an OAuth client rather
 than an end user. Never use a transport session ID, self-reported client
 metadata, or an unverified header as an authorization or rate-limit key.
 

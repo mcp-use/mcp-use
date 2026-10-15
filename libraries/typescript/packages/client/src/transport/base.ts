@@ -62,8 +62,10 @@ export interface ConnectorInitOptions {
    */
   clientOptions?: ClientOptions;
   /**
-   * Arbitrary request options (timeouts, cancellation, etc.) used by helper
-   * methods when they issue SDK requests. Can be overridden per‑call.
+   * Request options (timeouts, cancellation, etc.) used by
+   * {@link BaseConnector.initialize} for the initial `tools/list` request when
+   * it is called without arguments. Other methods use only the options passed
+   * to each call.
    */
   defaultRequestOptions?: RequestOptions;
   /**

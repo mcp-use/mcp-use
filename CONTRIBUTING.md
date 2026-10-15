@@ -319,6 +319,11 @@ Commit the generated `.changeset/*.md` file with your changes.
 
 ## Pull Request Process
 
+> [!NOTE]
+> Before you start, search [open pull requests](https://github.com/mcp-use/mcp-use/pulls) for the issue you want to work on. If a PR for that issue is already open, don't open a new one. Help on the existing PR instead: review it, test it, leave suggestions, or offer commits to the author.
+>
+> If the existing PR has gone inactive and the author doesn't respond to a comment, ask a maintainer on the PR or in [Discord](https://discord.gg/XkNkSkMz3V) before taking it over.
+
 ### 1. Create a Branch
 
 ```bash
@@ -384,6 +389,7 @@ Create a Pull Request on GitHub with:
 - Clear title and description
 - Link to related issues (use "Closes #123")
 - Screenshots/recordings for UI changes
+- **A before and after video for Inspector or Agent fixes.** If your PR fixes something in the Inspector (`@mcp-use/inspector`) or the Agent (`@mcp-use/agent` or Python's `MCPAgent`), attach a video showing the broken behavior before your change and the fixed behavior after. For Agent fixes, a terminal recording is fine.
 
 ### CI Checks
 

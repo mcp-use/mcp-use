@@ -123,8 +123,14 @@ overrides:
   markdown-it: ^14.3.1
   mermaid: ^11.16.1
   smol-toml: ^1.7.1
+  proxy-addr: ">=2.0.8"
+  shell-quote: ">=1.11.0"
+  source-map-js: ">=1.2.2"
 
 allowBuilds:
+  # firebase-admin pulls it in. Its postinstall only bakes a web app config
+  # from FIREBASE_WEBAPP_CONFIG for the browser SDK, which no package uses.
+  "@firebase/util": false
   "@tailwindcss/oxide": true
   esbuild: true
   # protobufjs only checks dependency version conventions during postinstall.

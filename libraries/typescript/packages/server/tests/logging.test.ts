@@ -644,6 +644,23 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     await server.close();
   });
 
+  it("never dumps OAuth endpoints under the MCP path at trace level", async () => {
+    const logger = requestLogger({ level: "trace", mcpPath: "/mcp" });
+    await logger(
+      new Request("http://localhost/mcp/oauth/token", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: "secret-code" }),
+      }),
+      async () => Response.json({ access_token: "secret-access-token" })
+    );
+    const output = loggedLines().join("\n");
+    expect(output).toContain("/mcp/oauth/token 200");
+    expect(output).not.toContain("[TRACE]");
+    expect(output).not.toContain("secret-access-token");
+    expect(output).not.toContain("secret-code");
+  });
+
   it("sanitizes control characters out of request-derived log text", async () => {
     const server = buildServer();
     await server.fetch(

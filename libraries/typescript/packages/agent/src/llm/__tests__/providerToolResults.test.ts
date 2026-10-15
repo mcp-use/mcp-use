@@ -59,6 +59,22 @@ describe("Anthropic: tool_result content", () => {
     expect(block.type).toBe("tool_result");
     expect(block.content).toBe("hello");
   });
+
+  it("falls back to [no content] when tool_result.content is an empty string", () => {
+    const messages: ProviderMessage[] = [
+      {
+        role: "tool",
+        toolCallId: "call_empty",
+        toolName: "delete-file",
+        toolResult: { content: [] },
+        content: "",
+      },
+    ];
+    const out = toAnthropicMessages(messages) as any[];
+    const block = out[0].content[0];
+    expect(block.type).toBe("tool_result");
+    expect(block.content).toBe("[no content]");
+  });
 });
 
 describe("OpenAI: tool message + follow-up user with image_url", () => {

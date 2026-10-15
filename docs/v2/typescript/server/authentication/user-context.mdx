@@ -20,17 +20,19 @@ type OAuthAuth<TUser> = {
   clientId?: string;
   expiresAt: number;
   resource?: URL;
+  upstream?: { accessToken: string; scopes: string[]; expiresAt?: number };
 };
 ```
 
 - `user` is the provider's normalized user type.
 - `payload` contains the verified token claims or introspection data.
-- `accessToken` is the verified bearer token. Forward it only when calling an upstream API on behalf of the user.
+- `accessToken` is the verified bearer token. Forward it only when calling an upstream API on behalf of the user. On an [OAuth Proxy](/v2/typescript/server/authentication/providers/oauth-proxy) server it is the proxy's own token, which upstream APIs do not accept.
 - `scopes` are copied from the auth information returned by the token verifier.
 - `permissions` are produced by the provider's mapping.
 - `clientId` is present when the token has a client identifier.
 - `expiresAt` is a Unix timestamp in seconds.
 - `resource` is the protected resource validated by the verifier.
+- `upstream` is set only on an OAuth Proxy server. It holds the upstream provider's token for the user; read it with `upstreamToken(ctx.auth)` from `mcp-use/oauth`.
 
 ## Use provider-specific fields
 
@@ -43,6 +45,8 @@ All built-in users have `id`. Optional profile and organization fields vary:
 | Keycloak | `id`, `email`, `name`, `preferredUsername`, `givenName`, `familyName`, `roles`, `realmAccess`, `resourceAccess` |
 | Supabase | `id`, `email`, `name`, `fullName`, `username`, `avatarUrl`, `role`, `aal`, `amr`, `sessionId`                   |
 | WorkOS   | `id`, `email`, `name`, `preferredUsername`, `firstName`, `lastName`, `roles`, `organizationId`, `sessionId`     |
+
+The OAuth Proxy is the exception: its user is `{ subject, profile }`, where `subject` is the provider's stable user ID and `profile` holds the provider's fields. Pass `mapUser` to `oauthProxy` to return a user with `id`.
 
 ```typescript
 server.tool(
@@ -112,6 +116,8 @@ For another authorization server, `oauthCustomProvider` separates verification f
 ```typescript
 import { MCPServer } from "mcp-use";
 import {
+  OAuthError,
+  OAuthErrorCode,
   oauthCustomProvider,
   type OAuthAuthInfo,
   type OAuthMetadata,
@@ -143,7 +149,10 @@ const server = new MCPServer({
     createTokenVerifier: (resource) => ({
       async verifyAccessToken(token) {
         if (token !== demoAccessToken) {
-          throw new Error("Invalid access token");
+          throw new OAuthError(
+            OAuthErrorCode.InvalidToken,
+            "Invalid access token",
+          );
         }
 
         return {
@@ -188,7 +197,7 @@ const server = new MCPServer({
 
 This fixed-token verifier keeps the example small and is only suitable for local testing. In production, validate the token signature, issuer, expiry, and MCP resource, or introspect an opaque token with the authorization server.
 
-`createTokenVerifier` receives the canonical MCP resource. `mapAuthInfo` runs only after SDK auth information has been verified and must return `{ user, payload, permissions }`. It does not rewrite `ctx.auth.scopes`; those come from the verifier's verified auth info.
+`createTokenVerifier` receives the canonical MCP resource. The verifier rejects a token by throwing `OAuthError` with `OAuthErrorCode.InvalidToken`, so the client gets `401` with a `WWW-Authenticate` challenge, or, for a ChatGPT `tools/call` request, an `isError` tool result carrying the same challenge (see [Mixed auth](/v2/typescript/server/authentication/mixed-auth)). An error that is not an `OAuthError` is answered with `500`. The auth information it returns must carry `resource` as a `URL` matching that resource, `clientId` as a string (`""` when the token has no client), and `expiresAt` in Unix seconds in the future. `mapAuthInfo` runs only after SDK auth information has been verified and must return `{ user, payload, permissions }`. It does not rewrite `ctx.auth.scopes`; those come from the verifier's verified auth info.
 
 ## Next steps
 

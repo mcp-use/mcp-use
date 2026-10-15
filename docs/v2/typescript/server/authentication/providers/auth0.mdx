@@ -15,11 +15,11 @@ In the [Auth0 Dashboard](https://manage.auth0.com):
 3. Create an API whose identifier is the canonical MCP resource, such as `https://mcp.example.com/mcp`.
 4. Use the `rfc9068_profile_authz` token dialect if tools need Auth0 permissions in access tokens.
 
-The API identifier must match the resource that mcp-use resolves for token verification. Auth0 provider options do not include a separate `audience`.
+The API identifier must match the resource that mcp-use resolves for token verification. The provider has no `audience` option; it checks the token audience against that resource.
 
 ## Configure the server
 
-Treat the environment variable as application configuration and pass `domain` explicitly.
+Pass `domain` explicitly, as below, or set `MCP_USE_OAUTH_AUTH0_DOMAIN` and call `oauthAuth0Provider()` without it.
 
 ```bash
 AUTH0_DOMAIN=https://your-tenant.us.auth0.com
@@ -41,6 +41,14 @@ const server = new MCPServer({
 
 export default server;
 ```
+
+<Warning>
+  When `MCP_USE_OAUTH_AUTH0_AUDIENCE` is set and you don't pass `resource`, the
+  provider uses its value as the MCP resource, overriding `MCP_URL`. It must be
+  the full MCP endpoint URL, such as `https://mcp.example.com/mcp`, with a path
+  equal to the server's `basePath`, or the server throws at startup. Unset
+  it if it still holds a different Auth0 API identifier.
+</Warning>
 
 ## Use Auth0 identity and permissions
 

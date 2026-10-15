@@ -12,6 +12,8 @@ Servers can ask the client for user input mid-tool-call via `elicitation/create`
 ## Setup
 
 ```typescript
+import { stdin, stdout } from "node:process";
+import { createInterface } from "node:readline/promises";
 import {
   acceptWithDefaults,
   MCPClient,
@@ -20,19 +22,32 @@ import {
 
 const onElicitation: OnElicitationCallback = async (params) => {
   if (params.mode === "url") {
+    // The tool call continues as soon as this returns, so accept only after
+    // the user has finished the external flow.
     console.log(`Visit: ${params.url}`);
+    const prompt = createInterface({ input: stdin, output: stdout });
+    await prompt.question("Press Enter after you finish in the browser. ");
+    prompt.close();
     return { action: "accept" };
   }
   // Form mode — collect fields from params.requestedSchema
   return acceptWithDefaults(params);
 };
 
-const client = new MCPClient(config, { onElicitation });
+const client = new MCPClient(
+  { mcpServers: { demo: { url: "http://localhost:3000/mcp" } } },
+  { onElicitation },
+);
 ```
+
+The second constructor argument is available only in the Node.js entry. In a
+browser build, set `onElicitation` at the top level of the configuration or on
+an individual server configuration instead.
 
 ## Helpers
 
-Import from `@mcp-use/client`:
+These helpers are exported only by the Node.js entry of `@mcp-use/client`. The
+browser entry and `@mcp-use/client/react` do not export them.
 
 | Helper | Purpose |
 | ------ | ------- |
@@ -44,10 +59,33 @@ Import from `@mcp-use/client`:
 
 ## React
 
+The helpers above are not available in a browser build, so handle the request
+directly. This handler waits for the user to finish a URL request and accepts
+form requests with their schema defaults:
+
 ```tsx
+import { useMcp, type ElicitResult } from "@mcp-use/client/react";
+
 const mcp = useMcp({
   url: "http://localhost:3000/mcp",
-  onElicitation: (params) => acceptWithDefaults(params),
+  onElicitation: async (params): Promise<ElicitResult> => {
+    if (params.mode === "url") {
+      window.open(params.url, "_blank", "noopener");
+      // The tool call continues as soon as this resolves, so accept only
+      // after the user confirms they finished the external flow.
+      const finished = window.confirm(
+        `${params.message}\n\nSelect OK after you finish in the new tab.`
+      );
+      return { action: finished ? "accept" : "cancel" };
+    }
+    const content: NonNullable<ElicitResult["content"]> = {};
+    for (const [name, field] of Object.entries(
+      params.requestedSchema.properties
+    )) {
+      if (field.default !== undefined) content[name] = field.default;
+    }
+    return { action: "accept", content };
+  },
 });
 ```
 
