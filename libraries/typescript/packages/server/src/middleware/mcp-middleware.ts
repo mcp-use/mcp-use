@@ -15,6 +15,8 @@ import type {
 } from "@modelcontextprotocol/server";
 import type { Context, Env, HonoRequest } from "hono";
 
+import type { RequestClientContext } from "../context.js";
+
 const MCP_MIDDLEWARE_METHODS = [
   "tools/call",
   "tools/list",
@@ -129,6 +131,8 @@ type MiddlewareContextCommon<TEnv extends Env = Env> = Omit<
   session?: { sessionId: string };
   /** OAuth info extracted from the validated access token. */
   auth?: AuthInfo;
+  /** Per-request client identity and capability queries. */
+  client: RequestClientContext;
   /** Shared state for middleware participating in this request. */
   state: Map<string, unknown>;
 };
