@@ -346,22 +346,25 @@ export class RemoteAgent {
         // Check for actual error conditions (not just presence of error field)
         if (result.status === "error" || result.error !== null) {
           const errorMsg = result.error ?? String(result);
+          const errorText =
+            typeof errorMsg === "string" ? errorMsg : JSON.stringify(errorMsg);
+
+          // Check if the error indicates agent initialization failure
+          if (errorText.includes("failed to initialize")) {
+            logger.error(`❌ Agent initialization failed: ${errorText}`);
+            throw new Error(
+              "Agent initialization failed on remote server. " +
+                "This usually indicates:\n" +
+                "• Invalid agent configuration (LLM model, system prompt)\n" +
+                "• Missing or invalid MCP server configurations\n" +
+                "• Network connectivity issues with MCP servers\n" +
+                "• Missing environment variables or credentials\n" +
+                `Raw error: ${errorText}`
+            );
+          }
+
           logger.error(`❌ Remote agent execution failed: ${errorMsg}`);
           throw new Error(`Remote agent execution failed: ${errorMsg}`);
-        }
-
-        // Check if the response indicates agent initialization failure
-        if (String(result).includes("failed to initialize")) {
-          logger.error(`❌ Agent initialization failed: ${result}`);
-          throw new Error(
-            "Agent initialization failed on remote server. " +
-              "This usually indicates:\n" +
-              "• Invalid agent configuration (LLM model, system prompt)\n" +
-              "• Missing or invalid MCP server configurations\n" +
-              "• Network connectivity issues with MCP servers\n" +
-              "• Missing environment variables or credentials\n" +
-              `Raw error: ${result}`
-          );
         }
       }
 
