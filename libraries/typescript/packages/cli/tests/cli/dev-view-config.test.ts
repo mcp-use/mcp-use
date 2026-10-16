@@ -109,7 +109,9 @@ beforeEach(() => {
   watcher = Object.assign(new EventEmitter(), { add: vi.fn() });
   mocks.createServer.mockResolvedValue({
     watcher,
-    environments: { ssr: { moduleGraph: {} } },
+    environments: {
+      ssr: { moduleGraph: { getModulesByFile: () => undefined } },
+    },
     close: vi.fn(),
   });
   mocks.createNodeServer.mockReturnValue(
