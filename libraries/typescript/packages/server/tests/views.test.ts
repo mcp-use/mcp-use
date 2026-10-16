@@ -1084,7 +1084,9 @@ describe("view resource reads through resources/read middleware", () => {
   });
   const seenUris: string[] = [];
   const seenTexts: string[] = [];
+  const seenDomains: unknown[] = [];
   let client: Client;
+  let claudeClient: Client;
 
   primeViews(server);
   server.tool(
@@ -1092,7 +1094,11 @@ describe("view resource reads through resources/read middleware", () => {
       name: "search-fruits",
       inputSchema: z.object({}),
       outputSchema: resultsSchema,
-      view: { name: "product-search-result", description: "Results" },
+      view: {
+        name: "product-search-result",
+        description: "Results",
+        domain: "https://views.example.com",
+      },
     },
     async () => ({
       structuredContent: { query: "", items: [] },
@@ -1114,6 +1120,8 @@ describe("view resource reads through resources/read middleware", () => {
         if ("text" in content) {
           seenTexts.push(content.text);
         }
+        const ui = content._meta?.["ui"] as Record<string, unknown> | undefined;
+        seenDomains.push(ui?.["domain"]);
         return {
           ...content,
           _meta: { ...content._meta, "example.com/injected": true },
@@ -1129,10 +1137,19 @@ describe("view resource reads through resources/read middleware", () => {
       { versionNegotiation: { mode: { pin: "2026-07-28" } } }
     );
     await client.connect(new StreamableHTTPClientTransport(new URL(url)));
+    claudeClient = new Client(
+      { name: "claude-desktop", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        capabilities: UI_CAPABILITIES,
+      }
+    );
+    await claudeClient.connect(new StreamableHTTPClientTransport(new URL(url)));
   });
 
   afterAll(async () => {
     await client.close();
+    await claudeClient.close();
     await server.close();
   });
 
@@ -1149,6 +1166,26 @@ describe("view resource reads through resources/read middleware", () => {
     expect(read.contents[0]?._meta?.["openai/widgetDescription"]).toBe(
       "Results"
     );
+  });
+
+  it("passes the Claude-hashed ui.domain to middleware", async () => {
+    seenDomains.length = 0;
+    const read = await claudeClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    const hashed = "36009c725adb9960af4aebe6278959e8.claudemcpcontent.com";
+    expect(seenDomains).toEqual([hashed]);
+    const ui = read.contents[0]?._meta?.["ui"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(ui?.["domain"]).toBe(hashed);
+    expect(read.contents[0]?._meta?.["example.com/injected"]).toBe(true);
+  });
+
+  it("passes the authored ui.domain to middleware for other clients", async () => {
+    seenDomains.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    expect(seenDomains).toEqual(["https://views.example.com"]);
   });
 
   it("lets middleware reject a view read", async () => {
