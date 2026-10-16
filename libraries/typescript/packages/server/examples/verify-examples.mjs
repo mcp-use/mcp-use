@@ -283,7 +283,7 @@ async function assertConnection(connection, example, origin, websiteOrigin) {
     if (
       !response.ok ||
       !/text\/html/i.test(response.headers.get("content-type") ?? "") ||
-      !body.includes("greet") ||
+      !body.includes(example.tools[0]) ||
       !body.includes(example.endpoint ?? "/mcp")
     ) {
       throw new Error("Expected the public landing route to return HTML.");
