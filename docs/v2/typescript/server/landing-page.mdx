@@ -1,55 +1,270 @@
 ---
 title: "Customize the landing page"
-description: "Render a custom React landing page at your MCP endpoint with the mcp-use CLI."
+description: "Replace the page a browser sees at your MCP URL with a React landing.tsx, read server data with hooks from mcp-use/landing, and reuse the client install links on other sites."
 icon: "panels-top-left"
 ---
 
-When a browser opens an MCP endpoint, mcp-use shows a page with connection instructions and the server's registered capabilities. Place `landing.tsx` in your MCP root to replace that page. The CLI discovers it in `mcp-use dev` and `mcp-use build`; `mcp-use start` serves the built version. If the file is absent, the built-in page remains.
+When a browser opens your MCP URL, mcp-use returns an HTML landing page with the server's name, connection instructions for common MCP clients, and its registered capabilities. Add a `landing.tsx` file to your MCP root to replace that page with your own React component. Without `landing.tsx`, mcp-use serves the built-in page.
 
-The screenshot below is a full-page capture of the **built-in page**, generated with `generateLandingPage()` for a sample Weather Server at a 1440 × 1000 browser viewport. It has a tool, prompt, and resource so every section is visible. The copyable files later on this page reproduce its layout and controls.
+## When the landing page is shown
+
+mcp-use serves the landing page for `GET` and `HEAD` requests to the MCP URL (such as `http://localhost:3000/mcp`) whose `Accept` header names `text/html`. Browsers send that header when you open the URL. MCP clients do not, so their requests reach the MCP handler as usual.
+
+If the server uses OAuth, the landing page HTML, including the hook data in it, requires a valid bearer token like any other request. Set `publicLandingPage: true` on `MCPServer` to serve it without one. Servers with `mixedAuth: true` already serve it without a token. MCP requests stay protected either way.
+
+The page's compiled JavaScript and CSS under `/_mcp-use/landing/` are always public, so do not put secrets in `landing.tsx`. Read server data through the hooks instead.
+
+The built-in page looks like this for a sample Weather Server with one tool, prompt, and resource:
 
 <Frame>
-  <img src="./images/default-landing-page.png" alt="Built-in MCP landing page for a Weather Server, with connection buttons, client tabs, and primitive lists" />
+  <img
+    src="./images/default-landing-page.png"
+    alt="Built-in MCP landing page for a Weather Server, with connection buttons, client tabs, and primitive lists"
+  />
 </Frame>
 
-## Add a custom page
+## Create landing.tsx
 
-Create these two files beside your MCP server entry:
+Projects created with `create-mcp-use-app` already include a `landing.tsx`. It is styled with Tailwind classes and resembles the built-in page. Edit it, or delete it to go back to the built-in page.
+
+To add one to an existing project, put `landing.tsx` next to your server entry:
 
 ```text
 my-server/
 ├── index.ts
 ├── landing.tsx
-└── landing.css
+└── public/
 ```
 
-If you started from the `mcp-server` template, install React and its TypeScript declarations. The `mcp-apps` template already includes them:
+The page needs React. Install it if your project does not have it yet:
 
 ```bash
 npm install react react-dom
 npm install --save-dev @types/react @types/react-dom
 ```
 
-The default export of `landing.tsx` must be a React component. Import `LandingPageProps` from `mcp-use/landing` for the server data. Return the page's **body content**; mcp-use supplies the HTML document, metadata, favicon, React mount point, and hydration script.
+To typecheck the page, set `"jsx": "react-jsx"` in `tsconfig.json` and add `"**/landing.tsx"` to its `include` array.
 
-```tsx
-import type { LandingPageProps } from "mcp-use/landing";
-import "./landing.css";
+The default export of `landing.tsx` must be a React component. It returns the page **body content**. mcp-use supplies the HTML document, the `<head>` tags, the favicon, and the hydration script.
 
-export default function LandingPage({ title, name, url, tools }: LandingPageProps) {
+```tsx landing.tsx
+import {
+  useInstallTargets,
+  useServerInfo,
+  useToolList,
+  type LandingMetadata,
+} from "mcp-use/landing";
+
+export const metadata: LandingMetadata = {
+  title: "Weather for Claude, Cursor, and VS Code",
+};
+
+export default function Landing() {
+  const { name, title, description, url } = useServerInfo();
+  const install = useInstallTargets();
+  const tools = useToolList();
+
   return (
-    <main>
-      <h1>{title ?? name}</h1>
-      <p>Connect an MCP client to {url}</p>
-      <p>{tools.length} tools available</p>
+    <main className="mx-auto max-w-2xl space-y-6 p-8">
+      <h1 className="text-3xl font-bold">{title ?? name}</h1>
+      {description && <p className="text-slate-600">{description}</p>}
+      <code className="block rounded bg-slate-100 p-2 text-sm">{url}</code>
+
+      <div className="flex gap-2">
+        <a
+          href={install.cursor.deeplink}
+          className="rounded-full bg-slate-900 px-4 py-2 text-white"
+        >
+          Add to {install.cursor.label}
+        </a>
+        <a
+          href={install.vscode.deeplink}
+          className="rounded-full bg-slate-900 px-4 py-2 text-white"
+        >
+          Add to {install.vscode.label}
+        </a>
+      </div>
+      <pre className="overflow-x-auto text-sm">
+        {install.claudeCode.command}
+      </pre>
+
+      <ul className="list-disc pl-5">
+        {tools.map((tool) => (
+          <li key={tool.name}>{tool.title ?? tool.name}</li>
+        ))}
+      </ul>
     </main>
   );
 }
 ```
 
-Run `mcp-use dev` and open your MCP endpoint, usually `http://localhost:3000/mcp`. Editing the component preserves React state through Fast Refresh, and CSS imports update immediately. Creating or removing `landing.tsx` while dev is running switches between your page and the built-in page. That switch may reload the tab.
+Run `mcp-use dev` and open the MCP URL in a browser to see the page.
 
-If your server entry is in another directory, select it with `--mcp-dir`. Discovery follows that directory:
+For a complete page with client tabs, copy buttons, and a gradient header, start from the [scaffold's `landing.tsx`](https://github.com/mcp-use/mcp-use/blob/main/docs/v2/typescript/server/examples/landing.tsx).
+
+### Server rendering and hydration
+
+mcp-use renders the component to HTML on the server with React's synchronous `renderToString`, then hydrates it in the browser so state, effects, and event handlers work. Keep browser-only code, such as `window`, `navigator.clipboard`, and event listeners, inside effects and event handlers.
+
+## Read server data with hooks
+
+Import these hooks from `mcp-use/landing` and call them from any component rendered by `landing.tsx`:
+
+| Hook                  | Returns                          | Data                                                                                                  |
+| --------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `useServerInfo()`     | `LandingServerInfo`              | Server identity and URLs resolved from the request.                                                   |
+| `useToolList()`       | `readonly LandingPageTool[]`     | Registered tools, in registration order.                                                              |
+| `usePromptList()`     | `readonly LandingPagePrompt[]`   | Registered prompts, in registration order.                                                            |
+| `useResourceList()`   | `readonly LandingPageResource[]` | Registered static resources, in registration order. Resource templates are not included.              |
+| `useInstallTargets()` | `InstallTargets`                 | Links and commands that add the server to MCP clients. See [Show install links](#show-install-links). |
+
+Calling a hook outside a component rendered by `landing.tsx` throws `useServerInfo() was called outside the landing page.` (with the hook's name).
+
+`LandingServerInfo` has these fields:
+
+| Field           | Type                  | Meaning                                                                                                                           |
+| --------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `name`          | `string`              | Protocol-facing server name.                                                                                                      |
+| `title`         | `string \| undefined` | Human-readable server title. Use `title ?? name` for a heading.                                                                   |
+| `version`       | `string`              | Server version reported to MCP clients.                                                                                           |
+| `description`   | `string \| undefined` | Server description.                                                                                                               |
+| `url`           | `string`              | Absolute URL of the MCP endpoint, resolved from the incoming request.                                                             |
+| `websiteUrl`    | `string \| undefined` | The server's configured website.                                                                                                  |
+| `iconUrl`       | `string \| undefined` | Absolute favicon URL, when the server configures `favicon` or `icons`.                                                            |
+| `iconType`      | `string \| undefined` | MIME type of the favicon, when known.                                                                                             |
+| `publicBaseUrl` | `string`              | Absolute URL prefix for files in the project's `public/` directory, ending in `/`. Includes the `MCP_ASSETS_URL` prefix when set. |
+
+Tools and prompts have `name`, an optional `title`, and an optional `description`. Resources have `uri`, and optional `name`, `title`, and `description`.
+
+### Which lists ship to the page
+
+mcp-use writes the hook data into the HTML as JSON so the browser can hydrate. Server info is always included. Each list is included only when your page imports its hook:
+
+- `tools` ships when a module imports `useToolList` from `mcp-use/landing`.
+- `prompts` ships when a module imports `usePromptList`.
+- `resources` ships when a module imports `useResourceList`.
+
+A page that does not show prompts therefore does not publish them. The CLI finds the imports at build time and in `mcp-use dev`:
+
+- Every module in your `landing.tsx` import graph counts, including modules loaded with dynamic `import()`.
+- `import type` does not count.
+- A namespace import (`import * as landing from "mcp-use/landing"`) or `export * from "mcp-use/landing"` ships all three lists.
+- Imports inside installed packages in `node_modules` do not count. If a component library calls a list hook, also import that hook in your own code.
+
+If a list hook runs on a page that did not ship its list, it throws `useToolList() has no data. Import it in a module under landing.tsx.` (with the hook's name). Import the hook directly from `mcp-use/landing` in one of your modules to fix it.
+
+## Show install links
+
+`useInstallTargets()` returns one entry per client, keyed by client. Each entry has a `label` and one field that depends on how the client installs a server:
+
+| Key              | `label`                | Field                                                              |
+| ---------------- | ---------------------- | ------------------------------------------------------------------ |
+| `claudeCode`     | `"Claude Code"`        | `command`: a `claude mcp add` command to run in a terminal.        |
+| `cursor`         | `"Cursor"`             | `deeplink`: a `cursor://` link that opens Cursor's install prompt. |
+| `vscode`         | `"VS Code"`            | `deeplink`: a `vscode:` link that opens VS Code's install prompt.  |
+| `vscodeInsiders` | `"VS Code Insiders"`   | `deeplink`: a `vscode-insiders:` link.                             |
+| `chatgpt`        | `"ChatGPT"`            | `steps`: plain-text setup steps. ChatGPT has no install link.      |
+| `inspector`      | `"Manufact Inspector"` | `url`: the hosted inspector, connected to this server.             |
+
+The keys are in display order. `Object.values(useInstallTargets())` lists the clients in the order of the built-in page's tabs, with Manufact Inspector last. Check which field an entry has to render it:
+
+```tsx
+import { useInstallTargets, type InstallTargets } from "mcp-use/landing";
+
+type InstallTarget = InstallTargets[keyof InstallTargets];
+
+function Instructions({ target }: { target: InstallTarget }) {
+  if ("command" in target) return <pre>{target.command}</pre>;
+  if ("deeplink" in target)
+    return <a href={target.deeplink}>Open in {target.label}</a>;
+  if ("steps" in target)
+    return (
+      <ol>
+        {target.steps.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+    );
+  return <a href={target.url}>Open {target.label}</a>;
+}
+
+export function InstallGuide() {
+  return (
+    <>
+      {Object.values(useInstallTargets()).map((target) => (
+        <section key={target.label}>
+          <h3>{target.label}</h3>
+          <Instructions target={target} />
+        </section>
+      ))}
+    </>
+  );
+}
+```
+
+The built-in page builds its links with the same function, so a custom page and the built-in page always produce the same links.
+
+## Set the page title and preview tags
+
+Export a `metadata` object from `landing.tsx` to set the document `<title>`, meta description, and Open Graph and Twitter tags:
+
+```tsx
+import type { LandingMetadata } from "mcp-use/landing";
+
+export const metadata: LandingMetadata = {
+  title: "Acme for Claude and Cursor",
+  description: "Connect Acme to your AI client in one step.",
+  icon: "acme.svg",
+  image: "og.png",
+};
+```
+
+| Field         | Sets                                                                                | Default                                                                           |
+| ------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `title`       | `<title>`, `og:title`, `twitter:title`                                              | The server's `title ?? name`, followed by "MCP Server" and the supported clients. |
+| `description` | `<meta name="description">`, `og:description`, `twitter:description`                | The server's `description`, or a generated sentence.                              |
+| `icon`        | `<link rel="icon">`                                                                 | The server's favicon, from `favicon` or `icons` on `MCPServer`.                   |
+| `image`       | `og:image`, `twitter:image`. Also switches `twitter:card` to `summary_large_image`. | No image, and `twitter:card` is `summary`.                                        |
+
+Every field is optional, and a missing or empty field keeps its default. `icon` and `image` accept an absolute URL or a path in the project's `public/` directory, such as `"og.png"`. mcp-use HTML-escapes every value.
+
+`metadata` must be a plain object. mcp-use reads it once when the module loads, so it cannot change per request. A field that is not a string is ignored, and the server logs a warning that starts with `[mcp-use] landing.tsx metadata:`.
+
+## Style the page
+
+Tailwind classes work in `landing.tsx` with no setup. The page loads the same CLI-managed Tailwind stylesheet as [MCP Apps views](/v2/typescript/mcp-apps). That stylesheet includes Tailwind's preflight reset, which removes browser defaults such as list markers and paragraph margins.
+
+You can also import CSS files. Vite bundles them with the page, and they load after Tailwind, so your rules win where both set a property:
+
+```tsx
+import "./landing.css";
+```
+
+To use a file from the project's `public/` directory, prefix its path with `publicBaseUrl`:
+
+```tsx
+const { publicBaseUrl } = useServerInfo();
+return <img src={`${publicBaseUrl}logo.svg`} alt="Acme" />;
+```
+
+## Develop the page
+
+`mcp-use dev` serves the page with hot reloading:
+
+- **Fast Refresh.** Edits to the component update the open page and keep React state. CSS edits apply immediately.
+- **New list hooks.** When an edit imports a list hook the open page did not ship, the page reloads to fetch the new list.
+- **Live add and remove.** Creating `landing.tsx` while dev is running switches the open page from the built-in page to yours. Deleting it switches back. Each switch reloads the tab.
+- **Last working page.** If an edit breaks the module, for example with a syntax error or a missing default export, mcp-use keeps serving the last version that loaded and logs `[mcp-use] landing update failed; serving last working page` with the error.
+
+## Build and deploy
+
+`mcp-use build` bundles the page with your server into `.mcp-use/build/`, and `mcp-use start` serves the built page. `start` does not look for source files. If you add or remove `landing.tsx`, build again.
+
+In production, mcp-use renders the HTML once for each MCP URL and asset origin and reuses it for later requests.
+
+### Server entry in a subdirectory
+
+mcp-use looks for `landing.tsx` in the MCP root: the project root, or the directory you pass with `--mcp-dir`. The `public/` directory stays at the project root.
 
 ```bash
 mcp-use dev --mcp-dir src/mcp
@@ -57,949 +272,49 @@ mcp-use build --mcp-dir src/mcp
 mcp-use start
 ```
 
-In this example, the custom file is `src/mcp/landing.tsx`. `start` uses the build output and does not rediscover source files.
+In this example, the page is `src/mcp/landing.tsx`.
 
-## Component data
+### Serve page assets from a CDN
 
-`LandingPageProps` includes:
+Set `MCP_ASSETS_URL` when you build to load the page's JavaScript and CSS from a CDN. The build rewrites the asset URLs and prints which directory to publish:
 
-| Prop | Meaning |
-| --- | --- |
-| `url` | Resolved absolute URL of the MCP endpoint, including its configured path. |
-| `name`, `title?`, `version`, `description?` | Protocol name and optional human-readable branding. Use `title ?? name` for the heading. |
-| `iconUrl?`, `iconType?`, `websiteUrl?` | Resolved icon and website branding when configured. The document shell also uses the icon as its favicon. |
-| `publicBaseUrl` | Absolute URL prefix for the project's `public/` files, including the configured CDN asset prefix. It ends in `/`. |
-| `tools`, `prompts`, `resources` | Registered capability summaries. Tools and prompts have `name`, optional `title`, and optional `description`; resources have `uri` and optional `name`, `title`, and `description`. |
+```bash
+MCP_ASSETS_URL=https://cdn.example.com/acme mcp-use build
+```
 
-The initial render runs synchronously on the server. Keep browser-only code such as `window`, clipboard access, and event listeners in effects or event handlers. The component hydrates in the browser so tabs, copy buttons, and other React interactions work. In production, mcp-use caches rendered HTML for each resolved MCP URL and asset origin while retaining the endpoint's existing response headers. MCP protocol requests and OAuth routing still use their normal handlers.
+Publish `.mcp-use/build/landing/` at `<MCP_ASSETS_URL><basePath>/_mcp-use/landing/`, for example `https://cdn.example.com/acme/mcp/_mcp-use/landing/`. With the root `basePath` `/`, the path is `<MCP_ASSETS_URL>/_mcp-use/landing/`. The build log prints the exact URL.
 
-You can import CSS from `landing.tsx`. Vite bundles it with the component in development and production. The page also loads the same CLI-managed Tailwind stylesheet as views, so Tailwind classes work without a CSS file. That stylesheet includes Tailwind's preflight reset, which removes browser defaults such as list markers and paragraph margins; your own CSS loads after it and wins where it sets a property. For a project-root `public/logo.svg`, use `<img src={publicBaseUrl + "logo.svg"} alt="" />` in your component. When deploying behind a CDN, configure `MCP_ASSETS_URL` for the published asset prefix; both `publicBaseUrl` and the generated landing bundle use that setting.
+Set `MCP_ASSETS_URL` when the server runs too, so `publicBaseUrl` points at the same CDN. In that case, also publish the project's `public/` directory at `<MCP_ASSETS_URL><basePath>/_mcp-use/public/`. Otherwise `publicBaseUrl` links and the `metadata` `icon` and `image` paths return 404. See the [CLI reference](/v2/typescript/api-reference/cli-reference) for how `MCP_ASSETS_URL` applies to views.
 
-## Copy the current page
+## Use install links on another site
 
-These complete files recreate the built-in page in React: animated hero, connection links, client tabs, URL and command copy buttons, public-chat readiness check, and registered capability lists. Paste both files into your MCP root, then edit the content or styles. The initial render requires no browser globals.
+`getInstallTargets()` builds the same install links without a running server, so a docs site or marketing page can show them. `mcp-use/landing` does not import React or Node.js built-ins, so it runs in Node.js, edge runtimes, and browsers.
 
-### `landing.tsx`
+Pass the MCP URL and the server name. `useInstallTargets()` passes the server's `title ?? name`, so pass the same value to match the links on your landing page:
 
-```tsx
-import { useEffect, useRef, useState } from "react";
-import type { LandingPageProps } from "mcp-use/landing";
-import "./landing.css";
+```tsx app/install/page.tsx
+import { getInstallTargets } from "mcp-use/landing";
 
-const vertexShader = `#version 300 es
-in vec4 a_position;
-out vec2 v_objectUV;
-void main(){
-  gl_Position=a_position;
-  v_objectUV=a_position.xy*0.5;
-}`;
+const install = getInstallTargets({
+  url: "https://acme.com/mcp",
+  name: "Acme",
+});
 
-// The same animated mesh used by the built-in landing page.
-const fragmentShader = `#version 300 es
-precision mediump float;
-uniform float u_time;
-uniform vec4 u_colors[4];
-uniform float u_colorsCount;
-uniform float u_distortion;
-uniform float u_swirl;
-uniform float u_grainMixer;
-uniform float u_grainOverlay;
-in vec2 v_objectUV;
-out vec4 fragColor;
-#define PI 3.14159265359
-vec2 rotate(vec2 uv,float th){return mat2(cos(th),sin(th),-sin(th),cos(th))*uv;}
-float hash21(vec2 p){
-  p=fract(p*vec2(0.3183099,0.3678794))+0.1;
-  p+=dot(p,p+19.19);
-  return fract(p.x*p.y);
-}
-float valueNoise(vec2 st){
-  vec2 i=floor(st);vec2 f=fract(st);
-  float a=hash21(i),b=hash21(i+vec2(1.,0.)),c=hash21(i+vec2(0.,1.)),d=hash21(i+vec2(1.,1.));
-  vec2 u=f*f*(3.-2.*f);
-  return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
-}
-vec2 getPosition(int i,float t){
-  float a=float(i)*.37,b=.6+fract(float(i)/3.)*.9,c=.8+fract(float(i+1)/4.);
-  float x=sin(t*b+a),y=cos(t*c+a*1.5);
-  return .5+.5*vec2(x,y);
-}
-void main(){
-  vec2 uv=v_objectUV;uv+=.5;
-  vec2 grainUV=uv*1000.;
-  float grain=valueNoise(grainUV);
-  float mixerGrain=.4*u_grainMixer*(grain-.5);
-  float t=.5*(u_time+41.5);
-  float radius=smoothstep(0.,1.,length(uv-.5));
-  float center=1.-radius;
-  for(float i=1.;i<=2.;i++){
-    uv.x+=u_distortion*center/i*sin(t+i*.4*smoothstep(0.,1.,uv.y))*cos(.2*t+i*2.4*smoothstep(0.,1.,uv.y));
-    uv.y+=u_distortion*center/i*cos(t+i*2.*smoothstep(0.,1.,uv.x));
-  }
-  vec2 uvR=uv-vec2(.5);
-  float angle=3.*u_swirl*radius;
-  uvR=rotate(uvR,-angle);uvR+=vec2(.5);
-  vec3 color=vec3(0.);float opacity=0.,totalWeight=0.;
-  for(int i=0;i<4;i++){
-    if(i>=int(u_colorsCount))break;
-    vec2 pos=getPosition(i,t)+mixerGrain;
-    vec3 cf=u_colors[i].rgb*u_colors[i].a;
-    float opacityF=u_colors[i].a;
-    float dist=length(uvR-pos);
-    dist=pow(dist,3.5);
-    float w=1./(dist+1e-3);
-    color+=cf*w;opacity+=opacityF*w;totalWeight+=w;
-  }
-  color/=max(1e-4,totalWeight);
-  opacity/=max(1e-4,totalWeight);
-  float grainO=valueNoise(rotate(grainUV,1.)+vec2(3.));
-  grainO=mix(grainO,valueNoise(rotate(grainUV,2.)+vec2(-1.)),.5);
-  grainO=pow(grainO,1.3);
-  float grainOV=grainO*2.-1.;
-  vec3 grainOC=vec3(step(0.,grainOV));
-  float grainOS=u_grainOverlay*abs(grainOV);
-  grainOS=pow(grainOS,.8);
-  color=mix(color,grainOC,.35*grainOS);
-  opacity+=.5*grainOS;
-  fragColor=vec4(color,clamp(opacity,0.,1.));
-}`;
-
-function MeshGradient() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const wrap = canvas?.parentElement;
-    const gl = canvas?.getContext("webgl2");
-    if (!canvas || !wrap || !gl) return;
-
-    function compile(type: number, source: string) {
-      const shader = gl!.createShader(type);
-      if (!shader) return null;
-      gl!.shaderSource(shader, source);
-      gl!.compileShader(shader);
-      if (gl!.getShaderParameter(shader, gl!.COMPILE_STATUS)) return shader;
-      console.error(gl!.getShaderInfoLog(shader));
-      gl!.deleteShader(shader);
-      return null;
-    }
-
-    const vertex = compile(gl.VERTEX_SHADER, vertexShader);
-    const fragment = compile(gl.FRAGMENT_SHADER, fragmentShader);
-    if (!vertex || !fragment) return;
-    const program = gl.createProgram();
-    if (!program) return;
-    gl.attachShader(program, vertex);
-    gl.attachShader(program, fragment);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error(gl.getProgramInfoLog(program));
-      return;
-    }
-    gl.useProgram(program);
-    const position = gl.getAttribLocation(program, "a_position");
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
-      gl.STATIC_DRAW,
-    );
-    gl.enableVertexAttribArray(position);
-    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-
-    const colors = ["#e0eaff", "#f9ffbd", "#dedede", "#ffffff"].map(
-      (hex) =>
-        new Float32Array([
-          parseInt(hex.slice(1, 3), 16) / 255,
-          parseInt(hex.slice(3, 5), 16) / 255,
-          parseInt(hex.slice(5, 7), 16) / 255,
-          1,
-        ]),
-    );
-    const uniform = (name: string) => gl.getUniformLocation(program, name);
-    const timeUniform = uniform("u_time");
-    const colorUniforms = colors.map((_, index) =>
-      uniform(`u_colors[${index}]`),
-    );
-    const colorCountUniform = uniform("u_colorsCount");
-    const distortionUniform = uniform("u_distortion");
-    const swirlUniform = uniform("u_swirl");
-    const grainMixerUniform = uniform("u_grainMixer");
-    const grainOverlayUniform = uniform("u_grainOverlay");
-    let time = 0;
-    let frame = 0;
-
-    function resize() {
-      const ratio = Math.min(2, window.devicePixelRatio || 1);
-      canvas!.width = Math.floor(wrap!.clientWidth * ratio);
-      canvas!.height = Math.floor(wrap!.clientHeight * ratio);
-      gl!.viewport(0, 0, canvas!.width, canvas!.height);
-    }
-
-    function draw() {
-      if (!document.hidden) {
-        time += 0.016;
-        gl!.uniform1f(timeUniform, time);
-        colors.forEach((color, index) =>
-          gl!.uniform4fv(colorUniforms[index], color),
-        );
-        gl!.uniform1f(colorCountUniform, 4);
-        gl!.uniform1f(distortionUniform, 0.8);
-        gl!.uniform1f(swirlUniform, 0.1);
-        gl!.uniform1f(grainMixerUniform, 0);
-        gl!.uniform1f(grainOverlayUniform, 0.3);
-        gl!.drawArrays(gl!.TRIANGLES, 0, 6);
-      }
-      frame = requestAnimationFrame(draw);
-    }
-
-    resize();
-    const observer = new ResizeObserver(resize);
-    observer.observe(wrap);
-    draw();
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-      gl.deleteBuffer(buffer);
-      gl.deleteProgram(program);
-      gl.deleteShader(vertex);
-      gl.deleteShader(fragment);
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} aria-hidden="true" />;
-}
-
-const copyIcon = (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <rect width="14" height="14" x="8" y="8" rx="2" />
-    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-  </svg>
-);
-
-const checkIcon = (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M20 6L9 17l-5-5" />
-  </svg>
-);
-
-function CopyButton({
-  text,
-  label = "Copy",
-}: {
-  text: string;
-  label?: string;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard access may be unavailable outside a secure browser context.
-    }
-  }
-
+export default function InstallPage() {
   return (
-    <button
-      type="button"
-      className={`copy-btn${copied ? " copied" : ""}`}
-      aria-label={label}
-      onClick={copy}
-    >
-      {copied ? checkIcon : copyIcon}
-    </button>
-  );
-}
-
-function sanitizeName(name: string) {
-  return name.replace(/[^a-zA-Z0-9-_]/g, "_").toLowerCase();
-}
-
-function base64Utf8(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
-const logoPath =
-  "M105.933 0C164.437 0.000115889 211.865 47.607 211.865 106.333C211.865 131.828 210.494 158.401 221.068 181.6L228.976 198.947C243.585 230.997 269.266 256.7 301.304 271.336L316.156 278.121C340.143 289.079 367.695 287.335 394.067 287.335C452.572 287.335 500 334.942 500 393.668C500 452.394 452.572 500.001 394.067 500.001C335.563 500.001 288.135 452.394 288.135 393.668C288.135 368.974 289.241 343.275 278.992 320.807L270.587 302.38C255.949 270.289 230.214 244.565 198.118 229.939L180.164 221.758C157.282 211.331 131.078 212.666 105.933 212.666C47.4278 212.666 4.92992e-05 165.059 0 106.333C0 47.607 47.4278 0 105.933 0Z";
-const logoCircle = { cx: 100.426, cy: 399.575, r: 100.426 };
-const logoPath2 =
-  "M500 100.426C500 155.889 455.037 200.851 399.574 200.851C344.11 200.851 299.148 155.889 299.148 100.426C299.148 44.962 344.11 0 399.574 0C455.037 0 500 44.962 500 100.426Z";
-const cornerPath =
-  "M10.5 4C10.5 7.31371 7.81371 10 4.5 10H0.5V11H4.5C7.81371 11 10.5 13.6863 10.5 17V21H11.5V17C11.5 13.6863 14.1863 11 17.5 11H21.5V10H17.5C14.1863 10 11.5 7.31371 11.5 4V0H10.5V4Z";
-
-function Logo() {
-  return (
-    <span className="logo-symbol">
-      <svg
-        viewBox="0 0 500 500"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <g className="logo-fill" fill="currentColor" fillRule="nonzero">
-          <path d={logoPath} />
-          <circle {...logoCircle} />
-          <path d={logoPath2} />
-        </g>
-        <g className="logo-stroke">
-          <path d={logoPath} />
-          <circle {...logoCircle} />
-          <path d={logoPath2} />
-        </g>
-      </svg>
-    </span>
-  );
-}
-
-const tabs = [
-  "Claude Code",
-  "Cursor",
-  "VS Code",
-  "VS Code Insiders",
-  "ChatGPT",
-] as const;
-type Tab = (typeof tabs)[number];
-
-export default function LandingPage({
-  name,
-  title,
-  version,
-  url,
-  description,
-  iconUrl,
-  tools,
-  prompts,
-  resources,
-}: LandingPageProps) {
-  const displayName = title ?? name;
-  const safeName = sanitizeName(displayName);
-  const [activeTab, setActiveTab] = useState<Tab>("Claude Code");
-  const [chatReady, setChatReady] = useState(false);
-  const origin = new URL(url).origin;
-  const chatUrl = new URL("/chat", origin).href;
-  const readyUrl = new URL("/chat/ready", origin).href;
-  const inspectorUrl = `https://inspector.manufact.com/inspector?${new URLSearchParams({ autoConnect: url, tab: "chat" })}`;
-  const cursorConfig = encodeURIComponent(base64Utf8(JSON.stringify({ url })));
-  const cursorUrl = `cursor://anysphere.cursor-deeplink/mcp/install?config=${cursorConfig}&name=${encodeURIComponent(safeName)}`;
-  const vscodeConfig = encodeURIComponent(
-    JSON.stringify({ url, name: safeName, type: "http" }),
-  );
-  const claudeCommand = `claude mcp add --transport http "${safeName}" '${url.replace(/'/g, "'\\''")}'`;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(readyUrl, {
-      cache: "no-store",
-      credentials: "omit",
-      signal: controller.signal,
-    })
-      .then((response) => {
-        if (response.ok) setChatReady(true);
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [readyUrl]);
-
-  return (
-    <div className="layout">
-      <div className="rail-left" />
-      <div className="rail-right" />
-      <div className="rail-top" />
-      <div className="rail-bottom" />
-      {["tl", "tr", "bl", "br"].map((corner) => (
-        <svg
-          key={corner}
-          className={`corner corner-${corner}`}
-          viewBox="0 0 22 21"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path d={cornerPath} fill="currentColor" />
-        </svg>
-      ))}
-
-      <div className="card hero-card">
-        <div className="hero-gradient-wrap">
-          <MeshGradient />
-          <div className="hero-inner">
-            <div className={`card-header${iconUrl ? " has-icon" : ""}`}>
-              {iconUrl && (
-                <img
-                  src={iconUrl}
-                  alt=""
-                  className="hero-icon"
-                  width="64"
-                  height="64"
-                />
-              )}
-              <div className="hero-row">
-                <h1>
-                  {displayName} <span className="version">(v{version})</span>
-                </h1>
-              </div>
-              {description && <p className="hero-description">{description}</p>}
-              <div className="hero-url-block">
-                <div className="url-block">
-                  <div className="url-box">{url}</div>
-                  <CopyButton text={url} label="Copy URL" />
-                </div>
-              </div>
-              <div className="hero-cta-row">
-                {chatReady && (
-                  <a
-                    href={chatUrl}
-                    className="hero-primary-btn"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Go to chat
-                  </a>
-                )}
-                <a
-                  href={inspectorUrl}
-                  className={
-                    chatReady ? "hero-secondary-btn" : "hero-primary-btn"
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open in Inspector
-                </a>
-              </div>
-              <div className="hero-powered">
-                <span>Powered by</span>
-                <a
-                  href="https://github.com/mcp-use/mcp-use"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <svg
-                    className="gh-icon"
-                    viewBox="0 0 16 16"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                  </svg>
-                  github.com/mcp-use/mcp-use
-                  <img
-                    src="https://img.shields.io/github/stars/mcp-use/mcp-use"
-                    alt="GitHub stars"
-                    className="gh-shield"
-                    width="90"
-                    height="18"
-                    loading="lazy"
-                  />
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Installation Guide</h2>
-          <p className="card-desc">Choose your preferred MCP client</p>
-        </div>
-        <div className="card-content">
-          <div className="tabs-row" role="tablist">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                className={`tab${activeTab === tab ? " active" : ""}`}
-                role="tab"
-                aria-selected={activeTab === tab}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-          <div className="tab-panel active" role="tabpanel">
-            {activeTab === "Claude Code" && (
-              <>
-                <h3>Install in Claude Code</h3>
-                <p>Run this command in your terminal:</p>
-                <div className="code-block">
-                  <pre>{claudeCommand}</pre>
-                  <CopyButton text={claudeCommand} />
-                </div>
-              </>
-            )}
-            {activeTab === "Cursor" && (
-              <>
-                <h3>Install in Cursor</h3>
-                <p>Click the button below to add this MCP server to Cursor:</p>
-                <a href={cursorUrl} className="install-btn">
-                  Open in Cursor
-                </a>
-                <p>Or add manually: Settings → MCP → Add server</p>
-              </>
-            )}
-            {activeTab === "VS Code" && (
-              <>
-                <h3>Install in VS Code</h3>
-                <p>Click the button below to add this MCP server to VS Code:</p>
-                <a
-                  href={`vscode:mcp/install?${vscodeConfig}`}
-                  className="install-btn"
-                >
-                  Open in VS Code
-                </a>
-                <p>Or add manually: Settings → MCP → Add server</p>
-              </>
-            )}
-            {activeTab === "VS Code Insiders" && (
-              <>
-                <h3>Install in VS Code Insiders</h3>
-                <p>
-                  Click the button below to add this MCP server to VS Code
-                  Insiders:
-                </p>
-                <a
-                  href={`vscode-insiders:mcp/install?${vscodeConfig}`}
-                  className="install-btn"
-                >
-                  Open in VS Code Insiders
-                </a>
-                <p>Or add manually: Settings → MCP → Add server</p>
-              </>
-            )}
-            {activeTab === "ChatGPT" && (
-              <>
-                <h3>Connect with ChatGPT</h3>
-                <ol className="steps">
-                  <li>
-                    <strong>Enable Developer Mode:</strong> Settings →
-                    Connectors → Advanced → Developer mode
-                  </li>
-                  <li>
-                    <strong>Import this MCP server:</strong> Go to Connectors
-                    tab and add: {url}
-                  </li>
-                  <li>
-                    <strong>Use in conversations:</strong> Choose the MCP server
-                    from the Plus menu
-                  </li>
-                </ol>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {(tools.length > 0 || prompts.length > 0 || resources.length > 0) && (
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Primitives</h2>
-            {tools.length > 0 && (
-              <div className="spec-section">
-                <h3>Tools ({tools.length})</h3>
-                {tools.map((tool) => (
-                  <div className="spec-item" key={tool.name}>
-                    <code className="spec-name">{tool.title ?? tool.name}</code>
-                    {tool.description && (
-                      <p className="spec-desc">{tool.description}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {prompts.length > 0 && (
-              <div className="spec-section">
-                <h3>Prompts ({prompts.length})</h3>
-                {prompts.map((prompt) => (
-                  <div className="spec-item" key={prompt.name}>
-                    <code className="spec-name">
-                      {prompt.title ?? prompt.name}
-                    </code>
-                    {prompt.description && (
-                      <p className="spec-desc">{prompt.description}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {resources.length > 0 && (
-              <div className="spec-section">
-                <h3>Resources ({resources.length})</h3>
-                {resources.map((resource) => (
-                  <div className="spec-item" key={resource.uri}>
-                    <code className="spec-uri">{resource.uri}</code>
-                    {resource.description && (
-                      <p className="spec-desc">{resource.description}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <footer className="footer-content">
-        <a
-          href="https://manufact.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="footer-brand-link"
-          aria-label="Manufact"
-        >
-          <Logo />
-          <span>Manufact</span>
-        </a>
-      </footer>
-    </div>
+    <ul>
+      <li>
+        <a href={install.cursor.deeplink}>Add to {install.cursor.label}</a>
+      </li>
+      <li>
+        <a href={install.vscode.deeplink}>Add to {install.vscode.label}</a>
+      </li>
+      <li>
+        <code>{install.claudeCode.command}</code>
+      </li>
+    </ul>
   );
 }
 ```
 
-### `landing.css`
-
-```css
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap");
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  color: #1e293b;
-  background-color: #fdfcfc;
-  min-height: 100vh;
-}
-.layout {
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: 2rem 1.5rem;
-  position: relative;
-}
-.rail-left, .rail-right {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(0,0,0,0.08);
-}
-.rail-left { left: 1.5rem; }
-.rail-right { right: 1.5rem; }
-.rail-top, .rail-bottom {
-  height: 1px;
-  background: rgba(0,0,0,0.08);
-  position: absolute;
-  left: 1.5rem;
-  right: 1.5rem;
-}
-.rail-top { top: 0; }
-.rail-bottom { bottom: 0; }
-.corner {
-  position: absolute;
-  width: 22px;
-  height: 21px;
-  color: rgba(0,0,0,0.08);
-}
-.corner-tl { left: 1.5rem; top: 0; transform: translate(-50%, -50%); }
-.corner-tr { right: 1.5rem; top: 0; transform: translate(50%, -50%); left: auto; }
-.corner-bl { left: 1.5rem; bottom: 0; transform: translate(-50%, 50%); top: auto; }
-.corner-br { right: 1.5rem; bottom: 0; transform: translate(50%, 50%); left: auto; top: auto; }
-.card {
-  background: #fff;
-  border-top: 1px solid rgba(0,0,0,0.08);
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  margin-bottom: 1.5rem;
-  overflow: hidden;
-}
-.card-header {
-  padding: 1.5rem 1.5rem 0.5rem;
-}
-.card-content { padding: 0 1.5rem 1.5rem; }
-.hero-card .card-header {
-  text-align: center;
-  padding: 0 1.5rem 1.25rem;
-}
-.hero-card .card-header.has-icon {
-  padding-top: 1.5rem;
-}
-.hero-icon {
-  display: block;
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
-  object-fit: contain;
-  margin: 0 auto 0.75rem;
-}
-.hero-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  margin-bottom: 0.35rem;
-}
-.hero h1 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #172037;
-  margin: 0.75rem 0 0;
-}
-.hero-card .card-header.has-icon .hero h1 { margin-top: 0; }
-.hero .version { font-size: 0.95rem; color: #64748b; font-weight: 500; }
-.hero-description {
-  color: rgba(23,32,55,0.8);
-  font-size: 1rem;
-  margin: 0.35rem 0 0;
-  max-width: 36rem;
-  margin-left: auto;
-  margin-right: auto;
-}
-.logo-symbol {
-  display: inline-block;
-  cursor: default;
-  flex-shrink: 0;
-}
-.logo-symbol svg {
-  width: 32px;
-  height: 32px;
-  color: #172037;
-}
-.logo-fill { transition: opacity 0.2s ease; }
-.logo-stroke path,
-.logo-stroke circle {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 2000;
-  stroke-dashoffset: 2000;
-  opacity: 0;
-}
-.logo-symbol:hover .logo-fill {
-  animation: logo-fill-out 0.2s forwards, logo-fill-in 0.6s 0.9s forwards;
-}
-.logo-symbol:hover .logo-stroke path,
-.logo-symbol:hover .logo-stroke circle {
-  opacity: 1;
-  animation: logo-draw 0.7s 0.2s ease-in-out forwards;
-}
-@keyframes logo-fill-out { to { opacity: 0; } }
-@keyframes logo-fill-in { to { opacity: 1; } }
-@keyframes logo-draw { to { stroke-dashoffset: 0; } }
-.footer-content { text-align: center; padding: 2.5rem 1.5rem; border-top: 1px solid rgba(0,0,0,0.08); display: flex; justify-content: center; align-items: center; }
-.footer-brand-link { justify-content: center; }
-.footer-brand-link .logo-symbol svg { width: 22px; height: 22px; }
-.hero-powered { display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; margin-top: 0.75rem; font-family: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif; font-size: 0.875rem; font-weight: 500; color: rgba(23,32,55,0.6); }
-.hero-powered a { color: #000; text-decoration: none; display: inline-flex; align-items: center; }
-.hero-powered a:hover { text-decoration: underline; }
-.footer-brand-link { display: inline-flex; align-items: center; gap: 0.5rem; font-family: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif; font-size: 1.5rem; font-weight: 600; color: #172037; text-decoration: none; }
-.footer-brand-link:hover { color: #0f172a; }
-.hero-url-block { display: flex; justify-content: center; margin: 0.75rem 0; }
-.hero-cta-row {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin: 0.35rem 0 0.5rem;
-}
-.hero-primary-btn {
-  display: inline-block;
-  padding: 0.625rem 1.25rem;
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-  color: #fff;
-  border-radius: 9999px;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.9375rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 2px 8px rgba(15,23,42,0.15);
-  transition: background 0.15s;
-  border: 1px solid rgba(0,0,0,0.12);
-}
-.hero-primary-btn:hover {
-  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
-  text-decoration: none;
-  color: #fff;
-}
-.hero-secondary-btn {
-  display: inline-block;
-  padding: 0.625rem 1.25rem;
-  background: rgba(255,255,255,0.72);
-  color: #172037;
-  border: 1px solid rgba(23,32,55,0.2);
-  border-radius: 9999px;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.9375rem;
-  transition: background 0.15s;
-}
-.hero-secondary-btn:hover {
-  background: #fff;
-  text-decoration: none;
-  color: #172037;
-}
-.hero-url-block .url-block { max-width: 100%; }
-.hero-url-block .url-box {
-  font-size: 0.938rem;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,0.12);
-  border-radius: 9999px;
-  padding: 0.75rem 3rem 0.75rem 1rem;
-  margin: 1rem 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hero-powered .gh-icon { width: 18px; height: 18px; margin-right: 0.25rem; vertical-align: -0.2em; }
-.hero-powered .gh-shield { height: 18px; width: auto; margin-left: 0.4rem; vertical-align: -0.2em; }
-.card-title { font-size: 1.25rem; font-weight: 600; color: #172037; margin: 0 0 0.25rem; }
-.card-desc { font-size: 0.875rem; color: rgba(23,32,55,0.8); margin: 0 0 1rem; }
-.url-block {
-  position: relative;
-  margin: 1rem 0;
-}
-.url-block .url-box {
-  margin: 0;
-  padding-right: 2.75rem;
-}
-.url-block .copy-btn { top: 50%; right: 0.5rem; transform: translateY(-50%); }
-.url-box {
-  font-family: ui-monospace, monospace;
-  font-size: 0.813rem;
-  background: #f8fafc;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  color: #475569;
-  margin: 1rem 0;
-}
-.spec-section { margin-top: 1.5rem; }
-.spec-section h3 { font-size: 1rem; font-weight: 600; color: #172037; margin: 0 0 0.75rem; }
-.spec-item { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f1f5f9; }
-.spec-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-.spec-name, .spec-uri { font-family: ui-monospace, monospace; font-size: 0.813rem; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; }
-.spec-uri { word-break: break-all; }
-.spec-desc { margin: 0.5rem 0 0; font-size: 0.875rem; color: #64748b; line-height: 1.5; }
-.tabs-row {
-  display: flex;
-  gap: 2px;
-  background: rgba(23,32,55,0.05);
-  padding: 3px;
-  border-radius: 8px;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-}
-.tab {
-  flex: 1;
-  min-width: 80px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.813rem;
-  font-weight: 500;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #64748b;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.tab:hover { color: #172037; background: rgba(255,255,255,0.6); }
-.tab.active { background: #fff; color: #172037; border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-.tab-panel { display: none; }
-.tab-panel.active { display: block; }
-.tab-panel h3 { font-size: 1.125rem; font-weight: 600; color: #172037; margin: 0 0 1rem; }
-.tab-panel p { margin: 1rem 0; }
-.install-btn {
-  display: inline-block;
-  padding: 0.375rem 0.875rem;
-  background: #0f172a;
-  color: #fff;
-  border-radius: 9999px;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.813rem;
-  margin-bottom: 1rem;
-  transition: background 0.15s;
-}
-.install-btn:hover { background: #1e293b; }
-.code-block {
-  position: relative;
-  margin: 1rem 0;
-}
-.code-block pre {
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  background: #f8fafc;
-  color: #475569;
-  border-radius: 8px;
-  font-family: ui-monospace, monospace;
-  font-size: 0.875rem;
-  overflow-x: auto;
-  border: 1px solid rgba(0,0,0,0.08);
-}
-.code-block .copy-btn { top: 50%; right: 0.375rem; transform: translateY(-50%); }
-.copy-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: #fff;
-  color: #172037;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-}
-.copy-btn:hover { background: #f1f5f9; }
-.copy-btn.copied { background: #fff; color: #172037; }
-.copy-btn svg { width: 14px; height: 14px; }
-ol.steps { margin: 0; padding-left: 1.25rem; list-style: decimal; }
-ol.steps li { margin: 0.5rem 0; color: #475569; }
-a { color: #0522a5; text-decoration: none; }
-a:hover { text-decoration: underline; }
-.hero-gradient-wrap {
-  position: relative;
-  padding: 1.5rem;
-  overflow: hidden;
-}
-.hero-gradient-wrap canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.hero-inner {
-  position: relative;
-  z-index: 1;
-  background: rgba(253,252,252,0.9);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  padding: 1.25rem 1.5rem;
-  border: 1px solid rgba(0,0,0,0.06);
-}
-.hero-inner .card-header { padding: 0; }
-.hero-inner .card-header.has-icon { padding-top: 0.5rem; }
-```
+The returned values are not HTML-escaped. JSX escapes them for you, but escape them yourself if you build HTML as a string. If your docs platform cannot import npm packages in a page, run `getInstallTargets()` in a build script and write the values into your docs.
