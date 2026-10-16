@@ -2518,47 +2518,58 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       uri,
       resourceConfig,
       async (readUri, ctx) => {
-        const req = ctx.http?.req;
-        const readOptions: BuildResourceUiMetaOptions =
-          req !== undefined
-            ? {
-                request: req,
-                ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
-              }
-            : metaOptions.hmrWs === true
-              ? { hmrWs: true }
-              : {};
-        const assetsBase =
-          req !== undefined
-            ? resolveAssetsBase(req)
-            : metaOptions.request !== undefined
-              ? resolveAssetsBase(metaOptions.request)
-              : "";
-        const html = synthesizeViewDocument(
-          entry,
-          assetsBase,
-          basePath,
-          viewName
+        const mwCtx = this.#createMiddlewareContext(
+          "resources/read",
+          {
+            uri: readUri.href,
+            ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
+          },
+          ctx
         );
-        // UI origin and MCP endpoint identity are separate. Claude hashes the
-        // full public endpoint, never the website or asset origin.
-        const meta = await applyClaudeResourceDomain(
-          buildResourceUiMeta(authorFacts, readOptions),
-          requestClientInfo(ctx),
-          (req ?? metaOptions.request)?.headers.get("user-agent"),
-          resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
-            authorFacts?.domain
-        );
-        return {
-          contents: [
-            {
-              uri: readUri.href,
-              mimeType: resourceConfig.mimeType,
-              text: html,
-              _meta: meta,
-            },
-          ],
+        const innerFn = async () => {
+          const req = ctx.http?.req;
+          const readOptions: BuildResourceUiMetaOptions =
+            req !== undefined
+              ? {
+                  request: req,
+                  ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
+                }
+              : metaOptions.hmrWs === true
+                ? { hmrWs: true }
+                : {};
+          const assetsBase =
+            req !== undefined
+              ? resolveAssetsBase(req)
+              : metaOptions.request !== undefined
+                ? resolveAssetsBase(metaOptions.request)
+                : "";
+          const html = synthesizeViewDocument(
+            entry,
+            assetsBase,
+            basePath,
+            viewName
+          );
+          // UI origin and MCP endpoint identity are separate. Claude hashes the
+          // full public endpoint, never the website or asset origin.
+          const meta = await applyClaudeResourceDomain(
+            buildResourceUiMeta(authorFacts, readOptions),
+            requestClientInfo(ctx),
+            (req ?? metaOptions.request)?.headers.get("user-agent"),
+            resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
+              authorFacts?.domain
+          );
+          return {
+            contents: [
+              {
+                uri: readUri.href,
+                mimeType: resourceConfig.mimeType,
+                text: html,
+                _meta: meta,
+              },
+            ],
+          };
         };
+        return await this.#runMcpHook("resources/read", mwCtx, innerFn);
       }
     );
   }
