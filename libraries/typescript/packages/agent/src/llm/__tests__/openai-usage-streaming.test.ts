@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { streamChat } from "../providers/openai-chat-completions.js";
+import { streamChat } from "../providers/index.js";
 
 describe("OpenAI Chat Completions streamed usage", () => {
   afterEach(() => {
@@ -24,21 +24,19 @@ describe("OpenAI Chat Completions streamed usage", () => {
     const sse =
       chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("") +
       "data: [DONE]\n\n";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(sse, {
-          status: 200,
-          headers: { "Content-Type": "text/event-stream" },
-        })
-      )
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(sse, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      })
     );
+    vi.stubGlobal("fetch", fetchMock);
 
     const events = [];
     for await (const event of streamChat({
       config: {
-        provider: "openai",
-        model: "test-model",
+        provider: "openrouter",
+        model: "anthropic/claude-sonnet-4",
         apiKey: "test-key",
       },
       messages: [{ role: "user", content: "hello" }],
@@ -55,6 +53,12 @@ describe("OpenAI Chat Completions streamed usage", () => {
         cachedInputTokens: 3,
         reasoningTokens: 2,
       },
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      stream_options: { include_usage: true },
     });
   });
 });
