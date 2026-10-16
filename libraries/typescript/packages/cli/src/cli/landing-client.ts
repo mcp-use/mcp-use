@@ -62,9 +62,10 @@ export const VIRTUAL_LANDING_SSR_ID = "virtual:mcp-use/landing-ssr";
 export const RESOLVED_LANDING_SSR_ID = `\0${VIRTUAL_LANDING_SSR_ID}`;
 
 /**
- * Serve `landing.tsx` together with `__withLandingData` to the dev module
- * runner. Importing `mcp-use/landing` from inside the graph, as `landing.tsx`
- * does, gives the setter the module instance the hooks read: the runner
+ * Serve `landing.tsx`, its `metadata` export (`undefined` when it has none),
+ * and `__withLandingData` to the dev module runner. Importing
+ * `mcp-use/landing` from inside the graph, as `landing.tsx` does, gives the
+ * setter the module instance the hooks read: the runner
  * internalizes a bare specifier passed straight to `runner.import()`, which
  * would evaluate a second copy beside the externalized one.
  */
@@ -86,7 +87,10 @@ export function mcpUseLandingSsrPlugin(options: {
       const source = options.getLandingPath();
       if (source === undefined) return undefined;
       return [
+        `import * as landing from ${JSON.stringify(source)};`,
         `export { default } from ${JSON.stringify(source)};`,
+        // Read through the namespace, so a page without `metadata` loads.
+        "export const metadata = landing.metadata;",
         'export { __withLandingData } from "mcp-use/landing";',
         "",
       ].join("\n");

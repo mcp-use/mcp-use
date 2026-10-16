@@ -137,7 +137,7 @@ async function writeWrapperEntry(
       ...(landing === undefined
         ? []
         : [
-            `import LandingPage from ${JSON.stringify(landing.source)};`,
+            `import * as LandingModule from ${JSON.stringify(landing.source)};`,
             `import { createElement } from "react";`,
             `import { renderToString } from "react-dom/server";`,
             `import { __withLandingData } from "mcp-use/landing";`,
@@ -149,7 +149,10 @@ async function writeWrapperEntry(
         ? []
         : [
             `server.__primeLandingPage({`,
-            `  render: (data) => __withLandingData(data, () => renderToString(createElement(LandingPage))),`,
+            `  render: (data) => __withLandingData(data, () => renderToString(createElement(LandingModule.default))),`,
+            // Optional export: a static `LandingModule.metadata` would make
+            // the bundler warn about every page that does not export it.
+            `  metadata: Reflect.get(LandingModule, "metadata"),`,
             `  entry: ${JSON.stringify(landing.entry)},`,
             `  css: ${JSON.stringify(landing.css)},`,
             `  dataKeys: ${JSON.stringify(landing.dataKeys)},`,

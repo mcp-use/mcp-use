@@ -179,6 +179,18 @@ export function Prompts() {
   );
 }
 
+/** A landing page with an optional `metadata` export. */
+function metadataLandingSource(
+  metadata: Record<string, string> | undefined
+): string {
+  return `import { useServerInfo } from "mcp-use/landing";
+${metadata === undefined ? "" : `export const metadata = ${JSON.stringify(metadata)};`}
+export default function Landing() {
+  return <main data-testid="metadata-landing">{useServerInfo().name}</main>;
+}
+`;
+}
+
 function writeLanding(cwd: string, mcpRoot = cwd): void {
   mkdirSync(mcpRoot, { recursive: true });
   for (const dependency of ["react", "react-dom"]) {
@@ -851,4 +863,91 @@ export default function Resources() {
     expect(html).not.toContain('data-testid="prompts"');
     expect(landingDataKeys(html)).toEqual(["prompts", "server"]);
   }, 90_000);
+
+  it("builds a page whose metadata export sets the document head", async () => {
+    const cwd = copyFixture("landing-build-metadata");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    writeLanding(cwd);
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      metadataLandingSource({ title: "Built <Title>", image: "og.png" })
+    );
+
+    await runBuild({ cwd });
+    const started = await runStart({
+      cwd,
+      port: await getFreePort(),
+      host: "127.0.0.1",
+    });
+    cleanups.push(() => started.close());
+
+    const html = await (await htmlRequest(started.url)).text();
+    expect(html).toContain('data-testid="metadata-landing"');
+    expect(html).toContain("<title>Built &lt;Title&gt;</title>");
+    expect(html).toContain(
+      '<meta name="description" content="A custom landing fixture.">'
+    );
+    expect(html).toContain(
+      `<meta property="og:image" content="${started.url}/_mcp-use/public/og.png">`
+    );
+  }, 90_000);
+
+  it("reads the metadata export of the current landing.tsx in dev", async () => {
+    const cwd = copyFixture("landing-dev-metadata");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    writeLanding(cwd);
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      metadataLandingSource({ title: "First title" })
+    );
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const url = await startDev(cwd);
+
+    expect(await (await htmlRequest(url)).text()).toContain(
+      "<title>First title</title>"
+    );
+
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      metadataLandingSource({ title: "Second title" })
+    );
+    await waitFor(async () => {
+      const html = await (await htmlRequest(url)).text();
+      return html.includes("<title>Second title</title>") ? true : undefined;
+    });
+
+    // A broken edit keeps the head of the last working page with its body.
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      `export const metadata = { title: "Broken title" };
+export default "not a component";
+`
+    );
+    const fallbackHtml = await waitFor(async () => {
+      const response = await htmlRequest(url);
+      const html = await response.text();
+      return errors.mock.calls.some(
+        ([message]) =>
+          message ===
+          "[mcp-use] landing update failed; serving last working page"
+      ) && response.status === 200
+        ? html
+        : undefined;
+    });
+    expect(fallbackHtml).toContain("<title>Second title</title>");
+    expect(fallbackHtml).toContain('data-testid="metadata-landing"');
+
+    // Without the export, the server's default title comes back.
+    writeFileSync(join(cwd, "landing.tsx"), metadataLandingSource(undefined));
+    await waitFor(async () => {
+      const html = await (await htmlRequest(url)).text();
+      return html.includes(
+        "<title>Fixture Custom MCP Server — Connect with Claude Code, Cursor &amp; VS Code</title>"
+      )
+        ? true
+        : undefined;
+    });
+  }, 60_000);
 });

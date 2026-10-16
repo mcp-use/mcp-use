@@ -174,6 +174,7 @@ interface ServerLike {
     load: () => Promise<{
       render: (data: unknown) => string | Promise<string>;
       dataKeys: readonly LandingDataKey[];
+      metadata?: unknown;
     }>;
     entry: string;
     css?: readonly string[];
@@ -189,6 +190,8 @@ interface LandingRenderer {
   withLandingData: <T>(data: unknown, render: () => T) => T;
   /** Lists the component's module graph imports a hook for. */
   dataKeys: LandingDataKey[];
+  /** The page's `metadata` export, validated by the server when rendered. */
+  metadata: unknown;
 }
 
 /**
@@ -712,15 +715,20 @@ export async function runDev(options: DevOptions): Promise<void> {
         const { renderToString } = projectRequire(
           "react-dom/server"
         ) as typeof import("react-dom/server");
-        // The component, the `mcp-use/landing` instance its hooks read, and
-        // the lists its imports need are kept together, so a fallback render
-        // still feeds the hooks the data its own imports asked for.
+        // The component, the `mcp-use/landing` instance its hooks read, the
+        // lists its imports need, and its metadata are kept together, so a
+        // fallback render still feeds the hooks the data its own imports
+        // asked for and keeps the head that matches its body.
         let lastWorking: LandingRenderer | undefined;
         const loadLanding = async (): Promise<LandingRenderer> => {
           try {
             const moduleExports = (await runner.import(
               VIRTUAL_LANDING_SSR_ID
-            )) as { default?: unknown; __withLandingData?: unknown };
+            )) as {
+              default?: unknown;
+              metadata?: unknown;
+              __withLandingData?: unknown;
+            };
             if (typeof moduleExports.default !== "function") {
               throw new Error(
                 "landing.tsx must default-export a React component"
@@ -736,6 +744,7 @@ export async function runDev(options: DevOptions): Promise<void> {
               withLandingData:
                 moduleExports.__withLandingData as LandingRenderer["withLandingData"],
               dataKeys: await currentLandingDataKeys(),
+              metadata: moduleExports.metadata,
             };
           } catch (error) {
             if (lastWorking === undefined) throw error;
@@ -751,11 +760,12 @@ export async function runDev(options: DevOptions): Promise<void> {
           // drop a hook import, and stay paired with the component they
           // came from even when another request reloads the page meanwhile.
           load: async () => {
-            const { component, withLandingData, dataKeys } =
+            const { component, withLandingData, dataKeys, metadata } =
               await loadLanding();
             shippedLandingDataKeys = dataKeys;
             return {
               dataKeys,
+              metadata,
               render: (data) =>
                 withLandingData(data, () =>
                   renderToString(react.createElement(component))
