@@ -73,7 +73,7 @@ In this example, the custom file is `src/mcp/landing.tsx`. `start` uses the buil
 
 The initial render runs synchronously on the server. Keep browser-only code such as `window`, clipboard access, and event listeners in effects or event handlers. The component hydrates in the browser so tabs, copy buttons, and other React interactions work. In production, mcp-use caches rendered HTML for each resolved MCP URL and asset origin while retaining the endpoint's existing response headers. MCP protocol requests and OAuth routing still use their normal handlers.
 
-You can import CSS from `landing.tsx`. Vite bundles it with the component in development and production. For a project-root `public/logo.svg`, use `<img src={publicBaseUrl + "logo.svg"} alt="" />` in your component. When deploying behind a CDN, configure `MCP_ASSETS_URL` for the published asset prefix; both `publicBaseUrl` and the generated landing bundle use that setting.
+You can import CSS from `landing.tsx`. Vite bundles it with the component in development and production. The page also loads the same CLI-managed Tailwind stylesheet as views, so Tailwind classes work without a CSS file. That stylesheet includes Tailwind's preflight reset, which removes browser defaults such as list markers and paragraph margins; your own CSS loads after it and wins where it sets a property. For a project-root `public/logo.svg`, use `<img src={publicBaseUrl + "logo.svg"} alt="" />` in your component. When deploying behind a CDN, configure `MCP_ASSETS_URL` for the published asset prefix; both `publicBaseUrl` and the generated landing bundle use that setting.
 
 ## Copy the current page
 
@@ -743,11 +743,12 @@ body {
   padding-top: 1.5rem;
 }
 .hero-icon {
+  display: block;
   width: 64px;
   height: 64px;
   border-radius: 14px;
   object-fit: contain;
-  margin-bottom: 0.75rem;
+  margin: 0 auto 0.75rem;
 }
 .hero-row {
   display: flex;
@@ -924,6 +925,7 @@ body {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .tab-panel h3 { font-size: 1.125rem; font-weight: 600; color: #172037; margin: 0 0 1rem; }
+.tab-panel p { margin: 1rem 0; }
 .install-btn {
   display: inline-block;
   padding: 0.375rem 0.875rem;
@@ -973,7 +975,7 @@ body {
 .copy-btn:hover { background: #f1f5f9; }
 .copy-btn.copied { background: #fff; color: #172037; }
 .copy-btn svg { width: 14px; height: 14px; }
-ol.steps { margin: 0; padding-left: 1.25rem; }
+ol.steps { margin: 0; padding-left: 1.25rem; list-style: decimal; }
 ol.steps li { margin: 0.5rem 0; color: #475569; }
 a { color: #0522a5; text-decoration: none; }
 a:hover { text-decoration: underline; }

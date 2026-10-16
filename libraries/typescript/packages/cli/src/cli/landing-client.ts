@@ -2,7 +2,12 @@
 
 import type { Plugin } from "vite";
 
-import { VIEW_REACT_DEDUPE } from "./views-plugin.js";
+import {
+  TAILWIND_STYLESHEET,
+  VIEW_REACT_DEDUPE,
+  VIRTUAL_TAILWIND_ID,
+  VIRTUAL_TAILWIND_RESOLVED_ID,
+} from "./views-plugin.js";
 
 /** Stable virtual entry used by the production client build and dev server. */
 export const VIRTUAL_LANDING_ID = "virtual:mcp-use/landing";
@@ -12,9 +17,17 @@ const RESOLVED_LANDING_ID = `\0${VIRTUAL_LANDING_ID}`;
 export const DEV_LANDING_ENTRY = `/@id/__x00__${VIRTUAL_LANDING_ID}`;
 
 /**
+ * URL Vite serves the managed Tailwind stylesheet at in development. The page
+ * head links it so server-rendered markup is styled before the entry runs;
+ * the entry's own import of it keeps receiving hot updates.
+ */
+export const DEV_LANDING_TAILWIND_CSS = `/@id/__x00__${VIRTUAL_TAILWIND_ID}`;
+
+/**
  * Compile the user's landing component as a browser hydration entry. The
  * source path remains live so a file created after `mcp-use dev` starts can be
- * loaded without replacing Vite's client environment.
+ * loaded without replacing Vite's client environment. Like views, the entry
+ * always loads the CLI-managed Tailwind stylesheet, preflight included.
  */
 export function mcpUseLandingPlugin(options: {
   getLandingPath: () => string | undefined;
@@ -30,9 +43,17 @@ export function mcpUseLandingPlugin(options: {
       return environment.name === "client";
     },
     resolveId(id) {
-      return id === VIRTUAL_LANDING_ID ? RESOLVED_LANDING_ID : undefined;
+      if (id === VIRTUAL_LANDING_ID) return RESOLVED_LANDING_ID;
+      // Also served here: the views plugin, which resolves it for views, is
+      // absent from landing builds and from dev servers started without views.
+      if (id === VIRTUAL_TAILWIND_ID) return VIRTUAL_TAILWIND_RESOLVED_ID;
+      return undefined;
     },
     load(id) {
+      // The dev page head links it, so Vite asks for `?direct` CSS too.
+      if (id.split("?", 1)[0] === VIRTUAL_TAILWIND_RESOLVED_ID) {
+        return TAILWIND_STYLESHEET;
+      }
       if (id !== RESOLVED_LANDING_ID) return undefined;
       const source = options.getLandingPath();
       if (source === undefined) return undefined;
@@ -40,6 +61,8 @@ export function mcpUseLandingPlugin(options: {
         ...(options.dev === true
           ? ['import "@vitejs/plugin-react/preamble";']
           : []),
+        // Before the page, so stylesheets it imports override the utilities.
+        `import ${JSON.stringify(VIRTUAL_TAILWIND_ID)};`,
         'import { createElement } from "react";',
         'import { hydrateRoot } from "react-dom/client";',
         'import { __setLandingData } from "mcp-use/landing";',
