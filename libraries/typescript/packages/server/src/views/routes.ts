@@ -165,8 +165,7 @@ export function createViewAssetsHandler(
  * Production only — dev serves the landing entry through Vite middleware.
  *
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
- * @param options - `projectRoot` defaults to `process.cwd()`; `assets` keys
- *   are paths relative to `.mcp-use/build/landing/`.
+ * @param options - `projectRoot` defaults to `process.cwd()`.
  *
  * @internal
  */
@@ -175,7 +174,6 @@ export function createLandingAssetsHandler(
   options?: {
     projectRoot?: string;
     deferCors?: boolean;
-    assets?: EmbeddedViewAssets;
   }
 ): FetchHandler {
   return createBundleAssetsHandler(

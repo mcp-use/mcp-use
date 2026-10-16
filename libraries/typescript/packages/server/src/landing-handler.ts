@@ -2,7 +2,6 @@ import {
   generateLandingPage,
   type LandingMetadata,
   type LandingPageOptions,
-  type LandingPageRegistration,
   type LandingPagePrompt,
   type LandingPageResource,
   type LandingPageTool,
@@ -14,6 +13,59 @@ import type {
 } from "./landing-data.js";
 import type { ServerBranding } from "./branding.js";
 import { resolveAssetsBase, resolveServerOrigin } from "./views/origin.js";
+
+/** A landing page's server renderer and the lists it reads. @internal */
+export interface LandingPageRenderer {
+  /**
+   * Server-render the body component. The CLI-generated renderer exposes
+   * `data` to the landing hooks with `__withLandingData`.
+   */
+  render: (data: LandingData) => string | Promise<string>;
+  /**
+   * Lists the page reads through hooks, found from its imports at build or
+   * dev time. Only listed keys are included in the rendered and serialized
+   * data; `server` always is.
+   */
+  dataKeys: readonly LandingDataKey[];
+  /**
+   * The page module's `metadata` export, unvalidated. Fields that are not
+   * strings are ignored with a warning when the document head is rendered.
+   */
+  metadata?: unknown;
+}
+
+/** Development source of a landing renderer, loaded for each render. @internal */
+export interface LandingPageLoader {
+  /**
+   * Load the current version of the page before each render. A render uses
+   * the keys and the component of one load, so an edit that lands mid-render
+   * cannot pair a newly imported hook with data that lacks its list.
+   */
+  load: () => Promise<LandingPageRenderer>;
+}
+
+/**
+ * Built or development rendering supplied by the CLI: a fixed renderer for
+ * a built page, or a loader for a dev server.
+ *
+ * @internal
+ */
+export type LandingPageRegistration = LandingPageAssets &
+  (LandingPageRenderer | LandingPageLoader);
+
+/** Browser assets and serving options of a CLI-supplied landing page. @internal */
+export interface LandingPageAssets {
+  /** Browser hydration module: full URL, root path, or landing-relative path. */
+  entry: string;
+  /** Browser stylesheet URLs, with the same path rules as `entry`. */
+  css?: readonly string[];
+  /** Scripts loaded before `entry`, such as Vite's development client. */
+  scripts?: readonly string[];
+  /** Disable HTML caching and use Vite middleware for module assets. */
+  dev?: boolean;
+  /** Project directory containing `.mcp-use/build/landing` and `public`. */
+  projectRoot?: string;
+}
 
 const MAX_CACHED_DOCUMENTS = 32;
 
@@ -207,6 +259,10 @@ ${scripts}
  * @param tools - Frozen tool registry values.
  * @param prompts - Frozen prompt registry values.
  * @param resources - Frozen static-resource registry values.
+ * @param registration - CLI-supplied `landing.tsx` page; without one, the
+ *   built-in page is rendered.
+ * @param cache - Rendered custom documents keyed by MCP URL and asset base,
+ *   reused unless the registration is in dev mode.
  * @returns HTML response, with an empty body for HEAD.
  *
  * @internal
