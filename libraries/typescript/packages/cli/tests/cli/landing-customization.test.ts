@@ -48,7 +48,7 @@ export default function Landing() {
   const prompts = usePromptList();
   const resources = useResourceList();
   const [clicks, setClicks] = useState(0);
-  return <main data-testid="custom-landing" className="custom-landing">
+  return <main data-testid="custom-landing" className="custom-landing bg-[#0d1e2f]">
     <h1>{title ?? name}</h1>
     <p data-testid="endpoint">{url}</p>
     <p data-testid="identity">{name} {version} {description}</p>
@@ -614,7 +614,20 @@ export default function Resources() {
     const url = await startDev(cwd, "src/mcp");
     const response = await htmlRequest(url);
     expect(response.status).toBe(200);
-    expect(await response.text()).toContain('data-testid="custom-landing"');
+    const html = await response.text();
+    expect(html).toContain('data-testid="custom-landing"');
+
+    // The head links the managed Tailwind stylesheet, built from the classes
+    // of the nested landing.tsx, so the server markup is styled before the
+    // hydration entry runs.
+    const { css } = landingAssetUrls(html);
+    expect(css).toBe(
+      new URL("/@id/__x00__virtual:mcp-use/tailwind.css", url).href
+    );
+    const cssResponse = await fetch(css!, { headers: { accept: "text/css" } });
+    expect(cssResponse.status).toBe(200);
+    expect(cssResponse.headers.get("content-type")).toMatch(/text\/css/);
+    expect(await cssResponse.text()).toContain("#0d1e2f");
   }, 60_000);
 
   it("builds, starts, and serves the custom page, CSS, and public assets", async () => {
@@ -668,7 +681,10 @@ export default function Resources() {
     expect(css).toBeDefined();
     const cssResponse = await fetch(new URL(css!, started.url));
     expect(cssResponse.status).toBe(200);
-    expect(await cssResponse.text()).toMatch(/#0b1621|rgb\(11,\s*22,\s*33\)/);
+    const cssText = await cssResponse.text();
+    expect(cssText).toMatch(/#0b1621|rgb\(11,\s*22,\s*33\)/);
+    // The managed Tailwind stylesheet is bundled with the page's own CSS.
+    expect(cssText).toContain("#0d1e2f");
 
     process.env["MCP_ASSETS_URL"] = "https://cdn.example.test/landing-bucket";
     const cdnHtml = await (await htmlRequest(started.url)).text();

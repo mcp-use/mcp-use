@@ -62,11 +62,12 @@ body {
   padding-top: 1.5rem;
 }
 .hero-icon {
+  display: block;
   width: 64px;
   height: 64px;
   border-radius: 14px;
   object-fit: contain;
-  margin-bottom: 0.75rem;
+  margin: 0 auto 0.75rem;
 }
 .hero-row {
   display: flex;
@@ -243,6 +244,7 @@ body {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .tab-panel h3 { font-size: 1.125rem; font-weight: 600; color: #172037; margin: 0 0 1rem; }
+.tab-panel p { margin: 1rem 0; }
 .install-btn {
   display: inline-block;
   padding: 0.375rem 0.875rem;
@@ -292,7 +294,7 @@ body {
 .copy-btn:hover { background: #f1f5f9; }
 .copy-btn.copied { background: #fff; color: #172037; }
 .copy-btn svg { width: 14px; height: 14px; }
-ol.steps { margin: 0; padding-left: 1.25rem; }
+ol.steps { margin: 0; padding-left: 1.25rem; list-style: decimal; }
 ol.steps li { margin: 0.5rem 0; color: #475569; }
 a { color: #0522a5; text-decoration: none; }
 a:hover { text-decoration: underline; }

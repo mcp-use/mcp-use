@@ -63,6 +63,7 @@ import { resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import {
   DEV_LANDING_ENTRY,
+  DEV_LANDING_TAILWIND_CSS,
   mcpUseLandingPlugin,
   mcpUseLandingSsrPlugin,
   RESOLVED_LANDING_SSR_ID,
@@ -773,6 +774,7 @@ export async function runDev(options: DevOptions): Promise<void> {
             };
           },
           entry: DEV_LANDING_ENTRY,
+          css: [DEV_LANDING_TAILWIND_CSS],
           scripts: ["/@vite/client"],
           dev: true,
           projectRoot: options.cwd,

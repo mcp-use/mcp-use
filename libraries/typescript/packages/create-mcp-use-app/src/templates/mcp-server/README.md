@@ -15,6 +15,8 @@ Open [http://localhost:3000/mcp/inspector](http://localhost:3000/mcp/inspector) 
 
 You can start building by editing the entry file. Add tools and prompts — the server auto-reloads as you edit.
 
+Open [http://localhost:3000/mcp](http://localhost:3000/mcp) in a browser to see the landing page. Edit `landing.tsx` to change it (Tailwind classes work with no extra setup), or delete it to use the built-in page.
+
 Run `npm run typecheck` to refresh MCP view types and check the project with its local TypeScript compiler.
 
 ## Learn More
