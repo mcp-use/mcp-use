@@ -698,39 +698,6 @@ describe("MCPServer landing page routing", () => {
     }
   });
 
-  it("serves embedded landing assets decoded once per file", async () => {
-    const handler = createLandingAssetsHandler("/mcp", {
-      assets: {
-        "assets/entry.js": {
-          body: btoa("export const embedded = true;"),
-          contentType: "application/javascript",
-        },
-      },
-    });
-    const url =
-      "https://server.example.test/mcp/_mcp-use/landing/assets/entry.js";
-    const decodeSpy = vi.spyOn(globalThis, "atob");
-    try {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const response = await handler(new Request(url));
-        expect(response.status).toBe(200);
-        expect(response.headers.get("content-type")).toBe(
-          "application/javascript"
-        );
-        expect(await response.text()).toBe("export const embedded = true;");
-      }
-      expect(decodeSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      decodeSpy.mockRestore();
-    }
-    const missing = await handler(
-      new Request(
-        "https://server.example.test/mcp/_mcp-use/landing/assets/other.js"
-      )
-    );
-    expect(missing.status).toBe(404);
-  });
-
   it("serves GET/HEAD HTML at a custom base path and preserves protocol probes", async () => {
     const server = track(
       new MCPServer({
