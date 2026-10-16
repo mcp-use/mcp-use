@@ -52,6 +52,11 @@ export const examples = [
     portableOutput: ".output",
   }),
   local("public-landing", { tools: ["greet"], landing: true }),
+  local("landing-page", {
+    tools: ["get-forecast", "get-alerts", "convert-units"],
+    prompts: ["plan-trip"],
+    landing: true,
+  }),
   local("events", {
     tools: ["ping", "recent-events"],
     resources: ["events://observations"],
