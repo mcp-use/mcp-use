@@ -27,7 +27,11 @@ import {
 } from "vitest";
 import { z } from "zod";
 
-import { MCPServer, registerViews } from "../src/index.js";
+import {
+  isInputRequiredResult,
+  MCPServer,
+  registerViews,
+} from "../src/index.js";
 import type { MetaObject } from "../src/index.js";
 import { synthesizeViewDocument } from "../src/views/document.js";
 import { createViewAssetsHandler } from "../src/views/routes.js";
@@ -1070,6 +1074,88 @@ describe("views server core (e2e over HTTP)", () => {
         mkdirSync(assetsDir, { recursive: true });
       }
     }
+  });
+});
+
+describe("view resource reads through resources/read middleware", () => {
+  const server = new MCPServer({
+    name: "views-middleware-test",
+    version: "1.0.0",
+  });
+  const seenUris: string[] = [];
+  const seenTexts: string[] = [];
+  let client: Client;
+
+  primeViews(server);
+  server.tool(
+    {
+      name: "search-fruits",
+      inputSchema: z.object({}),
+      outputSchema: resultsSchema,
+      view: { name: "product-search-result", description: "Results" },
+    },
+    async () => ({
+      structuredContent: { query: "", items: [] },
+      content: [{ type: "text", text: "Found 0 fruits" }],
+    })
+  );
+  server.use("mcp:resources/read", async (ctx, next) => {
+    seenUris.push(ctx.params.uri);
+    if (ctx.params.uri === "ui://views/orphan-view.html") {
+      throw new Error("Blocked by middleware");
+    }
+    const result = await next();
+    if (isInputRequiredResult(result)) {
+      return result;
+    }
+    return {
+      ...result,
+      contents: result.contents.map((content) => {
+        if ("text" in content) {
+          seenTexts.push(content.text);
+        }
+        return {
+          ...content,
+          _meta: { ...content._meta, "example.com/injected": true },
+        };
+      }),
+    };
+  });
+
+  beforeAll(async () => {
+    const { url } = await server.listen(0);
+    client = new Client(
+      { name: "plain-client", version: "1.0.0" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } }
+    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(url)));
+  });
+
+  afterAll(async () => {
+    await client.close();
+    await server.close();
+  });
+
+  it("runs middleware on view reads and returns its modified result", async () => {
+    const read = await client.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(seenUris).toContain("ui://views/product-search-result.html");
+    expect(seenTexts.some((text) => text.includes("<!doctype html>"))).toBe(
+      true
+    );
+    expect(read.contents).toHaveLength(1);
+    expect(read.contents[0]?._meta?.["example.com/injected"]).toBe(true);
+    expect(read.contents[0]?._meta?.["openai/widgetDescription"]).toBe(
+      "Results"
+    );
+  });
+
+  it("lets middleware reject a view read", async () => {
+    await expect(
+      client.readResource({ uri: "ui://views/orphan-view.html" })
+    ).rejects.toThrow("Blocked by middleware");
+    expect(seenUris).toContain("ui://views/orphan-view.html");
   });
 });
 
