@@ -14,8 +14,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { spawnAndWait } from "../../src/commands/load-client.js";
 
 // Like the real npm and pnpm shims, the fake hands its arguments to Node, so
-// the test sees exactly the argv a package manager would receive after
-// `cmd.exe` (Windows) or `sh` (elsewhere) has parsed the command line.
+// the test sees exactly the argv a package manager would receive. On Windows
+// that argv comes from `cmd.exe` parsing the command line; elsewhere
+// spawnAndWait runs without a shell and the argv is forwarded unchanged.
 const RECORDER = [
   'const { writeFileSync } = require("node:fs");',
   'writeFileSync("args.json", JSON.stringify(process.argv.slice(2)));',
