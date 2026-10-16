@@ -152,10 +152,9 @@ describe("generateLandingPage", () => {
     expect(html).toContain(
       `<a id="inspector-link" href="https://inspector.manufact.com/inspector?autoConnect=https%3A%2F%2Fexample.com%2Fmcp&amp;tab=chat"`
     );
-    // The panel markup predates getInstallTargets and must not change.
     expect(html).toContain(`<ol class="steps">
-          <li><strong>Enable Developer Mode:</strong> Settings → Connectors → Advanced → Developer mode</li>
-          <li><strong>Import this MCP server:</strong> Go to Connectors tab and add: https://example.com/mcp</li>
+          <li><strong>Open Plugins:</strong> In ChatGPT, go to Plugins and click Add</li>
+          <li><strong>Add this MCP server:</strong> Choose Add Custom MCP Server and enter https://example.com/mcp</li>
           <li><strong>Use in conversations:</strong> Choose the MCP server from the Plus menu</li>
         </ol>`);
   });
