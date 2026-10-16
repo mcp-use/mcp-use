@@ -98,7 +98,7 @@ export interface InstallTargets {
   /** VS Code Insiders deep link. */
   vscodeInsiders: VSCodeInsidersInstallTarget;
 
-  /** ChatGPT connector steps. */
+  /** ChatGPT setup steps. */
   chatgpt: ChatGPTInstallTarget;
 
   /** Hosted Manufact Inspector link. */
@@ -189,11 +189,11 @@ function getManufactInspectorUrl(serverUrl: string): string {
   return `${MANUFACT_INSPECTOR_ORIGIN}/inspector?${params.toString()}`;
 }
 
-/** Steps to add the server as a ChatGPT connector in developer mode. */
+/** Steps to add the server as a custom MCP server in ChatGPT Plugins. */
 function getChatGPTSteps(url: string): readonly string[] {
   return [
-    "Enable Developer Mode: Settings → Connectors → Advanced → Developer mode",
-    `Import this MCP server: Go to Connectors tab and add: ${url}`,
+    "Open Plugins: In ChatGPT, go to Plugins and click Add",
+    `Add this MCP server: Choose Add Custom MCP Server and enter ${url}`,
     "Use in conversations: Choose the MCP server from the Plus menu",
   ];
 }

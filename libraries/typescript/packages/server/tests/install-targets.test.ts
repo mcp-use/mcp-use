@@ -41,8 +41,8 @@ describe("getInstallTargets", () => {
       chatgpt: {
         label: "ChatGPT",
         steps: [
-          "Enable Developer Mode: Settings → Connectors → Advanced → Developer mode",
-          "Import this MCP server: Go to Connectors tab and add: https://example.com/mcp",
+          "Open Plugins: In ChatGPT, go to Plugins and click Add",
+          "Add this MCP server: Choose Add Custom MCP Server and enter https://example.com/mcp",
           "Use in conversations: Choose the MCP server from the Plus menu",
         ],
       },
@@ -125,7 +125,7 @@ describe("getInstallTargets", () => {
     const url = "https://example.com/mcp?token=a&b=c";
     const { chatgpt, inspector } = getInstallTargets({ url, name: "weather" });
     expect(chatgpt.steps[1]).toBe(
-      `Import this MCP server: Go to Connectors tab and add: ${url}`
+      `Add this MCP server: Choose Add Custom MCP Server and enter ${url}`
     );
     const params = new URL(inspector.url).searchParams;
     expect(params.get("autoConnect")).toBe(url);
