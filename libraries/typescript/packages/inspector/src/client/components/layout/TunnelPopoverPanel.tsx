@@ -45,31 +45,21 @@ export function TunnelPopoverPanel({
           <li className="flex gap-2">
             <span className="font-semibold text-foreground">1.</span>
             <span>
-              Enable{" "}
+              Open{" "}
               <a
-                href="https://chatgpt.com/plugins#settings/Security"
+                href="https://chatgpt.com/plugins"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-foreground underline underline-offset-2 hover:text-purple-600 dark:hover:text-purple-400"
               >
-                dev mode
+                Plugins
               </a>{" "}
-              from settings
+              in ChatGPT and click Add
             </span>
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-foreground">2.</span>
-            <span>
-              <a
-                href="https://chatgpt.com/plugins#settings/Connectors?create-connector=true&redirectAfter=%2Fplugins"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-foreground underline underline-offset-2 hover:text-purple-600 dark:hover:text-purple-400"
-              >
-                Add a connector
-              </a>{" "}
-              in App & Connectors
-            </span>
+            <span>Choose Add Custom MCP Server</span>
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-foreground">3.</span>
