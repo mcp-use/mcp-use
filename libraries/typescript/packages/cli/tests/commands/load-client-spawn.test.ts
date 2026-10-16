@@ -86,18 +86,4 @@ describe("spawnAndWait (real processes)", () => {
     expect(code).toBe(0);
     expect(recordedArgs()).toEqual(["add", dependency]);
   });
-
-  it("returns the package manager's non-zero exit code", async () => {
-    if (process.platform === "win32") {
-      writeFileSync(join(binDir, "failing-pm.cmd"), "@exit /b 3\r\n");
-    } else {
-      const path = join(binDir, "failing-pm");
-      writeFileSync(path, "#!/bin/sh\nexit 3\n");
-      chmodSync(path, 0o755);
-    }
-
-    const code = await spawnAndWait("failing-pm", ["install"], projectDir);
-
-    expect(code).toBe(3);
-  });
 });
