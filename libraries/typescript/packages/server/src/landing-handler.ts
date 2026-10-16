@@ -1,5 +1,6 @@
 import {
   generateLandingPage,
+  type LandingMetadata,
   type LandingPageOptions,
   type LandingPageRegistration,
   type LandingPagePrompt,
@@ -44,10 +45,78 @@ function assetUrl(
   return `${assetsBase}${prefix}/_mcp-use/landing/${value}`;
 }
 
+const METADATA_FIELDS = ["title", "description", "icon", "image"] as const;
+
+/** Warnings already printed, so cached and reloaded renders do not repeat them. */
+const reportedMetadataWarnings = new Set<string>();
+
+function warnMetadata(message: string): void {
+  if (reportedMetadataWarnings.has(message)) return;
+  reportedMetadataWarnings.add(message);
+  console.warn(`[mcp-use] landing.tsx metadata: ${message}`);
+}
+
+function describeType(value: unknown): string {
+  if (value === null) return "null";
+  return Array.isArray(value) ? "an array" : typeof value;
+}
+
+/**
+ * Keep the string fields of a page's `metadata` export. The export comes
+ * from user code at runtime, so anything else is ignored with a warning
+ * instead of failing the render. Empty strings count as absent.
+ */
+function readLandingMetadata(value: unknown): LandingMetadata {
+  if (value === undefined) return {};
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    warnMetadata(
+      `expected an object, got ${describeType(value)}; ignoring it.`
+    );
+    return {};
+  }
+  const metadata: LandingMetadata = {};
+  for (const field of METADATA_FIELDS) {
+    const fieldValue = (value as Record<string, unknown>)[field];
+    if (fieldValue === undefined) continue;
+    if (typeof fieldValue !== "string") {
+      warnMetadata(
+        `${field} must be a string, got ${describeType(fieldValue)}; ignoring it.`
+      );
+      continue;
+    }
+    if (fieldValue !== "") metadata[field] = fieldValue;
+  }
+  return metadata;
+}
+
+/**
+ * Resolve a metadata icon or image. A value with a URL scheme is kept as is
+ * and a protocol-relative `//host/...` URL takes the page's scheme; anything
+ * else is a path under `public/`, with or without a leading slash. A value
+ * that does not parse is ignored with a warning, so the default applies.
+ */
+function publicFileUrl(
+  field: "icon" | "image",
+  value: string,
+  publicBaseUrl: string
+): string | undefined {
+  if (/^[a-z][a-z\d+.-]*:/i.test(value)) return value;
+  try {
+    // URL parsing reads a backslash as a slash, so `\\host` is
+    // protocol-relative too.
+    if (/^[\\/]{2}/.test(value)) return new URL(value, publicBaseUrl).href;
+    return new URL(value.replace(/^[\\/]/, ""), publicBaseUrl).href;
+  } catch {
+    warnMetadata(`${field} is not a valid URL or public path; ignoring it.`);
+    return undefined;
+  }
+}
+
 function renderDocument(
   data: LandingData,
   markup: string,
   registration: LandingPageRegistration,
+  metadata: LandingMetadata,
   serverOrigin: string,
   assetsBase: string,
   basePath: string
@@ -55,9 +124,12 @@ function renderDocument(
   const { server } = data;
   const name = server.title ?? server.name;
   const description =
-    server.description ||
-    `${name} MCP Server — Connect with Claude Code, Cursor, and VS Code. Model Context Protocol server.`;
-  const title = `${name} MCP Server — Connect with Claude Code, Cursor & VS Code`;
+    metadata.description ??
+    (server.description ||
+      `${name} MCP Server — Connect with Claude Code, Cursor, and VS Code. Model Context Protocol server.`);
+  const title =
+    metadata.title ??
+    `${name} MCP Server — Connect with Claude Code, Cursor & VS Code`;
   const scripts = [...(registration.scripts ?? []), registration.entry]
     .map(
       (value) =>
@@ -70,9 +142,27 @@ function renderDocument(
         `<link rel="stylesheet" href="${escapeHtml(assetUrl(value, serverOrigin, assetsBase, basePath))}">`
     )
     .join("\n");
-  const icon = server.iconUrl
-    ? `<link rel="icon"${server.iconType ? ` type="${escapeHtml(server.iconType)}"` : ""} href="${escapeHtml(server.iconUrl)}">`
-    : "";
+  const iconUrl =
+    metadata.icon === undefined
+      ? undefined
+      : publicFileUrl("icon", metadata.icon, server.publicBaseUrl);
+  const icon =
+    iconUrl !== undefined
+      ? `<link rel="icon" href="${escapeHtml(iconUrl)}">`
+      : server.iconUrl
+        ? `<link rel="icon"${server.iconType ? ` type="${escapeHtml(server.iconType)}"` : ""} href="${escapeHtml(server.iconUrl)}">`
+        : "";
+  const imageUrl =
+    metadata.image === undefined
+      ? undefined
+      : publicFileUrl("image", metadata.image, server.publicBaseUrl);
+  const image = imageUrl === undefined ? undefined : escapeHtml(imageUrl);
+  const imageTags =
+    image === undefined
+      ? ""
+      : `<meta property="og:image" content="${image}">
+<meta name="twitter:image" content="${image}">
+`;
   const jsonLd = serializeScriptJson({
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -92,10 +182,10 @@ function renderDocument(
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:type" content="website">
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="${image === undefined ? "summary" : "summary_large_image"}">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
-${icon}
+${imageTags}${icon}
 <script type="application/ld+json">${jsonLd}</script>
 ${stylesheets}
 </head>
@@ -210,7 +300,7 @@ export async function createLandingPageResponse(
               registration.dev === true ? undefined : cache?.get(key);
             if (cached !== undefined) return cached;
             const rendering = (async () => {
-              const { render, dataKeys } =
+              const { render, dataKeys, metadata } =
                 "load" in registration
                   ? await registration.load()
                   : registration;
@@ -219,6 +309,7 @@ export async function createLandingPageResponse(
                 data,
                 await render(data),
                 registration,
+                readLandingMetadata(metadata),
                 origin,
                 assetsBase,
                 basePath

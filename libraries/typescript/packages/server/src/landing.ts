@@ -267,6 +267,46 @@ export interface LandingPageResource {
   description?: string;
 }
 
+/**
+ * Document head fields a `landing.tsx` sets with `export const metadata`.
+ *
+ * Every field is optional. A missing field keeps the default the server
+ * derives from its name, title, description, and favicon branding.
+ *
+ * @example
+ * ```tsx
+ * import type { LandingMetadata } from "mcp-use/landing";
+ *
+ * export const metadata: LandingMetadata = {
+ *   title: "Acme for Claude and Cursor",
+ *   description: "Connect Acme to your AI client in one step.",
+ *   icon: "acme.svg",
+ *   image: "og.png",
+ * };
+ * ```
+ */
+export interface LandingMetadata {
+  /** Page `<title>`, also used for the Open Graph and Twitter titles. */
+  title?: string;
+
+  /** Meta description, also used for the Open Graph and Twitter descriptions. */
+  description?: string;
+
+  /**
+   * Browser tab icon: an absolute URL, or a path relative to the project's
+   * `public/` directory, such as `"icon.svg"`. Replaces the favicon from
+   * server branding on this page.
+   */
+  icon?: string;
+
+  /**
+   * Link-preview image for Open Graph and Twitter cards: an absolute URL, or
+   * a path relative to the project's `public/` directory. Setting it switches
+   * the Twitter card to `summary_large_image`.
+   */
+  image?: string;
+}
+
 /** Inputs used to render the v1-compatible MCP server landing page. */
 export interface LandingPageOptions {
   /** Protocol-facing server name. */
@@ -312,6 +352,11 @@ export interface LandingPageRenderer {
    * data; `server` always is.
    */
   dataKeys: readonly LandingDataKey[];
+  /**
+   * The page module's `metadata` export, unvalidated. Fields that are not
+   * strings are ignored with a warning when the document head is rendered.
+   */
+  metadata?: unknown;
 }
 
 /** Development source of a landing renderer, loaded for each render. @internal */

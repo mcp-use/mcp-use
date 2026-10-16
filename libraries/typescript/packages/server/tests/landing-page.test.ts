@@ -383,6 +383,238 @@ describe("MCPServer landing page routing", () => {
     );
   });
 
+  describe("metadata", () => {
+    /** Render a custom page whose module exported `metadata`. */
+    async function renderHead(
+      metadata: unknown,
+      config: { title?: string; description?: string } = {}
+    ): Promise<string> {
+      const server = track(
+        new MCPServer({ name: "meta-landing", version: "1.0.0", ...config })
+      );
+      server.__primeLandingPage({
+        render: () => "<main>Meta</main>",
+        dataKeys: [],
+        metadata,
+        entry: "assets/entry.js",
+      });
+      const html = await (
+        await server.fetch(htmlRequest("https://server.example.test/mcp"))
+      ).text();
+      return html.slice(0, html.indexOf("</head>"));
+    }
+
+    const defaultTitle =
+      "Meta MCP Server — Connect with Claude Code, Cursor &amp; VS Code";
+    const defaultDescription = "A server with a description.";
+
+    it("keeps the default head when the page exports no metadata", async () => {
+      for (const metadata of [undefined, {}, { title: "", image: "" }]) {
+        const head = await renderHead(metadata, {
+          title: "Meta",
+          description: defaultDescription,
+        });
+        expect(head).toContain(`<title>${defaultTitle}</title>`);
+        expect(head).toContain(
+          `<meta name="description" content="${defaultDescription}">`
+        );
+        expect(head).toContain(
+          `<meta property="og:title" content="${defaultTitle}">`
+        );
+        expect(head).toContain(
+          `<meta name="twitter:description" content="${defaultDescription}">`
+        );
+        expect(head).toContain('<meta name="twitter:card" content="summary">');
+        expect(head).not.toContain("og:image");
+        expect(head).not.toContain("twitter:image");
+        expect(head).not.toContain('rel="icon"');
+      }
+    });
+
+    it("uses the title for the title and Open Graph and Twitter titles", async () => {
+      const head = await renderHead(
+        { title: "Acme for Claude" },
+        { description: defaultDescription }
+      );
+      expect(head).toContain("<title>Acme for Claude</title>");
+      expect(head).toContain(
+        '<meta property="og:title" content="Acme for Claude">'
+      );
+      expect(head).toContain(
+        '<meta name="twitter:title" content="Acme for Claude">'
+      );
+      expect(head).toContain(
+        `<meta name="description" content="${defaultDescription}">`
+      );
+    });
+
+    it("uses the description for the meta, Open Graph, Twitter, and JSON-LD descriptions", async () => {
+      const head = await renderHead({ description: "Connect Acme." });
+      expect(head).toContain(
+        '<meta name="description" content="Connect Acme.">'
+      );
+      expect(head).toContain(
+        '<meta property="og:description" content="Connect Acme.">'
+      );
+      expect(head).toContain(
+        '<meta name="twitter:description" content="Connect Acme.">'
+      );
+      expect(head).toContain('"description":"Connect Acme."');
+      expect(head).toContain(
+        "<title>meta-landing MCP Server — Connect with Claude Code, Cursor &amp; VS Code</title>"
+      );
+    });
+
+    it("resolves the icon under public/ unless it is an absolute URL", async () => {
+      const publicBase = "https://server.example.test/mcp/_mcp-use/public";
+      for (const [icon, href] of [
+        ["brand/icon.svg", `${publicBase}/brand/icon.svg`],
+        ["/icon.png", `${publicBase}/icon.png`],
+        ["//cdn.example.test/icon.png", "https://cdn.example.test/icon.png"],
+        [
+          "https://cdn.example.test/icon.png",
+          "https://cdn.example.test/icon.png",
+        ],
+        ["data:image/svg+xml,%3Csvg%3E", "data:image/svg+xml,%3Csvg%3E"],
+      ]) {
+        const head = await renderHead({ icon });
+        expect(head).toContain(`<link rel="icon" href="${href}">`);
+      }
+    });
+
+    it("replaces the branding favicon with the metadata icon", async () => {
+      const server = track(
+        new MCPServer({
+          name: "branded-meta-landing",
+          version: "1.0.0",
+          favicon: "data:image/png;base64,iVBORw0KGgo=",
+        })
+      );
+      server.__primeLandingPage({
+        render: () => "<main>Meta</main>",
+        dataKeys: [],
+        metadata: { icon: "icon.svg" },
+        entry: "assets/entry.js",
+      });
+      const html = await (
+        await server.fetch(htmlRequest("https://server.example.test/mcp"))
+      ).text();
+      expect(html.match(/rel="icon"/g)).toHaveLength(1);
+      expect(html).toContain(
+        '<link rel="icon" href="https://server.example.test/mcp/_mcp-use/public/icon.svg">'
+      );
+    });
+
+    it("adds Open Graph and Twitter images and a large Twitter card for the image", async () => {
+      const head = await renderHead({ image: "og.png" });
+      const image = "https://server.example.test/mcp/_mcp-use/public/og.png";
+      expect(head).toContain(`<meta property="og:image" content="${image}">`);
+      expect(head).toContain(`<meta name="twitter:image" content="${image}">`);
+      expect(head).toContain(
+        '<meta name="twitter:card" content="summary_large_image">'
+      );
+    });
+
+    it("HTML-escapes every metadata value", async () => {
+      const attack = `"><script>alert('x')</script>&`;
+      const escaped =
+        "&quot;&gt;&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;&amp;";
+      const head = await renderHead({
+        title: attack,
+        description: attack,
+        icon: `https://cdn.example.test/${attack}`,
+        image: `https://cdn.example.test/${attack}`,
+      });
+      expect(head).not.toContain("<script>alert");
+      expect(head).toContain(`<title>${escaped}</title>`);
+      expect(head).toContain(`<meta name="description" content="${escaped}">`);
+      expect(head).toContain(
+        `<link rel="icon" href="https://cdn.example.test/${escaped}">`
+      );
+      expect(head).toContain(
+        `<meta property="og:image" content="https://cdn.example.test/${escaped}">`
+      );
+      // The JSON-LD script cannot be closed by the description.
+      expect(head).toContain('"description":"\\"\\u003e\\u003cscript\\u003e');
+    });
+
+    it("ignores metadata that is not an object, and fields that are not strings, with a warning", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const nonObject = await renderHead("Acme");
+        expect(nonObject).toContain(
+          "<title>meta-landing MCP Server — Connect with Claude Code, Cursor &amp; VS Code</title>"
+        );
+        const partial = await renderHead({
+          title: 42,
+          description: "Still used.",
+          icon: { href: "icon.svg" },
+          image: null,
+        });
+        expect(partial).toContain(
+          "<title>meta-landing MCP Server — Connect with Claude Code, Cursor &amp; VS Code</title>"
+        );
+        expect(partial).toContain(
+          '<meta name="description" content="Still used.">'
+        );
+        expect(partial).not.toContain('rel="icon"');
+        expect(partial).not.toContain("og:image");
+        expect(warn.mock.calls.map(([message]) => message)).toEqual([
+          "[mcp-use] landing.tsx metadata: expected an object, got string; ignoring it.",
+          "[mcp-use] landing.tsx metadata: title must be a string, got number; ignoring it.",
+          "[mcp-use] landing.tsx metadata: icon must be a string, got object; ignoring it.",
+          "[mcp-use] landing.tsx metadata: image must be a string, got null; ignoring it.",
+        ]);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("ignores an icon or image that is not a valid URL or public path, with a warning", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const head = await renderHead({
+          title: "Kept",
+          icon: "\\\\",
+          image: "/\\\\",
+        });
+        expect(head).toContain("<title>Kept</title>");
+        expect(head).not.toContain('rel="icon"');
+        expect(head).not.toContain("og:image");
+        expect(head).toContain('<meta name="twitter:card" content="summary">');
+        expect(warn.mock.calls.map(([message]) => message)).toEqual([
+          "[mcp-use] landing.tsx metadata: icon is not a valid URL or public path; ignoring it.",
+          "[mcp-use] landing.tsx metadata: image is not a valid URL or public path; ignoring it.",
+        ]);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("reads the metadata of each development load", async () => {
+      const server = track(
+        new MCPServer({ name: "live-meta-landing", version: "1.0.0" })
+      );
+      const titles = ["First", "Second"];
+      server.__primeLandingPage({
+        load: async () => ({
+          dataKeys: [],
+          metadata: { title: titles.shift() },
+          render: () => "<main>Live</main>",
+        }),
+        entry: "assets/entry.js",
+        dev: true,
+      });
+      const request = htmlRequest("https://server.example.test/mcp");
+      expect(await (await server.fetch(request)).text()).toContain(
+        "<title>First</title>"
+      );
+      expect(await (await server.fetch(request)).text()).toContain(
+        "<title>Second</title>"
+      );
+    });
+  });
+
   it("rejects a registration without data keys", () => {
     const server = track(
       new MCPServer({ name: "keyless-landing", version: "1.0.0" })
