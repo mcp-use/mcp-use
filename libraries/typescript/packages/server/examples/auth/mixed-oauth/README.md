@@ -105,7 +105,8 @@ Both hosts need a public HTTPS URL. Use the CLI tunnel:
    ```
 
 3. Add `https://abc123.local.mcp-use.run/mcp` as a custom connector in Claude,
-   and in ChatGPT with developer mode on. Connect without signing in.
+   and in ChatGPT under Plugins → Add → Add Custom MCP Server. Connect without
+   signing in.
 
 Then work through the list. The server log shows every request and its status.
 
