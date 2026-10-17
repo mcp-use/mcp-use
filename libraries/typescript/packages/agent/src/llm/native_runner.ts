@@ -39,13 +39,18 @@ export async function* streamNativeAgentSteps(
   driver: LlmDriver,
   options: NativeRunOptions
 ): AsyncGenerator<AgentStep, string, void> {
-  let finalText = "";
+  // Like runNativeAgent, return only the text of a turn that ends without
+  // tool calls. A turn that requests tools is intermediate, even when the run
+  // is aborted before those tools run.
+  let turnText = "";
+  let turnRequestedTools = false;
   const pendingSteps = new Map<string, AgentStep>();
 
   for await (const ev of streamNativeAgent(driver, options)) {
     if (ev.type === "text-delta") {
-      finalText += ev.delta;
+      turnText += ev.delta;
     } else if (ev.type === "tool-call-ready") {
+      turnRequestedTools = true;
       const pendingStep = {
         action: {
           tool: ev.toolName,
@@ -59,6 +64,9 @@ export async function* streamNativeAgentSteps(
     } else if (ev.type === "tool-result") {
       const pendingStep = pendingSteps.get(ev.toolCallId);
       if (!pendingStep) continue;
+      // Text after a tool result belongs to the model's next turn.
+      turnText = "";
+      turnRequestedTools = false;
       const observation =
         typeof ev.result === "string"
           ? ev.result
@@ -73,7 +81,7 @@ export async function* streamNativeAgentSteps(
     }
   }
 
-  return finalText;
+  return turnRequestedTools ? "" : turnText;
 }
 
 export async function runNativeAgent(
