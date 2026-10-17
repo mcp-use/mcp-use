@@ -576,3 +576,169 @@ it.each([
     ]);
   }
 );
+
+describe("Chat Completions streams without a tool finish reason", () => {
+  it.each(
+    [false, true].flatMap((doneMarker) =>
+      ['{"target":', '{"target":"requested"}', "", undefined, null, false].map(
+        (args) => ({ doneMarker, args })
+      )
+    )
+  )(
+    "rejects unfinished tool calls (DONE=$doneMarker, args=$args)",
+    async ({ doneMarker, args }) => {
+      const event = {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call_1",
+                  function: { name: "record_operation", arguments: args },
+                },
+              ],
+            },
+            finish_reason: null,
+          },
+        ],
+      };
+      vi.stubGlobal(
+        "fetch",
+        async () =>
+          new Response(
+            `data: ${JSON.stringify(event)}\n\n` +
+              (doneMarker ? "data: [DONE]\n\n" : ""),
+            { headers: { "Content-Type": "text/event-stream" } }
+          )
+      );
+      const executed: unknown[] = [];
+      const output = await collect(
+        runToolLoop({
+          driver: createLlmDriver({
+            provider: "openai-compatible",
+            model: "test-model",
+            apiKey: "test-key",
+            baseUrl: "https://model.example/v1",
+          }),
+          messages: [...messages],
+          tools: [],
+          maxSteps: 1,
+          callTool: async (_name, args) => {
+            executed.push(args);
+            return "completed";
+          },
+        })
+      );
+      expect(output.at(-1)).toMatchObject({ type: "error" });
+      expect(
+        output.some(
+          (event) =>
+            event.type === "done" ||
+            event.type === "tool-call-ready" ||
+            event.type === "tool-result"
+        )
+      ).toBe(false);
+      expect(executed).toEqual([]);
+    }
+  );
+
+  it.each([false, true])(
+    "preserves text-only streams (finish reason=%s)",
+    async (finished) => {
+      vi.stubGlobal("fetch", async () =>
+        sseResponse([
+          {
+            choices: [
+              {
+                delta: { content: "A plain answer" },
+                finish_reason: finished ? "stop" : null,
+              },
+            ],
+          },
+        ])
+      );
+      const executed: unknown[] = [];
+      const output = await collect(
+        runToolLoop({
+          driver: createLlmDriver({
+            provider: "openai-compatible",
+            model: "test-model",
+            apiKey: "test-key",
+            baseUrl: "https://model.example/v1",
+          }),
+          messages: [...messages],
+          tools: [],
+          maxSteps: 1,
+          callTool: async (_name, args) => {
+            executed.push(args);
+            return "completed";
+          },
+        })
+      );
+      expect(output).toEqual([
+        { type: "text-delta", delta: "A plain answer" },
+        { type: "done" },
+      ]);
+      expect(executed).toEqual([]);
+    }
+  );
+});
+
+it("does not report an unfinished-call error for caller cancellation", async () => {
+  vi.stubGlobal("fetch", async () =>
+    sseResponse([
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call_1",
+                  function: {
+                    name: "record_operation",
+                    arguments: '{"target":',
+                  },
+                },
+              ],
+            },
+            finish_reason: null,
+          },
+        ],
+      },
+    ])
+  );
+  const controller = new AbortController();
+  const executed: unknown[] = [];
+  const stream = runToolLoop({
+    driver: createLlmDriver({
+      provider: "openai-compatible",
+      model: "test-model",
+      apiKey: "test-key",
+      baseUrl: "https://model.example/v1",
+    }),
+    messages: [...messages],
+    tools: [],
+    maxSteps: 1,
+    signal: controller.signal,
+    callTool: async (_name, args) => {
+      executed.push(args);
+      return "completed";
+    },
+  });
+  expect((await stream.next()).value).toMatchObject({
+    type: "tool-call-start",
+  });
+  controller.abort();
+  const remaining = await collect(stream);
+  expect(
+    remaining.some(
+      (event) =>
+        event.type === "error" ||
+        event.type === "tool-call-ready" ||
+        event.type === "tool-result"
+    )
+  ).toBe(false);
+  expect(executed).toEqual([]);
+});

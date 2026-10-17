@@ -249,6 +249,14 @@ export async function* streamChat(
       buffers.clear();
     }
   }
+  if (buffers.size > 0 && !signal?.aborted) {
+    // EOF (or [DONE]) cannot confirm an unfinished tool call, even with valid JSON.
+    yield {
+      type: "error",
+      message: "Chat Completions stream ended before tool calls finished.",
+    };
+    return;
+  }
   yield { type: "done" };
 }
 
