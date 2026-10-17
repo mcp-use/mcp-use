@@ -8,9 +8,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import type { JSONRPCMessage } from "@modelcontextprotocol/server";
 import { MCPServer } from "../src/index.js";
 import {
   oauthCustomProvider,
+  type OAuthAdmissionHook,
   type OAuthMetadata,
   type OAuthProviderHost,
 } from "../src/oauth/index.js";
@@ -23,7 +25,10 @@ interface TestUser {
 }
 
 /** Any bearer verifies with the `shop` scope as user `user-1`. */
-function provider(setup: (host: OAuthProviderHost<TestUser>) => void) {
+function provider(
+  setup: (host: OAuthProviderHost<TestUser>) => void,
+  admit?: OAuthAdmissionHook
+) {
   return oauthCustomProvider<TestUser>({
     resource,
     requiredScopes: ["shop"],
@@ -42,18 +47,20 @@ function provider(setup: (host: OAuthProviderHost<TestUser>) => void) {
       payload: {},
       permissions: [],
     }),
+    ...(admit !== undefined && { admit }),
     setup,
   });
 }
 
 function server(
   setup: (host: OAuthProviderHost<TestUser>) => void,
-  options: { instructions?: string; mixedAuth?: boolean } = {}
+  options: { instructions?: string; mixedAuth?: boolean } = {},
+  admit?: OAuthAdmissionHook
 ) {
   return new MCPServer({
     name: "shop",
     version: "1.0.0",
-    oauth: provider(setup),
+    oauth: provider(setup, admit),
     logging: { enabled: false },
     ...(options.mixedAuth !== undefined && { mixedAuth: options.mixedAuth }),
     ...(options.instructions !== undefined && {
@@ -165,6 +172,50 @@ describe("OAuth provider setup hook", () => {
     await app.fetch(post("tools/list", {}, signedIn));
     await app.fetch(post("tools/list", {}, signedIn));
     expect(setup).toHaveBeenCalledOnce();
+  });
+
+  it("uses the custom admission hook through server.fetch", async () => {
+    const admit = vi.fn(async (_request: Request, messages: JSONRPCMessage[]) => {
+      expect(messages).toMatchObject([{ method: "tools/list" }]);
+      return new Response("fetch admitted", { status: 202 });
+    });
+    const app = server(() => {}, {}, admit);
+    const response = await app.fetch(post("tools/list"));
+
+    expect(response.status).toBe(202);
+    expect(await response.text()).toBe("fetch admitted");
+    expect(admit).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("uses the same admission hook through server.listen", async () => {
+    const admit = vi.fn(async (_request: Request, messages: JSONRPCMessage[]) => {
+      expect(messages).toMatchObject([{ method: "tools/list" }]);
+      return new Response("listener admitted", { status: 202 });
+    });
+    const app = server(() => {}, {}, admit);
+    try {
+      const listening = await app.listen(0, { host: "127.0.0.1" });
+      const response = await fetch(listening.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+          params: {},
+        }),
+      });
+
+      expect(response.status).toBe(202);
+      expect(await response.text()).toBe("listener admitted");
+      expect(admit).toHaveBeenCalledOnce();
+    } finally {
+      await app.close();
+    }
   });
 
   it("registers provider tools behind the bearer gate, with the mapped identity", async () => {

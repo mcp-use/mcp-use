@@ -96,6 +96,7 @@ import {
 } from "./oauth/policy.js";
 import {
   getOAuthProviderOptions,
+  mapOAuthAuthInfo,
   resolveConfiguredOAuthResource,
   resolveLocalOAuthResource,
   wrapOAuthTokenVerifier,
@@ -1796,6 +1797,26 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           toolSchemes: (name) => this.#tools.get(name)?.schemes,
           // Only views a tool binds; an unbound manifest entry stays gated.
           openResourceUris: [...this.#viewBindings.keys()].map(viewResourceUri),
+          ...(provider.admit !== undefined && {
+            admit: async (request, messages) => {
+              const admission = await provider.admit!(request, messages);
+              if (admission instanceof Response) return admission;
+              if (
+                typeof admission.bearer !== "string" ||
+                admission.bearer.trim().length === 0
+              ) {
+                throw new TypeError(
+                  "OAuth admission hook must return a non-empty bearer token"
+                );
+              }
+              const authInfo = mapOAuthAuthInfo(
+                provider,
+                { ...admission.authInfo, token: admission.bearer },
+                resource
+              );
+              return { bearer: admission.bearer, authInfo };
+            },
+          }),
         };
         // The gate and its challenge builder load on the first MCP request,
         // keeping them out of the static graph of servers without OAuth.
