@@ -92,6 +92,11 @@ export interface ProviderToolCall {
   name: string;
   /** Parsed tool arguments. */
   args: Record<string, unknown>;
+  /**
+   * Opaque Gemini thought signature returned with the call. It is sent back
+   * unchanged on the next request, which Gemini 3 requires for tool calls.
+   */
+  thoughtSignature?: string;
 }
 
 /** Provider-neutral tool definition supplied to a model. */
@@ -166,6 +171,8 @@ export interface LlmToolCallReadyEvent {
   toolName: string;
   /** Parsed tool arguments. */
   args: Record<string, unknown>;
+  /** Opaque Gemini thought signature for this call, if the model sent one. */
+  thoughtSignature?: string;
 }
 
 /** Result of an MCP tool invocation. */

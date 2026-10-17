@@ -11,6 +11,7 @@ import type {
   ProviderConfig,
   ProviderMessage,
   ProviderTool,
+  ProviderToolCall,
   TokenUsage,
 } from "../types.js";
 import { tokenUsageFromRecord } from "../usage.js";
@@ -151,6 +152,10 @@ export function toGeminiContents(messages: ProviderMessage[]): unknown[] {
         for (const tc of m.toolCalls) {
           parts.push({
             functionCall: { name: tc.name, args: tc.args ?? {} },
+            // Gemini 3 rejects a replayed tool call without its signature.
+            ...(tc.thoughtSignature !== undefined && {
+              thoughtSignature: tc.thoughtSignature,
+            }),
           });
         }
       }
@@ -259,6 +264,9 @@ export async function* streamChat(
           toolCallId: id,
           toolName: name,
           args,
+          ...(typeof p.thoughtSignature === "string" && {
+            thoughtSignature: p.thoughtSignature,
+          }),
         };
       }
     }
@@ -269,7 +277,7 @@ export async function* streamChat(
 
 export async function chat(params: ChatParams): Promise<{
   text: string;
-  toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
+  toolCalls: ProviderToolCall[];
 }> {
   const { config, signal } = params;
   const url = `${endpointFor(config.model, "single")}?key=${encodeURIComponent(
@@ -289,11 +297,7 @@ export async function chat(params: ChatParams): Promise<{
   }
   const json = await res.json();
   let text = "";
-  const toolCalls: {
-    id: string;
-    name: string;
-    args: Record<string, unknown>;
-  }[] = [];
+  const toolCalls: ProviderToolCall[] = [];
   const parts = json?.candidates?.[0]?.content?.parts ?? [];
   for (const p of parts) {
     if (typeof p.text === "string") text += p.text;
@@ -305,6 +309,9 @@ export async function chat(params: ChatParams): Promise<{
           p.functionCall.args && typeof p.functionCall.args === "object"
             ? (p.functionCall.args as Record<string, unknown>)
             : {},
+        ...(typeof p.thoughtSignature === "string" && {
+          thoughtSignature: p.thoughtSignature,
+        }),
       });
     }
   }
