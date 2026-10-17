@@ -21,14 +21,66 @@ describe("tokenUsageFromRecord", () => {
       tokenUsageFromRecord({
         prompt_tokens: 10,
         completion_tokens: 4,
-        input_tokens_details: { cached_tokens: 3 },
+        prompt_tokens_details: { cached_tokens: 3 },
+        completion_tokens_details: { reasoning_tokens: 2 },
       })
     ).toMatchObject({
       inputTokens: 10,
       outputTokens: 4,
       totalTokens: 14,
       cachedInputTokens: 3,
+      reasoningTokens: 2,
     });
+  });
+
+  it("preserves Responses API usage details", () => {
+    expect(
+      tokenUsageFromRecord({
+        input_tokens: 10,
+        output_tokens: 4,
+        input_tokens_details: { cached_tokens: 3 },
+        output_tokens_details: { reasoning_tokens: 2 },
+      })
+    ).toMatchObject({
+      inputTokens: 10,
+      outputTokens: 4,
+      totalTokens: 14,
+      cachedInputTokens: 3,
+      reasoningTokens: 2,
+    });
+  });
+
+  it("preserves zero-valued Chat Completions usage details", () => {
+    expect(
+      tokenUsageFromRecord({
+        prompt_tokens: 10,
+        completion_tokens: 4,
+        prompt_tokens_details: { cached_tokens: 0 },
+        completion_tokens_details: { reasoning_tokens: 0 },
+      })
+    ).toMatchObject({ cachedInputTokens: 0, reasoningTokens: 0 });
+  });
+
+  it("prefers normalized counters over provider usage details", () => {
+    expect(
+      tokenUsageFromRecord({
+        cachedInputTokens: 0,
+        reasoningTokens: 0,
+        prompt_tokens_details: { cached_tokens: 3 },
+        completion_tokens_details: { reasoning_tokens: 2 },
+      })
+    ).toMatchObject({ cachedInputTokens: 0, reasoningTokens: 0 });
+  });
+
+  it.each([
+    { prompt_tokens_details: null, completion_tokens_details: null },
+    { prompt_tokens_details: "invalid", completion_tokens_details: 2 },
+    {
+      prompt_tokens_details: { cached_tokens: "3" },
+      completion_tokens_details: { reasoning_tokens: Infinity },
+    },
+  ])("ignores invalid usage details: %j", (details) => {
+    expect(tokenUsageFromRecord(details)).toBeUndefined();
   });
 
   it("does not fabricate usage when counters are absent", () => {
@@ -61,7 +113,7 @@ describe("Anthropic cache counters", () => {
       tokenUsageFromRecord({
         prompt_tokens: 10,
         completion_tokens: 4,
-        input_tokens_details: { cached_tokens: 3 },
+        prompt_tokens_details: { cached_tokens: 3 },
       })
     ).toMatchObject({ cachedInputTokens: 3, totalTokens: 14 });
   });
