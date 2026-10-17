@@ -79,9 +79,9 @@ Ensure all of the following have been completed:
 # Use the appropriate language syntax (python, typescript, bash, etc.)
 ```
 
-## Before / After Video
+## Before / After Video or Screenshots
 
-> Required if this PR fixes something in the Inspector (`@mcp-use/inspector`) or the Agent (`@mcp-use/agent` or Python's `MCPAgent`). For Agent fixes, a terminal recording is fine.
+> Required if this PR changes the Inspector (`@mcp-use/inspector`). Attach a video recording or screenshots.
 
 **Before:**
 
