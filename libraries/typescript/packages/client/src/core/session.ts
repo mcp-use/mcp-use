@@ -577,6 +577,7 @@ export class MCPConnection {
   /**
    * List available prompts from the server.
    *
+   * @param options - Request options
    * @returns List of available prompts
    *
    * @example
@@ -585,8 +586,8 @@ export class MCPConnection {
    * console.log(`Available prompts: ${result.prompts.length}`);
    * ```
    */
-  async listPrompts() {
-    return this.connector.listPrompts();
+  async listPrompts(options?: RequestOptions) {
+    return this.connector.listPrompts(options);
   }
 
   /**
