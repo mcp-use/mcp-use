@@ -171,6 +171,38 @@ export default server;
 
 [Explore MCP server tools →](https://mcp-use.com/docs/typescript/server/tools)
 
+
+## `tools/list` serialization contract
+
+`MCPServer.tool()` registrations are converted to MCP tool descriptors by the
+underlying MCP SDK. Treat the descriptor returned by `tools/list` as the wire
+contract; do not hash the authoring object itself.
+
+- `inputSchema` is the preferred authoring field. The legacy `schema` alias
+  resolves to `inputSchema`; when both are present, `inputSchema` wins.
+- Standard Schema inputs and outputs are converted through their
+  `~standard.jsonSchema` implementation. mcp-use preserves the root
+  `$schema` declaration emitted by that conversion, so the declared JSON
+  Schema dialect is not rewritten by mcp-use.
+- Structural normalization performed by the schema converter or MCP SDK is
+  reflected on the wire. For example, an object-shaped/discriminated-union
+  input may be emitted with an explicit `type: "object"` even when that
+  property was not written in the authoring object. Consumers should compare
+  the served descriptor rather than source-level schema syntax.
+- `annotations` and author `_meta` are forwarded. Framework-owned `_meta`
+  keys derived from `view`, `visibility`, or generated security schemes take
+  precedence when they collide with author metadata.
+- Only fields supported by `ToolDefinition` and the MCP SDK descriptor are
+  part of this contract. Arbitrary authoring fields are not guaranteed to pass
+  through; in particular, tool-level `icons` are not currently a
+  `ToolDefinition` field.
+- `outputSchema` follows the same Standard Schema conversion path as
+  `inputSchema`.
+
+Serialization changes that affect the served descriptor are release-note
+material because they can invalidate declaration hashes, caches, billing
+records, or audit comparisons.
+
 ## Add Views to your tools
 
 Create `views/weather-card/view.tsx`. The directory name matches `view.name` on the tool:
