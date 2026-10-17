@@ -6,12 +6,24 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.10.1" description="October 2026">
+  ## OAuth discovery & browser tool calls
+  Patch fixes for public MCP connections, OAuth credential binding, browser tool calls, and ChatGPT widget descriptions.
+
+- **Fix** (@mcp-use/client): validate OAuth protected-resource metadata with the official SDK before classifying an anonymous connection as mixed auth. Root metadata for a different resource no longer makes a public MCP endpoint appear to require authentication (`#2858`)
+- **Fix** (@mcp-use/client): discard cached OAuth credentials with a missing, empty, or mismatched issuer stamp. Affected users may need to sign in again (`#2858`)
+- **Fix** (@mcp-use/client): browser tool calls send `Mcp-Param-*` headers for parameters annotated with `x-mcp-header`, so servers that require those headers accept calls from clients such as the Inspector (`#2803`)
+- **Fix** (server): copy a tool view's `description` to `_meta["openai/widgetDescription"]` on `resources/list` and `resources/read`, restoring the widget description for ChatGPT (`#2845`)
+- **Update**: Updated @mcp-use/client to v2.4.4, @mcp-use/agent to v2.0.24, and @mcp-use/cli to v4.4.1
+- **Update**: Updated @mcp-use/inspector to v20.3.21; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.10.0" description="October 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.10.0&title=OAuth%20Proxy%20for%20non-DCR%20providers&date=2026-10&lang=typescript" alt="Release 2.10.0" />
   </Frame>
   ## OAuth Proxy for non-DCR providers
-  Canary release (`mcp-use@2.10.0-canary.4`) adding an OAuth authorization server in front of identity providers without dynamic client registration, secret-free production builds, and `.gitignore`-aware deployments. Stable v2.10.0 has not shipped.
+  Minor release adding an OAuth authorization server in front of identity providers without dynamic client registration, secret-free production builds, and `.gitignore`-aware deployments.
 
 - **New** (server): `oauthProxy()` in `mcp-use/oauth` makes the MCP server its own authorization server in front of GitHub (`github()`), Google (`google()`), or any OAuth 2.0 provider (`upstream()`). Clients present a client ID metadata document or register (DCR), approve a server-owned consent page that names the server by its host, and receive the proxy's own opaque tokens (`#2822`)
 - **New** (server): the `clients` option limits which clients may connect, by metadata document URL, origin, or a client defined on the server (`#2822`)
@@ -32,9 +44,9 @@ rss: true
 - **Documentation**: add the [OAuth Proxy](/v2/typescript/server/authentication/providers/oauth-proxy) guide, [OAuth Proxy storage](/v2/typescript/server/authentication/providers/oauth-proxy-storage), v1 migration notes, and API reference; add GitHub and Google `oauthProxy` examples with Firestore (`#2841`, `#2831`)
 - **Documentation**: correct API reference comments: stdio `env` does not inherit the parent environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, legacy stateless GET, DELETE, and HEAD return `204`, and `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` appear in the generated reference (`#2838`)
 - **Update**: patch vulnerable transitive dependencies (`proxy-addr`, `shell-quote`, `source-map-js`) and update Next.js examples to `next` ^16.3.8 (`#2842`)
-- **Update**: Updated @mcp-use/cli to v4.4.0 (canary.2)
-- **Update**: Updated @mcp-use/agent to v2.0.23 (canary.1) and @mcp-use/client to v2.4.3 (canary.0)
-- **Update**: Updated @mcp-use/inspector to v20.3.20 (canary.3); see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.4.0
+- **Update**: Updated @mcp-use/agent to v2.0.23 and @mcp-use/client to v2.4.3
+- **Update**: Updated @mcp-use/inspector to v20.3.20; see the [Inspector changelog](/inspector/changelog)
 </Update>
 
 <Update label="v2.9.0" description="October 2026">

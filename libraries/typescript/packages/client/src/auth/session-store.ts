@@ -175,7 +175,15 @@ export class OAuthSessionStore {
       if (legacyData) {
         try {
           const legacyValue = JSON.parse(legacyData) as T;
-          if (!legacyValue.issuer || legacyValue.issuer === ctx.issuer) {
+          // Never bind an unstamped legacy credential to newly discovered metadata.
+          if (
+            typeof legacyValue.issuer !== "string" ||
+            !legacyValue.issuer.trim()
+          ) {
+            await this.store.remove(legacyKey);
+            return undefined;
+          }
+          if (legacyValue.issuer === ctx.issuer) {
             const migratedValue = {
               ...legacyValue,
               issuer: ctx.issuer,
@@ -193,7 +201,17 @@ export class OAuthSessionStore {
     }
     if (!data) return undefined;
     try {
-      return { key, value: JSON.parse(data) as T };
+      const value = JSON.parse(data) as T;
+      // Scoped keys are not proof of issuer ownership; old SDK versions omitted the stamp.
+      if (
+        typeof value?.issuer !== "string" ||
+        !value.issuer.trim() ||
+        (ctx && value.issuer !== ctx.issuer)
+      ) {
+        await this.store.remove(key);
+        return undefined;
+      }
+      return { key, value };
     } catch (e) {
       console.warn(
         `[${this.storageKeyPrefix}] Failed to parse ${kind.replace("_", " ")}:`,
