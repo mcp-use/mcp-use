@@ -149,6 +149,24 @@ export const searchProducts = server.tool(
 A view-bound tool must declare `outputSchema`, and one View can bind to only
 one tool. The view reads the structured data while the model reads `content`.
 
+## Tool listing metadata
+
+The server derives UI metadata in `tools/list` from a tool's `view` and
+`visibility` fields. Author-supplied `_meta` is preserved except for these
+framework-owned keys:
+
+- If the tool declares a `view`, the server sets both `_meta.ui.resourceUri`
+  and the legacy `_meta["ui/resourceUri"]` to that View's URI. Without a
+  `view`, it removes both keys, even if `_meta` supplied them.
+- If the tool declares `visibility: "model"` or `visibility: "app"`, the
+  server sets `_meta.ui.visibility` to a one-item array containing that value.
+  Without top-level `visibility`, it removes an author-supplied
+  `_meta.ui.visibility`.
+
+Other `_meta` keys, including other properties inside `_meta.ui`, pass through.
+Set `view` or top-level `visibility` when you need these UI fields in the tool
+listing; setting their wire keys directly in `_meta` does not preserve them.
+
 ## Use request context
 
 The second callback argument is scoped to the current request. It includes an
