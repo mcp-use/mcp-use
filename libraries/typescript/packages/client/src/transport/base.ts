@@ -63,10 +63,13 @@ export interface ConnectorInitOptions {
   clientOptions?: ClientOptions;
   /**
    * Request options (timeouts, cancellation, etc.) applied to every SDK
-   * request the connector issues: the initial `tools/list` in
-   * {@link BaseConnector.initialize}, `callTool`, `listTools`, `readResource`,
-   * `getPrompt`, and the other helpers. Options passed to an individual call
-   * are merged on top and take precedence.
+   * request the connector issues once the connection is established: the
+   * initial `tools/list` in {@link BaseConnector.initialize}, the automatic
+   * `tools/list` refresh on `tools/list_changed`, `callTool`, `listTools`,
+   * `readResource`, `getPrompt`, and the other helpers. The `initialize`
+   * handshake performed by the SDK's `Client.connect()` is not covered.
+   * Options passed to an individual call are merged on top and take
+   * precedence.
    */
   defaultRequestOptions?: RequestOptions;
   /**
@@ -289,7 +292,10 @@ export abstract class BaseConnector {
       logger.debug(
         "[Auto] Refreshing tools cache due to list_changed notification"
       );
-      const result = await this.client.listTools();
+      const result = await this.client.listTools(
+        undefined,
+        this.requestOptions()
+      );
       this.toolsCache = (result.tools ?? []) as Tool[];
       logger.debug(
         `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
@@ -679,15 +685,22 @@ export abstract class BaseConnector {
 
   /**
    * Merge the connector's `defaultRequestOptions` with per-call options.
-   * Per-call values win; `undefined` is returned when neither is set so the
-   * SDK keeps its own defaults.
+   * Per-call values win, but keys explicitly set to `undefined` fall back to
+   * the defaults. `undefined` is returned when neither is set so the SDK
+   * keeps its own defaults.
    */
   protected requestOptions(
     options?: RequestOptions
   ): RequestOptions | undefined {
     const defaults = this.opts.defaultRequestOptions;
     if (!defaults) return options;
-    return { ...defaults, ...options };
+    const merged: RequestOptions = { ...defaults };
+    for (const [key, value] of Object.entries(options ?? {})) {
+      if (value !== undefined) {
+        (merged as Record<string, unknown>)[key] = value;
+      }
+    }
+    return merged;
   }
 
   /**

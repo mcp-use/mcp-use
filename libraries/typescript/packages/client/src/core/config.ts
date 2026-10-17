@@ -117,8 +117,9 @@ interface BaseServerConfig extends CallbackConfig {
   clientOptions?: ClientOptions;
   /**
    * Request options (timeout, cancellation) applied to every request the
-   * connection makes, from the initial `tools/list` through later calls such
-   * as `callTool()`. Options passed to an individual call take precedence.
+   * connection makes after the `initialize` handshake, from the initial
+   * `tools/list` through later calls such as `callTool()`. Options passed to
+   * an individual call take precedence.
    */
   defaultRequestOptions?: RequestOptions;
 }

@@ -1,5 +1,5 @@
 import type { JSONRPCRequest } from "@modelcontextprotocol/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { HttpConnector } from "../../../src/transport/http.js";
 
 /**
@@ -105,6 +105,51 @@ describe("defaultRequestOptions", () => {
       await connector.connect();
       const result = await connector.callTool("slow", {}, { timeout: 5000 });
       expect(result.content).toEqual([{ type: "text", text: "done" }]);
+    } finally {
+      await connector.disconnect();
+    }
+  });
+
+  it("keeps the configured defaults when a per-call option is undefined", async () => {
+    const connector = new HttpConnector("http://options.invalid/mcp", {
+      fetch: fetchFixture(never),
+      protocolNegotiation: "legacy",
+      detectMixedAuth: false,
+      defaultRequestOptions: { timeout: 50 },
+    });
+    try {
+      await connector.connect();
+      await expect(
+        connector.callTool("slow", {}, { timeout: undefined })
+      ).rejects.toThrow(/timed out/i);
+    } finally {
+      await connector.disconnect();
+    }
+  });
+
+  it("passes the configured options to the automatic tools/list refresh", async () => {
+    const connector = new HttpConnector("http://options.invalid/mcp", {
+      fetch: fetchFixture(never),
+      protocolNegotiation: "legacy",
+      detectMixedAuth: false,
+      defaultRequestOptions: { timeout: 50 },
+    });
+    try {
+      await connector.connect();
+      // The SDK serves `tools/list` from its list cache here, so assert on the
+      // options handed to the SDK rather than on a transport timeout.
+      const internals = connector as unknown as {
+        client: { listTools: (...args: unknown[]) => Promise<unknown> };
+        refreshToolsCache(): Promise<void>;
+      };
+      const listTools = vi
+        .spyOn(internals.client, "listTools")
+        .mockResolvedValue({ tools: [] });
+      await internals.refreshToolsCache();
+      expect(listTools).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ timeout: 50 })
+      );
     } finally {
       await connector.disconnect();
     }
