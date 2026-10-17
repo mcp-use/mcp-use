@@ -29,12 +29,15 @@ export function inspectorApiRateLimit(limiter: RateLimiterMemory) {
   };
 }
 
-/** Platforms such as Vercel and Railway set X-Real-IP to the client address. */
+/**
+ * The rightmost X-Forwarded-For entry is the peer the platform proxy saw
+ * (Vercel overwrites the header, Railway appends to it), so a client behind it
+ * cannot pick its own budget by sending the header. Without a proxy (local
+ * CLI) the header is the client's own and only the process ceiling holds.
+ */
 function clientKey(c: Context): string {
   return (
-    c.req.header("x-real-ip") ||
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown"
+    c.req.header("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown"
   );
 }
 
