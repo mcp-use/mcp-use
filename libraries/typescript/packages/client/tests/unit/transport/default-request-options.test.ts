@@ -127,6 +127,46 @@ describe("defaultRequestOptions", () => {
     }
   });
 
+  it("adds the no-op onprogress for resetTimeoutOnProgress on every helper", async () => {
+    const connector = new HttpConnector("http://options.invalid/mcp", {
+      fetch: fetchFixture(async () => ({ contents: [] })),
+      protocolNegotiation: "legacy",
+      detectMixedAuth: false,
+      defaultRequestOptions: { resetTimeoutOnProgress: true },
+    });
+    try {
+      await connector.connect();
+      const internals = connector as unknown as {
+        client: {
+          readResource: (...args: unknown[]) => Promise<unknown>;
+          callTool: (...args: unknown[]) => Promise<unknown>;
+        };
+      };
+      const readResource = vi
+        .spyOn(internals.client, "readResource")
+        .mockResolvedValue({ contents: [] });
+      const callTool = vi
+        .spyOn(internals.client, "callTool")
+        .mockResolvedValue({ content: [] });
+      await connector.readResource("file:///x");
+      await connector.callTool("t", {});
+      const withProgress = expect.objectContaining({
+        resetTimeoutOnProgress: true,
+        onprogress: expect.any(Function),
+      });
+      expect(readResource).toHaveBeenCalledWith(
+        { uri: "file:///x" },
+        withProgress
+      );
+      expect(callTool).toHaveBeenCalledWith(
+        { name: "t", arguments: {} },
+        withProgress
+      );
+    } finally {
+      await connector.disconnect();
+    }
+  });
+
   it("passes the configured options to the automatic tools/list refresh", async () => {
     const connector = new HttpConnector("http://options.invalid/mcp", {
       fetch: fetchFixture(never),

@@ -619,7 +619,10 @@ export abstract class BaseConnector {
     // Gracefully handle servers that don't implement tools/list or have no tools
     try {
       const listToolsRes = await this.executeRequest(() =>
-        this.client!.listTools(undefined, defaultRequestOptions)
+        this.client!.listTools(
+          undefined,
+          this.requestOptions(defaultRequestOptions)
+        )
       );
       this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
       logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
@@ -688,17 +691,34 @@ export abstract class BaseConnector {
    * Per-call values win, but keys explicitly set to `undefined` fall back to
    * the defaults. `undefined` is returned when neither is set so the SDK
    * keeps its own defaults.
+   *
+   * When `resetTimeoutOnProgress` is enabled without an `onprogress` callback,
+   * a no-op callback is added. The SDK only attaches a `progressToken` when
+   * `onprogress` is present, and the server needs that token to send the
+   * progress notifications that reset the timeout.
    */
   protected requestOptions(
     options?: RequestOptions
   ): RequestOptions | undefined {
     const defaults = this.opts.defaultRequestOptions;
-    if (!defaults) return options;
-    const merged: RequestOptions = { ...defaults };
-    for (const [key, value] of Object.entries(options ?? {})) {
-      if (value !== undefined) {
-        (merged as Record<string, unknown>)[key] = value;
+    let merged: RequestOptions | undefined;
+    if (!defaults) {
+      merged = options ? { ...options } : undefined;
+    } else {
+      merged = { ...defaults };
+      for (const [key, value] of Object.entries(options ?? {})) {
+        if (value !== undefined) {
+          (merged as Record<string, unknown>)[key] = value;
+        }
       }
+    }
+    if (merged?.resetTimeoutOnProgress && !merged.onprogress) {
+      merged.onprogress = () => {
+        // No-op: progress notifications are handled by the SDK's timeout reset logic
+      };
+      logger.debug(
+        "[BaseConnector] Added onprogress callback to enable progressToken"
+      );
     }
     return merged;
   }
@@ -721,24 +741,9 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
 
-    // If resetTimeoutOnProgress is enabled but no onprogress callback is provided,
-    // add a no-op callback to trigger the SDK to add progressToken to the request.
-    // The SDK only adds progressToken when onprogress is present, which is required
-    // for the server to send progress notifications that reset the timeout.
-    const merged = this.requestOptions(options);
-    const enhancedOptions = merged ? { ...merged } : undefined;
-    if (
-      enhancedOptions?.resetTimeoutOnProgress &&
-      !enhancedOptions.onprogress
-    ) {
-      // Add no-op progress callback to trigger progressToken addition
-      enhancedOptions.onprogress = () => {
-        // No-op: progress notifications are handled by the SDK's timeout reset logic
-      };
-      logger.debug(
-        `[BaseConnector] Added onprogress callback for tool '${name}' to enable progressToken`
-      );
-    }
+    // requestOptions() merges the connector defaults and adds the no-op
+    // onprogress callback when resetTimeoutOnProgress is enabled.
+    const enhancedOptions = this.requestOptions(options);
 
     logger.debug(`Calling tool '${name}' with args`, args);
     const res = await this.executeRequest(() =>
