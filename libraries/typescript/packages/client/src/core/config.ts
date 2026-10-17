@@ -116,9 +116,10 @@ interface BaseServerConfig extends CallbackConfig {
   /** Options forwarded to the official MCP SDK Client. */
   clientOptions?: ClientOptions;
   /**
-   * Request options (timeout, cancellation) for the initial `tools/list`
-   * request made while the connection initializes. They are not applied to
-   * later calls such as `callTool()`; pass options to each call instead.
+   * Request options (timeout, cancellation) applied to every request the
+   * connection makes after the `initialize` handshake, from the initial
+   * `tools/list` through later calls such as `callTool()`. Options passed to
+   * an individual call take precedence.
    */
   defaultRequestOptions?: RequestOptions;
 }
