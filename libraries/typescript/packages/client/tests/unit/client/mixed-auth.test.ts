@@ -238,11 +238,11 @@ describe("mixed OAuth authorization", () => {
   it("rediscovers authorization metadata after reconnect", async () => {
     vi.mocked(discoverOAuthProtectedResourceMetadata)
       .mockResolvedValueOnce({
-        resource: "https://mcp.example.com/first",
+        resource: "https://mcp.example.com/mcp",
         authorization_servers: ["https://auth.example.com"],
       })
       .mockResolvedValueOnce({
-        resource: "https://mcp.example.com/second",
+        resource: "https://mcp.example.com/",
         authorization_servers: ["https://auth.example.com"],
       });
     const connector = new HttpConnector("https://mcp.example.com/mcp", {
@@ -255,7 +255,7 @@ describe("mixed OAuth authorization", () => {
     );
 
     await expect(connector.discoverAuthorization()).resolves.toMatchObject({
-      resource: "https://mcp.example.com/first",
+      resource: "https://mcp.example.com/mcp",
     });
     await connector.disconnect();
     expect(connector.authorization).toBeUndefined();
@@ -266,7 +266,7 @@ describe("mixed OAuth authorization", () => {
       { finishAuth: vi.fn(async () => {}) }
     );
     await expect(connector.discoverAuthorization()).resolves.toMatchObject({
-      resource: "https://mcp.example.com/second",
+      resource: "https://mcp.example.com/",
     });
     expect(discoverOAuthProtectedResourceMetadata).toHaveBeenCalledTimes(2);
   });
