@@ -7,14 +7,14 @@
  * @module mcp-proxy
  */
 
-import type { Context, Hono, Next } from "hono";
+import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
-  inspectorRateLimitResponse,
+  inspectorApiRateLimit,
 } from "../rate-limit.js";
 // ponytail: vendored from mcp-use/src/server/middleware/mcp-proxy.ts — keep in sync manually.
 import { isSafeProxyTarget } from "./oauth-proxy.js";
@@ -138,16 +138,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     });
-  const rateLimit = async (c: Context, next: Next) => {
-    try {
-      // RateLimiterMemory prefixes and stringifies keys. The Hono request
-      // wrapper therefore maps every request to one mounted-instance budget.
-      await rateLimiter.consume(c.req as unknown as string);
-    } catch (error) {
-      return inspectorRateLimitResponse(c, error);
-    }
-    return next();
-  };
+  const rateLimit = inspectorApiRateLimit(rateLimiter);
 
   // CRITICAL: Enable CORS and expose all headers for FastMCP session management
   // The Mcp-Session-Id header MUST be exposed for the browser to read it
