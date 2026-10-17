@@ -3,6 +3,7 @@ import {
   discoverOAuthProtectedResourceMetadata,
   SdkError,
   SdkHttpError,
+  selectResourceURL,
   StreamableHTTPClientTransport,
   UnauthorizedError,
   type ClientOptions,
@@ -336,30 +337,27 @@ export class HttpConnector extends BaseConnector {
   override async discoverAuthorization(): Promise<
     MCPAuthorizationInfo | undefined
   > {
-    if (
-      !this.detectMixedAuth ||
-      !this.oauthProvider ||
-      this.hadAccessTokenAtConnect
-    ) {
+    const provider = this.oauthProvider;
+    if (!this.detectMixedAuth || !provider || this.hadAccessTokenAtConnect) {
       return this.authorizationCache;
     }
 
     if (this.authorizationDiscovery) return this.authorizationDiscovery;
 
-    this.authorizationDiscovery = this.discoverMixedAuthorization().then(
-      (authorization) => {
-        // A missing or temporarily unavailable RFC 9728 endpoint must not be
-        // cached for the lifetime of an otherwise healthy MCP connection.
-        if (!authorization) this.authorizationDiscovery = null;
-        return authorization;
-      }
-    );
+    this.authorizationDiscovery = this.discoverMixedAuthorization(
+      provider
+    ).then((authorization) => {
+      // A missing or temporarily unavailable RFC 9728 endpoint must not be
+      // cached for the lifetime of an otherwise healthy MCP connection.
+      if (!authorization) this.authorizationDiscovery = null;
+      return authorization;
+    });
     return this.authorizationDiscovery;
   }
 
-  private async discoverMixedAuthorization(): Promise<
-    MCPAuthorizationInfo | undefined
-  > {
+  private async discoverMixedAuthorization(
+    provider: OAuthClientProvider
+  ): Promise<MCPAuthorizationInfo | undefined> {
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const discoveryTimeout = new Promise<never>((_, reject) => {
@@ -382,6 +380,7 @@ export class HttpConnector extends BaseConnector {
         ),
         discoveryTimeout,
       ]);
+      await selectResourceURL(this.baseUrl, provider, metadata);
       this.authorizationCache = {
         mode: "mixed",
         authenticated: false,
