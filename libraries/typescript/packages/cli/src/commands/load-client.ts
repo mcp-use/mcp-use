@@ -17,7 +17,8 @@ type ClientPackage = typeof import("@mcp-use/client");
 
 const CLIENT_SDK_DIR = join(GLOBAL_STATE_DIR, "client-sdk");
 const CLIENT_PACKAGE = "@mcp-use/client";
-const DEFAULT_PEER_RANGE = "^2.0.0-alpha.0";
+/** Used only if the CLI's own package.json can't be read. */
+const DEFAULT_PEER_RANGE = "^2.0.1";
 
 const INSTALL_HINT = [
   `[mcp-use] ${CLIENT_PACKAGE} is not installed.`,
@@ -154,7 +155,12 @@ function packageManagerInstallArgs(dependency: string): [string, string[]] {
   return ["npm", ["install", dependency]];
 }
 
-function readClientPeerRange(): string {
+/**
+ * @internal Read the `@mcp-use/client` peer range from this package's own
+ * manifest: `../package.json` from the built `dist/` chunk, or
+ * `../../package.json` from `src/commands/`.
+ */
+export function readClientPeerRange(): string {
   for (const relative of ["../package.json", "../../package.json"]) {
     try {
       const raw = readFileSync(new URL(relative, import.meta.url), "utf8");
@@ -162,7 +168,7 @@ function readClientPeerRange(): string {
         name?: unknown;
         peerDependencies?: Record<string, string>;
       };
-      if (pkg.name !== "mcp-use") continue;
+      if (pkg.name !== "@mcp-use/cli") continue;
       const range = pkg.peerDependencies?.[CLIENT_PACKAGE];
       if (typeof range === "string" && range.length > 0) return range;
     } catch {

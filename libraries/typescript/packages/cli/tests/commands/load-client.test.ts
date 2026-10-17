@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   importProjectClientModule,
   loadClientPackage,
+  readClientPeerRange,
 } from "../../src/commands/load-client.js";
 
 const SERVER_PACKAGE_ROOT = join(
@@ -23,5 +25,15 @@ describe("loadClientPackage", () => {
     const mod = await importProjectClientModule(SERVER_PACKAGE_ROOT);
     expect(mod.MCPClient).toBeTypeOf("function");
     expect(mod.createOAuthProvider).toBeTypeOf("function");
+  });
+
+  it("installs the @mcp-use/client range declared in the CLI's package.json", () => {
+    const cliPackage = JSON.parse(
+      readFileSync(join(SERVER_PACKAGE_ROOT, "package.json"), "utf8")
+    ) as { peerDependencies: Record<string, string> };
+
+    expect(readClientPeerRange()).toBe(
+      cliPackage.peerDependencies["@mcp-use/client"]
+    );
   });
 });
