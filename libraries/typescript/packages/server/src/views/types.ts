@@ -1,3 +1,5 @@
+import type { ViewConfig } from "../react/runtime/view-config.js";
+import type { DisplayMode } from "../react/types/host-types.js";
 import type {
   McpUiResourceCsp,
   McpUiResourcePermissions,
@@ -35,6 +37,10 @@ export interface ViewResourceFacts {
   domain?: string;
   /** Ask the host to draw a border around the view → `_meta.ui.prefersBorder`. */
   prefersBorder?: boolean;
+  /** Supported modes extracted from the frontend named `viewConfig` export. */
+  displayModes?: readonly DisplayMode[];
+  /** Initial ChatGPT display preference extracted from frontend config. */
+  preferredDisplayMode?: "inline" | "fullscreen";
 }
 
 /**
@@ -46,6 +52,8 @@ export interface ViewResourceFacts {
 export interface InlineViewManifestEntry {
   /** Discriminant for the embedded bundle shape. */
   kind: "inline";
+  /** Static frontend configuration captured by build tooling. */
+  viewConfig?: ViewConfig | undefined;
   /**
    * Minified ES module source embedded in the generated view document's
    * `<script type="module">` element.
@@ -69,6 +77,8 @@ export interface InlineViewManifestEntry {
 export interface ExternalViewManifestEntry {
   /** Discriminant for the external-module shape. */
   kind: "external";
+  /** Static frontend configuration captured by build tooling. */
+  viewConfig?: ViewConfig | undefined;
   /**
    * Module entry path. Dev: origin-absolute Vite URL (`/…`). Production:
    * view-relative path under `.mcp-use/build/views/<name>/` (`assets/…`).

@@ -82,7 +82,7 @@ export default server;`);
       );
       await write(
         "src/views/card/view.tsx",
-        'import "./style.css"; export default function Card() { return <div>Built card</div>; }'
+        'import "./style.css"; export const viewConfig = {displayModes: ["inline", "fullscreen"], preferredDisplayMode: "fullscreen"}; export default function Card() { return <div>Built card</div>; }'
       );
       await write("src/views/card/style.css", "div { color: purple; }");
       await write("public/logo.svg", "<svg>embedded logo</svg>");
@@ -166,12 +166,16 @@ const assets = await Promise.all(urls.map(async url => {
 }));
 const skill = await rpc("resources/read", {uri:"skill://review/SKILL.md"});
 const logo = await (await request("/mcp/_mcp-use/public/logo.svg")).text();
-console.log(JSON.stringify({config, assets, skill, logo}));
+console.log(JSON.stringify({config, assets, skill, logo, view}));
 `,
         ],
         { cwd: root }
       );
       const result = JSON.parse(stdout.trim().split("\n").at(-1)!);
+      expect(result.view.result.contents[0]._meta["openai/ui"]).toEqual({
+        availableDisplayModes: ["inline", "fullscreen"],
+        preferredDisplayMode: "fullscreen",
+      });
       expect(result.config).toEqual({
         name: "configured-name",
         virtualValue: "build-only",

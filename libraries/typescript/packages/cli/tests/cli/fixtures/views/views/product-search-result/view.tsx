@@ -1,3 +1,8 @@
+export const viewConfig = {
+  displayModes: ["inline", "fullscreen"],
+  preferredDisplayMode: "fullscreen",
+} as const;
+
 import badgeUrl from "./badge.png";
 
 export default function ProductSearchResult({

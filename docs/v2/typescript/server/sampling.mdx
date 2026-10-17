@@ -1,12 +1,19 @@
 ---
 title: "Sampling"
-description: "Design tools when model generation belongs in the MCP host."
+description: "Keep model generation in the MCP host, or request a completion with an input-required round."
 icon: "pipette"
 ---
 
 Model generation belongs in the MCP host. The stateless TypeScript server does
-not expose `ctx.sample()`, so a tool callback cannot pause an HTTP request to
-ask the connected host to run a model completion.
+not expose a blocking `ctx.sample()`, so a tool callback cannot pause an HTTP
+request while the host runs a model completion.
+
+A tool that needs model output has two options:
+
+- Let the host generate first, then call a deterministic tool with the result.
+- Return an `input_required` result that embeds a sampling request. A capable
+  client runs the completion and retries the original tool call; the callback
+  runs again with the completion in its request context.
 
 ## Keep generation in the host
 
@@ -51,6 +58,91 @@ export default server;
 This keeps model choice, approval, credentials, and generation policy with the
 host. It also makes the server behavior reproducible and testable.
 
+## Request a completion in an input-required round
+
+When the tool itself needs a completion, return
+`inputRequired.createMessage()` under a stable key. The client runs the
+completion with its own model and policy, then retries the tool call with the
+result in `ctx.inputResponses`:
+
+```typescript
+import { inputRequired, inputResponse } from "mcp-use";
+
+// Continues the server above. `documents` stands in for your document store.
+server.tool(
+  {
+    name: "summarize-document",
+    description: "Summarize a stored document with the host's model.",
+    inputSchema: z.object({ documentId: z.string() }),
+  },
+  async ({ documentId }, ctx) => {
+    if (!ctx.client.can("sampling")) {
+      return {
+        isError: true,
+        content: [
+          { type: "text", text: "This client does not support sampling." },
+        ],
+      };
+    }
+
+    // The callback starts from the top on the initial call and on the retry.
+    const response = inputResponse(ctx.inputResponses, "summary");
+
+    if (response.kind === "missing") {
+      const document = await documents.get(documentId);
+      return inputRequired({
+        inputRequests: {
+          summary: inputRequired.createMessage({
+            messages: [
+              {
+                role: "user",
+                content: {
+                  type: "text",
+                  text: `Summarize this document:\n\n${document.text}`,
+                },
+              },
+            ],
+            maxTokens: 300,
+          }),
+        },
+      });
+    }
+
+    if (response.kind !== "sampling") {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Expected a sampling response." }],
+      };
+    }
+
+    const blocks = Array.isArray(response.result.content)
+      ? response.result.content
+      : [response.result.content];
+    const summary = blocks
+      .map((block) =>
+        block.type === "text" ? block.text : JSON.stringify(block),
+      )
+      .join("\n");
+
+    return { content: [{ type: "text", text: summary }] };
+  },
+);
+```
+
+`inputResponse()` returns `kind: "sampling"` with the client's
+`CreateMessageResult` in `result`. Treat the completion as untrusted input and
+validate it before acting on it. When the request's client capabilities do
+not declare `sampling`, the SDK fails the call with a missing-capability error
+instead of sending the request, so check `ctx.client.can("sampling")` first.
+
+The callback runs again for each round, so follow the same rules as
+[Elicitation](/v2/typescript/server/elicitation): use a stable key, and perform
+side effects only after the completion arrives.
+
+To read the client's roots, return `inputRequired.listRoots()` the same way.
+The response has `kind: "roots"` and a `roots` array, and the client must
+declare the `roots` capability.
+
 ## Report progress for the active request
 
 Long-running tool work can still report request-scoped progress.
@@ -82,13 +174,17 @@ before the callback returns. They are not a background push channel.
 
 ## Run the example
 
-The maintained example exposes a deterministic tool that explains this
-boundary:
+The maintained example exposes a deterministic tool that explains the
+host-first design:
 
 ```bash
 cd libraries/typescript/packages/server/examples/sampling
 pnpm dev
 ```
+
+The `sample-text` tool in
+[`examples/views/basic`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/basic)
+requests a completion through an input-required round.
 
 Use [Prompts](/v2/typescript/server/prompts) to package reusable model
 instructions and [Elicitation](/v2/typescript/server/elicitation) when a tool

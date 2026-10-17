@@ -6,6 +6,105 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.10.0" description="October 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.10.0&title=OAuth%20Proxy%20for%20non-DCR%20providers&date=2026-10&lang=typescript" alt="Release 2.10.0" />
+  </Frame>
+  ## OAuth Proxy for non-DCR providers
+  Canary release (`mcp-use@2.10.0-canary.4`) adding an OAuth authorization server in front of identity providers without dynamic client registration, secret-free production builds, and `.gitignore`-aware deployments. Stable v2.10.0 has not shipped.
+
+- **New** (server): `oauthProxy()` in `mcp-use/oauth` makes the MCP server its own authorization server in front of GitHub (`github()`), Google (`google()`), or any OAuth 2.0 provider (`upstream()`). Clients present a client ID metadata document or register (DCR), approve a server-owned consent page that names the server by its host, and receive the proxy's own opaque tokens (`#2822`)
+- **New** (server): the `clients` option limits which clients may connect, by metadata document URL, origin, or a client defined on the server (`#2822`)
+- **New** (server): the upstream client secret and user tokens stay on the server, encrypted in a shared store from `mcp-use/oauth/storage`: Upstash, Redis, Postgres, Firestore, Cloudflare D1 or Durable Object, or in-memory for local development. `redisStorage` takes a connected client or a lazy connect function (`#2822`)
+- **New** (server): tools read the upstream token with `upstreamToken(ctx.auth)` or `ctx.auth.upstream` (`#2822`)
+- **Enhancement** (server): failed sign-ins and refreshes log the cause without token or code values (provider error code and description, HTTP status and content type, mismatched `iss`, or network error); refused client metadata documents and records encrypted with a retired secret are also logged (`#2822`)
+- **Enhancement** (server): clients that signed in through the 1.x `oauthProxy` keep working while registration is on; users approve the consent page once and sign in again without removing the server (`#2822`)
+- **New** (server): OAuth providers can register public HTTP routes from `setup()` with `host.route()`, read `host.mode` and `host.listenHost`, and compute `oauthMetadata` from the resolved resource URL (`#2822`)
+- **Fix** (server): OAuth endpoints under the MCP path are never written to trace logs, and `oauthEnvironmentValue` no longer throws on runtimes without `process` (`#2822`)
+- **Fix** (server): trailing-slash trimming in `upstashStorage` and the GitHub and Google upstream providers no longer uses a backtracking regex
+- **New** (server, @mcp-use/cli): `mcp-use build` evaluates the entry with `MCP_USE_PHASE=build` and no longer needs runtime secrets; the new `isBuilding()` export lets module-scope code skip reading secrets or connecting to a database. `oauthProxy` and `upstashStorage` require no secrets or credentials while building (`#2830`)
+- **Fix** (@mcp-use/cli): `mcp-use build` exits when the build finishes, even if the entry opened a connection at module scope such as a Redis client (`#2830`)
+- **Fix** (@mcp-use/cli): `mcp-use build` builds for production when `NODE_ENV` is unset. Views no longer ship React's development build, and server-side JSX no longer compiles to `jsxDEV`, which failed under `mcp-use start` (`#2830`)
+- **Fix** (@mcp-use/cli): a failed build or dev start prints the cause of a refused connection instead of an empty line (`#2830`)
+- **New** (@mcp-use/cli): `mcp-use deploy --no-github` applies `.gitignore` rules when packaging, including wildcards, directory rules, and negation, while keeping the baseline cloud exclusions (`#2485`)
+- **Fix** (server): `MCPServer.fromOpenAPI` converts OpenAPI 3.0 boolean `exclusiveMinimum` and `exclusiveMaximum` into JSON Schema numeric bounds instead of throwing while registering tools (`#2717`)
+- **Fix** (@mcp-use/agent): the Anthropic provider sends `"[no content]"` for empty tool result content, avoiding HTTP 400 errors from the Messages API (`#2693`)
+- **Documentation**: add the [OAuth Proxy](/v2/typescript/server/authentication/providers/oauth-proxy) guide, [OAuth Proxy storage](/v2/typescript/server/authentication/providers/oauth-proxy-storage), v1 migration notes, and API reference; add GitHub and Google `oauthProxy` examples with Firestore (`#2841`, `#2831`)
+- **Documentation**: correct API reference comments: stdio `env` does not inherit the parent environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, legacy stateless GET, DELETE, and HEAD return `204`, and `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` appear in the generated reference (`#2838`)
+- **Update**: patch vulnerable transitive dependencies (`proxy-addr`, `shell-quote`, `source-map-js`) and update Next.js examples to `next` ^16.3.8 (`#2842`)
+- **Update**: Updated @mcp-use/cli to v4.4.0 (canary.2)
+- **Update**: Updated @mcp-use/agent to v2.0.23 (canary.1) and @mcp-use/client to v2.4.3 (canary.0)
+- **Update**: Updated @mcp-use/inspector to v20.3.20 (canary.3); see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.9.0" description="October 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.9.0&title=Typed%20composer%20mention%20search&date=2026-10&lang=typescript" alt="Release 2.9.0" />
+  </Frame>
+  ## Typed composer mention search
+  Minor release adding typed search for app-owned items in supporting ChatGPT desktop composers.
+
+- **New** (server): `server.mentions({ name, search })` registers a normal typed `ToolRef` for searching people, files, channels, and other app-owned items without a View or iframe handshake (`#2792`)
+- **New** (server): generate a required string `query` input schema and an `{ items: ResourceLink[] }` output schema using the official SDK resource-link schema; export `ResourceLink`, `MentionSearchParams`, `MentionSearchResult`, and `MentionsRegistration` from `mcp-use` (`#2792`)
+- **Enhancement** (server): mention tools advertise `mentions/search` extension metadata and always include app visibility, preserving unrelated descriptor metadata; search is annotated read-only by default (`#2792`)
+- **Enhancement** (server): search callbacks receive ordinary request context, OAuth sign-in defaults, and `ctx.signal`; empty and whitespace queries pass through unchanged. Applications control authorization, ranking, and result limits (`#2792`)
+- **Documentation**: add composer mention registration, result contracts, visibility behavior, and authorization guidance to [ChatGPT Plugin Extensions](/v2/typescript/mcp-apps/chatgpt-extensions#composer-mention-search) (`#2792`)
+- **Update** (@mcp-use/cli): rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated @mcp-use/cli to v4.3.3
+- **Update**: Updated @mcp-use/inspector to v20.3.19; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.8.2" description="October 2026">
+  ## Tunnel cancellation & API reference navigation
+  Patch release keeping development tunnels connected when a cancellation arrives after its request has finished, with clearer API reference navigation.
+
+- **Fix** (@mcp-use/tunnel, @mcp-use/cli): ignore valid late or duplicate request cancellations so they no longer close the tunnel or interrupt unrelated requests; active requests still cancel normally (`#2664`)
+- **Documentation**: improve generated API reference navigation and clarify client and React hook documentation (`#2791`)
+- **Update**: Updated @mcp-use/tunnel to v0.2.2 and @mcp-use/cli to v4.3.2
+- **Update**: Updated @mcp-use/inspector to v20.3.18; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.8.1" description="October 2026">
+  ## Streaming, code mode & deployment fixes
+  Patch release fixing streamed tool notifications, code-mode discovery, CLI deployment links and remote validation, Windows scaffolding, and Inspector tool timeouts.
+
+- **Fix** (server): request logging no longer buffers SSE response bodies, so tool progress and log notifications reach clients before tool completion. This applies at every logging level, including trace; finite JSON response logging is preserved (`#2789`)
+- **Fix** (@mcp-use/client): `CodeModeConnector.listTools()` returns `execute_code` and `search_tools`, exposes tool capabilities and protocol metadata, and returns empty resource, resource-template, and prompt lists (`#2488`)
+- **Fix** (@mcp-use/client): `CodeModeConnector` honors request abort signals for listing and tool calls, including cancellation while waiting for code execution or tool search (`#2488`)
+- **Fix** (@mcp-use/cli): deployment dashboard links use the selected organization slug and server ID for managed uploads and GitHub deployments; organizations without a slug no longer receive an invalid link (`#2744`)
+- **Fix** (@mcp-use/cli): `mcp-use deploy` validates that Git remotes are hosted on `github.com`, rejecting other hosts that merely contain `github.com` in their hostname or path (`#2687`)
+- **Fix** (create-mcp-use-app): `--install` and the install prompt run npm and pnpm through a shell on Windows so their `.cmd` shims work instead of failing with `spawn npm ENOENT` (`#2696`)
+- **Fix** (@mcp-use/inspector): tool calls honor saved timeout settings and cleared timeouts stay cleared; see the [Inspector changelog](/inspector/changelog) (`#2656`)
+- **Update**: Updated @mcp-use/agent to v2.0.22 and @mcp-use/client to v2.4.2
+- **Update**: Updated @mcp-use/inspector to v20.3.17; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.3.1
+- **Update**: Updated create-mcp-use-app to v2.0.10
+</Update>
+
+<Update label="v2.8.0" description="October 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.8.0&title=ChatGPT%20Plugin%20Extensions&date=2026-10&lang=typescript" alt="Release 2.8.0" />
+  </Frame>
+  ## ChatGPT Plugin Extensions
+  Minor release adding typed ChatGPT Plugin Extensions across server and React APIs, with updated MCP SDKs and richer examples.
+
+- **New** (server): register typed global, thread, and file entrypoints on `tool.view`; launch contracts are validated and OpenAI tool metadata is preserved (`#2737`)
+- **New** (server): register native ChatGPT plugin settings with typed fields, optional layout, validated read/update tools, request context callbacks, and per-request capability advertisement. Applications keep control of persistence and authorization (`#2739`)
+- **New** (server): advertise top-level tool icons in `tools/list`, including proxied tools, and support public-relative icon assets (`#2779`)
+- **New** (@mcp-use/react): `useDeepLink` reads the initial and subsequent ChatGPT deep-link URLs through the existing MCP App connection (`#2738`)
+- **New** (@mcp-use/react): `useModelContext` manages keyed native text, image, resource-link, and embedded-resource attachments. It activates only for committed hook consumers and handles replacement, removal, cancellation, and delivery failures without restoring stale content (`#2776`)
+- **Enhancement** (server): define supported MCP App display modes and an optional initial ChatGPT display preference in the named `viewConfig` export; validate preferences while preserving broader host capabilities (`#2740`)
+- **Enhancement** (@mcp-use/cli): include display-mode configuration in development and production view manifests and pre-bundle the model-context schema for cold iframe startup (`#2740`, `#2776`)
+- **New** (examples): add a Bookshop Plugin Extensions example with entrypoint icons, plugin settings, and model-context attachments (`#2773`)
+- **Fix** (create-mcp-use-app): failed template selection or GitHub template cloning no longer leaves an empty project directory that blocks a retry (`#2765`)
+- **Update** (@mcp-use/client): update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Node follows only same-origin redirects that preserve the request method; browsers reject redirects by default, so configure the final endpoint URL (`#2784`)
+- **Documentation**: add the ChatGPT Plugin Extensions guide for MCP Apps and clarify browser redirect restrictions (`#2772`, #2784)
+- **Update**: Updated @mcp-use/agent to v2.0.21 and @mcp-use/client to v2.4.1
+- **Update**: Updated @mcp-use/inspector to v20.3.16; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.3.0
+- **Update**: Updated create-mcp-use-app to v2.0.9
+</Update>
+
 <Update label="v2.7.3" description="October 2026">
   ## CLI argument & Windows screenshot fixes
   Patch release fixing CLI argument parsing, Windows browser discovery, scaffold deploy guidance, and Inspector chat input spacing, with dependency security updates.

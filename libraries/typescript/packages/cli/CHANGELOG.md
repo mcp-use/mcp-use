@@ -1,5 +1,139 @@
 # @mcp-use/cli
 
+## 4.4.0
+
+### Minor Changes
+
+- aa78231: Apply `.gitignore` rules by default when packaging projects for managed deployments (`mcp-use deploy --no-github`), supporting standard ignore semantics including wildcards, directory rules, and negation while preserving baseline cloud exclusions.
+
+### Patch Changes
+
+- aa78231: `mcp-use build` no longer needs the server's runtime secrets. The build evaluates the entry with `MCP_USE_PHASE=build`, and the new `isBuilding()` export of `mcp-use` lets module-scope code skip reading secrets or connecting to a database while building.
+
+  `mcp-use build` also exits when the build finishes. Before, an entry that opened a connection at module scope, such as a Redis client, kept the build process running after it had printed its result. A failed build or dev start also prints the cause of a refused connection, which it used to print as an empty line.
+
+- aa78231: `mcp-use build` now builds for production when `NODE_ENV` is unset. Before, the dev server that evaluates the entry set `NODE_ENV=development` for the rest of the build, so views shipped React's development build, and server-side JSX compiled to `jsxDEV`, which fails under `mcp-use start`. The entry is therefore also evaluated with `NODE_ENV=production` during the build.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.0-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.0-canary.1
+
+### Patch Changes
+
+- 3e9bc30: `mcp-use build` no longer needs the server's runtime secrets. The build evaluates the entry with `MCP_USE_PHASE=build`, and the new `isBuilding()` export of `mcp-use` lets module-scope code skip reading secrets or connecting to a database while building.
+
+  `mcp-use build` also exits when the build finishes. Before, an entry that opened a connection at module scope, such as a Redis client, kept the build process running after it had printed its result. A failed build or dev start also prints the cause of a refused connection, which it used to print as an empty line.
+
+- 3e9bc30: `mcp-use build` now builds for production when `NODE_ENV` is unset. Before, the dev server that evaluates the entry set `NODE_ENV=development` for the rest of the build, so views shipped React's development build, and server-side JSX compiled to `jsxDEV`, which fails under `mcp-use start`. The entry is therefore also evaluated with `NODE_ENV=production` during the build.
+
+## 4.4.0-canary.0
+
+### Minor Changes
+
+- 884521e: Apply `.gitignore` rules by default when packaging projects for managed deployments (`mcp-use deploy --no-github`), supporting standard ignore semantics including wildcards, directory rules, and negation while preserving baseline cloud exclusions.
+
+## 4.3.3
+
+### Patch Changes
+
+- b49c5f0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.3-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.2
+
+### Patch Changes
+
+- ad6ce34: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.2-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.1
+
+### Patch Changes
+
+- 6bf3a79: Fix deployment dashboard links to use the selected organization slug and server ID for managed uploads and GitHub deployments. Leave the link unavailable when an organization has no slug instead of returning an invalid route.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: `mcp-use deploy` now verifies that a Git remote is actually hosted on `github.com` before treating it as a GitHub repository. Non-GitHub hosts that contain `github.com` in their hostname or path are rejected instead of being mapped to an unrelated GitHub repository. Only explicit HTTP(S), SSH, Git, or SCP-style GitHub remotes with the original owner/repo path shape are accepted.
+
+## 4.3.1-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.1-canary.2
+
+### Patch Changes
+
+- 45bc353: `mcp-use deploy` now verifies that a Git remote is actually hosted on `github.com` before treating it as a GitHub repository. Non-GitHub hosts that contain `github.com` in their hostname or path are rejected instead of being mapped to an unrelated GitHub repository. Only explicit HTTP(S), SSH, Git, or SCP-style GitHub remotes with the original owner/repo path shape are accepted.
+
+## 4.3.1-canary.1
+
+### Patch Changes
+
+- 4d93a2e: Fix deployment dashboard links to use the selected organization slug and server ID for managed uploads and GitHub deployments. Leave the link unavailable when an organization has no slug instead of returning an invalid route.
+
+## 4.3.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.0
+
+### Minor Changes
+
+- 24bf7b0: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+
+### Patch Changes
+
+- 24bf7b0: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 4.3.0-canary.1
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 4.3.0-canary.0
+
+### Minor Changes
+
+- ab53ccd: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+
+### Patch Changes
+
+- ef495f6: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
 ## 4.2.1
 
 ### Patch Changes

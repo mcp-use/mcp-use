@@ -35,8 +35,18 @@ git branch --show-current
 git status --short
 ```
 
-The CLI does not initialize Git, create a repository, commit, push, install
-the GitHub App, or upload local source. Configure those prerequisites first.
+The CLI does not install the GitHub App. If you skip the Git steps above, it
+can perform them after asking you:
+
+- If the project has no `origin` remote, an interactive deploy offers to create
+  a private repository through the GitHub App, run `git init` when needed,
+  commit the project, and push it to `main`.
+- If the working tree has uncommitted changes, it offers to run `git add .`,
+  commit them, and push the branch before deploying.
+
+`--yes` authorizes both without prompting. In JSON or non-interactive runs
+without `--yes`, the command stops and reports the required choice. To deploy
+without GitHub, see [Deploy without GitHub](#deploy-without-github).
 
 ## Sign in
 
@@ -118,7 +128,9 @@ Pass `--new` to ignore the existing link and create a separate cloud server:
 npx mcp-use deploy --new
 ```
 
-Use `--yes` only when intentionally accepting non-interactive confirmations:
+Use `--yes` only when you intend to accept every confirmation. It also
+authorizes creating a GitHub repository and committing and pushing uncommitted
+changes with `git add .`:
 
 ```bash
 npx mcp-use deploy --new --yes
@@ -128,34 +140,57 @@ npx mcp-use deploy --new --yes
 
 The command accepts:
 
-| Flag                        | Purpose                                              |
-| --------------------------- | ---------------------------------------------------- |
-| `[path]`                    | Project directory; defaults to the current directory |
-| `--org <id-or-slug>`        | Select the Manufact organization                     |
-| `--name <name>`             | Set the server name on creation                      |
-| `--branch <name>`           | Deploy a branch instead of the current branch        |
-| `--root-dir <path>`         | Repository-relative app root                         |
-| `--region <region>`         | Select an API-supported region                       |
-| `--env <KEY=VALUE>`         | Add an environment value; repeatable                 |
-| `--env-file <path>`         | Load environment values from a file                  |
-| `--build-command <command>` | Override the detected build command                  |
-| `--start-command <command>` | Override the detected start command                  |
-| `--dockerfile <path>`       | Use a repository-relative Dockerfile                 |
-| `--new`                     | Create a new server instead of reusing the link      |
-| `--open`                    | Open the dashboard after deployment starts           |
-| `--yes`                     | Accept confirmation prompts                          |
-| `--json`                    | Emit machine-readable output                         |
+| Flag                        | Purpose                                                                    |
+| --------------------------- | -------------------------------------------------------------------------- |
+| `[path]`                    | Project directory; defaults to the current directory                       |
+| `--org <id-or-slug>`        | Select the Manufact organization                                           |
+| `--name <name>`             | Server name, and repository name when the CLI creates one                  |
+| `--branch <name>`           | Deploy a branch instead of the current branch                              |
+| `--root-dir <path>`         | Repository-relative app root                                               |
+| `--region <region>`         | Select an API-supported region                                             |
+| `--env <KEY=VALUE>`         | Add an environment value; repeatable                                       |
+| `--env-file <path>`         | Load environment values from a file                                        |
+| `--build-command <command>` | Override the detected build command                                        |
+| `--start-command <command>` | Override the detected start command                                        |
+| `--dockerfile <path>`       | Use a repository-relative Dockerfile                                       |
+| `--watch-paths <glob>`      | Auto-deploy only when matching files change; repeatable; GitHub only       |
+| `--wait-for-ci`             | Hold GitHub auto-deploys until other check runs pass; GitHub only          |
+| `--no-github`               | Upload local source to a managed private repository instead of GitHub      |
+| `--new`                     | Create a new server instead of reusing the link                            |
+| `--open`                    | Open the dashboard after deployment starts                                 |
+| `-y, --yes`                 | Accept confirmations and authorize Git and repository changes              |
+| `--json`                    | Emit machine-readable output; never prompts                                |
 
 `--root-dir` and `--dockerfile` must stay inside the repository. Repeated
 `--env` entries override duplicate keys loaded from `--env-file`, and the CLI
 does not echo uploaded values.
 
-Creation settings are applied when a server is created. For an existing
-server, use `mcp-use servers update` for supported mutable settings and
-`mcp-use servers env set` or `unset` for environment changes.
+Flags also apply when redeploying a linked server. Before the deployment
+starts, `--name`, `--branch` (which becomes the production branch), `--region`,
+`--root-dir`, `--build-command`, `--start-command`, `--dockerfile`,
+`--watch-paths`, and `--wait-for-ci` update the server's configuration. `--env`
+and `--env-file` values are written to the server's production variables, or to
+the branch's preview variables when `--branch` is set. To change settings
+without deploying, use `mcp-use servers update` and `mcp-use servers env set`
+or `unset`.
 
-Deployments always use the configured GitHub repository. The command does not
-create a platform-managed repository or upload a local source archive.
+## Deploy without GitHub
+
+Pass `--no-github` on the first deploy to upload the local project to a
+platform-managed private repository instead of GitHub:
+
+```bash
+npx mcp-use deploy --no-github
+```
+
+Later deploys of that linked server use the upload path automatically. The
+archive excludes `.git`, dependencies, build output, `.mcp-use`, `.env*` files,
+caches, coverage, OS metadata, symbolic links, and paths matched by the project
+root's `.gitignore`. The compressed archive limit is 80 MB.
+
+`--watch-paths` and `--wait-for-ci` are GitHub-only. `--no-github` cannot
+replace the source of a linked GitHub server; add `--new --yes` to create a
+separate server.
 
 ## Monorepo example
 

@@ -62,9 +62,11 @@ export interface ConnectorInitOptions {
    */
   clientOptions?: ClientOptions;
   /**
-   * Arbitrary request options (timeouts, cancellation, etc.) applied to every
-   * SDK request the connector issues (`callTool`, `listTools`, `readResource`,
-   * `getPrompt`, …). Per‑call options are merged on top and win.
+   * Request options (timeouts, cancellation, etc.) applied to every SDK
+   * request the connector issues: the initial `tools/list` in
+   * {@link BaseConnector.initialize}, `callTool`, `listTools`, `readResource`,
+   * `getPrompt`, and the other helpers. Options passed to an individual call
+   * are merged on top and take precedence.
    */
   defaultRequestOptions?: RequestOptions;
   /**

@@ -2,8 +2,9 @@
  * `@mcp-use/client` — MCP client for connecting to Model Context Protocol servers.
  *
  * Connectors, protocol-neutral MCP connections, project configuration, OAuth,
- * and code-mode helpers. The SDK negotiates legacy sessionful and modern
- * sessionless MCP servers automatically.
+ * and code-mode helpers. By default, HTTP connections negotiate the server's
+ * supported MCP protocol automatically and stdio connections use the sessionful
+ * protocol; set `protocolNegotiation` to override either default.
  */
 
 import "./telemetry/configure-node.js";

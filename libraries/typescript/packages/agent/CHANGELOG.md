@@ -1,5 +1,62 @@
 # @mcp-use/agent
 
+## 2.0.23
+
+### Patch Changes
+
+- aa78231: Fall back to `"[no content]"` when tool result content is an empty string in Anthropic provider, preventing HTTP 400 Bad Request errors from the Anthropic Messages API.
+- Updated dependencies [aa78231]
+  - @mcp-use/client@2.4.3
+
+## 2.0.23-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c64b4d4]
+  - @mcp-use/client@2.4.3-canary.0
+
+## 2.0.23-canary.0
+
+### Patch Changes
+
+- bd6ee70: Fall back to `"[no content]"` when tool result content is an empty string in Anthropic provider, preventing HTTP 400 Bad Request errors from the Anthropic Messages API.
+
+## 2.0.22
+
+### Patch Changes
+
+- Updated dependencies [6bf3a79]
+  - @mcp-use/client@2.4.2
+
+## 2.0.22-canary.0
+
+### Patch Changes
+
+- Updated dependencies [b3990f0]
+  - @mcp-use/client@2.4.2-canary.0
+
+## 2.0.21
+
+### Patch Changes
+
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+- Updated dependencies [24bf7b0]
+  - @mcp-use/client@2.4.1
+
+## 2.0.21-canary.0
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+- Updated dependencies [df6440c]
+  - @mcp-use/client@2.4.1-canary.0
+
 ## 2.0.20
 
 ### Patch Changes

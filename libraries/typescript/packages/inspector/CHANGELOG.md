@@ -1,5 +1,109 @@
 # @mcp-use/inspector
 
+## 20.3.20
+
+### Patch Changes
+
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.19
+
+### Patch Changes
+
+- b49c5f0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.19-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.18
+
+### Patch Changes
+
+- ad6ce34: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.18-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17
+
+### Patch Changes
+
+- 6bf3a79: Apply saved Inspector timeout settings to tool calls, preserve cleared timeouts when reopening or renaming a connection, and explain what blank timeout fields mean.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17-canary.1
+
+### Patch Changes
+
+- 53dcb47: Apply saved Inspector timeout settings to tool calls, preserve cleared timeouts when reopening or renaming a connection, and explain what blank timeout fields mean.
+
+## 20.3.17-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- 24bf7b0: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 24bf7b0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.15
 
 ### Patch Changes

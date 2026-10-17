@@ -11,6 +11,7 @@
  * `mcp-use start` therefore never evaluate Vite.
  */
 
+import { readViewConfig } from "./view-config.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
@@ -279,6 +280,7 @@ async function buildView(
     }
     return {
       kind: "inline",
+      viewConfig: readViewConfig(view.entryPath),
       js: inlineJs,
       css: inlineCss.join("\n"),
     };
@@ -286,6 +288,7 @@ async function buildView(
 
   return {
     kind: "external",
+    viewConfig: readViewConfig(view.entryPath),
     entry: jsFileName.replace(/^\/+/, ""),
     css: cssFileName !== undefined ? [cssFileName.replace(/^\/+/, "")] : [],
   };
@@ -313,6 +316,14 @@ async function buildView(
  */
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();
+  // Vite's dev server, which evaluates the entry below, sets NODE_ENV to
+  // development when it is unset, and every later build in this process
+  // would then bundle React's development build: views would ship it, and
+  // server JSX would call `jsxDEV`, which production React leaves undefined.
+  // Set it before the project `.env` loads, as `mcp-use start` does, so a
+  // `.env` that sets NODE_ENV=development cannot undo it. An explicit shell
+  // NODE_ENV still wins.
+  process.env["NODE_ENV"] ??= "production";
   loadProjectEnv(options.cwd, "production");
   const sourceRoot =
     options.mcpDir === undefined

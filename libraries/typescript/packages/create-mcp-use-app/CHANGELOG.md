@@ -1,5 +1,29 @@
 # create-mcp-use-app
 
+## 2.0.10
+
+### Patch Changes
+
+- 6bf3a79: Install dependencies on Windows. `--install` and the install prompt started npm and pnpm without a shell, which cannot run their `.cmd` shims, so the install step failed with `spawn npm ENOENT` and asked for a manual install. On Windows the package manager now runs through the shell; macOS and Linux are unchanged.
+
+## 2.0.10-canary.0
+
+### Patch Changes
+
+- 368b835: Install dependencies on Windows. `--install` and the install prompt started npm and pnpm without a shell, which cannot run their `.cmd` shims, so the install step failed with `spawn npm ENOENT` and asked for a manual install. On Windows the package manager now runs through the shell; macOS and Linux are unchanged.
+
+## 2.0.9
+
+### Patch Changes
+
+- 24bf7b0: A scaffold that fails before copying the template no longer leaves an empty project directory behind. An unknown or invalid `--template`, or a GitHub template that can't be cloned, used to leave `my-project/` in place, so retrying with a valid template failed with `Directory "my-project" already exists!` until the directory was deleted by hand.
+
+## 2.0.9-canary.0
+
+### Patch Changes
+
+- b3408b9: A scaffold that fails before copying the template no longer leaves an empty project directory behind. An unknown or invalid `--template`, or a GitHub template that can't be cloned, used to leave `my-project/` in place, so retrying with a valid template failed with `Directory "my-project" already exists!` until the directory was deleted by hand.
+
 ## 2.0.8
 
 ### Patch Changes

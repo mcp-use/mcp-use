@@ -79,6 +79,14 @@ Ensure all of the following have been completed:
 # Use the appropriate language syntax (python, typescript, bash, etc.)
 ```
 
+## Before / After Video or Screenshots
+
+> Required if this PR changes the Inspector (`@mcp-use/inspector`). Attach a video recording or screenshots.
+
+**Before:**
+
+**After:**
+
 ## Documentation Updates
 
 * List any documentation files that were updated

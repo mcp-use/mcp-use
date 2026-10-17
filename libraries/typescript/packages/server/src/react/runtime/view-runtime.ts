@@ -553,6 +553,7 @@ export function createMcpAppRuntime(
 
     app.onhostcontextchanged = (params) => {
       if (disposed) return;
+      modelContextStore.receiveHostContext(params as Record<string, unknown>);
       applyHostContext({
         ...(hostSnapshot.hostContext ?? {}),
         ...params,

@@ -1,5 +1,45 @@
 # @mcp-use/client
 
+## 2.4.3
+
+### Patch Changes
+
+- aa78231: Correct API reference comments. In `@mcp-use/client`, stdio `env` does not inherit the parent process environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, and several examples referenced fields and connectors that do not exist. In `mcp-use`, legacy stateless GET, DELETE, and HEAD requests are documented as returning `204`, the `withMcpUse` defaults match the build, and the `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` entry points now appear in the generated API reference.
+
+## 2.4.3-canary.0
+
+### Patch Changes
+
+- c64b4d4: Correct API reference comments. In `@mcp-use/client`, stdio `env` does not inherit the parent process environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, and several examples referenced fields and connectors that do not exist. In `mcp-use`, legacy stateless GET, DELETE, and HEAD requests are documented as returning `204`, the `withMcpUse` defaults match the build, and the `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` entry points now appear in the generated API reference.
+
+## 2.4.2
+
+### Patch Changes
+
+- 6bf3a79: Implement `listTools` and protocol metadata on `CodeModeConnector`
+
+## 2.4.2-canary.0
+
+### Patch Changes
+
+- b3990f0: Implement `listTools` and protocol metadata on `CodeModeConnector`
+
+## 2.4.1
+
+### Patch Changes
+
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 2.4.1-canary.0
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
 ## 2.4.0
 
 ### Minor Changes

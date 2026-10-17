@@ -6,6 +6,49 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.20" description="October 2026">
+  ## OAuth Proxy release alignment
+  Canary patch release (`@mcp-use/inspector@20.3.20-canary.3`) paired with `mcp-use@2.10.0-canary.4`, rebuilding bundled workspace code with the framework's OAuth Proxy and build changes. Stable v20.3.20 has not shipped; this wave has no Inspector-specific source changes.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.10.0 (canary.4)
+</Update>
+
+<Update label="v20.3.19" description="October 2026">
+  ## Composer mention search release alignment
+  Patch release paired with `mcp-use` v2.9.0, rebuilding bundled workspace code with the framework's composer mention search helper. This release has no Inspector-specific source changes.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.9.0
+</Update>
+
+<Update label="v20.3.18" description="October 2026">
+  ## Framework release alignment
+  Patch release paired with `mcp-use` v2.8.2, rebuilding the bundled Inspector and synchronizing internal package metadata.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.8.2
+</Update>
+
+<Update label="v20.3.17" description="October 2026">
+  ## Saved tool timeout settings
+  Patch release paired with `mcp-use` v2.8.1, applying connection timeout settings to tool calls and preserving cleared values.
+
+- **Fix**: tool calls use the saved request timeout, maximum total timeout, and reset-on-progress setting instead of hard-coded defaults (`#2656`)
+- **Fix**: cleared timeout fields stay cleared when reopening or renaming a connection (`#2656`)
+- **Fix**: changing a connection URL rejects duplicates before removing the existing connection (`#2656`)
+- **Enhancement**: connection settings explain that a blank request timeout uses the 10-minute default and a blank maximum total timeout removes the overall time limit while retaining the request timeout (`#2656`)
+- **Update**: Updated mcp-use to v2.8.1
+</Update>
+
+<Update label="v20.3.16" description="October 2026">
+  ## Framework release alignment
+  Patch release paired with `mcp-use` v2.8.0, rebuilding the bundled Inspector with the ChatGPT Plugin Extensions framework updates.
+
+- **Update**: rebuild bundled workspace code and synchronize published internal package metadata
+- **Update**: Updated mcp-use to v2.8.0
+</Update>
+
 <Update label="v20.3.15" description="October 2026">
   ## Chat input toolbar spacing
   Patch release paired with `mcp-use` v2.7.3, keeping multiline messages clear of the chat toolbar and updating dependencies.
