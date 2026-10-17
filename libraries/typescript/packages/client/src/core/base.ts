@@ -368,7 +368,20 @@ export abstract class BaseMCPClient {
       );
       const session = new MCPSession(connector);
       if (autoInitialize) {
-        await session.initialize();
+        try {
+          await session.initialize();
+        } catch (err) {
+          // This session is not in the map yet, so closeSession() cannot
+          // release its transport if initialization fails after connecting.
+          try {
+            await this.disconnectSession(session);
+          } catch (cleanupError) {
+            logger.warn(
+              `Error cleaning up failed session for '${serverName}': ${cleanupError}`
+            );
+          }
+          throw err;
+        }
       }
       return session;
     };
