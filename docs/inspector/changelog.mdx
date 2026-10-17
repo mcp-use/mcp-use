@@ -6,12 +6,23 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.21" description="October 2026">
+  ## Public MCP connections & tool headers
+  Patch fixes for browser connections and tool calls, paired with `mcp-use` v2.10.1.
+
+- **Fix**: public MCP endpoints remain connected anonymously when fallback OAuth metadata belongs to a different resource, instead of incorrectly requiring authentication (`#2858`)
+- **Fix**: discard cached OAuth credentials without a valid issuer stamp or with a mismatched issuer. Affected users may need to sign in again (`#2858`)
+- **Fix**: tool calls send parameters annotated with `x-mcp-header` as `Mcp-Param-*` headers as well as in the request body, so servers requiring the headers accept browser calls (`#2803`)
+- **Update**: rebuild bundled workspace code with @mcp-use/client v2.4.4 and @mcp-use/agent v2.0.24
+- **Update**: Updated mcp-use to v2.10.1
+</Update>
+
 <Update label="v20.3.20" description="October 2026">
   ## OAuth Proxy release alignment
-  Canary patch release (`@mcp-use/inspector@20.3.20-canary.3`) paired with `mcp-use@2.10.0-canary.4`, rebuilding bundled workspace code with the framework's OAuth Proxy and build changes. Stable v20.3.20 has not shipped; this wave has no Inspector-specific source changes.
+  Patch release paired with `mcp-use` v2.10.0, rebuilding bundled workspace code with the framework's OAuth Proxy and build changes. This release has no Inspector-specific source changes.
 
 - **Update**: rebuild bundled workspace code and synchronize published internal package metadata
-- **Update**: Updated mcp-use to v2.10.0 (canary.4)
+- **Update**: Updated mcp-use to v2.10.0
 </Update>
 
 <Update label="v20.3.19" description="October 2026">
