@@ -10,5 +10,8 @@
     "mcp-use": "2.10.1",
     "@mcp-use/tunnel": "0.2.2"
   },
-  "changesets": []
+  "changesets": [
+    "cli-client-install-windows",
+    "propagated-f3c3372fbd41ab78"
+  ]
 }
