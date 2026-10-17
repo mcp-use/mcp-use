@@ -1,3 +1,4 @@
+import { parseToolArguments } from "../toolArguments.js";
 import { parseSSE } from "../sse.js";
 import {
   partitionToolContent,
@@ -214,13 +215,15 @@ export async function* streamChat(
     }
     if (choice.finish_reason) {
       for (const [idx, buf] of buffers) {
-        let args: Record<string, unknown> = {};
-        if (buf.argsJson) {
-          try {
-            args = JSON.parse(buf.argsJson);
-          } catch {
-            args = {};
-          }
+        let args: Record<string, unknown>;
+        try {
+          args = parseToolArguments(buf.argsJson, buf.name);
+        } catch (err) {
+          yield {
+            type: "error",
+            message: err instanceof Error ? err.message : String(err),
+          };
+          return;
         }
         yield {
           type: "tool-call-ready",
@@ -274,12 +277,10 @@ export async function chat(params: ChatParams): Promise<{
     typeof choice?.content === "string" ? choice.content : "";
   const toolCalls = Array.isArray(choice?.tool_calls)
     ? choice.tool_calls.map((tc: any) => {
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(tc?.function?.arguments ?? "{}");
-        } catch {
-          args = {};
-        }
+        const args = parseToolArguments(
+          tc?.function?.arguments ?? "{}",
+          tc.function?.name ?? ""
+        );
         return {
           id: tc.id,
           name: tc.function?.name ?? "",
