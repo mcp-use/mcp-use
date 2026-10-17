@@ -114,3 +114,17 @@ pnpm dev
 
 It requires network access while starting. The default command runs
 `mcp-use dev`, which serves the default export and built-in inspector.
+
+## JSON request media types
+
+Generated tools select request bodies from entries that include a schema. They prefer
+`application/json`, then the first concrete media type ending in `+json`, then
+`application/*+json`. Media type matching is case-insensitive. Concrete entries use
+the declared media type as the request's `Content-Type`.
+
+A wildcard-only `application/*+json` entry does not identify a concrete subtype.
+For compatibility, generated requests still default to `application/json` in that
+case. That type is not within the wildcard suffix range, so strict endpoints may
+reject it. Set a concrete `Content-Type` in `headers` for these endpoints. An explicit
+`Content-Type` header always overrides automatic selection, regardless of header-name case.
+No `Content-Type` is added when the body is omitted.
