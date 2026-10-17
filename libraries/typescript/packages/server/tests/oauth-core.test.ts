@@ -8,6 +8,7 @@ import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 
 import {
+  mapOAuthAuthInfo,
   resolveConfiguredOAuthResource,
   wrapOAuthTokenVerifier,
 } from "../src/oauth/internal.js";
@@ -59,6 +60,60 @@ describe("OAuth core", () => {
         permissions: ["tools:read"],
       },
     });
+  });
+
+  it("maps AuthInfo supplied by a custom admission hook", () => {
+    const authInfo: AuthInfo = {
+      token: "adapter-token",
+      clientId: "client-1",
+      scopes: ["mcp"],
+      expiresAt: Date.now() / 1000 + 60,
+      resource: canonicalResource,
+      extra: { upstream: true },
+    };
+
+    expect(
+      mapOAuthAuthInfo(createProvider(authInfo), authInfo, canonicalResource)
+    ).toMatchObject({
+      token: "adapter-token",
+      clientId: "client-1",
+      scopes: ["mcp"],
+      extra: {
+        upstream: true,
+        user: { id: "user-1" },
+        payload: { sub: "user-1" },
+        permissions: ["tools:read"],
+      },
+    });
+  });
+
+  it("rejects admission AuthInfo bound to a different canonical resource", () => {
+    const provider = createProvider({
+      token: "adapter-token",
+      clientId: "client-1",
+      scopes: ["mcp"],
+      expiresAt: Date.now() / 1000 + 60,
+      resource: new URL("https://other.example.test/mcp"),
+    });
+
+    expect(() =>
+      mapOAuthAuthInfo(
+        provider,
+        {
+          token: "adapter-token",
+          clientId: "client-1",
+          scopes: ["mcp"],
+          expiresAt: Date.now() / 1000 + 60,
+          resource: new URL("https://other.example.test/mcp"),
+        },
+        canonicalResource
+      )
+    ).toThrow(
+      expect.objectContaining({
+        code: OAuthErrorCode.InvalidToken,
+        message: "Token resource does not match the protected resource",
+      })
+    );
   });
 
   it("rejects incomplete verifier output as an invalid token", async () => {

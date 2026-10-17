@@ -8,9 +8,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import type { JSONRPCMessage } from "@modelcontextprotocol/server";
 import { MCPServer } from "../src/index.js";
 import {
   oauthCustomProvider,
+  type OAuthAuthInfo,
+  type OAuthAdmissionHook,
+  type OAuthExtra,
   type OAuthMetadata,
   type OAuthProviderHost,
 } from "../src/oauth/index.js";
@@ -23,7 +27,11 @@ interface TestUser {
 }
 
 /** Any bearer verifies with the `shop` scope as user `user-1`. */
-function provider(setup: (host: OAuthProviderHost<TestUser>) => void) {
+function provider(
+  setup: (host: OAuthProviderHost<TestUser>) => void,
+  admit?: OAuthAdmissionHook,
+  mapAuthInfo?: (authInfo: OAuthAuthInfo) => OAuthExtra<TestUser>
+) {
   return oauthCustomProvider<TestUser>({
     resource,
     requiredScopes: ["shop"],
@@ -37,23 +45,28 @@ function provider(setup: (host: OAuthProviderHost<TestUser>) => void) {
       }),
     }),
     oauthMetadata: { issuer } as OAuthMetadata,
-    mapAuthInfo: () => ({
-      user: { id: "user-1" },
-      payload: {},
-      permissions: [],
-    }),
+    mapAuthInfo:
+      mapAuthInfo ??
+      (() => ({
+        user: { id: "user-1" },
+        payload: {},
+        permissions: [],
+      })),
+    ...(admit !== undefined && { admit }),
     setup,
   });
 }
 
 function server(
   setup: (host: OAuthProviderHost<TestUser>) => void,
-  options: { instructions?: string; mixedAuth?: boolean } = {}
+  options: { instructions?: string; mixedAuth?: boolean } = {},
+  admit?: OAuthAdmissionHook,
+  mapAuthInfo?: (authInfo: OAuthAuthInfo) => OAuthExtra<TestUser>
 ) {
   return new MCPServer({
     name: "shop",
     version: "1.0.0",
-    oauth: provider(setup),
+    oauth: provider(setup, admit, mapAuthInfo),
     logging: { enabled: false },
     ...(options.mixedAuth !== undefined && { mixedAuth: options.mixedAuth }),
     ...(options.instructions !== undefined && {
@@ -165,6 +178,189 @@ describe("OAuth provider setup hook", () => {
     await app.fetch(post("tools/list", {}, signedIn));
     await app.fetch(post("tools/list", {}, signedIn));
     expect(setup).toHaveBeenCalledOnce();
+  });
+
+  it("uses the custom admission hook through server.fetch", async () => {
+    const admit = vi.fn(
+      async (_request: Request, messages: JSONRPCMessage[]) => {
+        expect(messages).toMatchObject([{ method: "tools/list" }]);
+        return new Response("fetch admitted", { status: 202 });
+      }
+    );
+    const app = server(() => {}, {}, admit);
+    const response = await app.fetch(post("tools/list"));
+
+    expect(response.status).toBe(202);
+    expect(await response.text()).toBe("fetch admitted");
+    expect(admit).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("uses the same admission hook through server.listen", async () => {
+    const admit = vi.fn(
+      async (_request: Request, messages: JSONRPCMessage[]) => {
+        expect(messages).toMatchObject([{ method: "tools/list" }]);
+        return new Response("listener admitted", { status: 202 });
+      }
+    );
+    const app = server(() => {}, {}, admit);
+    try {
+      const listening = await app.listen(0, { host: "127.0.0.1" });
+      const response = await fetch(listening.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+          params: {},
+        }),
+      });
+
+      expect(response.status).toBe(202);
+      expect(await response.text()).toBe("listener admitted");
+      expect(admit).toHaveBeenCalledOnce();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("preserves the mixed-auth policy through fetch and listen when admission defers", async () => {
+    const admit: OAuthAdmissionHook = async () => ({ type: "defer" });
+    const register = (host: OAuthProviderHost<TestUser>) => {
+      host.tool(
+        { name: "browse", securitySchemes: [{ type: "noauth" }] },
+        async () => ({ content: [{ type: "text", text: "public" }] })
+      );
+      host.tool({ name: "private" }, async (_args, ctx) => ({
+        content: [{ type: "text", text: ctx.auth.user.id }],
+      }));
+    };
+    const createApp = () => server(register, { mixedAuth: true }, admit);
+    const app = createApp();
+
+    try {
+      const fetchResponses = await Promise.all([
+        app.fetch(post("tools/list")),
+        app.fetch(call("browse")),
+        app.fetch(call("private")),
+      ]);
+      expect(fetchResponses.map((response) => response.status)).toEqual([
+        200, 200, 401,
+      ]);
+    } finally {
+      await app.close();
+    }
+
+    const listeningApp = createApp();
+    try {
+      const listening = await listeningApp.listen(0, { host: "127.0.0.1" });
+      const send = async (request: Request) =>
+        fetch(listening.url, {
+          method: request.method,
+          headers: request.headers,
+          body: await request.text(),
+        });
+      const listenResponses = await Promise.all([
+        send(post("tools/list")),
+        send(call("browse")),
+        send(call("private")),
+      ]);
+      expect(listenResponses.map((response) => response.status)).toEqual([
+        200, 200, 401,
+      ]);
+    } finally {
+      await listeningApp.close();
+    }
+  });
+
+  it("rejects an empty bearer returned by admission as an OAuth authentication failure", async () => {
+    const authInfo: OAuthAuthInfo = {
+      token: "adapter-token",
+      clientId: "adapter-client",
+      scopes: ["shop"],
+      expiresAt: Date.now() / 1000 + 60,
+      resource: new URL(resource),
+    };
+    const admit: OAuthAdmissionHook = async () => ({
+      bearer: " ",
+      authInfo,
+    });
+    const app = server(() => {}, {}, admit);
+
+    try {
+      const response = await app.fetch(post("tools/list"));
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get("www-authenticate")).toContain(
+        'error="invalid_token"'
+      );
+      expect(response.headers.get("www-authenticate")).toContain(
+        "non-empty bearer token"
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns OAuth authentication challenges for invalid admitted AuthInfo and identity mapping failures", async () => {
+    const validAuthInfo: OAuthAuthInfo = {
+      token: "adapter-token",
+      clientId: "adapter-client",
+      scopes: ["shop"],
+      expiresAt: Date.now() / 1000 + 60,
+      resource: new URL(resource),
+    };
+    const cases: Array<{
+      authInfo: OAuthAuthInfo;
+      mapAuthInfo?: (authInfo: OAuthAuthInfo) => OAuthExtra<TestUser>;
+      description: string;
+    }> = [
+      {
+        authInfo: { ...validAuthInfo, expiresAt: 0 },
+        description:
+          "Token verifier returned invalid authentication information",
+      },
+      {
+        authInfo: {
+          ...validAuthInfo,
+          resource: new URL("https://other.example.test/mcp"),
+        },
+        description: "Token resource does not match the protected resource",
+      },
+      {
+        authInfo: validAuthInfo,
+        mapAuthInfo: () => {
+          throw new Error("mapper failed");
+        },
+        description: "Token identity mapping failed",
+      },
+    ];
+
+    for (const testCase of cases) {
+      const admit: OAuthAdmissionHook = async () => ({
+        bearer: "adapter-token",
+        authInfo: testCase.authInfo,
+      });
+      const app = server(() => {}, {}, admit, testCase.mapAuthInfo);
+
+      try {
+        const response = await app.fetch(post("tools/list"));
+
+        expect(response.status).toBe(401);
+        expect(response.headers.get("www-authenticate")).toContain(
+          'error="invalid_token"'
+        );
+        expect(response.headers.get("www-authenticate")).toContain(
+          `error_description="${testCase.description}"`
+        );
+      } finally {
+        await app.close();
+      }
+    }
   });
 
   it("registers provider tools behind the bearer gate, with the mapped identity", async () => {

@@ -15,6 +15,8 @@ import {
   OAuthError,
   OAuthErrorCode,
   oauthCustomProvider,
+  type OAuthAdmissionHook,
+  type OAuthAuthInfo,
   type OAuthMetadata,
 } from "../src/oauth/index.js";
 import { viewResourceUri } from "../src/views/constants.js";
@@ -34,7 +36,10 @@ interface TestUser {
  * grants the baseline as user `<id>`; `invalid` and `expired` fail
  * verification; anything else grants the baseline. Users default to `user-1`.
  */
-function provider(requiredScopes: readonly string[] = ["shop"]) {
+function provider(
+  requiredScopes: readonly string[] = ["shop"],
+  admit?: OAuthAdmissionHook
+) {
   return oauthCustomProvider<TestUser>({
     resource,
     requiredScopes,
@@ -69,6 +74,7 @@ function provider(requiredScopes: readonly string[] = ["shop"]) {
       payload: {},
       permissions: [],
     }),
+    ...(admit !== undefined && { admit }),
   });
 }
 
@@ -177,12 +183,16 @@ function who(auth: { user: TestUser; scopes: string[] } | undefined): string {
 }
 
 function oauthServer(
-  options: { mixedAuth?: boolean; requiredScopes?: readonly string[] } = {}
+  options: {
+    mixedAuth?: boolean;
+    requiredScopes?: readonly string[];
+    admit?: OAuthAdmissionHook;
+  } = {}
 ) {
   return new MCPServer({
     name: "auth",
     version: "1.0.0",
-    oauth: provider(options.requiredScopes),
+    oauth: provider(options.requiredScopes, options.admit),
     mixedAuth: options.mixedAuth ?? true,
     logging: { enabled: false },
   });
@@ -209,7 +219,12 @@ function text(value: string) {
  * One tool per `securitySchemes` shape, a noauth tool with a view, and one
  * resource, resource template, and prompt, which always require sign-in.
  */
-function shopServer(options: { requiredScopes?: readonly string[] } = {}) {
+function shopServer(
+  options: {
+    requiredScopes?: readonly string[];
+    admit?: OAuthAdmissionHook;
+  } = {}
+) {
   const server = oauthServer(options);
 
   server.tool(
@@ -381,6 +396,73 @@ describe("mixed auth: tools/list metadata", () => {
 });
 
 describe("mixed auth: tools", () => {
+  it("preserves anonymous discovery and noauth tools when admission defers", async () => {
+    const admit: OAuthAdmissionHook = async () => ({ type: "defer" });
+    const handler = shopServer({ admit }).fetch;
+
+    expect(
+      (
+        await handler(
+          post(
+            {
+              jsonrpc: "2.0",
+              id: 1,
+              method: "initialize",
+              params: {
+                protocolVersion: "2025-11-25",
+                capabilities: {},
+                clientInfo: { name: "test", version: "0" },
+              },
+            },
+            {},
+            { legacy: true }
+          )
+        )
+      ).status
+    ).toBe(200);
+    expect((await handler(post(rpc("server/discover")))).status).toBe(200);
+    expect((await handler(post(rpc("tools/list")))).status).toBe(200);
+    expect(await resultText(await handler(call("browse_catalog")))).toBe(
+      "catalog:signed-out"
+    );
+    const protectedCall = await handler(call("order_history"));
+    expect(protectedCall.status).toBe(401);
+    expect(challenge(protectedCall)).toContain('error="invalid_token"');
+  });
+
+  it("uses admitted identities and still validates standard bearer tokens", async () => {
+    const admittedAuthInfo: OAuthAuthInfo = {
+      token: "ignored-admission-token",
+      clientId: "adapter-client",
+      scopes: ["shop"],
+      expiresAt: Date.now() / 1000 + 60,
+      resource: new URL(resource),
+    };
+    const admit: OAuthAdmissionHook = async (request) =>
+      request.headers.get("x-session") === "valid"
+        ? { bearer: "user:adapter", authInfo: admittedAuthInfo }
+        : { type: "defer" };
+    const handler = shopServer({ admit }).fetch;
+
+    const admitted = await handler(
+      call("order_history", { "x-session": "valid" })
+    );
+    expect(admitted.status).toBe(200);
+    expect(await resultText(admitted)).toBe("orders:adapter");
+
+    const standardBearer = await handler(
+      call("order_history", bearer("user:ada"))
+    );
+    expect(standardBearer.status).toBe(200);
+    expect(await resultText(standardBearer)).toBe("orders:ada");
+
+    const invalidBearer = await handler(
+      call("order_history", bearer("invalid"))
+    );
+    expect(invalidBearer.status).toBe(401);
+    expect(challenge(invalidBearer)).toContain('error="invalid_token"');
+  });
+
   it("runs noauth and optional tools signed out, with ctx.auth when a token is sent", async () => {
     const handler = shopServer().fetch;
     for (const name of ["browse_catalog", "recommend"]) {
