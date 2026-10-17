@@ -1,5 +1,12 @@
 # @mcp-use/agent
 
+## 2.0.24-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9ab2723]
+  - @mcp-use/client@2.4.4-canary.1
+
 ## 2.0.24-canary.0
 
 ### Patch Changes

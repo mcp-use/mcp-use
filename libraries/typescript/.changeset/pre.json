@@ -12,6 +12,8 @@
   },
   "changesets": [
     "client-x-mcp-header-browser",
+    "mixed-auth-resource-binding",
+    "propagated-7ddb1b5f83ffa8af",
     "propagated-95f9b2aa1da254ff",
     "propagated-cc5428f9b791f430",
     "view-widget-description"

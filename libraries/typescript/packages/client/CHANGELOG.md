@@ -1,5 +1,13 @@
 # @mcp-use/client
 
+## 2.4.4-canary.1
+
+### Patch Changes
+
+- 9ab2723: Validate discovered OAuth metadata with the official SDK before classifying an anonymous MCP connection as mixed auth. Root metadata for a different resource no longer causes public endpoints to appear to require authentication.
+
+  Reject cached OAuth credentials with a missing, empty, or mismatched issuer stamp rather than adopting them for a newly discovered issuer.
+
 ## 2.4.4-canary.0
 
 ### Patch Changes
