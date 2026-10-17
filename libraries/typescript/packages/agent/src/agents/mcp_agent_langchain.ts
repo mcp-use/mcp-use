@@ -1843,12 +1843,6 @@ export class MCPAgent {
             : String(query);
       logger.debug(`💬 Received query for streamEvents: '${display_query}'`);
 
-      // Add user message to history if memory enabled
-      if (this.memoryEnabled) {
-        logger.debug(`🔄 Adding user message to history: ${display_query}`);
-        this.addToHistory(new HumanMessage({ content: query }));
-      }
-
       // Prepare history
       const historyToUse = history ?? this.conversationHistory;
       const langchainHistory: BaseMessage[] = [];
@@ -1956,6 +1950,14 @@ export class MCPAgent {
             finalResponse = output.output;
           }
         }
+      }
+
+      // Add the user message to history now that the stream has completed,
+      // mirroring run()/stream() which commit new messages to memory only
+      // after execution finishes, so a failed stream leaves no orphaned query.
+      if (this.memoryEnabled) {
+        logger.debug(`🔄 Adding user message to history: ${display_query}`);
+        this.addToHistory(new HumanMessage({ content: query }));
       }
 
       // Convert to structured output if requested
