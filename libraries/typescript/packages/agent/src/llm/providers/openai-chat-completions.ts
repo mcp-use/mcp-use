@@ -152,7 +152,13 @@ export async function* streamChat(
   // `tool-call-ready` with fully-parsed args.
   const buffers = new Map<
     number,
-    { id: string; name: string; argsJson: string; started: boolean }
+    {
+      id: string;
+      name: string;
+      argsJson: string | undefined;
+      invalidArguments: boolean;
+      started: boolean;
+    }
   >();
 
   for await (const ev of parseSSE(stream, signal)) {
@@ -181,7 +187,8 @@ export async function* streamChat(
           buf = {
             id: tc.id ?? `call_${idx}`,
             name: tc.function?.name ?? "",
-            argsJson: "",
+            argsJson: undefined,
+            invalidArguments: false,
             started: false,
           };
           buffers.set(idx, buf);
@@ -198,10 +205,13 @@ export async function* streamChat(
             toolName: buf.name,
           };
         }
-        const argsChunk: string | undefined = tc.function?.arguments;
-        if (typeof argsChunk === "string" && argsChunk.length > 0) {
-          buf.argsJson += argsChunk;
-          if (buf.started) {
+        const argsChunk: unknown = tc.function?.arguments;
+        if (argsChunk !== undefined && typeof argsChunk !== "string") {
+          buf.invalidArguments = true;
+        }
+        if (typeof argsChunk === "string") {
+          buf.argsJson = (buf.argsJson ?? "") + argsChunk;
+          if (buf.started && argsChunk.length > 0) {
             yield {
               type: "tool-call-args-delta",
               index: idx,
@@ -217,7 +227,10 @@ export async function* streamChat(
       for (const [idx, buf] of buffers) {
         let args: Record<string, unknown>;
         try {
-          args = parseToolArguments(buf.argsJson, buf.name);
+          args = parseToolArguments(
+            buf.invalidArguments ? undefined : buf.argsJson,
+            buf.name
+          );
         } catch (err) {
           yield {
             type: "error",
@@ -278,7 +291,7 @@ export async function chat(params: ChatParams): Promise<{
   const toolCalls = Array.isArray(choice?.tool_calls)
     ? choice.tool_calls.map((tc: any) => {
         const args = parseToolArguments(
-          tc?.function?.arguments ?? "{}",
+          tc?.function?.arguments,
           tc.function?.name ?? ""
         );
         return {

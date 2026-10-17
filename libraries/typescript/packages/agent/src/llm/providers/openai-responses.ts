@@ -210,7 +210,7 @@ function buildResponsesBody(
 interface FunctionCallItem {
   call_id: string;
   name: string;
-  arguments: string;
+  arguments: unknown;
 }
 
 export function extractFunctionCalls(output: unknown[]): FunctionCallItem[] {
@@ -225,7 +225,7 @@ export function extractFunctionCalls(output: unknown[]): FunctionCallItem[] {
     calls.push({
       call_id: row.call_id,
       name: row.name,
-      arguments: typeof row.arguments === "string" ? row.arguments : "{}",
+      arguments: row.arguments,
     });
   }
   return calls;
@@ -335,14 +335,15 @@ export async function* streamResponsesTurn(
 
     if (type === "response.function_call_arguments.done") {
       const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
-      const argsRaw =
-        typeof parsed.arguments === "string" ? parsed.arguments : "";
+      const argsRaw = parsed.arguments;
       const buf = callBuffers.get(callId);
       if (buf) {
-        if (argsRaw) buf.argsJson = argsRaw;
         let args: Record<string, unknown>;
         try {
-          args = parseToolArguments(buf.argsJson || argsRaw, buf.name);
+          args = parseToolArguments(
+            argsRaw === "" ? buf.argsJson : argsRaw,
+            buf.name
+          );
         } catch (err) {
           yield {
             type: "error",

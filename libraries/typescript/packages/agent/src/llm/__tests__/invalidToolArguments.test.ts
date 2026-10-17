@@ -10,7 +10,7 @@ const messages = [
 
 function providerReply(
   provider: ProviderConfig["provider"],
-  args: string | string[],
+  args: string | unknown[],
   streaming: boolean
 ): Response {
   const items = (Array.isArray(args) ? args : [args]).map(
@@ -97,15 +97,25 @@ describe.each(["openai-compatible", "openai"] as const)(
   (provider) => {
     it.each(
       [false, true].flatMap((streaming) =>
-        ['{"target":"requested"', "null", "[]"].map(
-          (args) => [streaming, args] as const
-        )
+        [
+          '{"target":"requested"',
+          "null",
+          "[]",
+          false,
+          0,
+          true,
+          42,
+          null,
+          undefined,
+          {},
+          [],
+        ].map((args) => [streaming, args] as const)
       )
     )(
       "does not execute invalid arguments (streaming=%s, args=%s)",
       async (streaming, rawArguments) => {
         vi.stubGlobal("fetch", async () =>
-          providerReply(provider, rawArguments, streaming)
+          providerReply(provider, [rawArguments], streaming)
         );
         const executed: unknown[] = [];
         const params = {
@@ -230,15 +240,15 @@ describe.each(["openai-compatible", "openai"] as const)(
 describe.each(["openai-compatible", "openai"] as const)(
   "invalid multi-call turn from %s",
   (provider) => {
-    it.each([false, true])(
-      "validates the whole turn before dispatch (streaming=%s)",
-      async (streaming) => {
+    it.each(
+      [false, true].flatMap((streaming) =>
+        ['{"target":', false].map((args) => [streaming, args] as const)
+      )
+    )(
+      "validates the whole turn before dispatch (streaming=%s, args=%s)",
+      async (streaming, args) => {
         vi.stubGlobal("fetch", async () =>
-          providerReply(
-            provider,
-            ['{"target":"first"}', '{"target":'],
-            streaming
-          )
+          providerReply(provider, ['{"target":"first"}', args], streaming)
         );
         const executed: unknown[] = [];
         const params = {
@@ -331,9 +341,13 @@ it("does not dispatch an earlier Anthropic tool after a later invalid-JSON error
 });
 
 describe("Responses arguments-done events using the existing call_id format", () => {
-  it.each(['{"target":', "null"])(
-    "reports invalid arguments without a ready call: %s",
-    async (args) => {
+  it.each(
+    ['{"target":', "null", false, 0, null, undefined, {}, []].map((args) => ({
+      args,
+    }))
+  )(
+    "reports invalid arguments without a ready call: $args",
+    async ({ args }) => {
       const { streamResponsesTurn } =
         await import("../providers/openai-responses.js");
       vi.stubGlobal("fetch", async () =>
@@ -347,6 +361,11 @@ describe("Responses arguments-done events using the existing call_id format", ()
               name: "record_operation",
               arguments: "",
             },
+          },
+          {
+            type: "response.function_call_arguments.delta",
+            call_id: "call_1",
+            delta: '{"target":"buffered"}',
           },
           {
             type: "response.function_call_arguments.done",
@@ -373,3 +392,187 @@ describe("Responses arguments-done events using the existing call_id format", ()
     }
   );
 });
+
+it("preserves split Chat Completions arguments after a name-only chunk", async () => {
+  vi.stubGlobal("fetch", async () =>
+    sseResponse([
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call_1",
+                  function: { name: "record_operation" },
+                },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [{ index: 0, function: { arguments: '{"target":' } }],
+            },
+          },
+        ],
+      },
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                { index: 0, function: { arguments: '"requested"}' } },
+              ],
+            },
+          },
+        ],
+      },
+      { choices: [{ delta: {}, finish_reason: "tool_calls" }] },
+    ])
+  );
+  const executed: unknown[] = [];
+  const output = await collect(
+    runToolLoop({
+      driver: createLlmDriver({
+        provider: "openai-compatible",
+        model: "test-model",
+        apiKey: "test-key",
+        baseUrl: "https://model.example/v1",
+      }),
+      messages: [...messages],
+      tools: [],
+      maxSteps: 1,
+      callTool: async (_name, args) => {
+        executed.push(args);
+        return "completed";
+      },
+    })
+  );
+  expect(output.some((event) => event.type === "error")).toBe(false);
+  expect(executed).toEqual([{ target: "requested" }]);
+});
+
+it.each([false, true])(
+  "rejects a non-string Chat chunk even with valid chunks (invalid first=%s)",
+  async (invalidFirst) => {
+    const parts = invalidFirst
+      ? [false, '{"target":"requested"}']
+      : ['{"target":"requested"}', false];
+    vi.stubGlobal("fetch", async () =>
+      sseResponse([
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: "call_1",
+                    function: { name: "record_operation" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        ...parts.map((argumentsChunk) => ({
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  { index: 0, function: { arguments: argumentsChunk } },
+                ],
+              },
+            },
+          ],
+        })),
+        { choices: [{ delta: {}, finish_reason: "tool_calls" }] },
+      ])
+    );
+    const executed: unknown[] = [];
+    const output = await collect(
+      runToolLoop({
+        driver: createLlmDriver({
+          provider: "openai-compatible",
+          model: "test-model",
+          apiKey: "test-key",
+          baseUrl: "https://model.example/v1",
+        }),
+        messages: [...messages],
+        tools: [],
+        maxSteps: 1,
+        callTool: async (_name, args) => {
+          executed.push(args);
+          return "completed";
+        },
+      })
+    );
+    expect(output.at(-1)).toMatchObject({ type: "error" });
+    expect(executed).toEqual([]);
+  }
+);
+
+it.each([
+  { delta: "", done: "", expected: {} },
+  {
+    delta: '{"target":"buffered"}',
+    done: "",
+    expected: { target: "buffered" },
+  },
+  {
+    delta: '{"target":"buffered"}',
+    done: '{"target":"completed"}',
+    expected: { target: "completed" },
+  },
+])(
+  "preserves valid Responses done arguments: $done (buffer=$delta)",
+  async ({ delta, done, expected }) => {
+    const { streamResponsesTurn } =
+      await import("../providers/openai-responses.js");
+    vi.stubGlobal("fetch", async () =>
+      sseResponse([
+        {
+          type: "response.output_item.added",
+          item: {
+            type: "function_call",
+            id: "fc_1",
+            call_id: "call_1",
+            name: "record_operation",
+            arguments: "",
+          },
+        },
+        {
+          type: "response.function_call_arguments.delta",
+          call_id: "call_1",
+          delta,
+        },
+        {
+          type: "response.function_call_arguments.done",
+          call_id: "call_1",
+          arguments: done,
+        },
+      ])
+    );
+    const output = await collect(
+      streamResponsesTurn({
+        config: { provider: "openai", model: "test-model", apiKey: "test-key" },
+        input: [],
+        tools: [],
+      })
+    );
+    expect(output.some((event) => event.type === "error")).toBe(false);
+    expect(output.filter((event) => event.type === "tool-call-ready")).toEqual([
+      {
+        type: "tool-call-ready",
+        index: 0,
+        toolCallId: "call_1",
+        toolName: "record_operation",
+        args: expected,
+      },
+    ]);
+  }
+);
