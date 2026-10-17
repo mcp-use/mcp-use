@@ -32,6 +32,19 @@ export * from "./adapters/ai-sdk.js";
 export * from "./transport/base.js";
 export * from "./transport/http.js";
 export * from "./utils/json-schema-validator.js";
+export {
+  accept,
+  acceptWithDefaults,
+  applyDefaults,
+  cancel,
+  decline,
+  getDefaults,
+  validate,
+} from "./utils/elicitation.js";
+export type {
+  ElicitContent,
+  ElicitValidationResult,
+} from "./utils/elicitation.js";
 
 export { logger } from "./utils/logging.js";
 export {
