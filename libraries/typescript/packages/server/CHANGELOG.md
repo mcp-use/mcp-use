@@ -1,5 +1,18 @@
 # mcp-use
 
+## 2.10.1
+
+### Patch Changes
+
+- 96b6aa5: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 96b6aa5: Copy a tool view's `description` to `_meta["openai/widgetDescription"]` on the view resource, on both `resources/list` and `resources/read`, so ChatGPT gets a widget description without extra config. This restores the v1 behavior.
+- Updated dependencies
+- Updated dependencies [96b6aa5]
+- Updated dependencies [96b6aa5]
+- Updated dependencies [96b6aa5]
+  - @mcp-use/inspector@20.3.21
+  - @mcp-use/cli@4.4.1
+
 ## 2.10.1-canary.2
 
 ### Patch Changes

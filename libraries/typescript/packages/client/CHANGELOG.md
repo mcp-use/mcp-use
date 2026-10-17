@@ -1,5 +1,14 @@
 # @mcp-use/client
 
+## 2.4.4
+
+### Patch Changes
+
+- 96b6aa5: Send `Mcp-Param-*` headers for tool parameters annotated with `x-mcp-header` when calling tools from a browser. The SDK only mirrors these parameters outside browsers, so browser clients such as the Inspector sent the value in the request body only and servers requiring the header rejected the call.
+- 96b6aa5: Validate discovered OAuth metadata with the official SDK before classifying an anonymous MCP connection as mixed auth. Root metadata for a different resource no longer causes public endpoints to appear to require authentication.
+
+  Reject cached OAuth credentials with a missing, empty, or mismatched issuer stamp rather than adopting them for a newly discovered issuer.
+
 ## 2.4.4-canary.1
 
 ### Patch Changes
