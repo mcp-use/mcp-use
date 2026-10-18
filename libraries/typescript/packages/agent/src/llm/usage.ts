@@ -13,45 +13,28 @@ function numberAt(
   return undefined;
 }
 
-/** Normalize exact provider-reported token counters. Never estimates usage. */
-export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const usage = raw as Record<string, unknown>;
-  const inputTokens = numberAt(
-    usage,
-    "inputTokens",
-    "input_tokens",
-    "prompt_tokens",
-    "promptTokenCount",
-    "prompt_eval_count"
-  );
-  const outputTokens = numberAt(
-    usage,
-    "outputTokens",
-    "output_tokens",
-    "completion_tokens",
-    "candidatesTokenCount",
-    "eval_count"
-  );
-  // Anthropic reports cache counters ALONGSIDE input_tokens and bills all of them, so
-  // input_tokens alone is not what the call is charged on. OpenAI reports cached_tokens
-  // INSIDE prompt_tokens, so adding that one would double count. Only the Anthropic-shaped
-  // keys are summed here.
-  const cacheReadOutsideInput = numberAt(usage, "cache_read_input_tokens");
-  const cacheCreationInputTokens = numberAt(
-    usage,
-    "cacheCreationInputTokens",
-    "cache_creation_input_tokens"
-  );
-  const uncountedCache =
-    (cacheReadOutsideInput ?? 0) + (cacheCreationInputTokens ?? 0);
+function tokenCountsFromRecord(usage: Record<string, unknown>): TokenUsage {
+  return {
+    inputTokens: numberAt(
+      usage,
+      "inputTokens",
+      "input_tokens",
+      "prompt_tokens",
+      "promptTokenCount",
+      "prompt_eval_count"
+    ),
+    outputTokens: numberAt(
+      usage,
+      "outputTokens",
+      "output_tokens",
+      "completion_tokens",
+      "candidatesTokenCount",
+      "eval_count"
+    ),
+  };
+}
 
-  const totalTokens =
-    numberAt(usage, "totalTokens", "total_tokens", "totalTokenCount") ??
-    (inputTokens !== undefined && outputTokens !== undefined
-      ? inputTokens + outputTokens + uncountedCache
-      : undefined);
-
+function cacheCountsFromRecord(usage: Record<string, unknown>): TokenUsage {
   const inputDetails =
     usage.input_tokens_details && typeof usage.input_tokens_details === "object"
       ? (usage.input_tokens_details as Record<string, unknown>)
@@ -61,32 +44,47 @@ export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
     typeof usage.output_tokens_details === "object"
       ? (usage.output_tokens_details as Record<string, unknown>)
       : undefined;
-  const cachedInputTokens =
-    numberAt(usage, "cachedInputTokens", "cache_read_input_tokens") ??
-    (inputDetails ? numberAt(inputDetails, "cached_tokens") : undefined);
-  const reasoningTokens =
-    numberAt(usage, "reasoningTokens", "thoughtsTokenCount") ??
-    (outputDetails ? numberAt(outputDetails, "reasoning_tokens") : undefined);
-
-  if (
-    inputTokens === undefined &&
-    outputTokens === undefined &&
-    totalTokens === undefined &&
-    cachedInputTokens === undefined &&
-    cacheCreationInputTokens === undefined &&
-    reasoningTokens === undefined
-  ) {
-    return undefined;
-  }
-
   return {
-    inputTokens,
-    outputTokens,
-    totalTokens,
-    cachedInputTokens,
-    cacheCreationInputTokens,
-    reasoningTokens,
+    cachedInputTokens:
+      numberAt(
+        usage,
+        "cachedInputTokens",
+        "cache_read_input_tokens",
+        "cachedContentTokenCount"
+      ) ?? (inputDetails ? numberAt(inputDetails, "cached_tokens") : undefined),
+    cacheCreationInputTokens: numberAt(
+      usage,
+      "cacheCreationInputTokens",
+      "cache_creation_input_tokens"
+    ),
+    reasoningTokens:
+      numberAt(usage, "reasoningTokens", "thoughtsTokenCount") ??
+      (outputDetails ? numberAt(outputDetails, "reasoning_tokens") : undefined),
   };
+}
+
+/** Normalize exact provider-reported token counters. Never estimates usage. */
+export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const usage = raw as Record<string, unknown>;
+  const counts = {
+    ...tokenCountsFromRecord(usage),
+    ...cacheCountsFromRecord(usage),
+  };
+  // Only Anthropic reports cache counters outside the input token count.
+  const uncountedCache =
+    (numberAt(usage, "cache_read_input_tokens") ?? 0) +
+    (counts.cacheCreationInputTokens ?? 0);
+  const { inputTokens, outputTokens } = counts;
+  const totalTokens =
+    numberAt(usage, "totalTokens", "total_tokens", "totalTokenCount") ??
+    (inputTokens !== undefined && outputTokens !== undefined
+      ? inputTokens + outputTokens + uncountedCache
+      : undefined);
+  const result = { ...counts, totalTokens };
+  return Object.values(result).every((value) => value === undefined)
+    ? undefined
+    : result;
 }
 
 /**

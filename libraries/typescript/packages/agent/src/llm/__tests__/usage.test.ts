@@ -67,6 +67,64 @@ describe("Anthropic cache counters", () => {
   });
 });
 
+describe("Google cache counters", () => {
+  it.each([80, 0])("preserves %i cached input tokens", (cachedTokens) => {
+    expect(
+      tokenUsageFromRecord({
+        promptTokenCount: 100,
+        candidatesTokenCount: 10,
+        cachedContentTokenCount: cachedTokens,
+        thoughtsTokenCount: 5,
+        totalTokenCount: 115,
+      })
+    ).toMatchObject({
+      inputTokens: 100,
+      outputTokens: 10,
+      cachedInputTokens: cachedTokens,
+      reasoningTokens: 5,
+      totalTokens: 115,
+    });
+  });
+
+  it("does not add cached tokens to the effective prompt size", () => {
+    expect(
+      tokenUsageFromRecord({
+        promptTokenCount: 100,
+        candidatesTokenCount: 10,
+        cachedContentTokenCount: 80,
+      })
+    ).toMatchObject({ cachedInputTokens: 80, totalTokens: 110 });
+  });
+
+  it("prefers an explicitly normalized zero over provider cache counters", () => {
+    expect(
+      tokenUsageFromRecord({
+        cachedInputTokens: 0,
+        cache_read_input_tokens: 20,
+        cachedContentTokenCount: 80,
+      })
+    ).toMatchObject({ cachedInputTokens: 0 });
+  });
+
+  it("preserves the existing Anthropic cache counter priority", () => {
+    expect(
+      tokenUsageFromRecord({
+        cache_read_input_tokens: 20,
+        cachedContentTokenCount: 80,
+      })
+    ).toMatchObject({ cachedInputTokens: 20 });
+  });
+
+  it.each(["80", null, NaN, Infinity])(
+    "ignores an invalid Google cache counter: %s",
+    (cachedTokens) => {
+      expect(
+        tokenUsageFromRecord({ cachedContentTokenCount: cachedTokens })
+      ).toBeUndefined();
+    }
+  );
+});
+
 describe("mergeTokenUsage", () => {
   it("keeps counters that the later record does not mention", () => {
     // Anthropic's streaming message_delta carries output_tokens only. A spread merge
