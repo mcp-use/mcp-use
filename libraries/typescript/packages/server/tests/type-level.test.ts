@@ -580,6 +580,8 @@ describe("MCP middleware type narrowing", () => {
   it("narrows ctx.params for tools/call middleware", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
     server.use("mcp:tools/call", async (ctx, next) => {
+      expectTypeOf(ctx.client).toEqualTypeOf<RequestClientContext>();
+      expectTypeOf(ctx.client.info().name).toEqualTypeOf<string | undefined>();
       expectTypeOf(ctx.params.name).toBeString();
       expectTypeOf(ctx.params.arguments).toEqualTypeOf<
         Record<string, unknown> | undefined
@@ -592,6 +594,7 @@ describe("MCP middleware type narrowing", () => {
   it("types list middleware as item-array transformations", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
     server.use("mcp:tools/list", async (ctx, next) => {
+      expectTypeOf(ctx.client).toEqualTypeOf<RequestClientContext>();
       expectTypeOf(ctx.params.cursor).toEqualTypeOf<string | undefined>();
       const tools = await next();
       expectTypeOf(tools).toEqualTypeOf<SdkTool[]>();
