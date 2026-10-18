@@ -35,7 +35,9 @@ export default server;
 ```
 
 `baseUrl` overrides `spec.servers[0].url`. One of them is required when the
-document contains operations. The loader does not fetch external `$ref`
+document contains operations. `{variable}` placeholders in the server URL are
+filled from that server's variable defaults, and the result must be an absolute
+`http` or `https` URL, so a relative entry like `/api/v3` needs `baseUrl`. The loader does not fetch external `$ref`
 targets, so bundle external references into local `#/...` references before
 creating the server.
 

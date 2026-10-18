@@ -634,6 +634,23 @@ describe("MCPServer.fromOpenAPI", () => {
     ).toThrow(/"\/api\/v3" is not an absolute URL/);
   });
 
+  it("rejects a non-http upstream base URL when the server is created", () => {
+    expect(() =>
+      MCPServer.fromOpenAPI({
+        baseUrl: "ftp://files.example.com",
+        spec: {
+          openapi: "3.1.0",
+          info: { title: "FTP API" },
+          paths: {
+            "/status": {
+              get: { responses: { "200": { description: "ok" } } },
+            },
+          },
+        },
+      })
+    ).toThrow(/must use http or https/);
+  });
+
   it("requires an upstream base URL when operations are present", () => {
     expect(() =>
       MCPServer.fromOpenAPI({

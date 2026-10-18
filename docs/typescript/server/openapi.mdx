@@ -150,17 +150,17 @@ type FromOpenAPIOptions = {
 };
 ```
 
-| Option    | Description                                                                                                                                                     |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `spec`    | Parsed OpenAPI document. This is required.                                                                                                                      |
-| `baseUrl` | Absolute upstream API base URL. Defaults to `spec.servers[0].url` when present, with any `{variable}` placeholders filled from that server's variable defaults. |
-| `name`    | MCP server name. Defaults to `spec.info.title`.                                                                                                                 |
-| `version` | MCP server version. Defaults to `spec.info.version` or `1.0.0`.                                                                                                 |
-| `auth`    | Bearer token or static header auth for upstream API requests.                                                                                                   |
-| `headers` | Static headers sent with every upstream API request.                                                                                                            |
-| `tags`    | Include only operations with one of these OpenAPI tags.                                                                                                         |
-| `exclude` | Exclude operations by operation ID, path, method, or tag.                                                                                                       |
-| `fetch`   | Custom fetch implementation, useful for tests or custom transports.                                                                                             |
+| Option    | Description                                                            |
+| --------- | ---------------------------------------------------------------------- |
+| `spec`    | Parsed OpenAPI document. This is required.                             |
+| `baseUrl` | Upstream API base URL. Defaults to `spec.servers[0].url` when present. |
+| `name`    | MCP server name. Defaults to `spec.info.title`.                        |
+| `version` | MCP server version. Defaults to `spec.info.version` or `1.0.0`.        |
+| `auth`    | Bearer token or static header auth for upstream API requests.          |
+| `headers` | Static headers sent with every upstream API request.                   |
+| `tags`    | Include only operations with one of these OpenAPI tags.                |
+| `exclude` | Exclude operations by operation ID, path, method, or tag.              |
+| `fetch`   | Custom fetch implementation, useful for tests or custom transports.    |
 
 ## Limitations
 

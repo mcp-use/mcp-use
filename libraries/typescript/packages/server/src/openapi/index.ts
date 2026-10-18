@@ -539,13 +539,19 @@ function resolveBaseUrl(options: FromOpenAPIOptions): string {
       "MCPServer.fromOpenAPI requires options.baseUrl or spec.servers[0].url"
     );
   }
-  // Every tool call builds its URL from this one, so catch a relative or
-  // malformed value now instead of failing each call with "Invalid URL".
+  // Every tool call builds its URL from this one, so catch a relative,
+  // malformed or non-HTTP value now instead of failing each call.
+  let protocol: string;
   try {
-    new URL(baseUrl);
+    protocol = new URL(baseUrl).protocol;
   } catch {
     throw new Error(
       `MCPServer.fromOpenAPI: upstream base URL "${baseUrl}" is not an absolute URL; pass options.baseUrl`
+    );
+  }
+  if (protocol !== "http:" && protocol !== "https:") {
+    throw new Error(
+      `MCPServer.fromOpenAPI: upstream base URL "${baseUrl}" must use http or https`
     );
   }
   return baseUrl;
