@@ -115,9 +115,7 @@ server.use("mcp:tools/call", async (ctx, next) => {
   const client = ctx.client.info();
 
   if (ctx.client.supportsViews()) {
-    console.log(
-      `Returning a view-capable response to ${client.name ?? "unknown"}`,
-    );
+    console.log(`Client ${client.name ?? "unknown"} reports view support`);
   }
 
   return next();
@@ -127,7 +125,7 @@ server.use("mcp:tools/call", async (ctx, next) => {
 Use `ctx.client.can("elicitation")` for a top-level capability,
 `ctx.client.extension(id)` for extension settings, and
 `ctx.client.capabilities()` when you need the full declared capability map.
-All four accessors describe the current request; they do not retain transport
+All of these accessors describe the current request; they do not retain transport
 session state.
 
 ## Add an OAuth scope guard
