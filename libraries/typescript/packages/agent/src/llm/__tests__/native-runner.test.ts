@@ -1,6 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LlmDriver } from "../driver.js";
 import { runNativeAgent, streamNativeAgentSteps } from "../native_runner.js";
+import { OpenAIResponsesDriver } from "../providers/openai-responses-driver.js";
+
+// A `Response` whose body streams the given Responses events as SSE.
+function sseResponse(events: unknown[]): Response {
+  const body = events
+    .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+    .join("");
+  return new Response(body, { status: 200 });
+}
 
 // The model writes a short preamble and calls a tool, then answers.
 function preambleThenAnswerDriver(): LlmDriver {
@@ -10,6 +19,12 @@ function preambleThenAnswerDriver(): LlmDriver {
       turn += 1;
       if (turn === 1) {
         yield { type: "text-delta", delta: "Let me check the files." };
+        yield {
+          type: "tool-call-start",
+          index: 0,
+          toolCallId: "call_a",
+          toolName: "list_files",
+        };
         yield {
           type: "tool-call-ready",
           index: 0,
@@ -180,5 +195,93 @@ describe("streamNativeAgentSteps", () => {
     ).resolves.toBe("");
 
     expect(callTool).not.toHaveBeenCalled();
+  });
+
+  describe("with the OpenAI Responses driver", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("returns only the final turn's text", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValueOnce(
+            sseResponse([
+              {
+                type: "response.output_text.delta",
+                delta: "Let me check the files.",
+              },
+              {
+                type: "response.output_item.added",
+                output_index: 1,
+                item: {
+                  type: "function_call",
+                  id: "fc_a",
+                  call_id: "call_a",
+                  name: "list_files",
+                  arguments: "",
+                },
+              },
+              {
+                type: "response.function_call_arguments.done",
+                item_id: "fc_a",
+                output_index: 1,
+                arguments: "{}",
+              },
+              {
+                type: "response.completed",
+                response: {
+                  output: [
+                    {
+                      type: "message",
+                      role: "assistant",
+                      content: [
+                        {
+                          type: "output_text",
+                          text: "Let me check the files.",
+                        },
+                      ],
+                    },
+                    {
+                      type: "function_call",
+                      id: "fc_a",
+                      call_id: "call_a",
+                      name: "list_files",
+                      arguments: "{}",
+                    },
+                  ],
+                },
+              },
+            ])
+          )
+          .mockResolvedValueOnce(
+            sseResponse([
+              {
+                type: "response.output_text.delta",
+                delta: "The folder has a.ts.",
+              },
+              { type: "response.completed", response: { output: [] } },
+            ])
+          )
+      );
+
+      const driver = new OpenAIResponsesDriver({
+        provider: "openai",
+        model: "gpt-4o-mini",
+        apiKey: "k",
+      });
+
+      await expect(
+        returnValue(
+          streamNativeAgentSteps(driver, {
+            messages: [{ role: "user", content: "What's in the folder?" }],
+            tools: [{ name: "list_files", inputSchema: { type: "object" } }],
+            callTool: vi.fn().mockResolvedValue("a.ts"),
+          })
+        )
+      ).resolves.toBe("The folder has a.ts.");
+    });
   });
 });

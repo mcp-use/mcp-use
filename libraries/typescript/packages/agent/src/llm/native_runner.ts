@@ -49,8 +49,9 @@ export async function* streamNativeAgentSteps(
   for await (const ev of streamNativeAgent(driver, options)) {
     if (ev.type === "text-delta") {
       turnText += ev.delta;
-    } else if (ev.type === "tool-call-ready") {
+    } else if (ev.type === "tool-call-start") {
       turnRequestedTools = true;
+    } else if (ev.type === "tool-call-ready") {
       const pendingStep = {
         action: {
           tool: ev.toolName,
@@ -62,11 +63,11 @@ export async function* streamNativeAgentSteps(
       pendingSteps.set(ev.toolCallId, pendingStep);
       yield pendingStep;
     } else if (ev.type === "tool-result") {
-      const pendingStep = pendingSteps.get(ev.toolCallId);
-      if (!pendingStep) continue;
       // Text after a tool result belongs to the model's next turn.
       turnText = "";
       turnRequestedTools = false;
+      const pendingStep = pendingSteps.get(ev.toolCallId);
+      if (!pendingStep) continue;
       const observation =
         typeof ev.result === "string"
           ? ev.result
