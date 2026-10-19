@@ -64,7 +64,7 @@ describe("RemoteAgent.run response handling", () => {
     ]);
 
     await expect(makeAgent().run({ prompt: "hi" })).rejects.toThrow(
-      "Remote agent execution failed: Agent exploded"
+      /^Remote agent execution failed: Agent exploded$/
     );
   });
 
