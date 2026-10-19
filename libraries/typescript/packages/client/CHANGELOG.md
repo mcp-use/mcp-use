@@ -1,5 +1,12 @@
 # @mcp-use/client
 
+## 2.4.5
+
+### Patch Changes
+
+- e4ff892: Close Node OAuth loopback connections after callbacks, cancellation, and timeout without truncating the callback response.
+- e4ff892: Fix `useMcp().authTokens.expires_at` moving later on every reconnect for opaque (non-JWT) tokens. The expiry was recomputed as now plus `expires_in` each time stored tokens were read, so a token that was 50 minutes into a 1-hour lifetime was reported as valid for another hour. The absolute expiry is now saved alongside the tokens when they are received and reused on later reads. JWT tokens still use their `exp` claim.
+
 ## 2.4.5-canary.1
 
 ### Patch Changes
