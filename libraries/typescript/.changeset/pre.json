@@ -1,0 +1,34 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.24",
+    "@mcp-use/cli": "4.4.1",
+    "@mcp-use/client": "2.4.4",
+    "create-mcp-use-app": "2.0.10",
+    "@mcp-use/inspector": "20.3.21",
+    "mcp-use": "2.10.1",
+    "@mcp-use/tunnel": "0.2.2"
+  },
+  "changesets": [
+    "agent-stream-final-text",
+    "blank-inspector-timeouts",
+    "chatgpt-plugins-install-steps",
+    "cli-client-install-windows",
+    "fix-inspector-stream-failures",
+    "inspector-bff-json-client-limits",
+    "landing-tailwind-followups",
+    "lazy-pandas-argue",
+    "mcp-landing-customization",
+    "oauth-loopback-cleanup",
+    "pinned-oauth-expiry",
+    "propagated-6fdbf4c83a25a185",
+    "propagated-9b45853e884579b0",
+    "propagated-e43d9b6a3f18d8be",
+    "propagated-f3c3372fbd41ab78",
+    "propagated-f674e121827eeba8",
+    "propagated-fdb52853707f181b",
+    "smart-lions-rest",
+    "tidy-pianos-gather"
+  ]
+}

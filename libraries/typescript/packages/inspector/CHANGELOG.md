@@ -1,5 +1,65 @@
 # @mcp-use/inspector
 
+## 20.3.22-canary.9
+
+### Patch Changes
+
+- 6d4d220: fix(inspector): OAuth BFF metadata responses are always JSON with `nosniff`, so a caller-chosen upstream body can no longer render as a page on the Inspector origin; proxy and OAuth rate limits are per caller (client IP) under a process-wide ceiling instead of one shared bucket. A local Inspector or `mcp-use dev`, where requests carry no `X-Forwarded-For`, is limited only by the process-wide ceiling
+
+## 20.3.22-canary.8
+
+### Patch Changes
+
+- 8e8c70d: Fix tool calls timing out after 10 seconds for servers added from the dashboard. The Connect form pre-filled Request Timeout with 10000 and Maximum Total Timeout with 60000, and since tool calls started honoring saved timeouts those values capped every call. Both fields now start blank, which means the default 10-minute request timeout and no overall limit, as the form's help text says. Servers added since that change keep the saved 10000 / 60000 values; clear both fields in the server's connection settings to go back to the defaults.
+
+## 20.3.22-canary.7
+
+### Patch Changes
+
+- 52d8d99: ChatGPT install steps on the landing page, in `getInstallTargets()` and in the inspector's tunnel panel follow ChatGPT's Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab.
+
+## 20.3.22-canary.6
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.5
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.4
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.1
+
+### Patch Changes
+
+- 2a05af2: Display streamed provider errors and explain responses that exhaust the output limit without producing content instead of silently showing an empty chat turn.
+
+## 20.3.22-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.21
 
 ### Patch Changes

@@ -1,5 +1,105 @@
 # mcp-use
 
+## 2.11.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [6d4d220]
+  - @mcp-use/inspector@20.3.22-canary.9
+
+## 2.11.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [8e8c70d]
+  - @mcp-use/inspector@20.3.22-canary.8
+
+## 2.11.0-canary.8
+
+### Patch Changes
+
+- f88a63b: Tailwind fixes for `landing.tsx` pages:
+  - The page now sets `data-theme` on `<html>` from the OS color scheme before the first paint and follows OS changes, so `dark:` classes work on the landing page without a theme script. A page that sets `data-theme` itself, for example from a theme toggle, keeps its value.
+  - A page whose CSS imports Tailwind itself (`@import "tailwindcss"`, for `@theme`, `@utility` or a custom `dark` variant) now owns Tailwind: the CLI-managed stylesheet is left out, so only the page's copy is compiled and its `dark` variant is the only one.
+  - In `mcp-use dev`, the page head links the stylesheets the page imports, so server-rendered markup no longer appears unstyled until the page's JavaScript loads.
+
+- Updated dependencies [f88a63b]
+  - @mcp-use/cli@4.5.0-canary.4
+
+## 2.11.0-canary.7
+
+### Minor Changes
+
+- 52d8d99: Customize the page a browser sees at the MCP URL with a `landing.tsx` in the MCP root. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`), and `mcp-use start` serves the built page. The page renders on the server and hydrates in the browser. Without `landing.tsx`, the built-in page is served as before.
+  - `mcp-use/landing` adds React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`, with the `LandingServerInfo`, `InstallTargets` and per-client target types. Server info always ships to the page; each list ships only when a module in the `landing.tsx` import graph imports its hook, and a list hook without its data throws an error that says to import it.
+  - `getInstallTargets({ url, name })` returns the Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and Manufact Inspector install links and commands, keyed by client, for use outside the server such as on a docs site. The built-in page now builds its links with it.
+  - `landing.tsx` can `export const metadata` (`LandingMetadata`: `title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags. Missing fields keep the server defaults.
+  - Tailwind classes work in `landing.tsx` with no CSS file, and CSS imports are bundled. In dev, edits use Fast Refresh, creating or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` for the page's assets.
+  - Every `create-mcp-use-app` template now includes a Tailwind-styled `landing.tsx` similar to the built-in page. The `blank` and `mcp-server` templates add `react`, `react-dom`, `@types/react` and `@types/react-dom`, and every template's `tsconfig.json` typechecks `landing.tsx`.
+
+### Patch Changes
+
+- 52d8d99: ChatGPT install steps on the landing page, in `getInstallTargets()` and in the inspector's tunnel panel follow ChatGPT's Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab.
+- Updated dependencies [52d8d99]
+- Updated dependencies [52d8d99]
+  - @mcp-use/inspector@20.3.22-canary.7
+  - @mcp-use/cli@4.5.0-canary.3
+
+## 2.10.2-canary.6
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [7ff7174]
+  - @mcp-use/inspector@20.3.22-canary.6
+  - @mcp-use/cli@4.4.2-canary.2
+
+## 2.10.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.22-canary.5
+
+## 2.10.2-canary.4
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.4.2-canary.1
+  - @mcp-use/inspector@20.3.22-canary.4
+
+## 2.10.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.22-canary.3
+
+## 2.10.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.22-canary.2
+
+## 2.10.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2a05af2]
+  - @mcp-use/inspector@20.3.22-canary.1
+
+## 2.10.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [bea1265]
+- Updated dependencies
+  - @mcp-use/cli@4.4.2-canary.0
+  - @mcp-use/inspector@20.3.22-canary.0
+
 ## 2.10.1
 
 ### Patch Changes

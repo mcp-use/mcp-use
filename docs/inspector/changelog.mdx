@@ -6,6 +6,20 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.22" description="October 2026">
+  ## Tool call timeouts, chat errors & proxy hardening
+  Patch release paired with `mcp-use` v2.11.0, fixing a 10-second tool call timeout, surfacing chat failures, and hardening the proxy and OAuth routes.
+
+- **Fix**: tool calls on servers added from the dashboard no longer time out after 10 seconds. The Connect form's timeout fields start blank, meaning the default 10-minute request timeout and no overall limit. Servers added since v20.3.17 keep their saved 10000 / 60000 values until both fields are cleared in connection settings (`#2881`)
+- **Fix**: chat shows streamed provider errors, and explains responses that use up the output limit without producing content, instead of an empty turn (`#2877`)
+- **Fix**: chat tool calls on OpenAI models show their arguments in the tool drawer instead of `{}` (`#2551`)
+- **Fix**: OAuth metadata responses are always JSON with `X-Content-Type-Options: nosniff`, so a body from a caller-chosen server can no longer render as a page on the Inspector's origin (`#2855`)
+- **Fix**: proxy and OAuth rate limits apply per caller (client IP) under a process-wide ceiling, instead of one bucket shared by every user. A local Inspector or `mcp-use dev` is limited only by the process-wide ceiling (`#2855`)
+- **Update**: ChatGPT install steps in the tunnel panel follow the Plugins flow (Plugins → Add → Add Custom MCP Server) (`#2648`)
+- **Update**: rebuild bundled workspace code with @mcp-use/client v2.4.5 and @mcp-use/agent v2.0.25
+- **Update**: Updated mcp-use to v2.11.0
+</Update>
+
 <Update label="v20.3.21" description="October 2026">
   ## Public MCP connections & tool headers
   Patch fixes for browser connections and tool calls, paired with `mcp-use` v2.10.1.

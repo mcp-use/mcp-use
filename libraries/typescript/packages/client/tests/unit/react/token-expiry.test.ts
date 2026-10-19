@@ -45,4 +45,18 @@ describe("getOAuthTokenExpiry", () => {
     ).toBe(Date.now() + 60_000);
     vi.useRealTimers();
   });
+
+  it("prefers the expiry pinned at save time over expires_in", () => {
+    const pinned = Date.parse("2026-01-01T01:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:50:00Z"));
+    expect(
+      getOAuthTokenExpiry({
+        access_token: "opaque",
+        expires_in: 3600,
+        mcp_use_expires_at: pinned,
+      })
+    ).toBe(pinned);
+    vi.useRealTimers();
+  });
 });

@@ -8,8 +8,21 @@ import { sanitizeContextDiagnostic } from "./context-diagnostics.js";
 import type { DiscoveredView } from "./views.js";
 import { VIRTUAL_VIEW_PREFIX, VIRTUAL_VIEW_RESOLVED_PREFIX } from "./views.js";
 
-const VIRTUAL_TAILWIND_ID = "virtual:mcp-use/tailwind.css";
-const VIRTUAL_TAILWIND_RESOLVED_ID = `\0${VIRTUAL_TAILWIND_ID}`;
+/** CLI-managed Tailwind stylesheet imported by view and landing entries. */
+export const VIRTUAL_TAILWIND_ID = "virtual:mcp-use/tailwind.css";
+/** Module graph id of {@link VIRTUAL_TAILWIND_ID}. */
+export const VIRTUAL_TAILWIND_RESOLVED_ID = `\0${VIRTUAL_TAILWIND_ID}`;
+/**
+ * Source of {@link VIRTUAL_TAILWIND_ID}. Tailwind scans the Vite root, so
+ * classes in any project file under it, `landing.tsx` included, are emitted.
+ *
+ * Host theme is applied via ext-apps applyDocumentTheme (data-theme on html)
+ * and optional .dark wrappers — not OS prefers-color-scheme.
+ */
+export const TAILWIND_STYLESHEET = [
+  '@import "tailwindcss";',
+  "@custom-variant dark (&:where(.dark, .dark *, [data-theme=dark], [data-theme=dark] *));",
+].join("\n");
 const VIRTUAL_CSP_RUNTIME_ID = "virtual:mcp-use/csp-runtime";
 const VIRTUAL_CSP_RUNTIME_RESOLVED_ID = `\0${VIRTUAL_CSP_RUNTIME_ID}`;
 
@@ -142,12 +155,7 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         ].join("\n");
       }
       if (id === VIRTUAL_TAILWIND_RESOLVED_ID) {
-        // Host theme is applied via ext-apps applyDocumentTheme (data-theme on
-        // html) and optional .dark wrappers — not OS prefers-color-scheme.
-        return [
-          '@import "tailwindcss";',
-          "@custom-variant dark (&:where(.dark, .dark *, [data-theme=dark], [data-theme=dark] *));",
-        ].join("\n");
+        return TAILWIND_STYLESHEET;
       }
       if (!id.startsWith(VIRTUAL_VIEW_RESOLVED_PREFIX)) {
         return undefined;

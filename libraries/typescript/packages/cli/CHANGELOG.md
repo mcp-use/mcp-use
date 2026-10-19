@@ -1,5 +1,43 @@
 # @mcp-use/cli
 
+## 4.5.0-canary.4
+
+### Patch Changes
+
+- f88a63b: Tailwind fixes for `landing.tsx` pages:
+  - The page now sets `data-theme` on `<html>` from the OS color scheme before the first paint and follows OS changes, so `dark:` classes work on the landing page without a theme script. A page that sets `data-theme` itself, for example from a theme toggle, keeps its value.
+  - A page whose CSS imports Tailwind itself (`@import "tailwindcss"`, for `@theme`, `@utility` or a custom `dark` variant) now owns Tailwind: the CLI-managed stylesheet is left out, so only the page's copy is compiled and its `dark` variant is the only one.
+  - In `mcp-use dev`, the page head links the stylesheets the page imports, so server-rendered markup no longer appears unstyled until the page's JavaScript loads.
+
+## 4.5.0-canary.3
+
+### Minor Changes
+
+- 52d8d99: Customize the page a browser sees at the MCP URL with a `landing.tsx` in the MCP root. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`), and `mcp-use start` serves the built page. The page renders on the server and hydrates in the browser. Without `landing.tsx`, the built-in page is served as before.
+  - `mcp-use/landing` adds React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`, with the `LandingServerInfo`, `InstallTargets` and per-client target types. Server info always ships to the page; each list ships only when a module in the `landing.tsx` import graph imports its hook, and a list hook without its data throws an error that says to import it.
+  - `getInstallTargets({ url, name })` returns the Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and Manufact Inspector install links and commands, keyed by client, for use outside the server such as on a docs site. The built-in page now builds its links with it.
+  - `landing.tsx` can `export const metadata` (`LandingMetadata`: `title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags. Missing fields keep the server defaults.
+  - Tailwind classes work in `landing.tsx` with no CSS file, and CSS imports are bundled. In dev, edits use Fast Refresh, creating or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` for the page's assets.
+  - Every `create-mcp-use-app` template now includes a Tailwind-styled `landing.tsx` similar to the built-in page. The `blank` and `mcp-server` templates add `react`, `react-dom`, `@types/react` and `@types/react-dom`, and every template's `tsconfig.json` typechecks `landing.tsx`.
+
+## 4.4.2-canary.2
+
+### Patch Changes
+
+- 7ff7174: Join Inspector and dev-API paths through a single `basePath` rule so they work when `basePath` is `"/"`. Previously `inspector-route.ts` and `dev-api.ts` interpolated directly and produced `//inspector`, while `views/document.ts` special-cased the root, so `mcp-use start --with-inspector` advertised `/inspector` but only matched `//inspector` and fell through to the MCP handler. `mcp-use dev` now also prints `/inspector` instead of `//inspector`. Nested `basePath` values are unaffected.
+
+## 4.4.2-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.2-canary.0
+
+### Patch Changes
+
+- bea1265: Install the right `@mcp-use/client` when `mcp-use client` or `mcp-use screenshot` auto-installs it. The CLI looked for its peer range in a package named `mcp-use`, but the code now lives in `@mcp-use/cli`, so every install fell back to `^2.0.0-alpha.0`. It now reads the range declared in `@mcp-use/cli`'s package.json, and the fallback is `^2.0.1`. On Windows, `cmd.exe` also stripped the `^` from the range, so npm and pnpm looked for the unpublished `2.0.0-alpha.0` and the install always failed. Each argument is now quoted and the package manager runs as one command string, which also removes Node's DEP0190 warning. macOS and Linux keep the direct spawn.
+
 ## 4.4.1
 
 ### Patch Changes

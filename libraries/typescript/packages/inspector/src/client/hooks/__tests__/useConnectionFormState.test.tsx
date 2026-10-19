@@ -45,6 +45,24 @@ describe("connection settings timeout hydration", () => {
     vi.unstubAllGlobals();
   });
 
+  it("leaves timeouts unset for a new connection", async () => {
+    function NewForm() {
+      form = useConnectionFormState(null, true);
+      return null;
+    }
+    const root = createRoot(document.createElement("div"));
+    roots.add(root);
+    await act(async () => root.render(<NewForm />));
+    await act(async () => form.setUrl("https://example.com/mcp"));
+
+    // Untouched fields must fall back to the tool-call defaults, not cap
+    // every call at a value the user never chose.
+    expect(form.buildConfig()).toMatchObject({
+      requestTimeout: undefined,
+      maxTotalTimeout: undefined,
+    });
+  });
+
   it("preserves cleared timeouts through remount and an alias-only save", async () => {
     const url = "https://example.com/mcp";
     saveStoredConnectionConfig(url, {

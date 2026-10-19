@@ -1047,6 +1047,7 @@ async function main(): Promise<void> {
     console.log("   ├── public/");
     console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
+    console.log("   ├── landing.tsx (page shown at the MCP URL)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
@@ -1063,12 +1064,14 @@ async function main(): Promise<void> {
     console.log("   │       └── MeshGradient.tsx");
     console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
+    console.log("   ├── landing.tsx (page shown at the MCP URL)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
   } else if (validatedTemplate === "mcp-server") {
     console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
+    console.log("   ├── landing.tsx (page shown at the MCP URL)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
