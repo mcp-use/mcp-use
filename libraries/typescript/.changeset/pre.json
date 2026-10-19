@@ -11,10 +11,12 @@
     "@mcp-use/tunnel": "0.2.2"
   },
   "changesets": [
+    "agent-stream-final-text",
     "cli-client-install-windows",
     "fix-inspector-stream-failures",
     "lazy-pandas-argue",
     "propagated-f3c3372fbd41ab78",
+    "propagated-f674e121827eeba8",
     "propagated-fdb52853707f181b"
   ]
 }
