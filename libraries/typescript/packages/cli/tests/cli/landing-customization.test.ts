@@ -2,6 +2,7 @@
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -907,6 +908,37 @@ export default function Resources() {
     expect(html).toContain(
       `<meta property="og:image" content="${started.url}/_mcp-use/public/og.png">`
     );
+  }, 90_000);
+
+  it("builds a page whose stylesheet imports Tailwind and extends its theme", async () => {
+    const cwd = copyFixture("landing-build-tailwind");
+    cleanups.push(() => removeDir(cwd));
+    writeLanding(cwd);
+    // The server bundle renders landing.tsx too, so it must not try to
+    // resolve `@import "tailwindcss"` from a project without that dependency.
+    writeFileSync(
+      join(cwd, "landing.css"),
+      '@import "tailwindcss";\n@theme { --color-brand: #ff3366; }\n'
+    );
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      `import "./landing.css";
+export default function Landing() {
+  return <main className="bg-brand">Brand</main>;
+}
+`
+    );
+
+    await runBuild({ cwd });
+
+    const assets = join(cwd, ".mcp-use", "build", "landing", "assets");
+    const stylesheet = readdirSync(assets).find((file) =>
+      file.endsWith(".css")
+    );
+    expect(stylesheet).toBeDefined();
+    const css = readFileSync(join(assets, stylesheet!), "utf8");
+    expect(css).toMatch(/\.bg-brand\{background-color:var\(--color-brand\)\}/);
+    expect(css).toMatch(/--color-brand:(#ff3366|#f36)/);
   }, 90_000);
 
   it("reads the metadata export of the current landing.tsx in dev", async () => {

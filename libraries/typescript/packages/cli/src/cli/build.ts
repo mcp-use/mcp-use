@@ -166,6 +166,30 @@ async function writeWrapperEntry(
   return wrapperPath;
 }
 
+/** Stylesheet languages Vite compiles, as module paths without a query. */
+const STYLESHEET_PATH =
+  /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
+
+/**
+ * The wrapper imports `landing.tsx` to render it, so the page's stylesheets
+ * reach the server bundle, which never ships CSS. Load them empty rather than
+ * compile them without the client build's Tailwind setup, where
+ * `@import "tailwindcss"` cannot resolve. CSS modules still compile: rendering
+ * reads their class names.
+ */
+function serverStylesheetStubPlugin(): Plugin {
+  return {
+    name: "mcp-use-server-stylesheet-stub",
+    enforce: "pre",
+    load(id) {
+      if (!STYLESHEET_PATH.test(id) || /\.module\.\w+$/.test(id)) {
+        return undefined;
+      }
+      return "";
+    },
+  };
+}
+
 /** Entry chunk and stylesheets emitted by one {@link buildClientBundle} run. */
 interface ClientBundle {
   /** Entry chunk path relative to the output directory. */
@@ -567,7 +591,10 @@ export async function runBuild(options: BuildOptions): Promise<void> {
           tsconfigPaths: true,
           alias: nextStandaloneAliases(options.cwd),
         },
-        plugins: [nextStandaloneCompatPlugin(options.cwd)],
+        plugins: [
+          nextStandaloneCompatPlugin(options.cwd),
+          serverStylesheetStubPlugin(),
+        ],
         build: {
           ssr: wrapperEntry,
           outDir: paths.build,
@@ -732,7 +759,10 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       alias: nextStandaloneAliases(options.cwd),
     },
     oxc: { jsx: { runtime: "automatic" } },
-    plugins: [nextStandaloneCompatPlugin(options.cwd)],
+    plugins: [
+      nextStandaloneCompatPlugin(options.cwd),
+      serverStylesheetStubPlugin(),
+    ],
     build: {
       ssr: wrapperEntry,
       outDir: paths.build,
