@@ -192,6 +192,16 @@ export default function Landing() {
 `;
 }
 
+/**
+ * Rewrite a file the running dev server watches. Chokidar drops a `change`
+ * for a path within 50ms of the previous one, and Linux and Windows report
+ * an edit fast enough for a test's next write to land inside that window.
+ */
+async function editWatchedFile(path: string, source: string): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  writeFileSync(path, source);
+}
+
 function writeLanding(cwd: string, mcpRoot = cwd): void {
   mkdirSync(mcpRoot, { recursive: true });
   for (const dependency of ["react", "react-dom"]) {
@@ -372,7 +382,10 @@ export default function Landing() {
 
     // An edit clears the runner's modules: the setter must come from the
     // re-evaluated mcp-use/landing that the new landing.tsx hooks read.
-    writeFileSync(join(cwd, "landing.tsx"), landingWithHeading("Second"));
+    await editWatchedFile(
+      join(cwd, "landing.tsx"),
+      landingWithHeading("Second")
+    );
     const second = await waitFor(async () => {
       const html = await (await htmlRequest(url)).text();
       return testIdText(html, "heading") === "Second fixture-basic"
@@ -382,7 +395,7 @@ export default function Landing() {
     expect(testIdText(second, "nested-tools")).toBe("add");
 
     // A broken edit keeps serving the last working component with its data.
-    writeFileSync(
+    await editWatchedFile(
       join(cwd, "landing.tsx"),
       "export default 'not a component';\n"
     );
@@ -415,7 +428,7 @@ export default function Landing() {
     expect(first).not.toContain('data-testid="prompts"');
     expect(landingDataKeys(first)).toEqual(["prompts", "server"]);
 
-    writeFileSync(
+    await editWatchedFile(
       join(cwd, "landing.tsx"),
       keyedLandingSource(`import { useToolList } from "mcp-use/landing";
 export function ToolCount() {
@@ -434,7 +447,7 @@ export function ToolCount() {
 
     // Dropping the child's import stops shipping its list, although the
     // child module itself is unchanged and its transform stays cached.
-    writeFileSync(
+    await editWatchedFile(
       join(cwd, "landing.tsx"),
       `import { useServerInfo } from "mcp-use/landing";
 export default function Landing() {
@@ -484,7 +497,7 @@ export default function Landing() {
     cleanups.push(() => ws.close());
 
     // An edit that needs no new list stays a hot update.
-    writeFileSync(
+    await editWatchedFile(
       join(cwd, "landing-prompts.tsx"),
       `import { usePromptList } from "mcp-use/landing";
 export function Prompts() {
@@ -498,7 +511,7 @@ export function Prompts() {
     expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
 
     // A newly imported hook reloads the page, whose HTML ships its list.
-    writeFileSync(
+    await editWatchedFile(
       join(cwd, "landing-prompts.tsx"),
       `import { usePromptList, useToolList } from "mcp-use/landing";
 export function Prompts() {
@@ -957,7 +970,7 @@ export default function Landing() {
       "<title>First title</title>"
     );
 
-    writeFileSync(
+    await editWatchedFile(
       join(cwd, "landing.tsx"),
       metadataLandingSource({ title: "Second title" })
     );
@@ -967,7 +980,7 @@ export default function Landing() {
     });
 
     // A broken edit keeps the head of the last working page with its body.
-    writeFileSync(
+    await editWatchedFile(
       join(cwd, "landing.tsx"),
       `export const metadata = { title: "Broken title" };
 export default "not a component";
@@ -988,7 +1001,10 @@ export default "not a component";
     expect(fallbackHtml).toContain('data-testid="metadata-landing"');
 
     // Without the export, the server's default title comes back.
-    writeFileSync(join(cwd, "landing.tsx"), metadataLandingSource(undefined));
+    await editWatchedFile(
+      join(cwd, "landing.tsx"),
+      metadataLandingSource(undefined)
+    );
     await waitFor(async () => {
       const html = await (await htmlRequest(url)).text();
       return html.includes(
