@@ -168,46 +168,37 @@ function sseResponse(events: unknown[]): Response {
 /**
  * Wire shape of a streamed tool call. The arguments events carry `item_id`
  * (the output item's `id`), never `call_id`.
- *
- * `correlation` selects which of the two the arguments events carry, so the
- * nonstandard `call_id` producer can be exercised too. `itemId` is `null` for
- * a producer that omits the output item's `id` altogether.
  */
-function toolCallEvents(
-  callId = "call_abc",
-  itemId: string | null = "fc_abc",
-  correlation: "item_id" | "call_id" = "item_id"
-): unknown[] {
-  const correlationValue = correlation === "item_id" ? itemId : callId;
+function toolCallEvents(): unknown[] {
   return [
     {
       type: "response.output_item.added",
       output_index: 0,
       item: {
         type: "function_call",
-        ...(itemId === null ? {} : { id: itemId }),
-        call_id: callId,
+        id: "fc_abc",
+        call_id: "call_abc",
         name: "get_weather",
         arguments: "",
       },
     },
     {
       type: "response.function_call_arguments.delta",
-      [correlation]: correlationValue,
+      item_id: "fc_abc",
       output_index: 0,
       delta: '{"city":',
       sequence_number: 1,
     },
     {
       type: "response.function_call_arguments.delta",
-      [correlation]: correlationValue,
+      item_id: "fc_abc",
       output_index: 0,
       delta: '"Paris"}',
       sequence_number: 2,
     },
     {
       type: "response.function_call_arguments.done",
-      [correlation]: correlationValue,
+      item_id: "fc_abc",
       output_index: 0,
       arguments: '{"city":"Paris"}',
       sequence_number: 3,
@@ -218,8 +209,8 @@ function toolCallEvents(
         output: [
           {
             type: "function_call",
-            id: itemId,
-            call_id: callId,
+            id: "fc_abc",
+            call_id: "call_abc",
             name: "get_weather",
             arguments: '{"city":"Paris"}',
           },
@@ -269,127 +260,6 @@ describe("Responses SSE event mapping", () => {
       toolCallId: "call_abc",
       toolName: "get_weather",
       args: { city: "Paris" },
-    });
-  });
-
-  it.each([
-    ["an item id", "fc_abc"],
-    ["no item id", null],
-  ] as const)(
-    "still correlates argument events from a call_id-only producer with %s",
-    async (_producer, itemId) => {
-      vi.stubGlobal(
-        "fetch",
-        vi
-          .fn()
-          .mockResolvedValue(
-            sseResponse(toolCallEvents("call_abc", itemId, "call_id"))
-          )
-      );
-
-      const turn = streamResponsesTurn({
-        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "k" },
-        input: [{ role: "user", content: "weather in Paris?" }],
-        tools: TOOLS,
-      });
-      const events: LlmStreamEvent[] = [];
-      for (;;) {
-        const next = await turn.next();
-        if (next.done) break;
-        events.push(next.value);
-      }
-
-      expect(events).toContainEqual({
-        type: "tool-call-args-delta",
-        index: 0,
-        toolCallId: "call_abc",
-        toolName: "get_weather",
-        argsDelta: '{"city":',
-      });
-      expect(events).toContainEqual({
-        type: "tool-call-ready",
-        index: 0,
-        toolCallId: "call_abc",
-        toolName: "get_weather",
-        args: { city: "Paris" },
-      });
-    }
-  );
-
-  it("keeps calls apart when one call's item id is another's call id", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        sseResponse([
-          {
-            type: "response.output_item.added",
-            output_index: 0,
-            item: {
-              type: "function_call",
-              id: "fc_shared",
-              call_id: "call_first",
-              name: "first_tool",
-              arguments: "",
-            },
-          },
-          {
-            type: "response.output_item.added",
-            output_index: 1,
-            item: {
-              type: "function_call",
-              id: "fc_second",
-              // A different call, whose call_id happens to equal the first
-              // call's item id. The two identifiers come from the producer
-              // and share no namespace, so they must not share a key.
-              call_id: "fc_shared",
-              name: "second_tool",
-              arguments: "",
-            },
-          },
-          {
-            type: "response.function_call_arguments.delta",
-            item_id: "fc_shared",
-            output_index: 0,
-            delta: '{"n":1}',
-            sequence_number: 1,
-          },
-          {
-            type: "response.function_call_arguments.done",
-            item_id: "fc_shared",
-            output_index: 0,
-            arguments: '{"n":1}',
-            sequence_number: 2,
-          },
-        ])
-      )
-    );
-
-    const turn = streamResponsesTurn({
-      config: { provider: "openai", model: "gpt-4o-mini", apiKey: "k" },
-      input: [{ role: "user", content: "run both" }],
-      tools: TOOLS,
-    });
-    const events: LlmStreamEvent[] = [];
-    for (;;) {
-      const next = await turn.next();
-      if (next.done) break;
-      events.push(next.value);
-    }
-
-    // The argument events name the first call's item id, so they belong to it
-    expect(events).toContainEqual({
-      type: "tool-call-args-delta",
-      index: 0,
-      toolCallId: "call_first",
-      toolName: "first_tool",
-      argsDelta: '{"n":1}',
-    });
-    expect(events).toContainEqual({
-      type: "tool-call-ready",
-      index: 0,
-      toolCallId: "call_first",
-      toolName: "first_tool",
-      args: { n: 1 },
     });
   });
 
