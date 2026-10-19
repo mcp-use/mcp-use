@@ -1,5 +1,16 @@
 # @mcp-use/agent
 
+## 2.0.25-canary.0
+
+### Patch Changes
+
+- 91f70c0: Fix OpenAI Responses streaming never emitting tool-call args events
+
+  `response.function_call_arguments.delta` and `...done` carry `item_id`, not
+  `call_id`, so the buffer lookup never matched and neither `tool-call-args-delta`
+  nor `tool-call-ready` was emitted. `MCPAgent.stream()` and `streamEvents()` now
+  report AgentSteps for tool calls made through the OpenAI Responses provider.
+
 ## 2.0.24
 
 ### Patch Changes
