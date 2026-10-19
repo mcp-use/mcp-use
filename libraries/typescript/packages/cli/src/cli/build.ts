@@ -4,7 +4,9 @@
  *
  * When views exist (under `views/<name>/view.tsx`), also runs a client-environment
  * build per view (hashed assets on disk), validates bindings, and emits a
- * wrapper entry that primes views before re-exporting the server.
+ * wrapper entry that primes views before re-exporting the server. A
+ * `<mcp-root>/landing.tsx` gets the same client build into
+ * `.mcp-use/build/landing/` and is primed by the same wrapper.
  *
  * Vite is regular framework implementation machinery, but this module is
  * reached only through the bin's lazy build command. Library imports and
@@ -18,9 +20,14 @@ import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { build } from "vite";
+import { build, type Plugin } from "vite";
 
 import { discoverEntry } from "./entry.js";
+import { mcpUseLandingPlugin, VIRTUAL_LANDING_ID } from "./landing-client.js";
+import {
+  createLandingDataKeysCollector,
+  type LandingDataKey,
+} from "./landing-data-keys.js";
 import {
   loadProjectEnv,
   nextStandaloneAliases,
@@ -43,7 +50,10 @@ import {
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { resolveWorkspacePaths, type BuildManifest } from "./workspace.js";
 import { normalizeAssetsBaseUrl } from "../views/origin.js";
-import { viewAssetsBasePath } from "../views/document.js";
+import {
+  landingAssetsBasePath,
+  viewAssetsBasePath,
+} from "../views/document.js";
 import type { ViewsManifest } from "../views/types.js";
 import type { SkillsSnapshot } from "../skills/types.js";
 
@@ -52,8 +62,19 @@ const BUILD_ENTRY_NAME = "index.js";
 
 const WRAPPER_BASENAME = "entry-wrapper.ts";
 
+/** Landing hydration bundle directory inside `.mcp-use/build/`. */
+const LANDING_OUT_DIR = "landing";
+
 /** Inline imported assets as data URLs up to this byte size (effectively all). */
 const ASSETS_INLINE_LIMIT = 100 * 1024 * 1024;
+
+interface BuiltLanding {
+  source: string;
+  entry: string;
+  css: string[];
+  /** Lists the page's modules import a hook for, sorted. */
+  dataKeys: LandingDataKey[];
+}
 
 async function copyPublicAssets(cwd: string, outputDir: string): Promise<void> {
   const publicSrc = join(cwd, "public");
@@ -101,7 +122,8 @@ async function writeWrapperEntry(
   cacheDir: string,
   userEntry: string,
   viewsManifest: ViewsManifest,
-  skillsSnapshot: SkillsSnapshot | undefined
+  skillsSnapshot: SkillsSnapshot | undefined,
+  landing?: BuiltLanding
 ): Promise<string> {
   const wrapperPath = join(cacheDir, WRAPPER_BASENAME);
   await mkdir(cacheDir, { recursive: true });
@@ -112,8 +134,31 @@ async function writeWrapperEntry(
     [
       `import server from ${JSON.stringify(userEntry)};`,
       `import { registerSkills, registerViews } from "mcp-use";`,
+      ...(landing === undefined
+        ? []
+        : [
+            `import * as LandingModule from ${JSON.stringify(landing.source)};`,
+            `import { createElement } from "react";`,
+            `import { renderToString } from "react-dom/server";`,
+            `import { __withLandingData } from "mcp-use/landing";`,
+            `import { fileURLToPath } from "node:url";`,
+          ]),
       `server[registerViews](${manifestJson});`,
       `server[registerSkills](${skillsJson});`,
+      ...(landing === undefined
+        ? []
+        : [
+            `server.__primeLandingPage({`,
+            `  render: (data) => __withLandingData(data, () => renderToString(createElement(LandingModule.default))),`,
+            // Optional export: a static `LandingModule.metadata` would make
+            // the bundler warn about every page that does not export it.
+            `  metadata: Reflect.get(LandingModule, "metadata"),`,
+            `  entry: ${JSON.stringify(landing.entry)},`,
+            `  css: ${JSON.stringify(landing.css)},`,
+            `  dataKeys: ${JSON.stringify(landing.dataKeys)},`,
+            `  projectRoot: fileURLToPath(new URL("../../", import.meta.url)),`,
+            `});`,
+          ]),
       `export default server;`,
       "",
     ].join("\n")
@@ -121,67 +166,62 @@ async function writeWrapperEntry(
   return wrapperPath;
 }
 
-function readBuildAssetsBase(): string | undefined {
-  const raw = process.env["MCP_ASSETS_URL"];
-  if (raw === undefined || raw.trim() === "") {
-    return undefined;
-  }
-  try {
-    return normalizeAssetsBaseUrl(new URL(raw).href.replace(/\/$/, ""));
-  } catch {
-    return undefined;
-  }
-}
+/** Stylesheet languages Vite compiles, as module paths without a query. */
+const STYLESHEET_PATH =
+  /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 
-/** Rewrite a view-relative manifest path to a full CDN URL at build time. */
-function toCdnAssetUrl(
-  relativePath: string,
-  viewName: string,
-  assetsBase: string,
-  basePath: string
-): string {
-  const clean = relativePath.replace(/^\/+/, "");
-  return `${assetsBase}${viewAssetsBasePath(basePath, viewName)}${clean}`;
-}
-
-function applyBuildAssetsPrefix(
-  entry: ViewsManifest[string],
-  viewName: string,
-  assetsBase: string,
-  basePath: string
-): ViewsManifest[string] {
-  if (entry.kind !== "external") {
-    return entry;
-  }
+/**
+ * The wrapper imports `landing.tsx` to render it, so the page's stylesheets
+ * reach the server bundle, which never ships CSS. Load them empty rather than
+ * compile them without the client build's Tailwind setup, where
+ * `@import "tailwindcss"` cannot resolve. CSS modules still compile: rendering
+ * reads their class names.
+ */
+function serverStylesheetStubPlugin(): Plugin {
   return {
-    ...entry,
-    entry: toCdnAssetUrl(entry.entry, viewName, assetsBase, basePath),
-    css: entry.css.map((path) =>
-      toCdnAssetUrl(path, viewName, assetsBase, basePath)
-    ),
-    ...(entry.scripts !== undefined && {
-      scripts: entry.scripts.map((path) =>
-        toCdnAssetUrl(path, viewName, assetsBase, basePath)
-      ),
-    }),
+    name: "mcp-use-server-stylesheet-stub",
+    enforce: "pre",
+    load(id) {
+      if (!STYLESHEET_PATH.test(id) || /\.module\.\w+$/.test(id)) {
+        return undefined;
+      }
+      return "";
+    },
   };
 }
 
+/** Entry chunk and stylesheets emitted by one {@link buildClientBundle} run. */
+interface ClientBundle {
+  /** Entry chunk path relative to the output directory. */
+  entry: string;
+  /** Stylesheet paths relative to the output directory. */
+  css: string[];
+  /** Entry chunk source, for bundles embedded instead of written. */
+  js: string | undefined;
+  /** Stylesheet sources, for bundles embedded instead of written. */
+  cssSources: string[];
+}
+
 /**
- * Build one view into either embedded source or hashed assets on disk.
+ * Run the browser build shared by views and the landing page: the project's
+ * Vite config plus Tailwind and React, one virtual entry resolved by
+ * `plugin`, hashed assets, and a single stylesheet.
  */
-async function buildView(
-  view: DiscoveredView,
-  options: {
-    cwd: string;
-    cacheDir: string;
-    viewsOutDir: string;
-    userViteConfig: string | false;
-    sourceMaps: boolean;
-    inline: boolean;
-  }
-): Promise<ViewsManifest[string]> {
-  const viewOutDir = join(options.viewsOutDir, view.name);
+async function buildClientBundle(options: {
+  cwd: string;
+  cacheDir: string;
+  outDir: string;
+  userViteConfig: string | false;
+  sourceMaps: boolean;
+  /** Keep the output in memory as one chunk instead of writing files. */
+  inline: boolean;
+  /** Resolve the virtual entry named by `input`, plus bundle-specific hooks. */
+  plugins: Plugin[];
+  /** Rollup input map: output chunk name to virtual entry id. */
+  input: Record<string, string>;
+  /** Names the bundle in build errors, e.g. `view "weather"`. */
+  label: string;
+}): Promise<ClientBundle> {
   const clientResult = await build({
     root: options.cwd,
     configFile: options.userViteConfig,
@@ -194,13 +234,9 @@ async function buildView(
       alias: { tailwindcss: resolveTailwindCss() },
     },
     oxc: { jsx: { runtime: "automatic" } },
-    plugins: [
-      tailwindcss(),
-      react(),
-      mcpUseViewsPlugin({ getViews: () => [view] }),
-    ],
+    plugins: [tailwindcss(), react(), ...options.plugins],
     build: {
-      outDir: viewOutDir,
+      outDir: options.outDir,
       emptyOutDir: true,
       write: !options.inline,
       target: "es2022",
@@ -210,7 +246,7 @@ async function buildView(
       chunkSizeWarningLimit: 1000,
       assetsInlineLimit: ASSETS_INLINE_LIMIT,
       rollupOptions: {
-        input: { [view.name]: virtualViewId(view.name) },
+        input: options.input,
         output: {
           format: "es",
           codeSplitting: !options.inline,
@@ -227,16 +263,16 @@ async function buildView(
     ? clientResult[0]
     : clientResult;
   if (clientOutput === undefined || !("output" in clientOutput)) {
-    throw new Error(`Client build for view "${view.name}" produced no output.`);
+    throw new Error(`Client build for ${options.label} produced no output.`);
   }
 
   const rawOutput = clientOutput.output;
   const items = Array.isArray(rawOutput) ? rawOutput : Object.values(rawOutput);
 
-  let jsFileName: string | undefined;
-  let cssFileName: string | undefined;
-  let inlineJs: string | undefined;
-  const inlineCss: string[] = [];
+  let entry: string | undefined;
+  let js: string | undefined;
+  const css: string[] = [];
+  const cssSources: string[] = [];
 
   for (const item of items) {
     if (typeof item !== "object" || item === null || !("fileName" in item)) {
@@ -254,26 +290,161 @@ async function buildView(
       source?: string | Uint8Array;
     };
     if (typed.type === "chunk" && typed.isEntry === true) {
-      jsFileName = typed.fileName;
-      inlineJs = typed.code;
+      entry = typed.fileName.replace(/^\/+/, "");
+      js = typed.code;
     } else if (typed.type === "asset" && typed.fileName.endsWith(".css")) {
-      cssFileName = typed.fileName;
+      css.push(typed.fileName.replace(/^\/+/, ""));
       if (typeof typed.source === "string") {
-        inlineCss.push(typed.source);
+        cssSources.push(typed.source);
       } else if (typed.source instanceof Uint8Array) {
-        inlineCss.push(new TextDecoder().decode(typed.source));
+        cssSources.push(new TextDecoder().decode(typed.source));
       }
     }
   }
 
-  if (jsFileName === undefined) {
+  if (entry === undefined) {
     throw new Error(
-      `Client build produced no entry chunk for view "${view.name}".`
+      `Client build produced no entry chunk for ${options.label}.`
     );
   }
+  return { entry, css, js, cssSources };
+}
+
+/** Compile the discovered component and its imported styles for hydration. */
+async function buildLanding(
+  source: string,
+  options: {
+    cwd: string;
+    cacheDir: string;
+    buildDir: string;
+    userViteConfig: string | false;
+    sourceMaps: boolean;
+  }
+): Promise<BuiltLanding> {
+  const dataKeys = createLandingDataKeysCollector({ environment: "client" });
+  const bundle = await buildClientBundle({
+    cwd: options.cwd,
+    cacheDir: options.cacheDir,
+    outDir: join(options.buildDir, LANDING_OUT_DIR),
+    userViteConfig: options.userViteConfig,
+    sourceMaps: options.sourceMaps,
+    inline: false,
+    plugins: [
+      mcpUseLandingPlugin({ getLandingPath: () => source }),
+      dataKeys.plugin,
+    ],
+    input: { landing: VIRTUAL_LANDING_ID },
+    label: "the landing page",
+  });
+  return {
+    source,
+    entry: bundle.entry,
+    css: bundle.css,
+    dataKeys: dataKeys.all(),
+  };
+}
+
+function readBuildAssetsBase(): string | undefined {
+  const raw = process.env["MCP_ASSETS_URL"];
+  if (raw === undefined || raw.trim() === "") {
+    return undefined;
+  }
+  try {
+    return normalizeAssetsBaseUrl(new URL(raw).href.replace(/\/$/, ""));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Rewrite a bundle-relative path to a full CDN URL at build time. */
+function toCdnAssetUrl(
+  relativePath: string,
+  routePath: string,
+  assetsBase: string
+): string {
+  const clean = relativePath.replace(/^\/+/, "");
+  return `${assetsBase}${routePath}${clean}`;
+}
+
+function applyBuildAssetsPrefix(
+  entry: ViewsManifest[string],
+  viewName: string,
+  assetsBase: string,
+  basePath: string
+): ViewsManifest[string] {
+  if (entry.kind !== "external") {
+    return entry;
+  }
+  const routePath = viewAssetsBasePath(basePath, viewName);
+  return {
+    ...entry,
+    entry: toCdnAssetUrl(entry.entry, routePath, assetsBase),
+    css: entry.css.map((path) => toCdnAssetUrl(path, routePath, assetsBase)),
+    ...(entry.scripts !== undefined && {
+      scripts: entry.scripts.map((path) =>
+        toCdnAssetUrl(path, routePath, assetsBase)
+      ),
+    }),
+  };
+}
+
+/** Point the landing hydration entry and stylesheets at the build-time CDN. */
+function applyLandingAssetsPrefix(
+  landing: BuiltLanding,
+  assetsBase: string,
+  basePath: string
+): BuiltLanding {
+  const routePath = landingAssetsBasePath(basePath);
+  return {
+    ...landing,
+    entry: toCdnAssetUrl(landing.entry, routePath, assetsBase),
+    css: landing.css.map((path) => toCdnAssetUrl(path, routePath, assetsBase)),
+  };
+}
+
+/**
+ * Tell the user which generated directory a CDN build expects at a URL. The
+ * path uses forward slashes on every platform, like the URL beside it.
+ */
+function logCdnPublishLocation(
+  cwd: string,
+  outDir: string,
+  assetUrl: string
+): void {
+  console.log(
+    `[mcp-use] MCP_ASSETS_URL set — publish ` +
+      `${relative(cwd, outDir).replaceAll("\\", "/")}/ at ${assetUrl}`
+  );
+}
+
+/**
+ * Build one view into either embedded source or hashed assets on disk.
+ */
+async function buildView(
+  view: DiscoveredView,
+  options: {
+    cwd: string;
+    cacheDir: string;
+    viewsOutDir: string;
+    userViteConfig: string | false;
+    sourceMaps: boolean;
+    inline: boolean;
+  }
+): Promise<ViewsManifest[string]> {
+  const bundle = await buildClientBundle({
+    cwd: options.cwd,
+    cacheDir: options.cacheDir,
+    outDir: join(options.viewsOutDir, view.name),
+    userViteConfig: options.userViteConfig,
+    sourceMaps: options.sourceMaps,
+    inline: options.inline,
+    plugins: [mcpUseViewsPlugin({ getViews: () => [view] })],
+    input: { [view.name]: virtualViewId(view.name) },
+    label: `view "${view.name}"`,
+  });
 
   if (options.inline) {
-    if (inlineJs === undefined) {
+    if (bundle.js === undefined) {
       throw new Error(
         `Client build produced no entry source for view "${view.name}".`
       );
@@ -281,16 +452,16 @@ async function buildView(
     return {
       kind: "inline",
       viewConfig: readViewConfig(view.entryPath),
-      js: inlineJs,
-      css: inlineCss.join("\n"),
+      js: bundle.js,
+      css: bundle.cssSources.join("\n"),
     };
   }
 
   return {
     kind: "external",
     viewConfig: readViewConfig(view.entryPath),
-    entry: jsFileName.replace(/^\/+/, ""),
-    css: cssFileName !== undefined ? [cssFileName.replace(/^\/+/, "")] : [],
+    entry: bundle.entry,
+    css: bundle.css,
   };
 }
 
@@ -329,6 +500,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     options.mcpDir === undefined
       ? options.cwd
       : resolve(options.cwd, options.mcpDir);
+  const landingSource = join(sourceRoot, "landing.tsx");
+  const hasLanding = existsSync(landingSource);
   const entry =
     options.entry === undefined
       ? discoverEntry(sourceRoot)
@@ -370,11 +543,45 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         options.cwd,
         conventionalSkillsDirectory
       );
+      let landing: BuiltLanding | undefined;
+      if (hasLanding) {
+        await rm(paths.build, { recursive: true, force: true });
+        landing = await buildLanding(landingSource, {
+          cwd: options.cwd,
+          cacheDir: paths.cache,
+          buildDir: paths.build,
+          userViteConfig,
+          sourceMaps,
+        });
+        const buildAssetsBase = readBuildAssetsBase();
+        if (buildAssetsBase !== undefined) {
+          const buildBasePath = await resolveBuildBasePath(
+            bindingServer.environments.ssr,
+            entry
+          );
+          landing = applyLandingAssetsPrefix(
+            landing,
+            buildAssetsBase,
+            buildBasePath
+          );
+          logCdnPublishLocation(
+            options.cwd,
+            join(paths.build, LANDING_OUT_DIR),
+            `${buildAssetsBase}${landingAssetsBasePath(buildBasePath)}`
+          );
+          if (buildBasePath !== "/mcp") {
+            console.log(
+              `[mcp-use] CDN manifest uses basePath ${buildBasePath} from server entry`
+            );
+          }
+        }
+      }
       const wrapperEntry = await writeWrapperEntry(
         paths.cache,
         entry,
         {},
-        skillsSnapshot
+        skillsSnapshot,
+        landing
       );
       await build({
         root: options.cwd,
@@ -387,11 +594,14 @@ export async function runBuild(options: BuildOptions): Promise<void> {
           tsconfigPaths: true,
           alias: nextStandaloneAliases(options.cwd),
         },
-        plugins: [nextStandaloneCompatPlugin(options.cwd)],
+        plugins: [
+          nextStandaloneCompatPlugin(options.cwd),
+          serverStylesheetStubPlugin(),
+        ],
         build: {
           ssr: wrapperEntry,
           outDir: paths.build,
-          emptyOutDir: true,
+          emptyOutDir: !hasLanding,
           target: "node22",
           sourcemap: sourceMaps,
           minify: false,
@@ -451,6 +661,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const viewsManifest: ViewsManifest = {};
   let skillsSnapshot: SkillsSnapshot | undefined;
   const buildAssetsBase = readBuildAssetsBase();
+  let landing: BuiltLanding | undefined;
   try {
     buildBasePath = await resolveBuildBasePath(
       bindingServer.environments.ssr,
@@ -477,15 +688,40 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       viewsManifest[view.name] = manifestEntry;
     }
 
-    if (buildAssetsBase !== undefined && !inline) {
-      const assetPath = `${buildAssetsBase}${viewAssetsBasePath(
-        buildBasePath,
-        "<view-name>"
-      )}`;
-      console.log(
-        `[mcp-use] MCP_ASSETS_URL set — publish ` +
-          `${relative(options.cwd, viewsOutDir)}/ at ${assetPath}`
-      );
+    if (hasLanding) {
+      landing = await buildLanding(landingSource, {
+        cwd: options.cwd,
+        cacheDir: paths.cache,
+        buildDir: paths.build,
+        userViteConfig,
+        sourceMaps,
+      });
+      // Unlike views, the landing bundle is never embedded, so `--inline`
+      // does not keep it off the CDN.
+      if (buildAssetsBase !== undefined) {
+        landing = applyLandingAssetsPrefix(
+          landing,
+          buildAssetsBase,
+          buildBasePath
+        );
+      }
+    }
+
+    if (buildAssetsBase !== undefined && (!inline || landing !== undefined)) {
+      if (!inline) {
+        logCdnPublishLocation(
+          options.cwd,
+          viewsOutDir,
+          `${buildAssetsBase}${viewAssetsBasePath(buildBasePath, "<view-name>")}`
+        );
+      }
+      if (landing !== undefined) {
+        logCdnPublishLocation(
+          options.cwd,
+          join(paths.build, LANDING_OUT_DIR),
+          `${buildAssetsBase}${landingAssetsBasePath(buildBasePath)}`
+        );
+      }
       if (buildBasePath !== "/mcp") {
         console.log(
           `[mcp-use] CDN manifest uses basePath ${buildBasePath} from server entry`
@@ -510,7 +746,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     paths.cache,
     entry,
     viewsManifest,
-    skillsSnapshot
+    skillsSnapshot,
+    landing
   );
 
   await build({
@@ -525,7 +762,10 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       alias: nextStandaloneAliases(options.cwd),
     },
     oxc: { jsx: { runtime: "automatic" } },
-    plugins: [nextStandaloneCompatPlugin(options.cwd)],
+    plugins: [
+      nextStandaloneCompatPlugin(options.cwd),
+      serverStylesheetStubPlugin(),
+    ],
     build: {
       ssr: wrapperEntry,
       outDir: paths.build,

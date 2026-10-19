@@ -312,6 +312,7 @@
                       "v2/typescript/server/index",
                       "v2/typescript/server/migration",
                       "v2/typescript/server/examples",
+                      "v2/typescript/server/landing-page",
                       "v2/typescript/server/skills",
                       {
                         "group": "Core Components",
