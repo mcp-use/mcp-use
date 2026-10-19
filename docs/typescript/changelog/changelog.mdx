@@ -6,6 +6,32 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.11.0" description="October 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.11.0&title=Custom%20landing%20pages&date=2026-10&lang=typescript" alt="Release 2.11.0" />
+  </Frame>
+  ## Custom landing pages
+  Minor release adding a customizable page at the MCP URL with `landing.tsx`, plus agent streaming, OAuth client, and CLI fixes.
+
+- **New** (server, @mcp-use/cli): a `landing.tsx` in the MCP root replaces the page a browser sees at the MCP URL. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`) and `mcp-use start` serves the built page. It renders on the server and hydrates in the browser; without it, the built-in page is served as before (`#2648`)
+- **New** (server): `mcp-use/landing` exports React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`. Server info always ships to the page; each list ships only when the page's import graph uses its hook (`#2648`)
+- **New** (server): `getInstallTargets({ url, name })` returns install links and commands for Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and the Manufact Inspector, for use outside the server such as on a docs site (`#2648`)
+- **New** (server): `landing.tsx` can `export const metadata` (`title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags (`#2648`)
+- **New** (@mcp-use/cli): Tailwind classes work in `landing.tsx` without a CSS file and CSS imports are bundled. In dev, edits use Fast Refresh, adding or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` (`#2648`)
+- **New** (create-mcp-use-app): every template includes a Tailwind-styled `landing.tsx`; `blank` and `mcp-server` add React and its types, and every template's `tsconfig.json` typechecks `landing.tsx` (`#2648`)
+- **Fix** (server, @mcp-use/cli): landing pages set `data-theme` from the OS color scheme before first paint so `dark:` classes work; a page whose CSS imports Tailwind itself owns Tailwind; and in `mcp-use dev` the page's stylesheets load before hydration (`#2880`)
+- **Update** (server): ChatGPT install steps follow the Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab (`#2648`)
+- **Fix** (@mcp-use/cli): `mcp-use start --with-inspector` serves the Inspector at `/inspector` when `basePath` is `"/"`, and `mcp-use dev` prints `/inspector` instead of `//inspector` (`#2555`)
+- **Fix** (@mcp-use/cli): `mcp-use client` and `mcp-use screenshot` install a matching `@mcp-use/client` when they auto-install it, including on Windows where the install always failed (`#2853`)
+- **Fix** (@mcp-use/agent): the OpenAI Responses provider emits tool-call argument events, so `MCPAgent.stream()` and `streamEvents()` report steps for tool calls on OpenAI models (`#2551`)
+- **Fix** (@mcp-use/agent): `MCPAgent.stream()` returns and saves to memory only the final turn's text, the same as `run()`, instead of gluing on text written before tool calls (`#2723`)
+- **Fix** (@mcp-use/agent): `RemoteAgent.run` no longer rejects successful responses whose body has no `error` field, and error messages show the error instead of `[object Object]` (`#2651`)
+- **Fix** (@mcp-use/client): `useMcp().authTokens.expires_at` no longer moves later on every reconnect for opaque (non-JWT) tokens; the expiry is saved when tokens are received (`#2879`)
+- **Fix** (@mcp-use/client): Node OAuth loopback connections close after the callback, cancellation, or timeout, so the process can exit (`#2766`)
+- **Update**: Updated @mcp-use/cli to v4.5.0, create-mcp-use-app to v2.1.0, @mcp-use/client to v2.4.5, and @mcp-use/agent to v2.0.25
+- **Update**: Updated @mcp-use/inspector to v20.3.22; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.10.1" description="October 2026">
   ## OAuth discovery & browser tool calls
   Patch fixes for public MCP connections, OAuth credential binding, browser tool calls, and ChatGPT widget descriptions.
