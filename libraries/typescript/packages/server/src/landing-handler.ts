@@ -32,6 +32,12 @@ export interface LandingPageRenderer {
    * strings are ignored with a warning when the document head is rendered.
    */
   metadata?: unknown;
+  /**
+   * Stylesheets this version of the page imports, with the same path rules
+   * as {@link LandingPageAssets.entry}. A dev server links them so the
+   * server-rendered markup is styled before the entry runs.
+   */
+  importedCss?: readonly string[];
 }
 
 /** Development source of a landing renderer, loaded for each render. @internal */
@@ -68,6 +74,15 @@ export interface LandingPageAssets {
 }
 
 const MAX_CACHED_DOCUMENTS = 32;
+
+/**
+ * Mirror the OS color scheme into `data-theme` on `<html>`, which the managed
+ * Tailwind `dark:` variant keys off, before the first paint and on every OS
+ * change. Once the page sets another value itself, as a theme toggle would,
+ * the script stops overriding it.
+ */
+const THEME_SCRIPT =
+  '<script>(()=>{const d=document.documentElement,q=matchMedia("(prefers-color-scheme: dark)");let s;const a=()=>{if(d.dataset.theme!==s)return;s=q.matches?"dark":"light";d.dataset.theme=s};a();q.addEventListener("change",a)})()</script>';
 
 function escapeHtml(value: string): string {
   return value
@@ -168,6 +183,7 @@ function renderDocument(
   data: LandingData,
   markup: string,
   registration: LandingPageRegistration,
+  pageCss: readonly string[],
   metadata: LandingMetadata,
   serverOrigin: string,
   assetsBase: string,
@@ -188,10 +204,13 @@ function renderDocument(
         `<script type="module" src="${escapeHtml(assetUrl(value, serverOrigin, assetsBase, basePath))}"></script>`
     )
     .join("\n");
-  const stylesheets = (registration.css ?? [])
+  // The dev entry removes these once its imports have inserted the same
+  // styles, which receive hot updates.
+  const devCss = registration.dev === true ? " data-mcp-use-dev-css" : "";
+  const stylesheets = [...(registration.css ?? []), ...pageCss]
     .map(
       (value) =>
-        `<link rel="stylesheet" href="${escapeHtml(assetUrl(value, serverOrigin, assetsBase, basePath))}">`
+        `<link rel="stylesheet"${devCss} href="${escapeHtml(assetUrl(value, serverOrigin, assetsBase, basePath))}">`
     )
     .join("\n");
   const iconUrl =
@@ -239,6 +258,7 @@ function renderDocument(
 <meta name="twitter:description" content="${escapeHtml(description)}">
 ${imageTags}${icon}
 <script type="application/ld+json">${jsonLd}</script>
+${THEME_SCRIPT}
 ${stylesheets}
 </head>
 <body>
@@ -356,7 +376,7 @@ export async function createLandingPageResponse(
               registration.dev === true ? undefined : cache?.get(key);
             if (cached !== undefined) return cached;
             const rendering = (async () => {
-              const { render, dataKeys, metadata } =
+              const { render, dataKeys, metadata, importedCss } =
                 "load" in registration
                   ? await registration.load()
                   : registration;
@@ -365,6 +385,7 @@ export async function createLandingPageResponse(
                 data,
                 await render(data),
                 registration,
+                importedCss ?? [],
                 readLandingMetadata(metadata),
                 origin,
                 assetsBase,

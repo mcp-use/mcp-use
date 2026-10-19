@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 
 import { MCPServer } from "../src/index.js";
 import {
@@ -380,6 +381,92 @@ describe("MCPServer landing page routing", () => {
     expect(rendered.find(({ version }) => version === 1)?.data.prompts).toEqual(
       [{ name: "plan" }]
     );
+  });
+
+  it("links each dev load's imported stylesheets, marked for the entry to remove", async () => {
+    const server = track(
+      new MCPServer({ name: "dev-css-landing", version: "1.0.0" })
+    );
+    server.__primeLandingPage({
+      load: async () => ({
+        dataKeys: [],
+        importedCss: ["/landing.css"],
+        render: () => "<main>Live</main>",
+      }),
+      entry: "/@id/entry",
+      css: ["/@id/tailwind.css"],
+      dev: true,
+    });
+    const html = await (
+      await server.fetch(htmlRequest("https://server.example.test/mcp"))
+    ).text();
+    expect(
+      [...html.matchAll(/<link rel="stylesheet"[^>]*>/g)].map(String)
+    ).toEqual([
+      '<link rel="stylesheet" data-mcp-use-dev-css href="https://server.example.test/@id/tailwind.css">',
+      '<link rel="stylesheet" data-mcp-use-dev-css href="https://server.example.test/landing.css">',
+    ]);
+  });
+
+  describe("color scheme", () => {
+    async function renderedHead(): Promise<string> {
+      const server = track(
+        new MCPServer({ name: "theme-landing", version: "1.0.0" })
+      );
+      server.__primeLandingPage({
+        render: () => "<main>Themed</main>",
+        dataKeys: [],
+        entry: "assets/entry.js",
+        css: ["assets/style.css"],
+      });
+      const html = await (
+        await server.fetch(htmlRequest("https://server.example.test/mcp"))
+      ).text();
+      return html.slice(0, html.indexOf("</head>"));
+    }
+
+    /** Run the head's theme script against a stand-in document. */
+    function runThemeScript(head: string, dark: boolean) {
+      const source = /<script>(.*?)<\/script>/.exec(head)?.[1];
+      expect(source).toBeDefined();
+      const dataset: { theme?: string } = {};
+      const query = {
+        matches: dark,
+        listener: undefined as (() => void) | undefined,
+        addEventListener(_type: string, listener: () => void) {
+          query.listener = listener;
+        },
+      };
+      runInNewContext(source!, {
+        document: { documentElement: { dataset } },
+        matchMedia: () => query,
+      });
+      const changeTo = (next: boolean): void => {
+        query.matches = next;
+        query.listener?.();
+      };
+      return { dataset, changeTo };
+    }
+
+    it("sets data-theme from the OS before the stylesheets load", async () => {
+      const head = await renderedHead();
+      expect(head.indexOf("prefers-color-scheme: dark")).toBeLessThan(
+        head.indexOf('<link rel="stylesheet"')
+      );
+      expect(head).not.toContain("data-mcp-use-dev-css");
+      expect(runThemeScript(head, true).dataset.theme).toBe("dark");
+      expect(runThemeScript(head, false).dataset.theme).toBe("light");
+    });
+
+    it("follows OS changes until the page sets its own theme", async () => {
+      const { dataset, changeTo } = runThemeScript(await renderedHead(), false);
+      changeTo(true);
+      expect(dataset.theme).toBe("dark");
+      dataset.theme = "light";
+      changeTo(false);
+      changeTo(true);
+      expect(dataset.theme).toBe("light");
+    });
   });
 
   describe("metadata", () => {
