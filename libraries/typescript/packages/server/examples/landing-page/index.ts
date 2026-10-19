@@ -45,7 +45,9 @@ server.tool(
     content: [
       {
         type: "text",
-        text: String(to === "F" ? (value * 9) / 5 + 32 : ((value - 32) * 5) / 9),
+        text: String(
+          to === "F" ? (value * 9) / 5 + 32 : ((value - 32) * 5) / 9
+        ),
       },
     ],
   })
@@ -61,7 +63,10 @@ server.prompt(
     messages: [
       {
         role: "user",
-        content: { type: "text", text: `Plan my day in ${city} using the forecast.` },
+        content: {
+          type: "text",
+          text: `Plan my day in ${city} using the forecast.`,
+        },
       },
     ],
   })
