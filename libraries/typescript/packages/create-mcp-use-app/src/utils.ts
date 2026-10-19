@@ -99,10 +99,13 @@ export function getDeployCommand(packageManager: string): string {
   return `${packageManager} run deploy`;
 }
 
-// Quote a directory with spaces so the hint works when pasted into bash,
-// PowerShell or cmd.exe.
+// Quote a directory with spaces or shell operators (`&`, `|`, `;`, parentheses
+// and so on) so the hint works when pasted into bash, PowerShell or cmd.exe.
+// Plain names stay unquoted.
 export function getCdCommand(directory: string): string {
-  return /\s/.test(directory) ? `cd "${directory}"` : `cd ${directory}`;
+  return /^[\w.\-/\\:@+]+$/.test(directory)
+    ? `cd ${directory}`
+    : `cd "${directory}"`;
 }
 
 export function updatePackageJson(projectPath: string, projectName: string) {
