@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.22-canary.7
+
+### Patch Changes
+
+- 52d8d99: ChatGPT install steps on the landing page, in `getInstallTargets()` and in the inspector's tunnel panel follow ChatGPT's Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab.
+
 ## 20.3.22-canary.6
 
 ### Patch Changes

@@ -12,9 +12,11 @@
   },
   "changesets": [
     "agent-stream-final-text",
+    "chatgpt-plugins-install-steps",
     "cli-client-install-windows",
     "fix-inspector-stream-failures",
     "lazy-pandas-argue",
+    "mcp-landing-customization",
     "oauth-loopback-cleanup",
     "pinned-oauth-expiry",
     "propagated-6fdbf4c83a25a185",
