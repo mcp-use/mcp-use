@@ -24,9 +24,9 @@ export function useConnectionFormState(
   const [protocolMode, setProtocolMode] =
     useState<InspectorProtocolMode>("auto");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
-  const [requestTimeout, setRequestTimeout] = useState("10000");
+  const [requestTimeout, setRequestTimeout] = useState("");
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState("True");
-  const [maxTotalTimeout, setMaxTotalTimeout] = useState("60000");
+  const [maxTotalTimeout, setMaxTotalTimeout] = useState("");
   const [proxyAddress, setProxyAddress] = useState(
     getDefaultInspectorProxyAddress()
   );
