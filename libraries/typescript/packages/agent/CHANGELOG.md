@@ -1,5 +1,11 @@
 # @mcp-use/agent
 
+## 2.0.25-canary.3
+
+### Patch Changes
+
+- 2d7c986: Fix `RemoteAgent.run` rejecting successful responses whose body has no `error` field. Error messages from a body with `error` or `status: "error"` now show the error (object errors as JSON) instead of `[object Object]`, without repeating the "Remote agent execution failed:" prefix. Remove the "failed to initialize" check, which could never match.
+
 ## 2.0.25-canary.2
 
 ### Patch Changes
