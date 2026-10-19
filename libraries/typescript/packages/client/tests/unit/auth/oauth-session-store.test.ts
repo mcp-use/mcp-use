@@ -5,7 +5,7 @@
  *   pnpm --filter mcp-use test:unit -- tests/unit/auth/session-store.test.ts
  */
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   OAuthSessionStore,
   type OAuthSessionStoreOptions,
@@ -128,6 +128,30 @@ describe("OAuthSessionStore", () => {
       expect(kv.get(session.getKey("code_verifier"))).toBeNull();
       expect(kv.get(session.getKey("last_auth_url"))).toBeNull();
       expect(kv.get(session.getKey("last_auth_callback_url"))).toBeNull();
+    });
+
+    describe("expiry", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("pins expires_in to an absolute expiry when saved", async () => {
+        const { session } = createStore();
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+
+        await session.saveTokens({
+          access_token: "abc",
+          expires_in: 3600,
+          issuer: "https://auth.example.com",
+        });
+
+        // Reading later must not restart the token's lifetime.
+        vi.setSystemTime(new Date("2026-01-01T00:50:00Z"));
+        expect(await session.tokens()).toMatchObject({
+          mcp_use_expires_at: Date.parse("2026-01-01T01:00:00Z"),
+        });
+      });
     });
   });
 

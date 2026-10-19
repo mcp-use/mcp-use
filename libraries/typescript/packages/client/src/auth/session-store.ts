@@ -232,9 +232,18 @@ export class OAuthSessionStore {
     tokens: StoredOAuthTokens,
     ctx?: OAuthClientInformationContext
   ): Promise<void> {
+    // `expires_in` counts from when the token was issued, so pin it to an
+    // absolute time here instead of re-deriving it from each later read.
+    const stored =
+      typeof tokens.expires_in === "number"
+        ? {
+            ...tokens,
+            mcp_use_expires_at: Date.now() + tokens.expires_in * 1000,
+          }
+        : tokens;
     // Persist tokens BEFORE clearing the verifier / last_auth_url so a failed
     // write can't strand the auth flow with no way to recover.
-    const serialized = JSON.stringify(tokens);
+    const serialized = JSON.stringify(stored);
     await this.store.set(this.credentialKey("tokens", ctx), serialized);
     // The no-context SDK read is the transport's latest bearer token lookup.
     if (ctx) await this.store.set(this.credentialKey("tokens"), serialized);
