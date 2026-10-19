@@ -16,6 +16,7 @@
     "chatgpt-plugins-install-steps",
     "cli-client-install-windows",
     "fix-inspector-stream-failures",
+    "inspector-bff-json-client-limits",
     "landing-tailwind-followups",
     "lazy-pandas-argue",
     "mcp-landing-customization",
