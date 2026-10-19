@@ -247,6 +247,30 @@ const { publicBaseUrl } = useServerInfo();
 return <img src={`${publicBaseUrl}logo.svg`} alt="Acme" />;
 ```
 
+### Dark mode
+
+The page sets `data-theme="dark"` or `data-theme="light"` on `<html>` from the visitor's OS color scheme before the first paint, and updates it when the OS setting changes. Tailwind's `dark:` variant follows `data-theme`, so `dark:` classes work with no setup:
+
+```tsx
+<main className="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+```
+
+To add a theme toggle, set `document.documentElement.dataset.theme` yourself. Once the page changes the value, mcp-use stops updating it from the OS.
+
+### Customize Tailwind
+
+To add theme tokens, utilities, or your own `dark` variant, import Tailwind in the page's CSS. You don't need to install `tailwindcss`:
+
+```css landing.css
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #ff3366;
+}
+```
+
+When a stylesheet the page imports contains `@import "tailwindcss"`, the page owns Tailwind: mcp-use leaves out its managed stylesheet, so only your copy is compiled. Your `dark` variant, if you define one, is then the only one.
+
 ## Develop the page
 
 `mcp-use dev` serves the page with hot reloading:
