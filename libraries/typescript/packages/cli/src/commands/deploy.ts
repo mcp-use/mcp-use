@@ -424,7 +424,7 @@ async function deployManaged(input: {
     serverId = existing.serverId;
     serverSlug = existing.serverSlug;
     await syncServerConfiguration(api, serverId, values);
-    await syncEnvironment(api, serverId, env, values.branch);
+    await syncEnvironment(api, serverId, env, branch, values);
     const sourceForm = new FormData();
     appendArchive(sourceForm, archive);
     sourceForm.set("branch", branch);
@@ -658,7 +658,7 @@ async function deployGitHub(input: {
     serverId = existing.serverId;
     serverSlug = existing.serverSlug;
     await syncServerConfiguration(api, serverId, values);
-    await syncEnvironment(api, serverId, env, values.branch);
+    await syncEnvironment(api, serverId, env, branch, values);
     const deployment = await api.request<{ id: string }>("/deployments", {
       method: "POST",
       body: JSON.stringify({ serverId, branch, trigger: "manual" }),
@@ -753,13 +753,37 @@ async function deployGitHub(input: {
   });
 }
 
+/**
+ * Whether deploying `branch` starts a production deployment. `--branch` was just
+ * saved as the production branch by syncServerConfiguration.
+ */
+async function deploysProduction(
+  api: CloudApi,
+  serverId: string,
+  branch: string,
+  values: DeployValues
+): Promise<boolean> {
+  if (values.branch !== undefined) return true;
+  const server = await api.request<{
+    connectedRepository?: { productionBranch?: string | null } | null;
+  }>(`/servers/${encodeURIComponent(serverId)}`);
+  return branch === (server.connectedRepository?.productionBranch ?? "main");
+}
+
+// Cloud gives production deployments only shared `production` variables and
+// preview deployments only their branch's variables (plus shared `preview`
+// ones), so the variables are scoped to the deployment this command starts.
 async function syncEnvironment(
   api: CloudApi,
   serverId: string,
   environment: Record<string, string>,
-  branch: string | undefined
+  deployBranch: string,
+  values: DeployValues
 ): Promise<void> {
   if (Object.keys(environment).length === 0) return;
+  const branch = (await deploysProduction(api, serverId, deployBranch, values))
+    ? undefined
+    : deployBranch;
   const query =
     branch === undefined ? "" : `?branch=${encodeURIComponent(branch)}`;
   const existing = await api.request<
