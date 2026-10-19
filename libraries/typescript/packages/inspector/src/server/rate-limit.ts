@@ -15,12 +15,14 @@ const processApiLimiter = new RateLimiterMemory({
 /**
  * Proxy/OAuth budget per caller (client IP), so one busy caller cannot exhaust
  * the API for everyone, under a process-wide ceiling for rotating or spoofed
- * caller keys.
+ * caller keys. Requests that didn't pass through a platform proxy (a local
+ * Inspector or `mcp-use dev`) can't be told apart, so only the ceiling applies.
  */
 export function inspectorApiRateLimit(limiter: RateLimiterMemory) {
   return async (c: Context, next: Next) => {
     try {
-      await limiter.consume(clientKey(c));
+      const key = clientKey(c);
+      if (key) await limiter.consume(key);
       await processApiLimiter.consume("process");
     } catch (error) {
       return inspectorRateLimitResponse(c, error);
@@ -35,9 +37,9 @@ export function inspectorApiRateLimit(limiter: RateLimiterMemory) {
  * cannot pick its own budget by sending the header. Without a proxy (local
  * CLI) the header is the client's own and only the process ceiling holds.
  */
-function clientKey(c: Context): string {
+function clientKey(c: Context): string | undefined {
   return (
-    c.req.header("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown"
+    c.req.header("x-forwarded-for")?.split(",").at(-1)?.trim() || undefined
   );
 }
 
