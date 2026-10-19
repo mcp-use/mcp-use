@@ -197,18 +197,31 @@ async function importSandboxClientModule(): Promise<ClientPackage> {
   return importInstalledClientModule(CLIENT_SDK_DIR);
 }
 
+/**
+ * Import the nearest installed copy at or above `installRoot`. Package managers
+ * with workspaces can hoist the dependency to an ancestor `node_modules`, so
+ * walk up the way Node's resolver would, using plain file checks.
+ */
 async function importInstalledClientModule(
   installRoot: string
 ): Promise<ClientPackage> {
   disableBrokenNodeLocalStorage();
-  const entry = join(
-    installRoot,
-    "node_modules",
-    CLIENT_PACKAGE,
-    "dist",
-    "index.js"
-  );
-  return import(pathToFileURL(entry).href) as Promise<ClientPackage>;
+  let current = resolve(installRoot);
+  for (;;) {
+    const packageDir = join(current, "node_modules", CLIENT_PACKAGE);
+    if (await pathExists(join(packageDir, "package.json"))) {
+      const entry = join(packageDir, "dist", "index.js");
+      return import(pathToFileURL(entry).href) as Promise<ClientPackage>;
+    }
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  const error = new Error(
+    `Cannot find package '${CLIENT_PACKAGE}' from ${installRoot}`
+  ) as NodeJS.ErrnoException;
+  error.code = "ERR_MODULE_NOT_FOUND";
+  throw error;
 }
 
 /**

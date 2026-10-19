@@ -71,4 +71,20 @@ describe("importProjectClientModule after auto-install", () => {
     };
     expect(mod.installedBy).toBe("project");
   });
+
+  it("loads a copy hoisted to a workspace root's node_modules", async () => {
+    // npm and yarn workspaces install a package's dependency at the root.
+    const packageRoot = join(projectRoot, "packages", "server");
+    mkdirSync(packageRoot, { recursive: true });
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      JSON.stringify({ name: "server", type: "module" })
+    );
+    installFakeClient(projectRoot);
+
+    const mod = (await importProjectClientModule(packageRoot)) as unknown as {
+      installedBy?: string;
+    };
+    expect(mod.installedBy).toBe("project");
+  });
 });
