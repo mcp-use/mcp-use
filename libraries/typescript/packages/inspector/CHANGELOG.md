@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.22-canary.1
+
+### Patch Changes
+
+- 2a05af2: Display streamed provider errors and explain responses that exhaust the output limit without producing content instead of silently showing an empty chat turn.
+
 ## 20.3.22-canary.0
 
 ### Patch Changes

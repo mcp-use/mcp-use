@@ -12,6 +12,7 @@
   },
   "changesets": [
     "cli-client-install-windows",
+    "fix-inspector-stream-failures",
     "propagated-f3c3372fbd41ab78"
   ]
 }
