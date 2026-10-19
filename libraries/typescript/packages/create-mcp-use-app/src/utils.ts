@@ -99,6 +99,12 @@ export function getDeployCommand(packageManager: string): string {
   return `${packageManager} run deploy`;
 }
 
+// Quote a directory with spaces so the hint works when pasted into bash,
+// PowerShell or cmd.exe.
+export function getCdCommand(directory: string): string {
+  return /\s/.test(directory) ? `cd "${directory}"` : `cd ${directory}`;
+}
+
 export function updatePackageJson(projectPath: string, projectName: string) {
   const packageJsonPath = join(projectPath, "package.json");
   const packageJsonContent = JSON.parse(readFileSync(packageJsonPath, "utf-8"));

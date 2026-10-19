@@ -158,6 +158,13 @@ describe("runBuild", () => {
             call[0] === "[mcp-use] views directory not configured."
         )
       ).toBe(true);
+      // One separator style per path, so Windows doesn't print `.mcp-use\build/index.js`.
+      const builtLine = logSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((line) => line.startsWith("[mcp-use] built "));
+      expect(builtLine).toContain(
+        `→ ${join(WORKSPACE_DIR_NAME, "build", "index.js")} (`
+      );
     } finally {
       logSpy.mockRestore();
     }
