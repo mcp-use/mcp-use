@@ -125,7 +125,7 @@ function landingAssetUrls(html: string): {
 } {
   return {
     script: /<script type="module" src="([^"]+)"/.exec(html)?.[1],
-    css: /<link rel="stylesheet" href="([^"]+)"/.exec(html)?.[1],
+    css: /<link rel="stylesheet"[^>]* href="([^"]+)"/.exec(html)?.[1],
   };
 }
 
@@ -632,16 +632,30 @@ export default function Resources() {
     expect(html).toContain('data-testid="custom-landing"');
 
     // The head links the managed Tailwind stylesheet, built from the classes
-    // of the nested landing.tsx, so the server markup is styled before the
-    // hydration entry runs.
-    const { css } = landingAssetUrls(html);
-    expect(css).toBe(
-      new URL("/@id/__x00__virtual:mcp-use/tailwind.css", url).href
+    // of the nested landing.tsx, and the stylesheet the page imports, so the
+    // server markup is styled before the hydration entry runs. The entry
+    // removes both links once its own imports have inserted the styles.
+    const links = [
+      ...html.matchAll(
+        /<link rel="stylesheet" data-mcp-use-dev-css href="([^"]+)">/g
+      ),
+    ].map(([, href]) => href);
+    expect(links).toEqual([
+      new URL("/@id/__x00__virtual:mcp-use/landing-tailwind.css", url).href,
+      new URL("/src/mcp/landing.css", url).href,
+    ]);
+    const [tailwind, pageCss] = await Promise.all(
+      links.map(async (href) => {
+        const cssResponse = await fetch(href!, {
+          headers: { accept: "text/css" },
+        });
+        expect(cssResponse.status).toBe(200);
+        expect(cssResponse.headers.get("content-type")).toMatch(/text\/css/);
+        return cssResponse.text();
+      })
     );
-    const cssResponse = await fetch(css!, { headers: { accept: "text/css" } });
-    expect(cssResponse.status).toBe(200);
-    expect(cssResponse.headers.get("content-type")).toMatch(/text\/css/);
-    expect(await cssResponse.text()).toContain("#0d1e2f");
+    expect(tailwind).toContain("#0d1e2f");
+    expect(pageCss).toMatch(/#0b1621|rgb\(11,\s*22,\s*33\)/);
   }, 60_000);
 
   it("builds, starts, and serves the custom page, CSS, and public assets", async () => {
@@ -923,7 +937,7 @@ export default function Resources() {
     );
   }, 90_000);
 
-  it("builds a page whose stylesheet imports Tailwind and extends its theme", async () => {
+  it("builds a page whose stylesheet imports Tailwind and owns it", async () => {
     const cwd = copyFixture("landing-build-tailwind");
     cleanups.push(() => removeDir(cwd));
     writeLanding(cwd);
@@ -931,13 +945,18 @@ export default function Resources() {
     // resolve `@import "tailwindcss"` from a project without that dependency.
     writeFileSync(
       join(cwd, "landing.css"),
-      '@import "tailwindcss";\n@theme { --color-brand: #ff3366; }\n'
+      [
+        '@import "tailwindcss";',
+        "@custom-variant dark (&:where(.dark, .dark *));",
+        "@theme { --color-brand: #ff3366; }",
+        "",
+      ].join("\n")
     );
     writeFileSync(
       join(cwd, "landing.tsx"),
       `import "./landing.css";
 export default function Landing() {
-  return <main className="bg-brand">Brand</main>;
+  return <main className="bg-brand dark:bg-zinc-900">Brand</main>;
 }
 `
     );
@@ -952,7 +971,57 @@ export default function Landing() {
     const css = readFileSync(join(assets, stylesheet!), "utf8");
     expect(css).toMatch(/\.bg-brand\{background-color:var\(--color-brand\)\}/);
     expect(css).toMatch(/--color-brand:(#ff3366|#f36)/);
+    // Only the page's copy is compiled, so `dark:` follows its variant alone.
+    expect(css).toMatch(/\.dark\\:bg-zinc-900:where\(\.dark,\.dark \*\)/);
+    expect(css).not.toContain("data-theme=dark");
   }, 90_000);
+
+  it("lets a page whose stylesheet imports Tailwind own it in dev", async () => {
+    const cwd = copyFixture("landing-dev-tailwind");
+    cleanups.push(() => removeDir(cwd));
+    writeLanding(cwd);
+    // Imported by a child module, so finding it walks the page's graph.
+    writeFileSync(
+      join(cwd, "brand.css"),
+      '@import "tailwindcss";\n@theme { --color-brand: #ff3366; }\n'
+    );
+    writeFileSync(
+      join(cwd, "brand.tsx"),
+      `import "./brand.css";
+export function Brand() {
+  return <p className="bg-brand">Brand</p>;
+}
+`
+    );
+    writeFileSync(
+      join(cwd, "landing.tsx"),
+      `import { Brand } from "./brand";
+export default function Landing() {
+  return <main className="dark:bg-zinc-900"><Brand /></main>;
+}
+`
+    );
+    const url = await startDev(cwd);
+    const managedUrl = new URL(
+      "/@id/__x00__virtual:mcp-use/landing-tailwind.css",
+      url
+    );
+    const managedCss = async (): Promise<string> =>
+      (await fetch(managedUrl, { headers: { accept: "text/css" } })).text();
+
+    const html = await (await htmlRequest(url)).text();
+    expect(html).toContain(`href="${new URL("/brand.css", url).href}"`);
+    expect(await managedCss()).not.toContain("data-theme=dark");
+
+    // Dropping the import hands the page back to the managed stylesheet.
+    await editWatchedFile(
+      join(cwd, "brand.css"),
+      ".bg-brand { background: #ff3366; }\n"
+    );
+    await waitFor(async () =>
+      (await managedCss()).includes("data-theme=dark") ? true : undefined
+    );
+  }, 60_000);
 
   it("reads the metadata export of the current landing.tsx in dev", async () => {
     const cwd = copyFixture("landing-dev-metadata");

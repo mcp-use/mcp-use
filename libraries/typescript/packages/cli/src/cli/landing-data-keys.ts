@@ -116,12 +116,12 @@ function sorted(keys: Iterable<LandingDataKey>): LandingDataKey[] {
 }
 
 /** Installed packages: their hook imports never count. */
-function isDependency(id: string): boolean {
+export function isDependency(id: string): boolean {
   return id.replaceAll("\\", "/").includes("/node_modules/");
 }
 
 /** `root` and every module it imports, statically or dynamically. */
-function reachable(root: GraphNode | undefined): GraphNode[] {
+export function reachable(root: GraphNode | undefined): GraphNode[] {
   const seen = new Set<GraphNode>();
   const pending = root === undefined ? [] : [root];
   for (let node = pending.pop(); node !== undefined; node = pending.pop()) {

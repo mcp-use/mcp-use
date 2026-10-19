@@ -65,6 +65,7 @@ import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import {
   DEV_LANDING_ENTRY,
   DEV_LANDING_TAILWIND_CSS,
+  landingStylesheetUrls,
   mcpUseLandingPlugin,
   mcpUseLandingSsrPlugin,
   RESOLVED_LANDING_SSR_ID,
@@ -194,6 +195,8 @@ interface LandingRenderer {
   dataKeys: LandingDataKey[];
   /** The page's `metadata` export, validated by the server when rendered. */
   metadata: unknown;
+  /** Stylesheets the component's module graph imports, as dev server URLs. */
+  importedCss: string[];
 }
 
 /**
@@ -510,6 +513,9 @@ export async function runDev(options: DevOptions): Promise<void> {
   });
   // Keys of the last landing HTML served. An open page holds only these lists.
   let shippedLandingDataKeys: readonly LandingDataKey[] | undefined;
+  // Stylesheets the last landing HTML linked, which Vite may serve before the
+  // browser module graph has reached them.
+  let linkedLandingCss: ReadonlySet<string> = new Set();
   const landingDataKeysReloadPlugin: Plugin = {
     name: "mcp-use-landing-data-keys-reload",
     applyToEnvironment(environment) {
@@ -747,6 +753,12 @@ export async function runDev(options: DevOptions): Promise<void> {
                 moduleExports.__withLandingData as LandingRenderer["withLandingData"],
               dataKeys: await currentLandingDataKeys(),
               metadata: moduleExports.metadata,
+              // Read after the keys, whose walk brings the graph up to date.
+              importedCss: landingStylesheetUrls(
+                ssrEnvironment.moduleGraph.getModuleById(
+                  RESOLVED_LANDING_SSR_ID
+                )
+              ),
             };
           } catch (error) {
             if (lastWorking === undefined) throw error;
@@ -762,12 +774,19 @@ export async function runDev(options: DevOptions): Promise<void> {
           // drop a hook import, and stay paired with the component they
           // came from even when another request reloads the page meanwhile.
           load: async () => {
-            const { component, withLandingData, dataKeys, metadata } =
-              await loadLanding();
+            const {
+              component,
+              withLandingData,
+              dataKeys,
+              metadata,
+              importedCss,
+            } = await loadLanding();
             shippedLandingDataKeys = dataKeys;
+            linkedLandingCss = new Set(importedCss);
             return {
               dataKeys,
               metadata,
+              importedCss,
               render: (data) =>
                 withLandingData(data, () =>
                   renderToString(react.createElement(component))
@@ -1258,6 +1277,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       !isInspectorPath(pathname, basePath) &&
       pathname !== basePath &&
       (pathname === landingUrlPath ||
+        linkedLandingCss.has(pathname) ||
         (pathname.startsWith("/") &&
           (vite.environments.client.moduleGraph.getModulesByFile(
             normalizePath(resolve(options.cwd, pathname.slice(1)))
