@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.4.5-canary.0
+
+### Patch Changes
+
+- e6e0e39: Close Node OAuth loopback connections after callbacks, cancellation, and timeout without truncating the callback response.
+
 ## 2.4.4
 
 ### Patch Changes
