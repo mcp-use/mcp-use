@@ -402,7 +402,10 @@ function applyLandingAssetsPrefix(
   };
 }
 
-/** Tell the user which generated directory a CDN build expects at a URL. */
+/**
+ * Tell the user which generated directory a CDN build expects at a URL. The
+ * path uses forward slashes on every platform, like the URL beside it.
+ */
 function logCdnPublishLocation(
   cwd: string,
   outDir: string,
@@ -410,7 +413,7 @@ function logCdnPublishLocation(
 ): void {
   console.log(
     `[mcp-use] MCP_ASSETS_URL set — publish ` +
-      `${relative(cwd, outDir)}/ at ${assetUrl}`
+      `${relative(cwd, outDir).replaceAll("\\", "/")}/ at ${assetUrl}`
   );
 }
 
