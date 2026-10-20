@@ -368,7 +368,20 @@ export abstract class BaseMCPClient {
       );
       const session = new MCPSession(connector);
       if (autoInitialize) {
-        await session.initialize();
+        try {
+          await session.initialize();
+        } catch (err) {
+          // The session never escapes this function, so no caller can close
+          // its connector. Tear it down before surfacing the failure.
+          try {
+            await this.disconnectSession(session);
+          } catch (disconnectErr) {
+            logger.error(
+              `Error disconnecting session after initialization failed for '${serverName}': ${disconnectErr}`
+            );
+          }
+          throw err;
+        }
       }
       return session;
     };

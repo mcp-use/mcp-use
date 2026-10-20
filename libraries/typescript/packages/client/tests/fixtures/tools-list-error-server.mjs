@@ -1,8 +1,13 @@
+import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 // Raw stdio MCP fixture for exercising tools/list failures deterministically.
-// Usage: node tools-list-error-server.mjs <method-not-found|internal-error|close>
+// Usage: node tools-list-error-server.mjs <method-not-found|internal-error|close> [pidFile]
 const mode = process.argv[2] ?? "internal-error";
+const pidFile = process.argv[3];
+if (pidFile) {
+  appendFileSync(pidFile, `${process.pid}\n`);
+}
 
 const input = createInterface({ input: process.stdin });
 input.on("close", () => process.exit(0));
