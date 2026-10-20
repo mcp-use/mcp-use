@@ -23,7 +23,13 @@ function hasThinking(messages: Message[], isLoading = true) {
 }
 
 function afterTool(
-  state: "pending" | "streaming" | "authorization-required" | "result" | "error"
+  state:
+    | "pending"
+    | "streaming"
+    | "authorization-required"
+    | "result"
+    | "error",
+  toolCallId = "call-1"
 ): Message {
   return {
     id: "assistant",
@@ -34,7 +40,7 @@ function afterTool(
       {
         type: "tool-invocation",
         toolInvocation: {
-          toolCallId: "call-1",
+          toolCallId,
           toolName: "test_simple_text",
           args: { message: "hello" },
           state,
@@ -67,7 +73,7 @@ describe("MessageList thinking indicator", () => {
     "stays hidden when an earlier parallel tool is still %s",
     (state) => {
       const message = afterTool(state);
-      message.parts!.push(...afterTool("result").parts!);
+      message.parts!.push(...afterTool("result", "call-2").parts!);
       expect(hasThinking([message])).toBe(false);
     }
   );
