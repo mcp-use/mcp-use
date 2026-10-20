@@ -28,6 +28,7 @@ Run the complete matrix:
 ## Feature examples
 
 - `node/basic-http.ts` — tools + automatic v1/v2 negotiation.
+- [`node/dreamtune.ts`](./node/dreamtune.md) — published Dreamtune stdio server discovery and explicit tool calls, using an environment-provided workspace key.
 - `node/ai-sdk-openai/` — a runnable AI SDK `generateText` tool loop against a
   remote MCP server. It is an isolated example package, so AI SDK dependencies
   are not dependencies of `@mcp-use/client`.
