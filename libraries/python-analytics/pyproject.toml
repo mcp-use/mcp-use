@@ -33,8 +33,14 @@ Repository = "https://github.com/mcp-use/mcp-use"
 Issues = "https://github.com/mcp-use/mcp-use/issues"
 
 [dependency-groups]
-# Lint and type check tooling (see README "Development").
+# Framework-independent test tooling. Each framework is added on top with
+# `uv run --with ...` (see README "Development"), so one checkout tests every
+# supported framework major in its own environment.
 dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=1.0",
+    "httpx>=0.27",
+    "uvicorn>=0.30",
     "ruff==0.15.22",
     "ty>=0.0.1a20",
 ]
@@ -47,7 +53,17 @@ build-backend = "hatchling.build"
 packages = ["src/mcp_use_analytics"]
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src/mcp_use_analytics", "README.md"]
+only-include = ["src/mcp_use_analytics", "tests", "README.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    # Framework deprecation noise is not ours to fix; keep test output readable.
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 120

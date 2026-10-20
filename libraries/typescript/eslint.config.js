@@ -307,7 +307,7 @@ export default [
           "./packages/server/tsconfig.test.json",
           "./packages/cli/tsconfig.test.json",
           "./packages/tunnel/tsconfig.test.json",
-          "./packages/analytics/tsconfig.json",
+          "./packages/analytics/tsconfig.test.json",
         ],
         tsconfigRootDir: import.meta.dirname,
       },

@@ -28,6 +28,10 @@
       "entry": ["tests/**/*.ts"],
       "project": ["src/**/*.ts", "tests/**/*.ts"]
     },
+    "packages/analytics": {
+      "entry": ["tests/**/*.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
     "packages/cli": {
       "entry": ["tests/**/*.{mjs,ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{mjs,ts,tsx}"],
