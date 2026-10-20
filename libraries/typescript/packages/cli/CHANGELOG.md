@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.5.1-canary.0
+
+### Patch Changes
+
+- 68c9e91: Fix `landing.tsx` pages in `mcp-use dev` losing their styles or not hydrating after reopening a closed tab or navigating back. The page head now links its stylesheets at their own `?direct` URLs, so the browser no longer caches the stylesheet and the hydration entry's import of it under the same URL.
+
 ## 4.5.0
 
 ### Minor Changes
