@@ -9,13 +9,25 @@ import { runAuthPopup } from "./popup.js";
 
 const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60_000;
 
+/**
+ * OAuth provider extension that can scope HTTP requests to a base fetch.
+ */
+export type OAuthFetchProvider = OAuthClientProvider & {
+  /**
+   * Wraps `baseFetch` with provider-specific OAuth routing.
+   *
+   * @param baseFetch - Underlying fetch used for requests not handled by the provider.
+   * @returns The scoped fetch, or `undefined` when the provider has no wrapper.
+   */
+  getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
+};
+
 /** Provider extras used by the Node loopback and browser popup flows. */
-type FlowProvider = OAuthClientProvider & {
+type FlowProvider = OAuthFetchProvider & {
   serverUrlHash?: string;
   hasPendingFlow?: boolean;
   getAuthorizationResponse?: () => Promise<NodeOAuthAuthorizationResponse>;
   getAuthorizationCode?: () => Promise<string>;
-  getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
   getKey?: (keySuffix: string) => string;
   getLastAttemptedAuthUrl?: () => string | null;
   markFlowComplete?: () => void;
