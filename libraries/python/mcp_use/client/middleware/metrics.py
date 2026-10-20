@@ -44,21 +44,17 @@ class MetricsMiddleware(Middleware):
             self.metrics["method_counts"][context.method] = self.metrics["method_counts"].get(context.method, 0) + 1
 
         try:
-            result = await call_next(context)
-            duration = time.time() - context.timestamp
-
-            async with self.lock:
-                self.metrics["active_contexts"] -= 1
-                self._record_duration(context.method, duration)
-
-            return result
+            return await call_next(context)
         except Exception:
-            duration = time.time() - context.timestamp
             async with self.lock:
                 self.metrics["total_errors"] += 1
+            raise
+        finally:
+            # Cancelled requests must also release their active count.
+            duration = time.time() - context.timestamp
+            async with self.lock:
                 self.metrics["active_contexts"] -= 1
                 self._record_duration(context.method, duration)
-            raise
 
     def _record_duration(self, method: str, duration: float) -> None:
         """Record duration for a method in a thread-safe manner."""
