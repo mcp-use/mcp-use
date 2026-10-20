@@ -24,8 +24,8 @@ interface DenoLike {
   unrefTimer?: (id: number) => void;
 }
 
-/** The globals the runtime probes read. */
-interface RuntimeGlobals {
+/** The globals the runtime probes read (exported for tests). */
+export interface RuntimeGlobals {
   process?: ProcessLike;
   Deno?: DenoLike;
   Bun?: { version?: string };

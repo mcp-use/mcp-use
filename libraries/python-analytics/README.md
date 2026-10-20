@@ -259,9 +259,28 @@ strings and lists), so large results never stall the server while events are pre
 
 ```bash
 cd libraries/python-analytics
-uv sync                                   # dev tools (ruff, ty)
+uv sync                                   # dev tools (pytest, ruff, ty, uvicorn, httpx)
 uv run ruff check . && uv run ruff format --check . && uv run ty check
+uv run pytest                             # unit tests; framework tests skip without a framework
 ```
+
+Each framework runs in its own environment layered on the project with `--with`
+(the same commands run in CI, `.github/workflows/python-analytics.yml`):
+
+```bash
+uv run --locked --isolated --python 3.13 --with 'mcp>=1.24,<2' pytest        # mcp 1.x: low-level, FastMCP, stdio
+uv run --locked --isolated --python 3.11 --with 'mcp==1.10.*' --with 'pydantic==2.11.*' pytest  # mcp 1.x floor
+uv run --locked --isolated --python 3.13 --with 'mcp>=2,<3' pytest           # mcp 2.x: low-level, MCPServer
+uv run --locked --isolated --python 3.11 --with 'fastmcp==2.9.*' --with 'pydantic==2.11.*' pytest  # fastmcp floor
+uv run --locked --isolated --python 3.12 --with 'fastmcp>=2.9,<3' pytest     # fastmcp 2.x
+uv run --locked --isolated --python 3.12 --with 'fastmcp>=3,<4' pytest       # fastmcp 3.x
+uv run --locked --isolated --python 3.13 --with 'fastmcp>=4,<5' pytest       # fastmcp 4.x
+uv run --locked --isolated --python 3.12 --with 'mcp-use' pytest             # mcp-use MCPServer
+```
+
+Integration tests start real servers (uvicorn on an ephemeral `127.0.0.1` port, stdio
+subprocesses, in-memory streams), drive them with real MCP clients and check every event a
+local mock ingest receives against what the client saw on the wire.
 
 Releases publish to PyPI through trusted publishing when `version` in `pyproject.toml`
 changes on `main`.

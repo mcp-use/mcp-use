@@ -5,15 +5,15 @@
  */
 
 /** Payloads larger than this (serialized characters) are replaced by a marker, like the gateway. */
-const MAX_PAYLOAD_CHARS = 100_000;
+export const MAX_PAYLOAD_CHARS = 100_000;
 
 /** Strings longer than this are cut. */
-const MAX_STRING_CHARS = 10_000;
+export const MAX_STRING_CHARS = 10_000;
 
 const MAX_DEPTH = 32;
 
 /** Replacement for values under sensitive keys. */
-const REDACTED = "[REDACTED]";
+export const REDACTED = "[REDACTED]";
 
 // Same rules as the Python SDK's `_redact.py`; both test suites check the
 // vectors in libraries/python-analytics/tests/fixtures/redaction_vectors.json.
@@ -43,13 +43,13 @@ const CREDENTIAL_VALUE =
   /^(?:Bearer\s+[A-Za-z0-9._~+/=-]{16,}|eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*|mfi_[A-Za-z0-9]{20,})\n?$/i;
 
 /** Whether a property name holds a credential or secret. */
-function isSensitiveKey(key: string): boolean {
+export function isSensitiveKey(key: string): boolean {
   const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
   return SENSITIVE_EXACT.has(normalized) || SENSITIVE_SUFFIX.test(normalized);
 }
 
 /** Whether a string value looks like a credential (Bearer value, JWT, `mfi_` key). */
-function isCredentialValue(value: string): boolean {
+export function isCredentialValue(value: string): boolean {
   return CREDENTIAL_VALUE.test(value);
 }
 

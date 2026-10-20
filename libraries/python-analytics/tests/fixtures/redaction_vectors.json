@@ -1,0 +1,450 @@
+{
+ "description": "Default payload redaction vectors shared by mcp-use-analytics (Python, the reference) and @mcp-use/analytics (TypeScript). Each case: redact(input) == expected, with the default limits (10,000-character strings, depth 32). input_json is raw JSON text, for values a JSON literal cannot hold once parsed (1e400 parses to Infinity).",
+ "sensitive_keys": [
+  "password",
+  "db_password",
+  "passwd",
+  "passphrase",
+  "client_secret",
+  "secret",
+  "token",
+  "access_token",
+  "refreshToken",
+  "github_token",
+  "apiKey",
+  "api_key",
+  "api-key",
+  "X-API-Key",
+  "API_KEY",
+  "private_key",
+  "privateKey",
+  "credential",
+  "credentials",
+  "cookie",
+  "cookies",
+  "set-cookie",
+  "Authorization",
+  "proxy-authorization",
+  "signature",
+  "x-hub-signature",
+  "aws_secret_access_key",
+  "access_key",
+  "AccessKey",
+  "auth",
+  "AUTH",
+  "pwd",
+  "pin",
+  "otp",
+  "ssn",
+  "cvv",
+  "cvc",
+  "card_number",
+  "cardNumber",
+  "credit-card",
+  "creditCard"
+ ],
+ "ordinary_keys": [
+  "max_tokens",
+  "output_tokens",
+  "token_count",
+  "tokens",
+  "tokenizer",
+  "author",
+  "authority",
+  "authenticated",
+  "name",
+  "text",
+  "uri",
+  "pinned",
+  "pin_code",
+  "spinner",
+  "cardinality",
+  "otp_enabled",
+  "cookie_policy",
+  "secret_santa",
+  "password_hint",
+  "keys",
+  "key",
+  "access",
+  "data",
+  "blob_url",
+  ""
+ ],
+ "cases": [
+  {
+   "name": "sensitive keys at any depth",
+   "input": {
+    "jsonrpc": "2.0",
+    "id": 7,
+    "method": "tools/call",
+    "params": {
+     "name": "login",
+     "arguments": {
+      "user": "ada",
+      "password": "hunter2",
+      "options": {
+       "apiKey": "k-123",
+       "retries": 3
+      },
+      "headers": [
+       {
+        "Authorization": "Basic YWRhOmh1bnRlcjI="
+       },
+       {
+        "X-Api-Key": "abc"
+       },
+       {
+        "Accept": "text/plain"
+       }
+      ]
+     }
+    }
+   },
+   "expected": {
+    "jsonrpc": "2.0",
+    "id": 7,
+    "method": "tools/call",
+    "params": {
+     "name": "login",
+     "arguments": {
+      "user": "ada",
+      "password": "[REDACTED]",
+      "options": {
+       "apiKey": "[REDACTED]",
+       "retries": 3
+      },
+      "headers": [
+       {
+        "Authorization": "[REDACTED]"
+       },
+       {
+        "X-Api-Key": "[REDACTED]"
+       },
+       {
+        "Accept": "text/plain"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "credential-shaped strings under neutral keys",
+   "input": {
+    "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJl",
+    "upstream": {
+     "X-Upstream": "Bearer abcdefghijklmnopqrstuvwxyz012345"
+    },
+    "query": "mfi_A1b2C3d4E5A1b2C3d4E5A1b2C3d4E5A1b2C3d4E5",
+    "list": [
+     "Bearer abcdefghijklmnopqrstuvwxyz012345",
+     "kept"
+    ],
+    "lowercase_bearer": "bearer abcdefghijklmnopqrstuvwxyz"
+   },
+   "expected": {
+    "jwt": "[REDACTED]",
+    "upstream": {
+     "X-Upstream": "[REDACTED]"
+    },
+    "query": "[REDACTED]",
+    "list": [
+     "[REDACTED]",
+     "kept"
+    ],
+    "lowercase_bearer": "[REDACTED]"
+   }
+  },
+  {
+   "name": "strings that only look a bit like credentials are kept",
+   "input": {
+    "phrase": "Bearer of good news",
+    "short_bearer": "Bearer abc",
+    "short_jwt": "eyJ.abc.def",
+    "short_key": "mfi_short",
+    "inside": "token is Bearer abcdefghijklmnopqrstuvwxyz012345",
+    "with_space": " eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJl"
+   },
+   "expected": {
+    "phrase": "Bearer of good news",
+    "short_bearer": "Bearer abc",
+    "short_jwt": "eyJ.abc.def",
+    "short_key": "mfi_short",
+    "inside": "token is Bearer abcdefghijklmnopqrstuvwxyz012345",
+    "with_space": " eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJl"
+   }
+  },
+  {
+   "name": "a whole value under a sensitive key is redacted, whatever it is",
+   "input": {
+    "secret": {
+     "nested": "x",
+     "n": 1
+    },
+    "token": [
+     "a",
+     "b"
+    ],
+    "credentials": null,
+    "cookie": 42,
+    "pin": true
+   },
+   "expected": {
+    "secret": "[REDACTED]",
+    "token": "[REDACTED]",
+    "credentials": "[REDACTED]",
+    "cookie": "[REDACTED]",
+    "pin": "[REDACTED]"
+   }
+  },
+  {
+   "name": "binary content becomes its size",
+   "input": {
+    "content": [
+     {
+      "type": "image",
+      "data": "aGVsbG8gd29ybGQ=",
+      "mimeType": "image/png"
+     },
+     {
+      "type": "audio",
+      "data": "AAECAwQ=",
+      "mimeType": "audio/wav"
+     },
+     {
+      "type": "text",
+      "text": "kept",
+      "data": "kept too"
+     },
+     {
+      "type": "resource",
+      "resource": {
+       "uri": "file:///a.bin",
+       "blob": "AAAA",
+       "mimeType": "application/octet-stream"
+      }
+     }
+    ]
+   },
+   "expected": {
+    "content": [
+     {
+      "type": "image",
+      "data": "[binary 11 bytes]",
+      "mimeType": "image/png"
+     },
+     {
+      "type": "audio",
+      "data": "[binary 5 bytes]",
+      "mimeType": "audio/wav"
+     },
+     {
+      "type": "text",
+      "text": "kept",
+      "data": "kept too"
+     },
+     {
+      "type": "resource",
+      "resource": {
+       "uri": "file:///a.bin",
+       "blob": "[binary 3 bytes]",
+       "mimeType": "application/octet-stream"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "scalars and empty containers pass through",
+   "input": {
+    "n": 0,
+    "neg": -1.5,
+    "big": 12345678901234,
+    "t": true,
+    "f": false,
+    "none": null,
+    "empty": "",
+    "list": [],
+    "obj": {}
+   },
+   "expected": {
+    "n": 0,
+    "neg": -1.5,
+    "big": 12345678901234,
+    "t": true,
+    "f": false,
+    "none": null,
+    "empty": "",
+    "list": [],
+    "obj": {}
+   }
+  },
+  {
+   "name": "non-finite numbers become null",
+   "input_json": "{\"clientInfo\":{\"name\":\"x\",\"version\":\"1\",\"build\":1e400},\"low\":-1e400,\"list\":[1e400,1.5]}",
+   "expected": {
+    "clientInfo": {
+     "name": "x",
+     "version": "1",
+     "build": null
+    },
+    "low": null,
+    "list": [
+     null,
+     1.5
+    ]
+   }
+  },
+  {
+   "name": "nesting deeper than 32 levels is cut",
+   "input": {
+    "deep": [
+     [
+      [
+       [
+        [
+         [
+          [
+           [
+            [
+             [
+              [
+               [
+                [
+                 [
+                  [
+                   [
+                    [
+                     [
+                      [
+                       [
+                        [
+                         [
+                          [
+                           [
+                            [
+                             [
+                              [
+                               [
+                                [
+                                 [
+                                  [
+                                   [
+                                    [
+                                     [
+                                      [
+                                       [
+                                        [
+                                         [
+                                          [
+                                           [
+                                            "bottom"
+                                           ]
+                                          ]
+                                         ]
+                                        ]
+                                       ]
+                                      ]
+                                     ]
+                                    ]
+                                   ]
+                                  ]
+                                 ]
+                                ]
+                               ]
+                              ]
+                             ]
+                            ]
+                           ]
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   },
+   "expected": {
+    "deep": [
+     [
+      [
+       [
+        [
+         [
+          [
+           [
+            [
+             [
+              [
+               [
+                [
+                 [
+                  [
+                   [
+                    [
+                     [
+                      [
+                       [
+                        [
+                         [
+                          [
+                           [
+                            [
+                             [
+                              [
+                               [
+                                [
+                                 [
+                                  [
+                                   "[MaxDepth]"
+                                  ]
+                                 ]
+                                ]
+                               ]
+                              ]
+                             ]
+                            ]
+                           ]
+                          ]
+                         ]
+                        ]
+                       ]
+                      ]
+                     ]
+                    ]
+                   ]
+                  ]
+                 ]
+                ]
+               ]
+              ]
+             ]
+            ]
+           ]
+          ]
+         ]
+        ]
+       ]
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

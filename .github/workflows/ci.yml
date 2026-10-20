@@ -34,6 +34,7 @@ permissions:
 #    ├─ typescript/inspector: Unit tests for inspector package
 #    ├─ typescript/cli: Unit tests for CLI package
 #    ├─ typescript/tunnel: Protocol and local relay integration tests
+#    ├─ typescript/analytics: Unit tests + framework integration tests against a mock ingest
 #    ├─ typescript-release-channel-test: release-channel helper suite (main + canary PRs)
 #    └─ typescript-changeset-check: PR validation (PRs only)
 #
@@ -857,6 +858,38 @@ jobs:
         run: pnpm build:tunnel
       - name: Run Tunnel Tests
         run: pnpm --filter @mcp-use/tunnel test:run
+
+  typescript-test-analytics:
+    needs: typescript-lint
+    name: "typescript/analytics (node-${{ matrix.node-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22.23.1]
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      # The mcp-use integration suite runs against the workspace mcp-use build.
+      - name: Build Packages
+        run: pnpm build
+      - name: Run Analytics Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter @mcp-use/analytics test:run
 
   typescript-release-channel-test:
     needs: detect-changes

@@ -1,8 +1,8 @@
 name: Python Analytics
 
-# mcp-use-analytics (libraries/python-analytics): lint and type check, and a PyPI
-# release through trusted publishing whenever `version` in its pyproject.toml
-# changes on main.
+# mcp-use-analytics (libraries/python-analytics): lint and type check, the test
+# matrix (one uv environment per framework major), and a PyPI release through
+# trusted publishing whenever `version` in its pyproject.toml changes on main.
 #
 # The package lives outside libraries/python on purpose: that path drives the
 # mcp-use CI, the mcp-use release workflow and the auto-close policy for
@@ -55,9 +55,62 @@ jobs:
           fi
           unzip -l dist/*.whl | grep -q 'mcp_use_analytics/py.typed'
 
+  test:
+    name: "python-analytics/${{ matrix.name }}"
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: unit-py3.10
+            python: "3.10"
+            with: ""
+          - name: unit-py3.14
+            python: "3.14"
+            with: ""
+          - name: mcp1-py3.10
+            python: "3.10"
+            with: "--with 'mcp>=1.24,<2'"
+          - name: mcp1-py3.13
+            python: "3.13"
+            with: "--with 'mcp>=1.24,<2'"
+          - name: mcp1-floor
+            python: "3.11"
+            with: "--with 'mcp==1.10.*' --with 'pydantic==2.11.*'"
+          - name: mcp2-py3.10
+            python: "3.10"
+            with: "--with 'mcp>=2,<3'"
+          - name: mcp2-py3.13
+            python: "3.13"
+            with: "--with 'mcp>=2,<3'"
+          - name: fastmcp2-floor
+            python: "3.11"
+            with: "--with 'fastmcp==2.9.*' --with 'pydantic==2.11.*'"
+          - name: fastmcp2
+            python: "3.12"
+            with: "--with 'fastmcp>=2.9,<3'"
+          - name: fastmcp3
+            python: "3.12"
+            with: "--with 'fastmcp>=3,<4'"
+          - name: fastmcp4
+            python: "3.13"
+            with: "--with 'fastmcp>=4,<5'"
+          - name: mcp-use
+            python: "3.12"
+            with: "--with 'mcp-use'"
+    env:
+      MCP_USE_ANONYMIZED_TELEMETRY: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Test (${{ matrix.name }})
+        run: uv run --locked --isolated --python ${{ matrix.python }} ${{ matrix.with }} pytest -v
+
   release:
     name: "python-analytics/release"
-    needs: lint
+    needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     concurrency:
