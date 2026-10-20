@@ -7,6 +7,16 @@ from typing import Any
 from mcp.types import ToolAnnotations
 
 
+def _combine_prefixes(*prefixes: str) -> str:
+    """Combine non-empty prefixes into a single name prefix.
+
+    Prefixes are joined in outermost-to-innermost order, matching FastAPI's
+    ``include_router`` composition: a call-site prefix comes before the
+    included router's own prefix.
+    """
+    return "_".join(prefix for prefix in prefixes if prefix)
+
+
 @dataclass
 class PendingTool:
     """A tool waiting to be registered with a server."""
@@ -76,8 +86,10 @@ class MCPRouter:
         Create a new MCP router.
 
         Args:
-            prefix: Optional prefix to add to all tool/resource names when included.
+            prefix: Optional prefix to add to all tool/prompt names when included.
                     For example, prefix="math" would make tool "add" become "math_add".
+                    It is combined with the prefix passed to ``include_router`` and
+                    with prefixes of routers nested in this one, outermost first.
             tags: Optional tags for documentation/organization purposes.
         """
         self.prefix = prefix
@@ -207,9 +219,13 @@ class MCPRouter:
 
         Args:
             router: The router to include
-            prefix: Additional prefix to add to included items
+            prefix: Additional prefix to add to included items. Combined with
+                ``router.prefix`` as ``{prefix}_{router.prefix}``.
         """
-        combined_prefix = f"{self.prefix}_{prefix}".strip("_") if prefix else self.prefix
+        # The prefix of the router being included is applied here, not the
+        # prefix of this router: ``self.prefix`` is applied when this router
+        # is itself included, so every prefix is applied exactly once.
+        combined_prefix = _combine_prefixes(prefix, router.prefix)
 
         for tool in router._pending_tools:
             # Apply combined prefix to tool name

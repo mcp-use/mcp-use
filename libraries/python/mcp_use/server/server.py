@@ -39,6 +39,7 @@ from mcp_use.server.middleware import (
     TelemetryMiddleware,
 )
 from mcp_use.server.middleware.server_session import MiddlewareServerSession
+from mcp_use.server.router import _combine_prefixes
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
@@ -275,7 +276,8 @@ class MCPServer(FastMCP):
 
         Args:
             router: The MCPRouter instance to include
-            prefix: Optional prefix to add to all tool names (e.g., "math" -> "math_add")
+            prefix: Optional prefix to add to all tool names (e.g., "math" -> "math_add").
+                Combined with ``router.prefix`` as ``{prefix}_{router.prefix}``.
             enabled: Whether to enable this router (default True). Set to False to skip registration.
 
         Example:
@@ -297,11 +299,14 @@ class MCPServer(FastMCP):
         """
         if not enabled:
             return
+        # Apply the call-site prefix and the router's own prefix (outermost first).
+        effective_prefix = _combine_prefixes(prefix, router.prefix)
+
         # Register all tools from the router
         for tool in router.tools:
             tool_name = tool.name or getattr(tool.fn, "__name__", "unknown")
-            if prefix:
-                tool_name = f"{prefix}_{tool_name}"
+            if effective_prefix:
+                tool_name = f"{effective_prefix}_{tool_name}"
 
             self.add_tool(
                 tool.fn,
@@ -313,10 +318,12 @@ class MCPServer(FastMCP):
             )
 
         # Register all resources from the router
+        # Resource naming is tracked separately (see #1438); keep the existing
+        # registration behavior and use the computed name only for consistency.
         for resource in router.resources:
             resource_name = resource.name or getattr(resource.fn, "__name__", "unknown")
-            if prefix:
-                resource_name = f"{prefix}_{resource_name}"
+            if effective_prefix:
+                resource_name = f"{effective_prefix}_{resource_name}"
             self.resource(
                 uri=resource.uri,
                 name=resource.name,
@@ -327,8 +334,8 @@ class MCPServer(FastMCP):
         # Register all prompts from the router
         for prompt in router.prompts:
             prompt_name = prompt.name or getattr(prompt.fn, "__name__", "unknown")
-            if prefix:
-                prompt_name = f"{prefix}_{prompt_name}"
+            if effective_prefix:
+                prompt_name = f"{effective_prefix}_{prompt_name}"
 
             self.prompt(
                 name=prompt_name,
