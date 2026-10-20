@@ -32,26 +32,11 @@ const VIRTUAL_LANDING_TAILWIND_ID = "virtual:mcp-use/landing-tailwind.css";
 const RESOLVED_LANDING_TAILWIND_ID = `\0${VIRTUAL_LANDING_TAILWIND_ID}`;
 
 /**
- * Give a dev stylesheet URL that the page head links its own `?direct` URL.
- * Vite serves the bare URL as CSS or as a JavaScript module depending on the
- * request's `Accept` header, without `Vary`, so a link and the entry's import
- * of the same URL share one browser cache entry. A load that skips
- * revalidation, such as reopening a closed tab or going back, then hands the
- * link the module (unstyled page) or the import the stylesheet (no
- * hydration).
+ * URL Vite serves the managed Tailwind stylesheet at in development. The page
+ * head links it so server-rendered markup is styled before the entry runs;
+ * the entry's own import of it keeps receiving hot updates.
  */
-function directStylesheetUrl(url: string): string {
-  return `${url}${url.includes("?") ? "&" : "?"}direct`;
-}
-
-/**
- * URL the page head links the managed Tailwind stylesheet at in development,
- * so server-rendered markup is styled before the entry runs; the entry's own
- * import of it keeps receiving hot updates.
- */
-export const DEV_LANDING_TAILWIND_CSS = directStylesheetUrl(
-  `/@id/__x00__${VIRTUAL_LANDING_TAILWIND_ID}`
-);
+export const DEV_LANDING_TAILWIND_CSS = `/@id/__x00__${VIRTUAL_LANDING_TAILWIND_ID}`;
 
 /** Stylesheet languages Vite compiles, as module paths without a query. */
 const STYLESHEET_PATH =
@@ -154,17 +139,13 @@ async function devStylesheets(
 }
 
 /**
- * The stylesheets in a dev module graph under `root`: Vite's URL for each,
- * and the `?direct` URL the page head links. The graph must be current, as
- * after `LandingDataKeysCollector.reachableFrom`.
+ * URLs of the stylesheets in a dev module graph under `root`, for the page
+ * head. The graph must be current, as after
+ * `LandingDataKeysCollector.reachableFrom`.
  */
-export function landingStylesheetUrls(
-  root: GraphNode | undefined
-): { url: string; href: string }[] {
+export function landingStylesheetUrls(root: GraphNode | undefined): string[] {
   return reachable(root).flatMap((node) =>
-    node.id !== null && isStylesheet(node.id)
-      ? [{ url: node.url, href: directStylesheetUrl(node.url) }]
-      : []
+    node.id !== null && isStylesheet(node.id) ? [node.url] : []
   );
 }
 

@@ -640,18 +640,14 @@ export default function Resources() {
         /<link rel="stylesheet" data-mcp-use-dev-css href="([^"]+)">/g
       ),
     ].map(([, href]) => href);
-    // Own `?direct` URLs: Vite answers the bare ones with CSS or JavaScript by
-    // `Accept`, so a shared URL would share a browser cache entry with the
-    // entry's imports.
     expect(links).toEqual([
-      new URL("/@id/__x00__virtual:mcp-use/landing-tailwind.css?direct", url)
-        .href,
-      new URL("/src/mcp/landing.css?direct", url).href,
+      new URL("/@id/__x00__virtual:mcp-use/landing-tailwind.css", url).href,
+      new URL("/src/mcp/landing.css", url).href,
     ]);
     const [tailwind, pageCss] = await Promise.all(
       links.map(async (href) => {
         const cssResponse = await fetch(href!, {
-          headers: { accept: "*/*" },
+          headers: { accept: "text/css" },
         });
         expect(cssResponse.status).toBe(200);
         expect(cssResponse.headers.get("content-type")).toMatch(/text\/css/);
@@ -1014,7 +1010,7 @@ export default function Landing() {
       (await fetch(managedUrl, { headers: { accept: "text/css" } })).text();
 
     const html = await (await htmlRequest(url)).text();
-    expect(html).toContain(`href="${new URL("/brand.css?direct", url).href}"`);
+    expect(html).toContain(`href="${new URL("/brand.css", url).href}"`);
     expect(await managedCss()).not.toContain("data-theme=dark");
 
     // Dropping the import hands the page back to the managed stylesheet.
