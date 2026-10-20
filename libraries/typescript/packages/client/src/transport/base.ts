@@ -623,14 +623,16 @@ export abstract class BaseConnector {
     } catch (err: unknown) {
       if (isOAuthInteractionRequired(err)) throw err;
       const error = err as Error & { code?: number };
-      // If tools/list is not implemented or fails, assume no tools
-      // This commonly happens with blank servers that have no tools registered
+      // A server that does not implement tools/list has no tools to report.
+      // Any other failure must surface instead of being reported as an empty
+      // but successfully initialized server.
       if (error.code === -32601) {
         logger.debug("Server does not implement tools/list, assuming no tools");
+        this.toolsCache = [];
       } else {
-        logger.debug("Failed to list tools, assuming empty:", error.message);
+        logger.warn("Failed to list tools:", error.message);
+        throw err;
       }
-      this.toolsCache = [];
     }
 
     logger.debug("Server capabilities:", capabilities);
