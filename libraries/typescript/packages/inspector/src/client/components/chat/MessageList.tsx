@@ -150,7 +150,26 @@ export const MessageList = memo(
           // Check parts array first — streaming delivers content via parts
           // while content may remain "" until after the stream reader closes
           if (lastMessage.parts && lastMessage.parts.length > 0) {
-            return false;
+            const parts = lastMessage.parts;
+
+            // Another tool may still be running in a parallel batch.
+            const hasActiveTool = parts.some(
+              (part) =>
+                part.type === "tool-invocation" &&
+                (part.toolInvocation?.state === "pending" ||
+                  part.toolInvocation?.state === "streaming" ||
+                  part.toolInvocation?.state === "authorization-required")
+            );
+
+            if (hasActiveTool) return false;
+
+            const lastPart = parts[parts.length - 1];
+
+            return (
+              lastPart.type === "tool-invocation" &&
+              (lastPart.toolInvocation?.state === "result" ||
+                lastPart.toolInvocation?.state === "error")
+            );
           }
 
           const contentStr =
