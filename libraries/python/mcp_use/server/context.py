@@ -99,8 +99,18 @@ class Context(FastMCPContext):
         """
         _telemetry.track_server_context(context_type="sample")
 
+        normalized_messages: list[SamplingMessage]
+        if isinstance(messages, str):
+            normalized_messages = [self._text_message(messages)]
+        elif isinstance(messages, SamplingMessage):
+            normalized_messages = [messages]
+        else:
+            normalized_messages = [
+                self._text_message(message) if isinstance(message, str) else message for message in messages
+            ]
+
         result = await self.session.create_message(
-            messages=messages,
+            messages=normalized_messages,
             max_tokens=max_tokens,
             system_prompt=system_prompt,
             include_context=include_context,
