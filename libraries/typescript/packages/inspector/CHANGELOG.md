@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.23-canary.2
+
+### Patch Changes
+
+- e7450b5: Strip DevSpace routing headers before forwarding MCP requests so the Inspector proxy can reach hosted MCP servers without routing them using the Inspector's hostname.
+
 ## 20.3.23-canary.1
 
 ### Patch Changes
