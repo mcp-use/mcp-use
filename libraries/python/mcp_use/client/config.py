@@ -31,7 +31,7 @@ def load_config_file(filepath: str) -> dict[str, Any]:
     Returns:
         The parsed configuration
     """
-    with open(filepath) as f:
+    with open(filepath, encoding="utf-8") as f:
         return json.load(f)
 
 

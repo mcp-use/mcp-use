@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from mcp_use.client.auth.bearer import BearerAuth
+from mcp_use.client.client import MCPClient
 from mcp_use.client.config import create_connector_from_config, load_config_file
 from mcp_use.client.connectors import HttpConnector, SandboxConnector, StdioConnector, WebSocketConnector
 from mcp_use.client.connectors.sandbox import SandboxOptions
@@ -38,6 +39,24 @@ class TestConfigLoading(unittest.TestCase):
         """Test loading a non-existent file raises FileNotFoundError."""
         with self.assertRaises(FileNotFoundError):
             load_config_file("/tmp/nonexistent_file.json")
+
+    def test_utf8_config_preserves_server_names_and_arguments(self):
+        """UTF-8 JSON must not depend on the host's default text encoding."""
+        config = {
+            "mcpServers": {
+                "文档服务 🌍": {
+                    "command": "python",
+                    "args": ["server.py", "--root", "资料/日本語/🤖"],
+                }
+            }
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "mcp.json")
+            with open(path, "w", encoding="utf-8") as stream:
+                json.dump(config, stream, ensure_ascii=False)
+
+            self.assertEqual(load_config_file(path), config)
+            self.assertEqual(MCPClient.from_config_file(path).config, config)
 
 
 class TestConnectorCreation(unittest.TestCase):
