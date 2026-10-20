@@ -132,6 +132,7 @@ interface McpServerWrapperProps {
   options: McpServerConfig;
   defaultCallbackUrl?: string;
   defaultOAuthProxyUrl?: string;
+  defaultOAuthClientMetadataUrl?: string;
   defaultProxyConfig?: {
     proxyAddress?: string;
     headers?: Record<string, string>;
@@ -208,6 +209,7 @@ function McpServerWrapper({
   options,
   defaultCallbackUrl,
   defaultOAuthProxyUrl,
+  defaultOAuthClientMetadataUrl,
   defaultProxyConfig,
   defaultAutoProxyFallback,
   clientInfo: providerClientInfo,
@@ -250,6 +252,19 @@ function McpServerWrapper({
       // Use server-specific callbackUrl if provided, otherwise use provider default
       callbackUrl: rest.callbackUrl || defaultCallbackUrl,
       oauthProxyUrl: rest.oauthProxyUrl || defaultOAuthProxyUrl,
+      // Apply at connection time so restored servers and scope-only overrides
+      // receive the default without persisting an app's runtime identity.
+      // A different callback needs its own matching metadata document.
+      oauth:
+        defaultOAuthClientMetadataUrl &&
+        !rest.oauth?.clientId?.trim() &&
+        (!rest.callbackUrl || rest.callbackUrl === defaultCallbackUrl)
+          ? {
+              ...rest.oauth,
+              clientMetadataUrl:
+                rest.oauth?.clientMetadataUrl ?? defaultOAuthClientMetadataUrl,
+            }
+          : rest.oauth,
       // Use server-specific proxyConfig if provided, otherwise use default
       proxyConfig: rest.proxyConfig || defaultProxyConfig,
       // Use server-specific autoProxyFallback if provided, otherwise use default
@@ -272,6 +287,7 @@ function McpServerWrapper({
     options,
     defaultCallbackUrl,
     defaultOAuthProxyUrl,
+    defaultOAuthClientMetadataUrl,
     defaultProxyConfig,
     defaultAutoProxyFallback,
     providerClientInfo,
@@ -459,6 +475,13 @@ export interface McpClientProviderProps {
   defaultOAuthProxyUrl?: string;
 
   /**
+   * Public HTTPS CIMD URL for the default callback. Applied to new and restored
+   * connections unless they set a client ID, metadata URL, or different callback.
+   * Per-server `oauth.clientMetadataUrl: ""` disables this default.
+   */
+  defaultOAuthClientMetadataUrl?: string;
+
+  /**
    * Default proxy configuration for all servers
    * Can be overridden per-server in addServer() options
    */
@@ -637,6 +660,7 @@ export function McpClientProvider({
   mcpServers,
   defaultCallbackUrl,
   defaultOAuthProxyUrl,
+  defaultOAuthClientMetadataUrl,
   defaultProxyConfig,
   defaultAutoProxyFallback = false,
   defaultServerConfig,
@@ -1195,6 +1219,7 @@ export function McpClientProvider({
             options={config.options}
             defaultCallbackUrl={defaultCallbackUrl}
             defaultOAuthProxyUrl={defaultOAuthProxyUrl}
+            defaultOAuthClientMetadataUrl={defaultOAuthClientMetadataUrl}
             defaultProxyConfig={defaultProxyConfig}
             defaultAutoProxyFallback={defaultAutoProxyFallback}
             clientInfo={clientInfoForWrapper}

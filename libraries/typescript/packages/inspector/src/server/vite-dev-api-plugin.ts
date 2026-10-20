@@ -1,10 +1,16 @@
 import { getRequestListener } from "@hono/node-server";
 import type { Plugin } from "vite";
 import { createDevApiApp } from "./create-dev-api-app.js";
+import {
+  LOCAL_OAUTH_METADATA_PATH,
+  OAUTH_METADATA_PATH,
+} from "../shared/oauth-metadata.js";
 
 function isDevApiPath(url: string): boolean {
   return (
     url.startsWith("/inspector/api/") ||
+    url === OAUTH_METADATA_PATH ||
+    url.startsWith(`${LOCAL_OAUTH_METADATA_PATH}/`) ||
     url === "/inspector/health" ||
     url.startsWith("/inspector/health?")
   );
