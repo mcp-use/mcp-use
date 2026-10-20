@@ -195,8 +195,8 @@ interface LandingRenderer {
   dataKeys: LandingDataKey[];
   /** The page's `metadata` export, validated by the server when rendered. */
   metadata: unknown;
-  /** Stylesheets the component's module graph imports, as dev server URLs. */
-  importedCss: string[];
+  /** Stylesheets the component's module graph imports. */
+  importedCss: ReturnType<typeof landingStylesheetUrls>;
 }
 
 /**
@@ -782,11 +782,11 @@ export async function runDev(options: DevOptions): Promise<void> {
               importedCss,
             } = await loadLanding();
             shippedLandingDataKeys = dataKeys;
-            linkedLandingCss = new Set(importedCss);
+            linkedLandingCss = new Set(importedCss.map(({ url }) => url));
             return {
               dataKeys,
               metadata,
-              importedCss,
+              importedCss: importedCss.map(({ href }) => href),
               render: (data) =>
                 withLandingData(data, () =>
                   renderToString(react.createElement(component))
