@@ -1085,6 +1085,8 @@ describe("view resource reads through resources/read middleware", () => {
   const seenUris: string[] = [];
   const seenTexts: string[] = [];
   const seenDomains: unknown[] = [];
+  const seenViews: unknown[] = [];
+  const observed: string[] = [];
   let client: Client;
   let claudeClient: Client;
 
@@ -1105,8 +1107,12 @@ describe("view resource reads through resources/read middleware", () => {
       content: [{ type: "text", text: "Found 0 fruits" }],
     })
   );
+  server.resource({ name: "notes", uri: "notes://plain" }, async (uri) => ({
+    contents: [{ uri: uri.href, text: "plain" }],
+  }));
   server.use("mcp:resources/read", async (ctx, next) => {
     seenUris.push(ctx.params.uri);
+    seenViews.push(ctx.view);
     if (ctx.params.uri === "ui://views/orphan-view.html") {
       throw new Error("Blocked by middleware");
     }
@@ -1128,6 +1134,13 @@ describe("view resource reads through resources/read middleware", () => {
         };
       }),
     };
+  });
+
+  server.on("mcp:resources/read", (ctx) => {
+    observed.push(`before:${ctx.params.uri}:${ctx.view?.name}`);
+  });
+  server.on("mcp:resources/read:complete", (ctx) => {
+    observed.push(`complete:${ctx.params.uri}:${ctx.view?.name}`);
   });
 
   beforeAll(async () => {
@@ -1186,6 +1199,22 @@ describe("view resource reads through resources/read middleware", () => {
     seenDomains.length = 0;
     await client.readResource({ uri: "ui://views/product-search-result.html" });
     expect(seenDomains).toEqual(["https://views.example.com"]);
+  });
+
+  it("sets ctx.view on view reads only", async () => {
+    seenViews.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    await client.readResource({ uri: "notes://plain" });
+    expect(seenViews).toEqual([{ name: "product-search-result" }, undefined]);
+  });
+
+  it("fires resources/read observers for view reads", async () => {
+    observed.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    expect(observed).toEqual([
+      "before:ui://views/product-search-result.html:product-search-result",
+      "complete:ui://views/product-search-result.html:product-search-result",
+    ]);
   });
 
   it("lets middleware reject a view read", async () => {

@@ -2156,10 +2156,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #createMiddlewareContext<M extends McpMiddlewareMethod>(
     method: M,
     params: MiddlewareContext<M, TEnv>["params"],
-    ctx: ServerContext
+    ctx: ServerContext,
+    fields: { view?: { name: string } } = {}
   ): MiddlewareContext<M, TEnv> {
     const requestContext = toRequestContext<TEnv>(ctx);
     return Object.assign(requestContext, {
+      ...fields,
       method,
       params,
       ...(ctx.sessionId !== undefined && {
@@ -2168,6 +2170,28 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       ...(ctx.http?.authInfo !== undefined && { auth: ctx.http.authInfo }),
       state: new Map(),
     }) as unknown as MiddlewareContext<M, TEnv>;
+  }
+
+  /**
+   * Run a `resources/read` handler through MCP middleware, observers, and
+   * usage telemetry. `view` is set only for tool view reads.
+   */
+  #hookResourceRead(
+    uri: URL,
+    ctx: ServerContext,
+    innerFn: () => Promise<McpMiddlewareResult<"resources/read">>,
+    view?: { name: string }
+  ): Promise<McpMiddlewareResult<"resources/read">> {
+    const mwCtx = this.#createMiddlewareContext(
+      "resources/read",
+      {
+        uri: uri.href,
+        ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
+      },
+      ctx,
+      view === undefined ? {} : { view }
+    );
+    return this.#runMcpHook("resources/read", mwCtx, innerFn);
   }
 
   #runMcpHook<M extends McpMiddlewareMethod>(
@@ -2518,14 +2542,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       uri,
       resourceConfig,
       async (readUri, ctx) => {
-        const mwCtx = this.#createMiddlewareContext(
-          "resources/read",
-          {
-            uri: readUri.href,
-            ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
-          },
-          ctx
-        );
         const innerFn = async () => {
           const req = ctx.http?.req;
           const readOptions: BuildResourceUiMetaOptions =
@@ -2569,7 +2585,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             ],
           };
         };
-        return await this.#runMcpHook("resources/read", mwCtx, innerFn);
+        return await this.#hookResourceRead(readUri, ctx, innerFn, {
+          name: viewName,
+        });
       }
     );
   }
@@ -2597,20 +2615,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }),
       },
       async (uri, ctx) => {
-        const mwCtx = this.#createMiddlewareContext(
-          "resources/read",
-          {
-            uri: uri.href,
-            ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
-          },
-          ctx
-        );
         const innerFn = async () =>
           toResourceResult(
             await callback(uri, this.#toRequestContext(ctx)),
             uri.href
           );
-        return await this.#runMcpHook("resources/read", mwCtx, innerFn);
+        return await this.#hookResourceRead(uri, ctx, innerFn);
       }
     );
   }
@@ -2642,14 +2652,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }),
       },
       async (uri, variables, ctx) => {
-        const mwCtx = this.#createMiddlewareContext(
-          "resources/read",
-          {
-            uri: uri.href,
-            ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
-          },
-          ctx
-        );
         const innerFn = async () =>
           toResourceResult(
             await callback(
@@ -2659,7 +2661,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             ),
             uri.href
           );
-        return await this.#runMcpHook("resources/read", mwCtx, innerFn);
+        return await this.#hookResourceRead(uri, ctx, innerFn);
       }
     );
   }
