@@ -12,6 +12,7 @@
   },
   "changesets": [
     "propagated-e46a61a656acf465",
-    "revert-landing-dev-css-cache"
+    "revert-landing-dev-css-cache",
+    "thinking-between-tool-calls"
   ]
 }
