@@ -139,6 +139,22 @@ authenticatedServer.use("mcp:tools/call", async (ctx, next) => {
 Use [server authentication](/v2/typescript/server/authentication/index) to
 verify bearer tokens before relying on `ctx.auth`.
 
+### Let hosts read views before sign-in
+
+`resources/read` middleware also runs for tool view reads, and `ctx.view` is
+set to `{ name }` for those reads only. On a `mixedAuth` server, hosts such as
+ChatGPT read every view while an app is being created, before anyone signs in,
+so a view read can reach middleware with `ctx.auth` undefined. Let view reads
+through before requiring `ctx.auth`:
+
+```typescript
+server.use("mcp:resources/read", async (ctx, next) => {
+  if (ctx.view) return next();
+  if (!ctx.auth) throw new Error("Unauthorized");
+  return next();
+});
+```
+
 ## Rate-limit expensive operations
 
 Use middleware when the limit applies to a class of operations instead of one

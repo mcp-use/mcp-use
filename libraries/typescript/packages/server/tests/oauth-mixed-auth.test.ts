@@ -716,6 +716,30 @@ describe("mixed auth: resources, prompts, and views", () => {
     expect((await server.fetch(call("private_card"))).status).toBe(401);
   });
 
+  it("marks signed-out view reads with ctx.view for resources/read middleware", async () => {
+    const server = shopServer();
+    const seen: Array<{ uri: string; view: unknown; auth: string }> = [];
+    server.use("mcp:resources/read", async (ctx, next) => {
+      seen.push({
+        uri: ctx.params.uri,
+        view: ctx.view,
+        auth: ctx.auth === undefined ? "signed-out" : "signed-in",
+      });
+      return next();
+    });
+
+    const view = await server.fetch(read(catalogView));
+    expect(view.status).toBe(200);
+    expect(await resourceText(view)).toContain("<!doctype html>");
+    const profile = await server.fetch(read("shop://me", bearer("user:ada")));
+    expect(await resourceText(profile)).toBe("me:ada");
+
+    expect(seen).toEqual([
+      { uri: catalogView, view: { name: "catalog-card" }, auth: "signed-out" },
+      { uri: "shop://me", view: undefined, auth: "signed-in" },
+    ]);
+  });
+
   it("opens subscriptions/listen signed out only without resource subscriptions", async () => {
     const handler = shopServer().fetch;
     for (const notifications of [

@@ -629,6 +629,25 @@ describe("MCP middleware type narrowing", () => {
     expect(server).toBeDefined();
   });
 
+  it("exposes ctx.view on resources/read contexts only", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.use("mcp:resources/read", async (ctx, next) => {
+      expectTypeOf(ctx.view).toEqualTypeOf<{ name: string } | undefined>();
+      return next();
+    });
+    server.on("mcp:resources/read", (ctx) => {
+      expectTypeOf(ctx.view).toEqualTypeOf<
+        Readonly<{ name: string }> | undefined
+      >();
+    });
+    server.use("mcp:tools/call", async (ctx, next) => {
+      // @ts-expect-error — view exists only on resources/read contexts
+      void ctx.view;
+      return next();
+    });
+    expect(server).toBeDefined();
+  });
+
   it("keeps global middleware type-preserving", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
     server.use("mcp:*", async (ctx, next) => {
