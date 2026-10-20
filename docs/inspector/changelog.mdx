@@ -6,12 +6,37 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.22" description="October 2026">
+  ## Tool call timeouts, chat errors & proxy hardening
+  Patch release paired with `mcp-use` v2.11.0, fixing a 10-second tool call timeout, surfacing chat failures, and hardening the proxy and OAuth routes.
+
+- **Fix**: tool calls on servers added from the dashboard no longer time out after 10 seconds. The Connect form's timeout fields start blank, meaning the default 10-minute request timeout and no overall limit. Servers added since v20.3.17 keep their saved 10000 / 60000 values until both fields are cleared in connection settings (`#2881`)
+- **Fix**: chat shows streamed provider errors, and explains responses that use up the output limit without producing content, instead of an empty turn (`#2877`)
+- **Fix**: chat tool calls on OpenAI models show their arguments in the tool drawer instead of `{}` (`#2551`)
+- **Fix**: OAuth metadata responses are always JSON with `X-Content-Type-Options: nosniff`, so a body from a caller-chosen server can no longer render as a page on the Inspector's origin (`#2855`)
+- **Fix**: proxy and OAuth rate limits apply per caller (client IP) under a process-wide ceiling, instead of one bucket shared by every user. A local Inspector or `mcp-use dev` is limited only by the process-wide ceiling (`#2855`)
+- **Update**: ChatGPT install steps in the tunnel panel follow the Plugins flow (Plugins → Add → Add Custom MCP Server) (`#2648`)
+- **Update**: rebuild bundled workspace code with @mcp-use/client v2.4.5 and @mcp-use/agent v2.0.25
+- **Update**: Updated mcp-use to v2.11.0
+</Update>
+
+<Update label="v20.3.21" description="October 2026">
+  ## Public MCP connections & tool headers
+  Patch fixes for browser connections and tool calls, paired with `mcp-use` v2.10.1.
+
+- **Fix**: public MCP endpoints remain connected anonymously when fallback OAuth metadata belongs to a different resource, instead of incorrectly requiring authentication (`#2858`)
+- **Fix**: discard cached OAuth credentials without a valid issuer stamp or with a mismatched issuer. Affected users may need to sign in again (`#2858`)
+- **Fix**: tool calls send parameters annotated with `x-mcp-header` as `Mcp-Param-*` headers as well as in the request body, so servers requiring the headers accept browser calls (`#2803`)
+- **Update**: rebuild bundled workspace code with @mcp-use/client v2.4.4 and @mcp-use/agent v2.0.24
+- **Update**: Updated mcp-use to v2.10.1
+</Update>
+
 <Update label="v20.3.20" description="October 2026">
   ## OAuth Proxy release alignment
-  Canary patch release (`@mcp-use/inspector@20.3.20-canary.3`) paired with `mcp-use@2.10.0-canary.4`, rebuilding bundled workspace code with the framework's OAuth Proxy and build changes. Stable v20.3.20 has not shipped; this wave has no Inspector-specific source changes.
+  Patch release paired with `mcp-use` v2.10.0, rebuilding bundled workspace code with the framework's OAuth Proxy and build changes. This release has no Inspector-specific source changes.
 
 - **Update**: rebuild bundled workspace code and synchronize published internal package metadata
-- **Update**: Updated mcp-use to v2.10.0 (canary.4)
+- **Update**: Updated mcp-use to v2.10.0
 </Update>
 
 <Update label="v20.3.19" description="October 2026">

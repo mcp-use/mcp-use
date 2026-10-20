@@ -269,7 +269,13 @@ export async function* streamResponsesTurn(
 
   const callBuffers = new Map<
     string,
-    { index: number; name: string; argsJson: string; started: boolean }
+    {
+      index: number;
+      callId: string;
+      name: string;
+      argsJson: string;
+      started: boolean;
+    }
   >();
   let nextIndex = 0;
   let completedOutput: unknown[] = [];
@@ -300,12 +306,17 @@ export async function* streamResponsesTurn(
           typeof item.call_id === "string" ? item.call_id : `call_${nextIndex}`;
         const name = typeof item.name === "string" ? item.name : "";
         const idx = nextIndex++;
-        callBuffers.set(callId, {
-          index: idx,
-          name,
-          argsJson: "",
-          started: true,
-        });
+        // Argument events identify the call by this item's `id` (as
+        // `item_id`), not by `call_id`.
+        if (typeof item.id === "string") {
+          callBuffers.set(item.id, {
+            index: idx,
+            callId,
+            name,
+            argsJson: "",
+            started: true,
+          });
+        }
         yield {
           type: "tool-call-start",
           index: idx,
@@ -317,15 +328,15 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.delta") {
-      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      const itemId = typeof parsed.item_id === "string" ? parsed.item_id : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
-      const buf = callBuffers.get(callId);
+      const buf = callBuffers.get(itemId);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
         yield {
           type: "tool-call-args-delta",
           index: buf.index,
-          toolCallId: callId,
+          toolCallId: buf.callId,
           toolName: buf.name,
           argsDelta: delta,
         };
@@ -334,9 +345,9 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.done") {
-      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      const itemId = typeof parsed.item_id === "string" ? parsed.item_id : "";
       const argsRaw = parsed.arguments;
-      const buf = callBuffers.get(callId);
+      const buf = callBuffers.get(itemId);
       if (buf) {
         let args: Record<string, unknown>;
         try {
@@ -354,7 +365,7 @@ export async function* streamResponsesTurn(
         yield {
           type: "tool-call-ready",
           index: buf.index,
-          toolCallId: callId,
+          toolCallId: buf.callId,
           toolName: buf.name,
           args,
         };

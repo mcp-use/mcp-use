@@ -6,12 +6,50 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.11.0" description="October 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.11.0&title=Custom%20landing%20pages&date=2026-10&lang=typescript" alt="Release 2.11.0" />
+  </Frame>
+  ## Custom landing pages
+  Minor release adding a customizable page at the MCP URL with `landing.tsx`, plus agent streaming, OAuth client, and CLI fixes.
+
+- **New** (server, @mcp-use/cli): a `landing.tsx` in the MCP root replaces the page a browser sees at the MCP URL. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`) and `mcp-use start` serves the built page. It renders on the server and hydrates in the browser; without it, the built-in page is served as before (`#2648`)
+- **New** (server): `mcp-use/landing` exports React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`. Server info always ships to the page; each list ships only when the page's import graph uses its hook (`#2648`)
+- **New** (server): `getInstallTargets({ url, name })` returns install links and commands for Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and the Manufact Inspector, for use outside the server such as on a docs site (`#2648`)
+- **New** (server): `landing.tsx` can `export const metadata` (`title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags (`#2648`)
+- **New** (@mcp-use/cli): Tailwind classes work in `landing.tsx` without a CSS file and CSS imports are bundled. In dev, edits use Fast Refresh, adding or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` (`#2648`)
+- **New** (create-mcp-use-app): every template includes a Tailwind-styled `landing.tsx`; `blank` and `mcp-server` add React and its types, and every template's `tsconfig.json` typechecks `landing.tsx` (`#2648`)
+- **Fix** (server, @mcp-use/cli): landing pages set `data-theme` from the OS color scheme before first paint so `dark:` classes work; a page whose CSS imports Tailwind itself owns Tailwind; and in `mcp-use dev` the page's stylesheets load before hydration (`#2880`)
+- **Update** (server): ChatGPT install steps follow the Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab (`#2648`)
+- **Fix** (@mcp-use/cli): `mcp-use start --with-inspector` serves the Inspector at `/inspector` when `basePath` is `"/"`, and `mcp-use dev` prints `/inspector` instead of `//inspector` (`#2555`)
+- **Fix** (@mcp-use/cli): `mcp-use client` and `mcp-use screenshot` install a matching `@mcp-use/client` when they auto-install it, including on Windows where the install always failed (`#2853`)
+- **Fix** (@mcp-use/agent): the OpenAI Responses provider emits tool-call argument events, so `MCPAgent.stream()` and `streamEvents()` report steps for tool calls on OpenAI models (`#2551`)
+- **Fix** (@mcp-use/agent): `MCPAgent.stream()` returns and saves to memory only the final turn's text, the same as `run()`, instead of gluing on text written before tool calls (`#2723`)
+- **Fix** (@mcp-use/agent): `RemoteAgent.run` no longer rejects successful responses whose body has no `error` field, and error messages show the error instead of `[object Object]` (`#2651`)
+- **Fix** (@mcp-use/client): `useMcp().authTokens.expires_at` no longer moves later on every reconnect for opaque (non-JWT) tokens; the expiry is saved when tokens are received (`#2879`)
+- **Fix** (@mcp-use/client): Node OAuth loopback connections close after the callback, cancellation, or timeout, so the process can exit (`#2766`)
+- **Update**: Updated @mcp-use/cli to v4.5.0, create-mcp-use-app to v2.1.0, @mcp-use/client to v2.4.5, and @mcp-use/agent to v2.0.25
+- **Update**: Updated @mcp-use/inspector to v20.3.22; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.10.1" description="October 2026">
+  ## OAuth discovery & browser tool calls
+  Patch fixes for public MCP connections, OAuth credential binding, browser tool calls, and ChatGPT widget descriptions.
+
+- **Fix** (@mcp-use/client): validate OAuth protected-resource metadata with the official SDK before classifying an anonymous connection as mixed auth. Root metadata for a different resource no longer makes a public MCP endpoint appear to require authentication (`#2858`)
+- **Fix** (@mcp-use/client): discard cached OAuth credentials with a missing, empty, or mismatched issuer stamp. Affected users may need to sign in again (`#2858`)
+- **Fix** (@mcp-use/client): browser tool calls send `Mcp-Param-*` headers for parameters annotated with `x-mcp-header`, so servers that require those headers accept calls from clients such as the Inspector (`#2803`)
+- **Fix** (server): copy a tool view's `description` to `_meta["openai/widgetDescription"]` on `resources/list` and `resources/read`, restoring the widget description for ChatGPT (`#2845`)
+- **Update**: Updated @mcp-use/client to v2.4.4, @mcp-use/agent to v2.0.24, and @mcp-use/cli to v4.4.1
+- **Update**: Updated @mcp-use/inspector to v20.3.21; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.10.0" description="October 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.10.0&title=OAuth%20Proxy%20for%20non-DCR%20providers&date=2026-10&lang=typescript" alt="Release 2.10.0" />
   </Frame>
   ## OAuth Proxy for non-DCR providers
-  Canary release (`mcp-use@2.10.0-canary.4`) adding an OAuth authorization server in front of identity providers without dynamic client registration, secret-free production builds, and `.gitignore`-aware deployments. Stable v2.10.0 has not shipped.
+  Minor release adding an OAuth authorization server in front of identity providers without dynamic client registration, secret-free production builds, and `.gitignore`-aware deployments.
 
 - **New** (server): `oauthProxy()` in `mcp-use/oauth` makes the MCP server its own authorization server in front of GitHub (`github()`), Google (`google()`), or any OAuth 2.0 provider (`upstream()`). Clients present a client ID metadata document or register (DCR), approve a server-owned consent page that names the server by its host, and receive the proxy's own opaque tokens (`#2822`)
 - **New** (server): the `clients` option limits which clients may connect, by metadata document URL, origin, or a client defined on the server (`#2822`)
@@ -32,9 +70,9 @@ rss: true
 - **Documentation**: add the [OAuth Proxy](/v2/typescript/server/authentication/providers/oauth-proxy) guide, [OAuth Proxy storage](/v2/typescript/server/authentication/providers/oauth-proxy-storage), v1 migration notes, and API reference; add GitHub and Google `oauthProxy` examples with Firestore (`#2841`, `#2831`)
 - **Documentation**: correct API reference comments: stdio `env` does not inherit the parent environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, legacy stateless GET, DELETE, and HEAD return `204`, and `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` appear in the generated reference (`#2838`)
 - **Update**: patch vulnerable transitive dependencies (`proxy-addr`, `shell-quote`, `source-map-js`) and update Next.js examples to `next` ^16.3.8 (`#2842`)
-- **Update**: Updated @mcp-use/cli to v4.4.0 (canary.2)
-- **Update**: Updated @mcp-use/agent to v2.0.23 (canary.1) and @mcp-use/client to v2.4.3 (canary.0)
-- **Update**: Updated @mcp-use/inspector to v20.3.20 (canary.3); see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.4.0
+- **Update**: Updated @mcp-use/agent to v2.0.23 and @mcp-use/client to v2.4.3
+- **Update**: Updated @mcp-use/inspector to v20.3.20; see the [Inspector changelog](/inspector/changelog)
 </Update>
 
 <Update label="v2.9.0" description="October 2026">

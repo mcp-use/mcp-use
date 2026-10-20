@@ -84,7 +84,8 @@ export interface ToolViewConfig {
   entrypoints?: readonly ToolViewEntrypoint[];
   /**
    * Human-readable description of the view resource → the resource's
-   * `description` on `resources/list` and `resources/read`.
+   * `description` on `resources/list`, and `_meta["openai/widgetDescription"]`
+   * on `resources/list` and `resources/read`.
    */
   description?: string;
   /**

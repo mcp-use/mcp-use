@@ -30,6 +30,7 @@ import {
 } from "./branding.js";
 import { assertServerConfig, type ServerConfig } from "./config.js";
 import { resolveListenHost, resolveListenPort } from "./listen-address.js";
+import type { LandingPageRegistration } from "./landing-handler.js";
 import { toNodeHandler } from "./node-bridge.js";
 import {
   requestClientInfo,
@@ -152,6 +153,7 @@ import type {
   ViewResourceFacts,
 } from "./views/types.js";
 import {
+  createLandingAssetsHandler,
   createViewPublicHandler,
   createViewAssetsHandler,
   registerViews,
@@ -384,6 +386,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   readonly #prompts = new Map<string, PromptEntry<TUser, TEnv>>();
   readonly #views = new Map<string, ViewManifestEntry>();
   #settings: ReturnType<typeof prepareSettings> | undefined;
+  #landingPage: LandingPageRegistration | undefined;
+  readonly #landingHtmlCache = new Map<string, Promise<string>>();
   #skills: SkillsSnapshot | undefined;
   #skillsPrimed = false;
   #skillsDiscovery: Promise<void> | undefined;
@@ -799,6 +803,31 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   __primeViews(views: ViewsManifest, options?: ViewRegistrationOptions): void {
     this[registerViews](views, options);
+  }
+
+  /** Supply a CLI-discovered custom landing component before the first request. @internal */
+  __primeLandingPage(registration: LandingPageRegistration): void {
+    this.#assertNotStarted("landing page", "renderer");
+    if (this.#landingPage !== undefined) {
+      throw new Error(
+        "Cannot prime landing page twice on one server instance."
+      );
+    }
+    const renders =
+      "load" in registration
+        ? typeof registration.load === "function"
+        : typeof registration.render === "function" &&
+          Array.isArray(registration.dataKeys);
+    if (
+      !renders ||
+      typeof registration.entry !== "string" ||
+      registration.entry.length === 0
+    ) {
+      throw new TypeError(
+        "Landing page requires a renderer, data keys, and browser entry URL."
+      );
+    }
+    this.#landingPage = registration;
   }
 
   /**
@@ -1854,18 +1883,23 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             this.#branding,
             this.#tools.values(),
             this.#prompts.values(),
-            this.#resources.values()
+            this.#resources.values(),
+            this.#landingPage,
+            this.#landingHtmlCache
           );
         };
         return respond();
       };
 
-      const brandingDevMode = this.#viewsPrimed
-        ? this.#viewsDevMode
-        : process.env["NODE_ENV"] !== "production";
+      const brandingDevMode =
+        this.#landingPage !== undefined
+          ? this.#landingPage.dev === true
+          : this.#viewsPrimed
+            ? this.#viewsDevMode
+            : process.env["NODE_ENV"] !== "production";
       const faviconHandler = createFaviconHandler(this.#branding, {
         dev: brandingDevMode,
-        projectRoot: this.#viewsProjectRoot,
+        projectRoot: this.#landingPage?.projectRoot ?? this.#viewsProjectRoot,
         deferCors: deferViewCors,
       });
       if (faviconHandler !== undefined) {
@@ -1875,10 +1909,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
 
       const viewHandler = createViewPublicHandler(basePath, this.#views, {
-        dev: this.#viewsPrimed ? this.#viewsDevMode : brandingDevMode,
-        projectRoot: this.#viewsProjectRoot,
+        dev: brandingDevMode,
+        projectRoot: this.#landingPage?.projectRoot ?? this.#viewsProjectRoot,
         enabled:
           hasLocalBrandingAsset(this.#branding) ||
+          this.#landingPage !== undefined ||
           [...this.#tools.values()].some(
             (entry) =>
               entry.definition.icons !== undefined &&
@@ -1916,6 +1951,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             (context) => viewAssetsHandler(context.req.raw)
           );
         }
+      }
+
+      if (this.#landingPage !== undefined && this.#landingPage.dev !== true) {
+        const landingAssetsHandler = createLandingAssetsHandler(basePath, {
+          projectRoot: this.#landingPage.projectRoot ?? this.#viewsProjectRoot,
+          deferCors: deferViewCors,
+        });
+        this.app.on(
+          ["GET", "HEAD"],
+          `${nestedBasePath}/_mcp-use/landing/*`,
+          (context) => landingAssetsHandler(context.req.raw)
+        );
       }
 
       this.app.all(basePath, (context) => endpointHandler(context.req.raw));

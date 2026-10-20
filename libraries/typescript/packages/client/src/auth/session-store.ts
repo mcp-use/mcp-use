@@ -175,7 +175,15 @@ export class OAuthSessionStore {
       if (legacyData) {
         try {
           const legacyValue = JSON.parse(legacyData) as T;
-          if (!legacyValue.issuer || legacyValue.issuer === ctx.issuer) {
+          // Never bind an unstamped legacy credential to newly discovered metadata.
+          if (
+            typeof legacyValue.issuer !== "string" ||
+            !legacyValue.issuer.trim()
+          ) {
+            await this.store.remove(legacyKey);
+            return undefined;
+          }
+          if (legacyValue.issuer === ctx.issuer) {
             const migratedValue = {
               ...legacyValue,
               issuer: ctx.issuer,
@@ -193,7 +201,17 @@ export class OAuthSessionStore {
     }
     if (!data) return undefined;
     try {
-      return { key, value: JSON.parse(data) as T };
+      const value = JSON.parse(data) as T;
+      // Scoped keys are not proof of issuer ownership; old SDK versions omitted the stamp.
+      if (
+        typeof value?.issuer !== "string" ||
+        !value.issuer.trim() ||
+        (ctx && value.issuer !== ctx.issuer)
+      ) {
+        await this.store.remove(key);
+        return undefined;
+      }
+      return { key, value };
     } catch (e) {
       console.warn(
         `[${this.storageKeyPrefix}] Failed to parse ${kind.replace("_", " ")}:`,
@@ -214,9 +232,18 @@ export class OAuthSessionStore {
     tokens: StoredOAuthTokens,
     ctx?: OAuthClientInformationContext
   ): Promise<void> {
+    // `expires_in` counts from when the token was issued, so pin it to an
+    // absolute time here instead of re-deriving it from each later read.
+    const stored =
+      typeof tokens.expires_in === "number"
+        ? {
+            ...tokens,
+            mcp_use_expires_at: Date.now() + tokens.expires_in * 1000,
+          }
+        : tokens;
     // Persist tokens BEFORE clearing the verifier / last_auth_url so a failed
     // write can't strand the auth flow with no way to recover.
-    const serialized = JSON.stringify(tokens);
+    const serialized = JSON.stringify(stored);
     await this.store.set(this.credentialKey("tokens", ctx), serialized);
     // The no-context SDK read is the transport's latest bearer token lookup.
     if (ctx) await this.store.set(this.credentialKey("tokens"), serialized);

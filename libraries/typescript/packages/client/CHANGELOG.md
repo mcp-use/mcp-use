@@ -1,5 +1,47 @@
 # @mcp-use/client
 
+## 2.4.5
+
+### Patch Changes
+
+- e4ff892: Close Node OAuth loopback connections after callbacks, cancellation, and timeout without truncating the callback response.
+- e4ff892: Fix `useMcp().authTokens.expires_at` moving later on every reconnect for opaque (non-JWT) tokens. The expiry was recomputed as now plus `expires_in` each time stored tokens were read, so a token that was 50 minutes into a 1-hour lifetime was reported as valid for another hour. The absolute expiry is now saved alongside the tokens when they are received and reused on later reads. JWT tokens still use their `exp` claim.
+
+## 2.4.5-canary.1
+
+### Patch Changes
+
+- d1999a0: Fix `useMcp().authTokens.expires_at` moving later on every reconnect for opaque (non-JWT) tokens. The expiry was recomputed as now plus `expires_in` each time stored tokens were read, so a token that was 50 minutes into a 1-hour lifetime was reported as valid for another hour. The absolute expiry is now saved alongside the tokens when they are received and reused on later reads. JWT tokens still use their `exp` claim.
+
+## 2.4.5-canary.0
+
+### Patch Changes
+
+- e6e0e39: Close Node OAuth loopback connections after callbacks, cancellation, and timeout without truncating the callback response.
+
+## 2.4.4
+
+### Patch Changes
+
+- 96b6aa5: Send `Mcp-Param-*` headers for tool parameters annotated with `x-mcp-header` when calling tools from a browser. The SDK only mirrors these parameters outside browsers, so browser clients such as the Inspector sent the value in the request body only and servers requiring the header rejected the call.
+- 96b6aa5: Validate discovered OAuth metadata with the official SDK before classifying an anonymous MCP connection as mixed auth. Root metadata for a different resource no longer causes public endpoints to appear to require authentication.
+
+  Reject cached OAuth credentials with a missing, empty, or mismatched issuer stamp rather than adopting them for a newly discovered issuer.
+
+## 2.4.4-canary.1
+
+### Patch Changes
+
+- 9ab2723: Validate discovered OAuth metadata with the official SDK before classifying an anonymous MCP connection as mixed auth. Root metadata for a different resource no longer causes public endpoints to appear to require authentication.
+
+  Reject cached OAuth credentials with a missing, empty, or mismatched issuer stamp rather than adopting them for a newly discovered issuer.
+
+## 2.4.4-canary.0
+
+### Patch Changes
+
+- b2f55fc: Send `Mcp-Param-*` headers for tool parameters annotated with `x-mcp-header` when calling tools from a browser. The SDK only mirrors these parameters outside browsers, so browser clients such as the Inspector sent the value in the request body only and servers requiring the header rejected the call.
+
 ## 2.4.3
 
 ### Patch Changes

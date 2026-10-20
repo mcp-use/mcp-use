@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { createServer as createNetServer } from "node:net";
+import {
+  connect,
+  createServer as createNetServer,
+  type Socket,
+} from "node:net";
+import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -31,6 +36,90 @@ class MemoryKVStore implements KVStore {
 }
 
 describe("NodeOAuthClientProvider", () => {
+  it.each(["success", "error", "cancel", "timeout"] as const)(
+    "closes all loopback connections on %s without truncating the response",
+    async (outcome) => {
+      const provider = await NodeOAuthClientProvider.create(
+        "https://mcp.example.com/mcp",
+        {
+          kvStore: new MemoryKVStore(),
+          openBrowser: vi.fn(),
+          authTimeoutMs: outcome === "timeout" ? 500 : 5_000,
+          preferredPort: 37_000 + (process.pid % 1_000),
+          portRange: 100,
+        }
+      );
+      const sockets: Socket[] = [];
+      const closed: Promise<unknown>[] = [];
+      const openSocket = async () => {
+        const socket = connect(provider.callbackPort, "127.0.0.1");
+        sockets.push(socket);
+        closed.push(
+          new Promise<void>((resolve) => socket.once("close", () => resolve()))
+        );
+        // Force-closing an incomplete request can legitimately reset its TCP connection.
+        socket.on("error", () => {});
+        socket.resume();
+        await once(socket, "connect");
+        return socket;
+      };
+
+      try {
+        await provider.redirectToAuthorization(
+          new URL("https://auth.example.com/authorize?state=test-state")
+        );
+        // Neither an unused TCP connection nor an incomplete request receives
+        // a response header, so both require explicit shutdown cleanup.
+        await openSocket();
+        const incomplete = await openSocket();
+        incomplete.write("GET /callback HTTP/1.1\r\nHost: 127.0.0.1\r\n");
+        const response = provider.getAuthorizationResponse();
+
+        if (outcome === "success" || outcome === "error") {
+          const callback = await openSocket();
+          let rawResponse = "";
+          callback.setEncoding("utf8");
+          callback.on("data", (chunk) => (rawResponse += chunk));
+          const query =
+            outcome === "success"
+              ? "code=test-code&state=test-state"
+              : "error=access_denied";
+          callback.write(
+            `GET /callback?${query} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: keep-alive\r\n\r\n`
+          );
+          if (outcome === "success") {
+            await expect(response).resolves.toEqual({ code: "test-code" });
+          } else {
+            await expect(response).rejects.toMatchObject({
+              code: "access_denied",
+            });
+          }
+          await Promise.all(closed);
+          expect(rawResponse).toContain(
+            `HTTP/1.1 ${outcome === "success" ? 200 : 400}`
+          );
+          expect(rawResponse).toMatch(/connection: close/i);
+          expect(rawResponse).toContain(
+            outcome === "success"
+              ? "Authentication complete"
+              : "Authentication failed"
+          );
+          expect(rawResponse).toContain("</body></html>");
+        } else {
+          if (outcome === "cancel") provider.dispose();
+          await expect(response).rejects.toMatchObject({
+            code: outcome === "cancel" ? "cancelled" : "timeout",
+          });
+          await Promise.all(closed);
+        }
+      } finally {
+        sockets.forEach((socket) => socket.destroy());
+        provider.dispose();
+      }
+    },
+    2_000
+  );
+
   it("prefers the persisted callback port over the configured default", async () => {
     const probe = createNetServer();
     await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));

@@ -340,7 +340,7 @@ it("does not dispatch an earlier Anthropic tool after a later invalid-JSON error
   expect(executed).toEqual([]);
 });
 
-describe("Responses arguments-done events using the existing call_id format", () => {
+describe("Responses arguments-done events using item_id correlation", () => {
   it.each(
     ['{"target":', "null", false, 0, null, undefined, {}, []].map((args) => ({
       args,
@@ -364,12 +364,12 @@ describe("Responses arguments-done events using the existing call_id format", ()
           },
           {
             type: "response.function_call_arguments.delta",
-            call_id: "call_1",
+            item_id: "fc_1",
             delta: '{"target":"buffered"}',
           },
           {
             type: "response.function_call_arguments.done",
-            call_id: "call_1",
+            item_id: "fc_1",
             arguments: args,
           },
         ])
@@ -547,12 +547,12 @@ it.each([
         },
         {
           type: "response.function_call_arguments.delta",
-          call_id: "call_1",
+          item_id: "fc_1",
           delta,
         },
         {
           type: "response.function_call_arguments.done",
-          call_id: "call_1",
+          item_id: "fc_1",
           arguments: done,
         },
       ])

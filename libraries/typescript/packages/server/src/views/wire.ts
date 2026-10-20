@@ -148,7 +148,7 @@ function resolveCspOptions(
 
 /**
  * Resource metadata for a primed view, including `_meta.ui` and the
- * OpenAI resource display-mode extension.
+ * OpenAI widget-description and display-mode extensions.
  *
  * Emits `csp` by merging author `view.csp`, env (`CSP_URLS` / `CSP_*_DOMAINS`),
  * and MCP auto-append (`MCP_URL` → connect; assets origin → resource).
@@ -173,6 +173,9 @@ export function buildResourceUiMeta(
 
   return {
     [UI_META_KEY]: ui,
+    ...(authorFacts?.description !== undefined && {
+      "openai/widgetDescription": authorFacts.description,
+    }),
     ...(authorFacts?.displayModes !== undefined && {
       "openai/ui": {
         availableDisplayModes: authorFacts.displayModes.filter(

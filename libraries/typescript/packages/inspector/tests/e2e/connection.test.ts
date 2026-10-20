@@ -369,7 +369,9 @@ test.describe("Inspector MCP Server Connections", () => {
     await page.goto("http://localhost:3000/inspector");
 
     await page.getByTestId("server-tile-settings").click();
-    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
+      "http://localhost:3002/mcp"
+    );
 
     await page.getByTestId("config-dialog-request-timeout-input").fill("30000");
     await page.getByTestId("connection-form-save-button").click();
@@ -440,7 +442,12 @@ test.describe("Inspector MCP Server Connections", () => {
     await page.goto("http://localhost:3000/inspector");
 
     await page.getByTestId("server-tile-settings").click();
-    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    // The dashboard's Connect form has the same (empty) URL input and stays
+    // mounted until the view transition to the settings tab finishes. Wait
+    // for the connection's URL so the edit can't land in the dashboard form.
+    await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
+      "http://localhost:3002/mcp"
+    );
 
     await page.getByTestId("connection-form-url-input").fill("");
     await page
@@ -464,7 +471,9 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(page.getByTestId("server-tile-local-recovery")).toHaveCount(0);
 
     await page.getByTestId("server-tile-settings").click();
-    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
+      "http://localhost:29999/mcp"
+    );
     await page.getByTestId("connection-form-url-input").fill("");
     await page
       .getByTestId("connection-form-url-input")

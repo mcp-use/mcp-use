@@ -1,5 +1,81 @@
 # @mcp-use/agent
 
+## 2.0.25
+
+### Patch Changes
+
+- e4ff892: `MCPAgent.stream()` now returns, and saves to conversation memory, only the final turn's text, the same as `run()`. Text the model wrote before calling a tool used to be glued onto the answer, for example `Let me check the files.The folder has a.ts.`. If the run is aborted after the model asks for a tool but before the tool runs, `stream()` now returns an empty answer, as `run()` does, instead of that preamble.
+- e4ff892: Fix OpenAI Responses streaming never emitting tool-call args events
+
+  `response.function_call_arguments.delta` and `...done` carry `item_id`, not
+  `call_id`, so the buffer lookup never matched and neither `tool-call-args-delta`
+  nor `tool-call-ready` was emitted. `MCPAgent.stream()` and `streamEvents()` now
+  report AgentSteps for tool calls made through the OpenAI Responses provider.
+
+- e4ff892: Fix `RemoteAgent.run` rejecting successful responses whose body has no `error` field. Error messages from a body with `error` or `status: "error"` now show the error (object errors as JSON) instead of `[object Object]`, without repeating the "Remote agent execution failed:" prefix. Remove the "failed to initialize" check, which could never match.
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+  - @mcp-use/client@2.4.5
+
+## 2.0.25-canary.4
+
+### Patch Changes
+
+- Updated dependencies [d1999a0]
+  - @mcp-use/client@2.4.5-canary.1
+
+## 2.0.25-canary.3
+
+### Patch Changes
+
+- 2d7c986: Fix `RemoteAgent.run` rejecting successful responses whose body has no `error` field. Error messages from a body with `error` or `status: "error"` now show the error (object errors as JSON) instead of `[object Object]`, without repeating the "Remote agent execution failed:" prefix. Remove the "failed to initialize" check, which could never match.
+
+## 2.0.25-canary.2
+
+### Patch Changes
+
+- Updated dependencies [e6e0e39]
+  - @mcp-use/client@2.4.5-canary.0
+
+## 2.0.25-canary.1
+
+### Patch Changes
+
+- de53e6f: `MCPAgent.stream()` now returns, and saves to conversation memory, only the final turn's text, the same as `run()`. Text the model wrote before calling a tool used to be glued onto the answer, for example `Let me check the files.The folder has a.ts.`. If the run is aborted after the model asks for a tool but before the tool runs, `stream()` now returns an empty answer, as `run()` does, instead of that preamble.
+
+## 2.0.25-canary.0
+
+### Patch Changes
+
+- 91f70c0: Fix OpenAI Responses streaming never emitting tool-call args events
+
+  `response.function_call_arguments.delta` and `...done` carry `item_id`, not
+  `call_id`, so the buffer lookup never matched and neither `tool-call-args-delta`
+  nor `tool-call-ready` was emitted. `MCPAgent.stream()` and `streamEvents()` now
+  report AgentSteps for tool calls made through the OpenAI Responses provider.
+
+## 2.0.24
+
+### Patch Changes
+
+- Updated dependencies [96b6aa5]
+- Updated dependencies [96b6aa5]
+  - @mcp-use/client@2.4.4
+
+## 2.0.24-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9ab2723]
+  - @mcp-use/client@2.4.4-canary.1
+
+## 2.0.24-canary.0
+
+### Patch Changes
+
+- Updated dependencies [b2f55fc]
+  - @mcp-use/client@2.4.4-canary.0
+
 ## 2.0.23
 
 ### Patch Changes

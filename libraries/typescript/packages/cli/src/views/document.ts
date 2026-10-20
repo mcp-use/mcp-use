@@ -1,8 +1,11 @@
-// Keep this URL layout aligned with the server resource document helper. It is
-// duplicated here to keep the CLI build graph independent of server runtime code.
-function pathUnderBase(basePath: string, childPath: string): string {
-  const child = childPath.replace(/^\/+/, "");
-  return basePath === "/" ? `/${child}` : `${basePath}/${child}`;
+// Keep this URL layout aligned with the server resource document helper. The
+// join rule lives in ../base-path.js to keep the CLI build graph independent of
+// server runtime code while giving every consumer one answer for basePath "/".
+import { pathUnderBase } from "../base-path.js";
+
+/** Build the HTTP path prefix for the landing page's generated assets. */
+export function landingAssetsBasePath(basePath: string): string {
+  return `${pathUnderBase(basePath, "_mcp-use/landing")}/`;
 }
 
 /** Build the HTTP path prefix for one view's generated assets. */

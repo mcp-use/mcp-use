@@ -1,0 +1,263 @@
+---
+title: "Customize Landing Page"
+description: "Replace the page a browser sees at your MCP URL with your own React component, and show server data and client install links with hooks from mcp-use/landing."
+icon: "panels-top-left"
+---
+
+When someone opens your MCP URL in a browser, mcp-use serves a landing page. It shows the server's name, instructions for adding the server to MCP clients, and the server's tools, prompts, and resources. To replace it, add a `landing.tsx` file that default-exports a React component.
+
+The built-in page looks like this for a sample Weather Server:
+
+<Frame>
+  <img
+    src="./images/default-landing-page.png"
+    alt="Built-in MCP landing page for a Weather Server, with connection buttons, client tabs, and primitive lists"
+  />
+</Frame>
+
+## Create a custom landing page
+
+<Steps>
+  <Step title="Install React">
+    ```bash
+    npm install react react-dom
+    npm install --save-dev @types/react @types/react-dom
+    ```
+  </Step>
+  <Step title="Add landing.tsx next to your server entry">
+    ```text
+    my-server/
+    ├── index.ts
+    └── landing.tsx
+    ```
+
+    The default export must be a React component. Read server data with the hooks from `mcp-use/landing`:
+
+    ```tsx landing.tsx
+    import { useServerInfo, useToolList } from "mcp-use/landing";
+
+    export default function Landing() {
+      const { name, title, description, url } = useServerInfo();
+      const tools = useToolList();
+
+      return (
+        <main className="mx-auto max-w-2xl space-y-4 p-8">
+          <h1 className="text-3xl font-bold">{title ?? name}</h1>
+          {description && <p>{description}</p>}
+          <code>{url}</code>
+          <ul className="list-disc pl-5">
+            {tools.map((tool) => (
+              <li key={tool.name}>{tool.title ?? tool.name}</li>
+            ))}
+          </ul>
+        </main>
+      );
+    }
+    ```
+
+  </Step>
+  <Step title="Open the page">
+    Run `mcp-use dev` and open the MCP URL, such as `http://localhost:3000/mcp`, in a browser.
+  </Step>
+</Steps>
+
+For a complete page with client tabs, copy buttons, and a gradient header, start from the [scaffold's `landing.tsx`](https://github.com/mcp-use/mcp-use/blob/canary/docs/v2/typescript/server/examples/landing.tsx).
+
+## Show server data
+
+Call these hooks from any component rendered by `landing.tsx`:
+
+| Hook                  | Returns                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| `useServerInfo()`     | Server name, title, version, description, MCP URL, and icon. See [`LandingServerInfo`](#landingserverinfo). |
+| `useToolList()`       | Registered tools, in registration order.                                                 |
+| `usePromptList()`     | Registered prompts, in registration order.                                               |
+| `useResourceList()`   | Registered static resources, in registration order. Resource templates are not included. |
+| `useInstallTargets()` | Links and commands that add the server to MCP clients. See [Add install buttons](#add-install-buttons). |
+
+## Add install buttons
+
+`useInstallTargets()` returns the same install links and commands as the built-in page, one entry per client. Each entry has a `label` and one field that says how to install:
+
+| Key              | Field      | Value                                                 |
+| ---------------- | ---------- | ----------------------------------------------------- |
+| `claudeCode`     | `command`  | A `claude mcp add` command to run in a terminal.      |
+| `cursor`         | `deeplink` | A `cursor://` link that opens Cursor's install prompt. |
+| `vscode`         | `deeplink` | A `vscode:` link that opens VS Code's install prompt. |
+| `vscodeInsiders` | `deeplink` | A `vscode-insiders:` link.                            |
+| `chatgpt`        | `steps`    | Plain-text setup steps. ChatGPT has no install link.  |
+| `inspector`      | `url`      | The hosted Manufact Inspector, connected to this server. |
+
+To show a few clients, read their entries by key:
+
+```tsx
+import { useInstallTargets } from "mcp-use/landing";
+
+export function InstallButtons() {
+  const { cursor, vscode, claudeCode } = useInstallTargets();
+
+  return (
+    <div>
+      <a href={cursor.deeplink}>Add to {cursor.label}</a>
+      <a href={vscode.deeplink}>Add to {vscode.label}</a>
+      <pre>{claudeCode.command}</pre>
+    </div>
+  );
+}
+```
+
+To show every client, iterate `Object.values()`. The keys are in the built-in page's tab order, so check which field each entry has:
+
+```tsx
+import { useInstallTargets, type InstallTargets } from "mcp-use/landing";
+
+type InstallTarget = InstallTargets[keyof InstallTargets];
+
+function Instructions({ target }: { target: InstallTarget }) {
+  if ("command" in target) return <pre>{target.command}</pre>;
+  if ("deeplink" in target)
+    return <a href={target.deeplink}>Open in {target.label}</a>;
+  if ("steps" in target)
+    return (
+      <ol>
+        {target.steps.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+    );
+  return <a href={target.url}>Open {target.label}</a>;
+}
+
+export function InstallGuide() {
+  return Object.values(useInstallTargets()).map((target) => (
+    <section key={target.label}>
+      <h3>{target.label}</h3>
+      <Instructions target={target} />
+    </section>
+  ));
+}
+```
+
+## Set the page title and social previews
+
+Export a `metadata` object from `landing.tsx` to set the `<title>`, the meta description, and the Open Graph and Twitter tags:
+
+```tsx landing.tsx
+import type { LandingMetadata } from "mcp-use/landing";
+
+export const metadata: LandingMetadata = {
+  title: "Acme for Claude and Cursor",
+  description: "Connect Acme to your AI client in one step.",
+  icon: "acme.svg",
+  image: "og.png",
+};
+```
+
+| Field         | Sets                                                                             | Default                                                                  |
+| ------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `title`       | `<title>`, `og:title`, `twitter:title`                                           | The server's `title ?? name`, followed by "MCP Server" and the supported clients. |
+| `description` | `<meta name="description">`, `og:description`, `twitter:description`             | The server's `description`, or a generated sentence.                     |
+| `icon`        | `<link rel="icon">`                                                              | The server's `favicon` or `icons` from `MCPServer`.                      |
+| `image`       | `og:image`, `twitter:image`, and sets `twitter:card` to `summary_large_image`    | No image, and `twitter:card` is `summary`.                               |
+
+Every field is optional. `icon` and `image` accept an absolute URL or a path in the project's `public/` directory. mcp-use HTML-escapes every value.
+
+`metadata` must be a plain object. mcp-use reads it once when the module loads, so it cannot change per request. Fields that are not strings are ignored, and the server logs a warning that starts with `[mcp-use] landing.tsx metadata:`.
+
+## Style the page
+
+Tailwind classes work in `landing.tsx` with no setup. The page loads the same CLI-managed Tailwind stylesheet as [MCP Apps views](/v2/typescript/mcp-apps), including Tailwind's preflight reset, which removes browser defaults such as list markers and heading sizes.
+
+To add your own CSS, import a stylesheet. It loads after Tailwind, so your rules win where both set a property:
+
+```tsx landing.tsx
+import "./landing.css";
+```
+
+To use a file from the project's `public/` directory, prefix its path with `publicBaseUrl`:
+
+```tsx
+const { publicBaseUrl } = useServerInfo();
+
+return <img src={`${publicBaseUrl}logo.svg`} alt="Acme" />;
+```
+
+### Dark mode
+
+`dark:` classes work with no setup. Before the first paint, mcp-use sets `data-theme="dark"` or `data-theme="light"` on `<html>` from the visitor's OS color scheme, and updates it when the OS setting changes. Tailwind's `dark:` variant follows `data-theme`.
+
+```tsx
+<main className="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+```
+
+To add a theme toggle, set `document.documentElement.dataset.theme` yourself. After the page changes the value, mcp-use stops syncing it with the OS.
+
+### Customize Tailwind
+
+To add theme tokens, utilities, or your own `dark` variant, import Tailwind in the page's stylesheet. You don't need to install `tailwindcss`:
+
+```css landing.css
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #ff3366;
+}
+```
+
+When a stylesheet the page imports contains `@import "tailwindcss"`, mcp-use drops its managed stylesheet and compiles only yours.
+
+## Preview changes with mcp-use dev
+
+`mcp-use dev` reloads the page as you edit:
+
+- **Component edits** update the open page with Fast Refresh and keep React state. CSS edits apply immediately.
+- **Adding or deleting `landing.tsx`** switches the open tab between your page and the built-in page.
+- **Broken edits**, such as a syntax error or a missing default export, keep the last working page on screen. The terminal logs `[mcp-use] landing update failed; serving last working page` with the error.
+
+## Reference
+
+### LandingServerInfo
+
+Returned by `useServerInfo()`.
+
+| Field           | Type                  | Description                                                                 |
+| --------------- | --------------------- | --------------------------------------------------------------------------- |
+| `name`          | `string`              | Protocol-facing server name.                                                |
+| `title`         | `string \| undefined` | Human-readable server title. Use `title ?? name` for a heading.             |
+| `version`       | `string`              | Server version reported to MCP clients.                                     |
+| `description`   | `string \| undefined` | Server description.                                                         |
+| `url`           | `string`              | Absolute URL of the MCP endpoint, resolved from the incoming request.       |
+| `websiteUrl`    | `string \| undefined` | The server's configured website.                                            |
+| `iconUrl`       | `string \| undefined` | Absolute favicon URL, when the server sets `favicon` or `icons`.            |
+| `iconType`      | `string \| undefined` | MIME type of the favicon, when known.                                       |
+| `publicBaseUrl` | `string`              | Absolute URL prefix for files in the project's `public/` directory, ending in `/`. |
+
+### List items
+
+| Hook                | Item fields                                                  |
+| ------------------- | ------------------------------------------------------------ |
+| `useToolList()`     | `name`, and optional `title` and `description`.              |
+| `usePromptList()`   | `name`, and optional `title` and `description`.              |
+| `useResourceList()` | `uri`, and optional `name`, `title`, and `description`.      |
+
+### Install targets
+
+`useInstallTargets()` returns an `InstallTargets` object. `Object.values()` lists the entries in this order:
+
+| Key              | `label`                | Field      |
+| ---------------- | ---------------------- | ---------- |
+| `claudeCode`     | `"Claude Code"`        | `command`  |
+| `cursor`         | `"Cursor"`             | `deeplink` |
+| `vscode`         | `"VS Code"`            | `deeplink` |
+| `vscodeInsiders` | `"VS Code Insiders"`   | `deeplink` |
+| `chatgpt`        | `"ChatGPT"`            | `steps`    |
+| `inspector`      | `"Manufact Inspector"` | `url`      |
+
+Clients store the server name lowercased, with characters other than letters, digits, `-`, and `_` replaced by `_`.
+
+### Errors
+
+| Error                                                                                          | Cause                                                       | Fix                                                                          |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `useServerInfo() was called outside the landing page. Call it from a component rendered by landing.tsx.` | A hook ran outside a component rendered by `landing.tsx`.   | Call the hook only from components that `landing.tsx` renders.               |
+Each message names the hook that threw.
