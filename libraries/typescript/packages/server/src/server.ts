@@ -2585,9 +2585,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             ],
           };
         };
-        return await this.#hookResourceRead(readUri, ctx, innerFn, {
-          name: viewName,
-        });
+        // Only tool-bound views are views to middleware; on a `mixedAuth`
+        // server these are the ones the OAuth gate serves signed out.
+        return await this.#hookResourceRead(
+          readUri,
+          ctx,
+          innerFn,
+          this.#viewBindings.has(viewName) ? { name: viewName } : undefined
+        );
       }
     );
   }

@@ -1218,10 +1218,13 @@ describe("view resource reads through resources/read middleware", () => {
   });
 
   it("lets middleware reject a view read", async () => {
+    seenViews.length = 0;
     await expect(
       client.readResource({ uri: "ui://views/orphan-view.html" })
     ).rejects.toThrow("Blocked by middleware");
     expect(seenUris).toContain("ui://views/orphan-view.html");
+    // No tool binds orphan-view, so it is not marked as a tool view.
+    expect(seenViews).toEqual([undefined]);
   });
 });
 
