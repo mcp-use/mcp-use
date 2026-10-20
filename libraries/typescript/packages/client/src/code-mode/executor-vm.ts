@@ -80,6 +80,58 @@ export function isVMAvailable(): boolean {
 }
 
 /**
+ * Format one console argument for the captured logs without throwing into
+ * the executed code.
+ */
+function formatLogArgument(arg: unknown): string {
+  try {
+    if (typeof arg !== "object" || arg === null) return String(arg);
+    // An error's message and stack are not enumerable, so JSON.stringify gives
+    // "{}". `instanceof Error` is false for errors created in the VM context.
+    if (Object.prototype.toString.call(arg) === "[object Error]") {
+      return String(arg);
+    }
+    return JSON.stringify(arg, jsonLogReplacer(), 2);
+  } catch {
+    // A getter, toJSON or toString defined by the executed code threw.
+    try {
+      return String(arg);
+    } catch {
+      return "[unserializable value]";
+    }
+  }
+}
+
+/**
+ * JSON.stringify replacer that writes nested errors as `Error: message`,
+ * BigInt values as `123n` and circular references as "[Circular]" instead of
+ * printing `{}` or throwing. Other values serialize as they would without a
+ * replacer.
+ */
+function jsonLogReplacer(): (
+  this: unknown,
+  key: string,
+  value: unknown
+) => unknown {
+  const ancestors: unknown[] = [];
+  return function (this: unknown, _key: string, value: unknown): unknown {
+    if (typeof value === "bigint") return `${value}n`;
+    if (typeof value !== "object" || value === null) return value;
+    if (Object.prototype.toString.call(value) === "[object Error]") {
+      return String(value);
+    }
+    // `this` is the object that holds `value`; drop entries that are no
+    // longer on the path from the root.
+    while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this) {
+      ancestors.pop();
+    }
+    if (ancestors.includes(value)) return "[Circular]";
+    ancestors.push(value);
+    return value;
+  };
+}
+
+/**
  * VM-based code executor using Node.js vm module.
  * Executes code in an isolated V8 context with access to MCP tools.
  */
@@ -197,13 +249,7 @@ export class VMCodeExecutor extends BaseCodeExecutor {
   private async _buildContext(logs: string[]): Promise<any> {
     // Helper to capture logs
     const logHandler = (...args: unknown[]) => {
-      logs.push(
-        args
-          .map((arg) =>
-            typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg)
-          )
-          .join(" ")
-      );
+      logs.push(args.map(formatLogArgument).join(" "));
     };
 
     // Basic safe globals
