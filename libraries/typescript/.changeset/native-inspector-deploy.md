@@ -2,4 +2,4 @@
 "@mcp-use/inspector": patch
 ---
 
-Pin native Railway builds to the Inspector version in the deployed commit and prevent prerelease versions from deploying from main. Publish and verify canary packages before pushing their version commit, replacing the custom Railway deployment action.
+Docker builds now default to the exact version in package.json, reject dist-tags and unpublished versions, and start the installed mcp-inspect binary directly while preserving PORT support. Native Railway deployments reject prerelease versions from main. Publish and verify canary packages before pushing their version commit, replacing the custom Railway deployment action.
