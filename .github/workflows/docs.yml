@@ -45,7 +45,8 @@ jobs:
         run: cd libraries/python && uv pip install -e . && uv pip install google-genai
 
       - name: Install Mintlify CLI
-        run: npm install -g mint
+        # Keep the native deployment CI gate independent of partial CLI publishes.
+        run: npm install -g mint@4.2.1085
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4

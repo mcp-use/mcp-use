@@ -312,6 +312,9 @@ Deploy the MCP Inspector to your own infrastructure with a single Docker contain
 
 The official Docker image is available on [Docker Hub](https://hub.docker.com/r/mcpuse/inspector).
 
+Building the Dockerfile installs the exact Inspector version in `package.json`.
+Select another published version with `--build-arg VERSION=x.y.z`.
+
 **Quick Start:**
 
 ```bash

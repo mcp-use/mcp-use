@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 
 export const changelogs = [
-  "docs/typescript/changelog/changelog.mdx",
+  "docs/v2/typescript/changelog.mdx",
   "docs/inspector/changelog.mdx",
 ];
 
