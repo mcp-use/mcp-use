@@ -6,6 +6,15 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.24" description="October 2026">
+  ## Native hosted deployments
+  Hosted Inspector builds install the exact package version from their Git commit through Railway's native GitHub integration.
+
+- **Fix**: verify npm publication before exposing canary's version commit to native deployments
+- **Fix**: invalidate the Docker install layer when the package version changes, reject dist-tags, and keep prerelease versions off production during promotion
+- **Cleanup**: remove the custom Railway deployment action and its token dependency
+</Update>
+
 <Update label="v20.3.23" description="October 2026">
   ## Chat feedback, backgrounds & hosted connections
   Patch release paired with `mcp-use` v2.11.1, improving chat feedback and keeping hosted MCP requests on the correct route.

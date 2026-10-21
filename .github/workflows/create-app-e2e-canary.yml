@@ -21,15 +21,15 @@ jobs:
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
-      - name: Download deployment marker
+      - name: Download canary release marker
         if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: railway-deploy-marker
+          name: canary-release
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
-      
+
       - name: Check if packages were published
         id: check
         env:
@@ -38,7 +38,7 @@ jobs:
           if [ "$EVENT_NAME" == "workflow_dispatch" ]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
             echo "Manual trigger, will run e2e tests"
-          elif [ -f .railway-deploy-marker ] && grep -q "packages_published=true" .railway-deploy-marker; then
+          elif [ -f .canary-release ] && grep -q "packages_published=true" .canary-release; then
             echo "should_run=true" >> $GITHUB_OUTPUT
             echo "Packages were published, will run e2e tests"
           else
@@ -55,10 +55,10 @@ jobs:
       - name: Wait for canary packages to be available on npm
         run: |
           echo "Waiting for canary packages to be available on npm..."
-          
+
           MAX_RETRIES=30
           SLEEP_TIME=20
-          
+
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i/$MAX_RETRIES: Checking npm registry..."
             
@@ -73,7 +73,7 @@ jobs:
             echo "Packages not yet available, waiting ${SLEEP_TIME}s..."
             sleep $SLEEP_TIME
           done
-          
+
           echo "Timeout waiting for canary packages"
           exit 1
 
@@ -90,18 +90,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      
+
       - name: Create app with npm and sdk-version canary
         run: |
           npx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --sdk-version canary
           echo "Project created successfully"
-      
+
       - name: Install dependencies
         working-directory: test-app-${{ matrix.template }}
         run: |
           npm install
           echo "Dependencies installed"
-      
+
       - name: Run dev server and kill it
         working-directory: test-app-${{ matrix.template }}
         run: |
@@ -111,7 +111,7 @@ jobs:
           kill $DEV_PID 2>/dev/null || true
           wait $DEV_PID 2>/dev/null || true
           echo "Dev server started and stopped successfully"
-      
+
       - name: Build project
         working-directory: test-app-${{ matrix.template }}
         run: |
@@ -133,18 +133,18 @@ jobs:
           node-version: 22
       - name: Setup Yarn
         run: corepack enable
-      
+
       - name: Create app with yarn and sdk-version canary
         run: |
           yarn dlx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --sdk-version canary
           echo "Project created successfully"
-      
+
       - name: Install dependencies
         working-directory: test-app-${{ matrix.template }}
         run: |
           yarn install
           echo "Dependencies installed"
-      
+
       - name: Run dev server and kill it
         working-directory: test-app-${{ matrix.template }}
         run: |
@@ -154,7 +154,7 @@ jobs:
           kill $DEV_PID 2>/dev/null || true
           wait $DEV_PID 2>/dev/null || true
           echo "Dev server started and stopped successfully"
-      
+
       - name: Build project
         working-directory: test-app-${{ matrix.template }}
         run: |
