@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.23-canary.3
+
+### Patch Changes
+
+- b89b9d4: Keep the chat mesh gradient visible while opening or closing history by redrawing the WebGL canvas immediately after resizing it.
+
 ## 20.3.23-canary.2
 
 ### Patch Changes

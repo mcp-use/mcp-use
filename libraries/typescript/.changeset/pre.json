@@ -11,6 +11,7 @@
     "@mcp-use/tunnel": "0.2.2"
   },
   "changesets": [
+    "calm-mesh-resize",
     "propagated-e46a61a656acf465",
     "quiet-inspector-routing",
     "revert-landing-dev-css-cache",
