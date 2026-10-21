@@ -1,6 +1,7 @@
 import type { Context, Hono } from "hono";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { registerInspectorStaticAssets } from "./static-assets.js";
+import { registerInspectorOAuthMetadata } from "./oauth-metadata.js";
 import { getInspectorVersion } from "./version.js";
 import { buildSandboxProxyBlobHtml } from "@mcp-use/client/sandbox";
 
@@ -219,6 +220,7 @@ export function registerInspectorShell(
   // Scoped local assets must be registered before the Inspector SPA fallback,
   // otherwise `/inspector/assets/*` would be answered with the HTML shell.
   registerInspectorStaticAssets(app, assetsPath);
+  registerInspectorOAuthMetadata(app, basePath);
 
   app.get(p("/inspector/oauth-popup-closed.html"), (c) =>
     c.html(OAUTH_POPUP_CLOSED_HTML)
