@@ -244,7 +244,8 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 
       // Copy relevant headers, stripping proxy/infrastructure headers that would
       // confuse the target (e.g. X-Forwarded-Host from our own chain causes the
-      // gateway to resolve the wrong hostname and return 404).
+      // gateway to resolve the wrong hostname). DevSpace routing headers belong
+      // to this Inspector hop too, not to the upstream MCP server.
       const requestHeaders = c.req.header();
       for (const [key, value] of Object.entries(requestHeaders)) {
         const lowerKey = key.toLowerCase();
@@ -253,6 +254,8 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           !lowerKey.startsWith("x-target-") &&
           !lowerKey.startsWith("x-mcp-") &&
           !lowerKey.startsWith("x-forwarded-") &&
+          !lowerKey.startsWith("x-dev-") &&
+          !lowerKey.startsWith("x-devspace-") &&
           !lowerKey.startsWith("cf-") &&
           lowerKey !== "x-original-host" &&
           lowerKey !== "host" &&

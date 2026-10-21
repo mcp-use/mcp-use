@@ -1,0 +1,20 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.25",
+    "@mcp-use/cli": "4.5.0",
+    "@mcp-use/client": "2.4.5",
+    "create-mcp-use-app": "2.1.0",
+    "@mcp-use/inspector": "20.3.22",
+    "mcp-use": "2.11.0",
+    "@mcp-use/tunnel": "0.2.2"
+  },
+  "changesets": [
+    "calm-mesh-resize",
+    "propagated-e46a61a656acf465",
+    "quiet-inspector-routing",
+    "revert-landing-dev-css-cache",
+    "thinking-between-tool-calls"
+  ]
+}

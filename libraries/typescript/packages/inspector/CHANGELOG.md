@@ -1,5 +1,29 @@
 # @mcp-use/inspector
 
+## 20.3.23-canary.3
+
+### Patch Changes
+
+- b89b9d4: Keep the chat mesh gradient visible while opening or closing history by redrawing the WebGL canvas immediately after resizing it.
+
+## 20.3.23-canary.2
+
+### Patch Changes
+
+- e7450b5: Strip DevSpace routing headers before forwarding MCP requests so the Inspector proxy can reach hosted MCP servers without routing them using the Inspector's hostname.
+
+## 20.3.23-canary.1
+
+### Patch Changes
+
+- 0ead84c: Show the thinking indicator between completed tool calls while the assistant request remains active, including after tool errors. Keep it hidden during active tools and text output.
+
+## 20.3.23-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.22
 
 ### Patch Changes
