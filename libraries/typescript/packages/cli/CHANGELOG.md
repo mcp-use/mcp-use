@@ -1,5 +1,237 @@
 # @mcp-use/cli
 
+## 4.5.0
+
+### Minor Changes
+
+- e4ff892: Customize the page a browser sees at the MCP URL with a `landing.tsx` in the MCP root. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`), and `mcp-use start` serves the built page. The page renders on the server and hydrates in the browser. Without `landing.tsx`, the built-in page is served as before.
+  - `mcp-use/landing` adds React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`, with the `LandingServerInfo`, `InstallTargets` and per-client target types. Server info always ships to the page; each list ships only when a module in the `landing.tsx` import graph imports its hook, and a list hook without its data throws an error that says to import it.
+  - `getInstallTargets({ url, name })` returns the Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and Manufact Inspector install links and commands, keyed by client, for use outside the server such as on a docs site. The built-in page now builds its links with it.
+  - `landing.tsx` can `export const metadata` (`LandingMetadata`: `title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags. Missing fields keep the server defaults.
+  - Tailwind classes work in `landing.tsx` with no CSS file, and CSS imports are bundled. In dev, edits use Fast Refresh, creating or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` for the page's assets.
+  - Every `create-mcp-use-app` template now includes a Tailwind-styled `landing.tsx` similar to the built-in page. The `blank` and `mcp-server` templates add `react`, `react-dom`, `@types/react` and `@types/react-dom`, and every template's `tsconfig.json` typechecks `landing.tsx`.
+
+### Patch Changes
+
+- e4ff892: Install the right `@mcp-use/client` when `mcp-use client` or `mcp-use screenshot` auto-installs it. The CLI looked for its peer range in a package named `mcp-use`, but the code now lives in `@mcp-use/cli`, so every install fell back to `^2.0.0-alpha.0`. It now reads the range declared in `@mcp-use/cli`'s package.json, and the fallback is `^2.0.1`. On Windows, `cmd.exe` also stripped the `^` from the range, so npm and pnpm looked for the unpublished `2.0.0-alpha.0` and the install always failed. Each argument is now quoted and the package manager runs as one command string, which also removes Node's DEP0190 warning. macOS and Linux keep the direct spawn.
+- e4ff892: Tailwind fixes for `landing.tsx` pages:
+  - The page now sets `data-theme` on `<html>` from the OS color scheme before the first paint and follows OS changes, so `dark:` classes work on the landing page without a theme script. A page that sets `data-theme` itself, for example from a theme toggle, keeps its value.
+  - A page whose CSS imports Tailwind itself (`@import "tailwindcss"`, for `@theme`, `@utility` or a custom `dark` variant) now owns Tailwind: the CLI-managed stylesheet is left out, so only the page's copy is compiled and its `dark` variant is the only one.
+  - In `mcp-use dev`, the page head links the stylesheets the page imports, so server-rendered markup no longer appears unstyled until the page's JavaScript loads.
+
+- e4ff892: Rebuild bundled workspace code and synchronize published internal package metadata.
+- e4ff892: Join Inspector and dev-API paths through a single `basePath` rule so they work when `basePath` is `"/"`. Previously `inspector-route.ts` and `dev-api.ts` interpolated directly and produced `//inspector`, while `views/document.ts` special-cased the root, so `mcp-use start --with-inspector` advertised `/inspector` but only matched `//inspector` and fell through to the MCP handler. `mcp-use dev` now also prints `/inspector` instead of `//inspector`. Nested `basePath` values are unaffected.
+
+## 4.5.0-canary.4
+
+### Patch Changes
+
+- f88a63b: Tailwind fixes for `landing.tsx` pages:
+  - The page now sets `data-theme` on `<html>` from the OS color scheme before the first paint and follows OS changes, so `dark:` classes work on the landing page without a theme script. A page that sets `data-theme` itself, for example from a theme toggle, keeps its value.
+  - A page whose CSS imports Tailwind itself (`@import "tailwindcss"`, for `@theme`, `@utility` or a custom `dark` variant) now owns Tailwind: the CLI-managed stylesheet is left out, so only the page's copy is compiled and its `dark` variant is the only one.
+  - In `mcp-use dev`, the page head links the stylesheets the page imports, so server-rendered markup no longer appears unstyled until the page's JavaScript loads.
+
+## 4.5.0-canary.3
+
+### Minor Changes
+
+- 52d8d99: Customize the page a browser sees at the MCP URL with a `landing.tsx` in the MCP root. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`), and `mcp-use start` serves the built page. The page renders on the server and hydrates in the browser. Without `landing.tsx`, the built-in page is served as before.
+  - `mcp-use/landing` adds React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`, with the `LandingServerInfo`, `InstallTargets` and per-client target types. Server info always ships to the page; each list ships only when a module in the `landing.tsx` import graph imports its hook, and a list hook without its data throws an error that says to import it.
+  - `getInstallTargets({ url, name })` returns the Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and Manufact Inspector install links and commands, keyed by client, for use outside the server such as on a docs site. The built-in page now builds its links with it.
+  - `landing.tsx` can `export const metadata` (`LandingMetadata`: `title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags. Missing fields keep the server defaults.
+  - Tailwind classes work in `landing.tsx` with no CSS file, and CSS imports are bundled. In dev, edits use Fast Refresh, creating or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` for the page's assets.
+  - Every `create-mcp-use-app` template now includes a Tailwind-styled `landing.tsx` similar to the built-in page. The `blank` and `mcp-server` templates add `react`, `react-dom`, `@types/react` and `@types/react-dom`, and every template's `tsconfig.json` typechecks `landing.tsx`.
+
+## 4.4.2-canary.2
+
+### Patch Changes
+
+- 7ff7174: Join Inspector and dev-API paths through a single `basePath` rule so they work when `basePath` is `"/"`. Previously `inspector-route.ts` and `dev-api.ts` interpolated directly and produced `//inspector`, while `views/document.ts` special-cased the root, so `mcp-use start --with-inspector` advertised `/inspector` but only matched `//inspector` and fell through to the MCP handler. `mcp-use dev` now also prints `/inspector` instead of `//inspector`. Nested `basePath` values are unaffected.
+
+## 4.4.2-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.2-canary.0
+
+### Patch Changes
+
+- bea1265: Install the right `@mcp-use/client` when `mcp-use client` or `mcp-use screenshot` auto-installs it. The CLI looked for its peer range in a package named `mcp-use`, but the code now lives in `@mcp-use/cli`, so every install fell back to `^2.0.0-alpha.0`. It now reads the range declared in `@mcp-use/cli`'s package.json, and the fallback is `^2.0.1`. On Windows, `cmd.exe` also stripped the `^` from the range, so npm and pnpm looked for the unpublished `2.0.0-alpha.0` and the install always failed. Each argument is now quoted and the package manager runs as one command string, which also removes Node's DEP0190 warning. macOS and Linux keep the direct spawn.
+
+## 4.4.1
+
+### Patch Changes
+
+- 96b6aa5: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 96b6aa5: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.1-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.0
+
+### Minor Changes
+
+- aa78231: Apply `.gitignore` rules by default when packaging projects for managed deployments (`mcp-use deploy --no-github`), supporting standard ignore semantics including wildcards, directory rules, and negation while preserving baseline cloud exclusions.
+
+### Patch Changes
+
+- aa78231: `mcp-use build` no longer needs the server's runtime secrets. The build evaluates the entry with `MCP_USE_PHASE=build`, and the new `isBuilding()` export of `mcp-use` lets module-scope code skip reading secrets or connecting to a database while building.
+
+  `mcp-use build` also exits when the build finishes. Before, an entry that opened a connection at module scope, such as a Redis client, kept the build process running after it had printed its result. A failed build or dev start also prints the cause of a refused connection, which it used to print as an empty line.
+
+- aa78231: `mcp-use build` now builds for production when `NODE_ENV` is unset. Before, the dev server that evaluates the entry set `NODE_ENV=development` for the rest of the build, so views shipped React's development build, and server-side JSX compiled to `jsxDEV`, which fails under `mcp-use start`. The entry is therefore also evaluated with `NODE_ENV=production` during the build.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.0-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.4.0-canary.1
+
+### Patch Changes
+
+- 3e9bc30: `mcp-use build` no longer needs the server's runtime secrets. The build evaluates the entry with `MCP_USE_PHASE=build`, and the new `isBuilding()` export of `mcp-use` lets module-scope code skip reading secrets or connecting to a database while building.
+
+  `mcp-use build` also exits when the build finishes. Before, an entry that opened a connection at module scope, such as a Redis client, kept the build process running after it had printed its result. A failed build or dev start also prints the cause of a refused connection, which it used to print as an empty line.
+
+- 3e9bc30: `mcp-use build` now builds for production when `NODE_ENV` is unset. Before, the dev server that evaluates the entry set `NODE_ENV=development` for the rest of the build, so views shipped React's development build, and server-side JSX compiled to `jsxDEV`, which fails under `mcp-use start`. The entry is therefore also evaluated with `NODE_ENV=production` during the build.
+
+## 4.4.0-canary.0
+
+### Minor Changes
+
+- 884521e: Apply `.gitignore` rules by default when packaging projects for managed deployments (`mcp-use deploy --no-github`), supporting standard ignore semantics including wildcards, directory rules, and negation while preserving baseline cloud exclusions.
+
+## 4.3.3
+
+### Patch Changes
+
+- b49c5f0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.3-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.2
+
+### Patch Changes
+
+- ad6ce34: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.2-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.1
+
+### Patch Changes
+
+- 6bf3a79: Fix deployment dashboard links to use the selected organization slug and server ID for managed uploads and GitHub deployments. Leave the link unavailable when an organization has no slug instead of returning an invalid route.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: `mcp-use deploy` now verifies that a Git remote is actually hosted on `github.com` before treating it as a GitHub repository. Non-GitHub hosts that contain `github.com` in their hostname or path are rejected instead of being mapped to an unrelated GitHub repository. Only explicit HTTP(S), SSH, Git, or SCP-style GitHub remotes with the original owner/repo path shape are accepted.
+
+## 4.3.1-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.1-canary.2
+
+### Patch Changes
+
+- 45bc353: `mcp-use deploy` now verifies that a Git remote is actually hosted on `github.com` before treating it as a GitHub repository. Non-GitHub hosts that contain `github.com` in their hostname or path are rejected instead of being mapped to an unrelated GitHub repository. Only explicit HTTP(S), SSH, Git, or SCP-style GitHub remotes with the original owner/repo path shape are accepted.
+
+## 4.3.1-canary.1
+
+### Patch Changes
+
+- 4d93a2e: Fix deployment dashboard links to use the selected organization slug and server ID for managed uploads and GitHub deployments. Leave the link unavailable when an organization has no slug instead of returning an invalid route.
+
+## 4.3.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 4.3.0
+
+### Minor Changes
+
+- 24bf7b0: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+
+### Patch Changes
+
+- 24bf7b0: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 4.3.0-canary.1
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 4.3.0-canary.0
+
+### Minor Changes
+
+- ab53ccd: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+
+### Patch Changes
+
+- ef495f6: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+## 4.2.1
+
+### Patch Changes
+
+- 8dc3750: fix(cli): keep `:=` inside a plain `key=value` tool or prompt argument instead of splitting the key there, so `code="x := 1"` is sent as a string
+- 8dc3750: On Windows, `mcp-use screenshot` now finds Microsoft Edge, which ships with Windows, Chrome installed under `Program Files (x86)`, and Brave. It used to check only two Chrome locations, so it failed with `chrome_not_found` on machines without them even though the error message lists Edge and Brave.
+
+## 4.2.1-canary.1
+
+### Patch Changes
+
+- f44450c: On Windows, `mcp-use screenshot` now finds Microsoft Edge, which ships with Windows, Chrome installed under `Program Files (x86)`, and Brave. It used to check only two Chrome locations, so it failed with `chrome_not_found` on machines without them even though the error message lists Edge and Brave.
+
+## 4.2.1-canary.0
+
+### Patch Changes
+
+- 0e240fc: fix(cli): keep `:=` inside a plain `key=value` tool or prompt argument instead of splitting the key there, so `code="x := 1"` is sent as a string
+
 ## 4.2.0
 
 ### Minor Changes

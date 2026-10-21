@@ -1,3 +1,12 @@
+/** Frontend configuration captured in a generated view manifest. */
+export interface ViewConfig {
+  /** Automatic size reporting. */
+  autoResize?: boolean;
+  /** Supported modes, including inline. */
+  displayModes?: readonly ("inline" | "fullscreen" | "pip")[];
+  /** Initial ChatGPT mode preference. */
+  preferredDisplayMode?: "inline" | "fullscreen";
+}
 import type { Plugin } from "vite";
 
 /** A discovered browser view. */
@@ -17,6 +26,7 @@ export declare function buildDevViewsManifest(views: DiscoveredView[]): Record<
   string,
   {
     kind: "external";
+    viewConfig?: ViewConfig | undefined;
     entry: string;
     css: string[];
     scripts: string[];
@@ -45,3 +55,6 @@ export declare function syncMcpEnvDeclaration(
   root: string,
   entry: string
 ): Promise<"created" | "updated" | "unchanged" | "user-owned">;
+
+/** Extract static frontend config without evaluating browser code. */
+export declare function readViewConfig(path: string): ViewConfig | undefined;

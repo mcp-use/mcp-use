@@ -5,6 +5,8 @@
 
 import type { TunnelManager } from "@mcp-use/tunnel";
 
+import { pathUnderBase } from "../base-path.js";
+
 /** Web-standard request handler compatible with `MCPServer.fetch`. */
 type FetchHandler = (request: Request) => Promise<Response>;
 
@@ -69,9 +71,9 @@ export function createDevApiHandler(
 
   return async (request: Request): Promise<Response> => {
     const basePath = options.getBasePath();
-    const infoPath = `${basePath}/inspector/api/dev/info`;
-    const startPath = `${basePath}/inspector/api/dev/start-tunnel`;
-    const stopPath = `${basePath}/inspector/api/dev/stop-tunnel`;
+    const infoPath = pathUnderBase(basePath, "inspector/api/dev/info");
+    const startPath = pathUnderBase(basePath, "inspector/api/dev/start-tunnel");
+    const stopPath = pathUnderBase(basePath, "inspector/api/dev/stop-tunnel");
     const pathname = new URL(request.url).pathname;
 
     if (request.method === "GET" && pathname === infoPath) {

@@ -19,7 +19,7 @@ The maintained example includes a consent route and is the best starting point f
 
 ## Configure the server
 
-Pass either `projectId` for hosted Supabase or `supabaseUrl` for local or self-hosted Supabase. Environment names belong to your application; the provider does not read them.
+Pass either `projectId` for hosted Supabase or `supabaseUrl` for local or self-hosted Supabase. Each omitted option falls back to an environment variable: `projectId` to `MCP_USE_OAUTH_SUPABASE_PROJECT_ID`, `supabaseUrl` to `MCP_USE_OAUTH_SUPABASE_URL`, and `jwtSecret` to `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`. A Supabase URL from either source takes precedence over `projectId`.
 
 ```bash
 SUPABASE_PROJECT_ID=your-project-ref
@@ -52,7 +52,7 @@ oauthSupabaseProvider({
 });
 ```
 
-`jwtSecret` selects HS256 verification and must be at least 32 bytes. Without it, the provider selects ES256/JWKS verification.
+`jwtSecret` selects HS256 verification and must be at least 32 bytes. Without it, and without `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`, the provider selects ES256/JWKS verification.
 
 ## Use mapped identity
 

@@ -8,6 +8,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { ViteDevServer } from "vite";
 
+import { readViewConfig } from "./view-config.js";
 import type { ViewsManifest } from "../views/types.js";
 import {
   nextStandaloneAliases,
@@ -146,6 +147,7 @@ export function buildDevViewsManifest(views: DiscoveredView[]): ViewsManifest {
   for (const view of views) {
     manifest[view.name] = {
       kind: "external",
+      viewConfig: readViewConfig(view.entryPath),
       entry: devVirtualEntryPath(view.name),
       css: [],
       scripts: ["/@vite/client"],

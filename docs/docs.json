@@ -312,6 +312,7 @@
                       "v2/typescript/server/index",
                       "v2/typescript/server/migration",
                       "v2/typescript/server/examples",
+                      "v2/typescript/server/landing-page",
                       "v2/typescript/server/skills",
                       {
                         "group": "Core Components",
@@ -329,6 +330,14 @@
                           "v2/typescript/server/authentication/index",
                           "v2/typescript/server/authentication/user-context",
                           "v2/typescript/server/authentication/mixed-auth",
+                          {
+                            "group": "OAuth Proxy",
+                            "icon": "shuffle",
+                            "pages": [
+                              "v2/typescript/server/authentication/providers/oauth-proxy",
+                              "v2/typescript/server/authentication/providers/oauth-proxy-storage"
+                            ]
+                          },
                           {
                             "group": "OAuth Providers",
                             "icon": "plug",
@@ -363,6 +372,7 @@
                         "pages": [
                           "v2/typescript/server/middleware",
                           "v2/typescript/server/elicitation",
+                          "v2/typescript/server/sampling",
                           "v2/typescript/server/subscriptions",
                           "v2/typescript/server/notifications"
                         ]
@@ -375,6 +385,7 @@
                     "pages": [
                       "v2/typescript/mcp-apps",
                       "v2/typescript/mcp-apps/quickstart",
+                      "v2/typescript/mcp-apps/chatgpt-extensions",
                       "v2/typescript/mcp-apps/generative-ui",
                       "v2/typescript/mcp-apps/interactivity",
                       "v2/typescript/mcp-apps/model-context",

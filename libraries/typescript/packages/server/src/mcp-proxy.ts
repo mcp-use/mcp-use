@@ -93,6 +93,8 @@ export interface ProxyConnection {
 export interface ProxyTool {
   /** Upstream tool name. */
   name: string;
+  /** Upstream tool icons advertised on `tools/list`. */
+  icons?: ToolDefinition["icons"];
   /** Human-readable tool title. */
   title?: string | undefined;
   /** LLM-facing tool description. */
@@ -356,6 +358,7 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
     const definition: ToolDefinition = {
       name,
       ...(tool.title !== undefined && { title: tool.title }),
+      ...(tool.icons !== undefined && { icons: tool.icons }),
       ...(tool.description !== undefined && { description: tool.description }),
       ...(tool.annotations !== undefined && { annotations: tool.annotations }),
       ...(tool.inputSchema !== undefined && {

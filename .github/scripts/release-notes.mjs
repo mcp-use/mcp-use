@@ -54,7 +54,7 @@ export function isSdkPath(path) {
   return true;
 }
 
-export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
+function comparison({ base, head, cwd }) {
   const git = (...args) =>
     execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   const ancestor = git("merge-base", base, head);
@@ -64,7 +64,14 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
   const readIfPresent = (ref, path) =>
     git("ls-tree", "--name-only", ref, "--", path) ? read(ref, path) : "";
 
-  const promotion = baseBranch === "main" && headBranch === "canary";
+  return { git, ancestor, read, readIfPresent };
+}
+
+export function checkChangesets(options) {
+  const { baseBranch, headBranch, head } = options;
+  // Promotion consumes changesets already applied by canary releases.
+  if (baseBranch === "main" && headBranch === "canary") return [];
+  const { git, ancestor, read, readIfPresent } = comparison(options);
   const changed = git(
     "diff",
     "--no-renames",
@@ -113,7 +120,7 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
     if (!manifest.private) packages.add(manifest.name);
   }
 
-  if (!promotion && packages.size) {
+  if (packages.size) {
     // Existing changesets on the target branch do not belong to this PR.
     const added = git(
       "diff",
@@ -155,28 +162,38 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
       : [];
   }
 
-  if (promotion) {
-    return changelogs.flatMap((path) => {
-      const previous = new Set(changelogEntries(readIfPresent(ancestor, path)));
-      const updated = changelogEntries(readIfPresent(head, path)).some(
-        (entry) => !previous.has(entry),
-      );
-      return updated
-        ? []
-        : [
-            `Add or update a non-empty release <Update> entry in ${path} before merging canary into main. Package CHANGELOG.md files do not satisfy this check.`,
-          ];
-    });
-  }
   return [];
+}
+
+export function checkChangelogs(options) {
+  const { baseBranch, headBranch, head } = options;
+  // Guard here as well as in the workflow so other PRs never need changelogs.
+  if (baseBranch !== "main" || headBranch !== "canary") return [];
+  const { ancestor, readIfPresent } = comparison(options);
+  return changelogs.flatMap((path) => {
+    const previous = new Set(changelogEntries(readIfPresent(ancestor, path)));
+    const updated = changelogEntries(readIfPresent(head, path)).some(
+      (entry) => !previous.has(entry),
+    );
+    return updated
+      ? []
+      : [
+          `Add or update a non-empty release <Update> entry in ${path} before merging canary into main. Package CHANGELOG.md files do not satisfy this check.`,
+        ];
+  });
 }
 
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
+  const mode = process.argv[2];
   try {
-    const errors = checkReleaseNotes({
+    const check = { changeset: checkChangesets, changelog: checkChangelogs }[
+      mode
+    ];
+    if (!check) throw new Error("Specify a check: changeset or changelog");
+    const errors = check({
       base: process.env.BASE_SHA,
       head: process.env.HEAD_SHA,
       baseBranch: process.env.BASE_BRANCH,
@@ -184,9 +201,9 @@ if (
     });
     for (const error of errors) console.error(error);
     process.exitCode = errors.length ? 1 : 0;
-    if (!errors.length) console.log("Release notes check passed.");
+    if (!errors.length) console.log(`${mode} check passed.`);
   } catch (error) {
-    console.error(`Release notes check failed: ${error.message}`);
+    console.error(`${mode || "Release notes"} check failed: ${error.message}`);
     process.exitCode = 1;
   }
 }

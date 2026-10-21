@@ -76,7 +76,10 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
       callbackUrl: "https://app.example.com/oauth/callback",
     });
 
-    await provider.saveClientInformation({ client_id: "dcr-registered" });
+    await provider.saveClientInformation({
+      client_id: "dcr-registered",
+      issuer: "https://auth.example.com",
+    });
     const info = await provider.clientInformation();
     expect(info?.client_id).toBe("dcr-registered");
   });
@@ -90,12 +93,14 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
       client_id: "dcr-public-client",
       client_secret: "must-not-be-persisted",
       token_endpoint_auth_method: "none",
+      issuer: "https://auth.example.com",
     } as OAuthClientInformation & { token_endpoint_auth_method: "none" });
 
     expect(await provider.clientInformation()).toEqual({
       client_id: "dcr-public-client",
       token_endpoint_auth_method: "none",
       redirect_uris: [provider.callbackUrl],
+      issuer: "https://auth.example.com",
     });
     expect(localStorage.getItem(provider.getKey("client_info"))).not.toContain(
       "must-not-be-persisted"

@@ -1,3 +1,4 @@
+import { normalizeViewConfig } from "./react/runtime/view-config.js";
 import {
   localhostAllowedHostnames,
   localhostAllowedOrigins,
@@ -18,7 +19,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { createServer as createNodeHttpServer } from "#mcp-use-node-http";
 import type { Server as NodeHttpServer } from "node:http";
-import { Hono, type Env, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type Env, type MiddlewareHandler } from "hono";
 
 import {
   createFaviconHandler,
@@ -29,6 +30,7 @@ import {
 } from "./branding.js";
 import { assertServerConfig, type ServerConfig } from "./config.js";
 import { resolveListenHost, resolveListenPort } from "./listen-address.js";
+import type { LandingPageRegistration } from "./landing-handler.js";
 import { toNodeHandler } from "./node-bridge.js";
 import {
   requestClientInfo,
@@ -67,7 +69,20 @@ import {
 } from "./middleware/mcp-middleware.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
+import {
+  prepareSettings,
+  type SettingsFields,
+  type SettingsRegistration,
+  type SettingsValues,
+} from "./settings.js";
 import { normalizeCompletions } from "./resource-completion.js";
+import {
+  prepareMentions,
+  finalizeMentionsMeta,
+  type MentionsRegistration,
+  type MentionSearchParams,
+  type MentionSearchResult,
+} from "./mentions.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
 import { getOAuthProtectedResourceMetadataUrl } from "./oauth/index.js";
@@ -86,7 +101,10 @@ import {
   resolveLocalOAuthResource,
   wrapOAuthTokenVerifier,
 } from "./oauth/internal.js";
-import type { OAuthProviderHost } from "./oauth/provider.js";
+import type {
+  OAuthProviderHost,
+  OAuthProviderRouteHandler,
+} from "./oauth/provider.js";
 import type {
   InferPromptInput,
   PromptCallback,
@@ -116,6 +134,10 @@ import type {
   ToolViewConfig,
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
+import {
+  buildEntrypointMeta,
+  validateEntrypointInput,
+} from "./views/entrypoints.js";
 import { isUsageDisabled, recordUsage } from "./usage.js";
 import { registerSkillsRuntime } from "./skills/runtime.js";
 import {
@@ -131,6 +153,7 @@ import type {
   ViewResourceFacts,
 } from "./views/types.js";
 import {
+  createLandingAssetsHandler,
   createViewPublicHandler,
   createViewAssetsHandler,
   registerViews,
@@ -244,6 +267,8 @@ function clientUsage(
 
 /** Type-erased registry entry replayed when a per-request SDK server is built. */
 interface ToolEntry<TUser, TEnv extends Env> {
+  /** Generated mention tools retain app visibility after UI serialization. */
+  mentions?: true;
   /** Declarative tool metadata and schemas supplied at registration time. */
   definition: ToolDefinition;
   /** Tool callback widened for heterogeneous storage in the registry. */
@@ -360,6 +385,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   >();
   readonly #prompts = new Map<string, PromptEntry<TUser, TEnv>>();
   readonly #views = new Map<string, ViewManifestEntry>();
+  #settings: ReturnType<typeof prepareSettings> | undefined;
+  #landingPage: LandingPageRegistration | undefined;
+  readonly #landingHtmlCache = new Map<string, Promise<string>>();
   #skills: SkillsSnapshot | undefined;
   #skillsPrimed = false;
   #skillsDiscovery: Promise<void> | undefined;
@@ -396,6 +424,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #oauthProviderSetupRan = false;
   /** The error from a failed setup hook, rethrown on every later mount. */
   #oauthProviderSetupFailure: { error: unknown } | undefined;
+  /** HTTP routes the OAuth provider's setup hook registered. */
+  #oauthProviderRoutes: {
+    method: "GET" | "POST" | "OPTIONS";
+    path: string;
+    handler: OAuthProviderRouteHandler;
+  }[] = [];
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
@@ -599,7 +633,17 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     >
   ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>> {
     this.#assertNotStarted("tool", definition.name);
+    if (
+      this.#settings !== undefined &&
+      [
+        this.#settings.capability.readTool,
+        this.#settings.capability.updateTool,
+      ].includes(definition.name)
+    ) {
+      throw new Error(`Tool "${definition.name}" is reserved for settings`);
+    }
     const schemes = this.#resolveSecuritySchemes(definition);
+    validateEntrypointInput(definition);
     this.#validateToolViewBinding(definition);
     this.#openApiTools.delete(definition.name);
     this.#proxiedTools.delete(definition.name);
@@ -617,6 +661,87 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     return Object.freeze({
       name: definition.name,
     }) as ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>>;
+  }
+
+  /**
+   * Register one native plugin settings read/update pair before starting the server.
+   *
+   * Callbacks receive the same request context and OAuth guarantees as ordinary
+   * authenticated tools. They own authorization, defaults, persistence, atomic
+   * partial updates, and cross-field validation. The framework validates field
+   * values and replays both tools and the capability on every request-scoped server.
+   *
+   * @throws When already registered, started, field schemas are unsupported,
+   * or either tool name collides with an existing registration.
+   */
+  settings<const Fields extends SettingsFields>(
+    options: SettingsRegistration<Fields, TUser, HasOAuth<TUser>, TEnv>
+  ): void {
+    this.#assertNotStarted("settings", options.readTool ?? "settings.read");
+    if (this.#settings !== undefined)
+      throw new Error("Settings are already registered on this server");
+    const prepared = prepareSettings(options);
+    for (const name of [
+      prepared.capability.readTool,
+      prepared.capability.updateTool,
+    ]) {
+      if (this.#tools.has(name))
+        throw new Error(`Settings tool "${name}" is already registered`);
+    }
+    const read = options.read;
+    const update = options.update;
+    this.tool(prepared.readDefinition, async (_args, ctx) => ({
+      content: [],
+      structuredContent: {
+        schema: prepared.schema,
+        ...(prepared.layout !== undefined && { layout: prepared.layout }),
+        values: await read(ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>),
+      },
+    }));
+    this.tool(prepared.updateDefinition, async ({ set }, ctx) => ({
+      content: [],
+      structuredContent: {
+        values: await update(
+          set as Partial<SettingsValues<Fields>>,
+          ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>
+        ),
+      },
+    }));
+    this.#settings = prepared;
+  }
+
+  /**
+   * Register a composer mention search tool before startup.
+   *
+   * Search receives the ordinary request context, authentication defaults, and
+   * cancellation signal. Authorization, ranking, limits, and resource identity
+   * remain application-owned. Hosts may ignore the marker; explicit tool calls
+   * still work. App visibility is always included, without requiring a View.
+   *
+   * @param options - Tool descriptor and search callback returning resource links.
+   * @returns A normal tool reference with typed query input and link output.
+   * @throws When started, the name or callback is invalid, or the name collides.
+   */
+  mentions<const Name extends string>(
+    options: MentionsRegistration<
+      RequestContext<TUser, HasOAuth<TUser>, TEnv>,
+      Name
+    >
+  ): ToolRef<Name, MentionSearchParams, MentionSearchResult> {
+    this.#assertNotStarted("mentions", options.name);
+    const definition = prepareMentions(options);
+    if (this.#tools.has(options.name))
+      throw new Error(`Mention tool "${options.name}" is already registered`);
+    const search = options.search;
+    const ref = this.tool(definition, async (params, ctx) => ({
+      content: [],
+      structuredContent: await search(
+        params,
+        ctx as RequestContext<TUser, HasOAuth<TUser>, TEnv>
+      ),
+    }));
+    this.#tools.get(options.name)!.mentions = true;
+    return ref;
   }
 
   /**
@@ -642,6 +767,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       );
     }
     this.#assertNotStarted("views", "manifest");
+    // Validate the complete candidate before committing registry or options so
+    // a failed attempt can be retried without retaining part of its manifest.
+    for (const [name, entry] of Object.entries(views)) {
+      try {
+        normalizeViewConfig(entry.viewConfig);
+      } catch (error) {
+        throw new Error(
+          `View "${name}" has an invalid viewConfig: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error }
+        );
+      }
+    }
     this.#viewsDevMode = options?.dev === true;
     this.#embeddedViewAssets = options?.assets;
     if (options?.projectRoot !== undefined) {
@@ -666,6 +803,31 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   __primeViews(views: ViewsManifest, options?: ViewRegistrationOptions): void {
     this[registerViews](views, options);
+  }
+
+  /** Supply a CLI-discovered custom landing component before the first request. @internal */
+  __primeLandingPage(registration: LandingPageRegistration): void {
+    this.#assertNotStarted("landing page", "renderer");
+    if (this.#landingPage !== undefined) {
+      throw new Error(
+        "Cannot prime landing page twice on one server instance."
+      );
+    }
+    const renders =
+      "load" in registration
+        ? typeof registration.load === "function"
+        : typeof registration.render === "function" &&
+          Array.isArray(registration.dataKeys);
+    if (
+      !renders ||
+      typeof registration.entry !== "string" ||
+      registration.entry.length === 0
+    ) {
+      throw new TypeError(
+        "Landing page requires a renderer, data keys, and browser entry URL."
+      );
+    }
+    this.#landingPage = registration;
   }
 
   /**
@@ -1288,7 +1450,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * first error instead of re-running a hook whose middleware and
    * instructions transforms were already partly applied.
    */
-  #runOAuthProviderSetup(resource: URL, basePath: string): void {
+  #runOAuthProviderSetup(
+    resource: URL,
+    basePath: string,
+    mode: "listen" | "handler",
+    listenHost: string | undefined
+  ): void {
     const setup = this.#config.oauth?.setup;
     if (setup === undefined || this.#oauthProviderSetupRan) return;
     if (this.#oauthProviderSetupFailure !== undefined) {
@@ -1308,6 +1475,44 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       resourceUrl: resource,
       basePath,
       mixedAuth: this.#config.mixedAuth === true,
+      mode,
+      listenHost: mode === "listen" ? listenHost : undefined,
+      route: (method, path, handler) => {
+        assertActive("route");
+        if (method !== "GET" && method !== "POST" && method !== "OPTIONS") {
+          throw new TypeError(
+            "[mcp-use] OAuthProviderHost.route() method must be GET, POST, or OPTIONS"
+          );
+        }
+        if (typeof handler !== "function") {
+          throw new TypeError(
+            "[mcp-use] OAuthProviderHost.route() handler must be a function"
+          );
+        }
+        const prefix = basePath === "/" ? "/" : `${basePath}/`;
+        if (
+          typeof path !== "string" ||
+          !path.startsWith(prefix) ||
+          path.length === prefix.length ||
+          /[?#*:]/.test(path) ||
+          path.split("/").some((segment) => segment === "." || segment === "..")
+        ) {
+          throw new TypeError(
+            `[mcp-use] OAuthProviderHost.route() path must be a literal ` +
+              `pathname under ${prefix}`
+          );
+        }
+        if (
+          this.#oauthProviderRoutes.some(
+            (route) => route.method === method && route.path === path
+          )
+        ) {
+          throw new Error(
+            `[mcp-use] OAuth provider route ${method} ${path} is already registered`
+          );
+        }
+        this.#oauthProviderRoutes.push({ method, path, handler });
+      },
       use: (pattern, handler) => {
         assertActive("use");
         this.use(
@@ -1528,7 +1733,19 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         middlewares.unshift(hostValidationMiddleware(hosts));
       }
       if (origins !== undefined) {
-        middlewares.push(originValidationMiddleware(origins));
+        // OAuth provider routes validate their own requests (PKCE, CSRF
+        // tokens, binding cookies), and MCP clients call the token and
+        // registration endpoints cross-origin.
+        middlewares.push(
+          originValidationMiddleware(origins, true, (request) => {
+            if (this.#oauthProviderRoutes.length === 0) return false;
+            const pathname = new URL(request.url).pathname;
+            return this.#oauthProviderRoutes.some(
+              (route) =>
+                route.method === request.method && route.path === pathname
+            );
+          })
+        );
       }
       if (hosts === undefined) {
         if (mode === "listen") {
@@ -1556,9 +1773,25 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         // #handler is still unset, so their registrations pass the same
         // pre-start checks as user registrations, and before view-binding
         // validation below so provider items are included.
-        this.#runOAuthProviderSetup(resource, basePath);
+        this.#runOAuthProviderSetup(resource, basePath, mode, listenHost);
+        // Provider routes (for example authorization endpoints) land ahead of
+        // the OAuth gate and the application's routes, so they stay public
+        // and the application cannot shadow them.
+        for (const route of this.#oauthProviderRoutes) {
+          httpApp.on(route.method, route.path, (context) =>
+            route.handler(context as unknown as Context)
+          );
+        }
       }
 
+      for (const group of this.#settings?.layout ?? []) {
+        for (const item of group.items) {
+          if (item.kind === "tool" && !this.#tools.has(item.tool))
+            throw new Error(
+              `Settings action tool "${item.tool}" is not registered on this server`
+            );
+        }
+      }
       this.#validateViewBindingsAtMount();
 
       const { handler, fetch: mcpFetch } = createMcpMount(
@@ -1650,18 +1883,23 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             this.#branding,
             this.#tools.values(),
             this.#prompts.values(),
-            this.#resources.values()
+            this.#resources.values(),
+            this.#landingPage,
+            this.#landingHtmlCache
           );
         };
         return respond();
       };
 
-      const brandingDevMode = this.#viewsPrimed
-        ? this.#viewsDevMode
-        : process.env["NODE_ENV"] !== "production";
+      const brandingDevMode =
+        this.#landingPage !== undefined
+          ? this.#landingPage.dev === true
+          : this.#viewsPrimed
+            ? this.#viewsDevMode
+            : process.env["NODE_ENV"] !== "production";
       const faviconHandler = createFaviconHandler(this.#branding, {
         dev: brandingDevMode,
-        projectRoot: this.#viewsProjectRoot,
+        projectRoot: this.#landingPage?.projectRoot ?? this.#viewsProjectRoot,
         deferCors: deferViewCors,
       });
       if (faviconHandler !== undefined) {
@@ -1671,9 +1909,16 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
 
       const viewHandler = createViewPublicHandler(basePath, this.#views, {
-        dev: this.#viewsPrimed ? this.#viewsDevMode : brandingDevMode,
-        projectRoot: this.#viewsProjectRoot,
-        enabled: hasLocalBrandingAsset(this.#branding),
+        dev: brandingDevMode,
+        projectRoot: this.#landingPage?.projectRoot ?? this.#viewsProjectRoot,
+        enabled:
+          hasLocalBrandingAsset(this.#branding) ||
+          this.#landingPage !== undefined ||
+          [...this.#tools.values()].some(
+            (entry) =>
+              entry.definition.icons !== undefined &&
+              hasLocalBrandingAsset({ icons: entry.definition.icons })
+          ),
         deferCors: deferViewCors,
         ...(this.#embeddedViewAssets !== undefined && {
           assets: this.#embeddedViewAssets,
@@ -1706,6 +1951,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             (context) => viewAssetsHandler(context.req.raw)
           );
         }
+      }
+
+      if (this.#landingPage !== undefined && this.#landingPage.dev !== true) {
+        const landingAssetsHandler = createLandingAssetsHandler(basePath, {
+          projectRoot: this.#landingPage.projectRoot ?? this.#viewsProjectRoot,
+          deferCors: deferViewCors,
+        });
+        this.app.on(
+          ["GET", "HEAD"],
+          `${nestedBasePath}/_mcp-use/landing/*`,
+          (context) => landingAssetsHandler(context.req.raw)
+        );
       }
 
       this.app.all(basePath, (context) => endpointHandler(context.req.raw));
@@ -1818,10 +2075,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           tools: { listChanged: true },
           prompts: { listChanged: true },
           resources: { listChanged: true, subscribe: true },
-          ...(this.#skills !== undefined && {
+          ...((this.#skills !== undefined || this.#settings !== undefined) && {
             extensions: {
-              [SKILLS_EXTENSION_ID]: { directoryRead: true },
+              ...(this.#skills !== undefined && {
+                [SKILLS_EXTENSION_ID]: { directoryRead: true },
+              }),
+              ...(this.#settings !== undefined && {
+                "openai/settings": this.#settings.capability,
+              }),
             },
+          }),
+          ...(this.#settings !== undefined && {
+            experimental: { "openai/settings": this.#settings.capability },
           }),
         },
         ...(instructions !== undefined && { instructions }),
@@ -1840,7 +2105,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const basePath = this.#basePath();
 
     for (const entry of this.#tools.values()) {
-      this.#registerTool(server, entry);
+      this.#registerTool(server, entry, request);
     }
     for (const entry of this.#resources.values()) {
       this.#registerResource(server, entry);
@@ -2104,15 +2369,22 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     wrapListMethod("prompts/list", "prompts");
   }
 
-  #registerTool(server: SdkMcpServer, entry: ToolEntry<TUser, TEnv>): void {
+  #registerTool(
+    server: SdkMcpServer,
+    entry: ToolEntry<TUser, TEnv>,
+    request: Request | undefined
+  ): void {
     const { definition, callback, schemes } = entry;
     const view = definition.view;
 
-    const uiMeta = buildToolUiMeta(
+    const serializedUiMeta = buildToolUiMeta(
       view?.name,
       definition.visibility,
-      definition._meta
+      buildEntrypointMeta(definition)
     );
+    const uiMeta = entry.mentions
+      ? finalizeMentionsMeta(definition, serializedUiMeta)
+      : serializedUiMeta;
     // Hand-written `_meta.securitySchemes` is already in `uiMeta`; only the
     // generated schemes are added here.
     const toolMeta = this.#generatesSecuritySchemes(entry)
@@ -2123,6 +2395,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       : uiMeta;
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
+      ...(definition.icons !== undefined && {
+        icons: resolveImplementationIcons(
+          definition.icons,
+          request,
+          this.#basePath()
+        ),
+      }),
       ...(definition.description !== undefined && {
         description: definition.description,
       }),
@@ -2199,9 +2478,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     basePath: string
   ): void {
     const uri = viewResourceUri(viewName);
-    const authorFacts = this.#viewResourceFacts(
-      this.#viewBindings.get(viewName)?.config
-    );
+    const frontendConfig = normalizeViewConfig(entry.viewConfig);
+    const authorFacts = {
+      ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),
+      displayModes: frontendConfig.displayModes,
+      ...(frontendConfig.preferredDisplayMode !== undefined && {
+        preferredDisplayMode: frontendConfig.preferredDisplayMode,
+      }),
+    };
     const resourceConfig = viewResourceConfig(
       viewName,
       entry,

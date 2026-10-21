@@ -40,13 +40,17 @@ export interface WithMcpUseOptions {
   /**
    * Authored MCP server entry, relative to `projectRoot`.
    *
-   * @defaultValue `"mcp/server.ts"`
+   * @defaultValue Conventional discovery in `mcpDir`, or in `projectRoot`
+   * when `mcpDir` is omitted: `src/index.ts`, `src/index.tsx`,
+   * `src/server.ts`, `src/server.tsx`, `index.ts`, `index.tsx`, `server.ts`,
+   * `server.tsx` — first hit wins.
    */
   entry?: string;
   /**
    * Conventional MCP source directory containing the entry and `views/`.
    *
-   * @defaultValue `"mcp"`
+   * @defaultValue None: the entry is discovered in `projectRoot` and views
+   * are read from `views/`.
    */
   mcpDir?: string;
   /** Explicit views directory, relative to `projectRoot`. */

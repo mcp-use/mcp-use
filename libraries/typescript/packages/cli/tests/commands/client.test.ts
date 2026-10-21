@@ -394,6 +394,25 @@ describe("client JSON output", () => {
   });
 });
 
+describe("client tool arguments", () => {
+  it("sends a plain value containing := as a string", async () => {
+    await runClient([
+      "connect",
+      "demo",
+      "https://mcp.example.com/mcp",
+      "--no-oauth",
+    ]);
+
+    await expect(
+      runClient(["--json", "demo", "tools", "call", "echo", "code=x := 1"])
+    ).resolves.toBe(0);
+
+    expect(connection.callTool.mock.calls.at(-1)?.[1]).toEqual({
+      code: "x := 1",
+    });
+  });
+});
+
 describe("client human-readable output", () => {
   it("reports mixed auth without blocking connect", async () => {
     connection.authorization = {

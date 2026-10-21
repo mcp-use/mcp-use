@@ -7,30 +7,43 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { gunzipSync } from "node:zlib";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { api, cloudApiForOrganization } = vi.hoisted(() => {
-  const api = {
-    request: vi.fn(),
-    multipartRequest: vi.fn(),
-  };
-  return {
-    api,
-    cloudApiForOrganization: vi.fn(async () => ({
+const { api, cloudApiForOrganization, cloudWebUrl, openBrowser } = vi.hoisted(
+  () => {
+    const api = {
+      request: vi.fn(),
+      multipartRequest: vi.fn(),
+    };
+    return {
       api,
-      organizationId: "org_1",
-    })),
-  };
-});
+      cloudWebUrl: vi.fn(() => "https://cloud.example.test"),
+      openBrowser: vi.fn(),
+      cloudApiForOrganization: vi.fn(async () => ({
+        api,
+        organizationId: "org_1",
+        organizationSlug: "primary-demo" as string | null,
+      })),
+    };
+  }
+);
 
 vi.mock("../../src/commands/cloud-api.js", () => ({
   cloudApiForOrganization,
-  cloudWebUrl: () => "https://cloud.example.test",
+  cloudWebUrl,
+}));
+
+vi.mock("../../src/commands/shared.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/commands/shared.js")>()),
+  openBrowser,
 }));
 
 import {
@@ -39,6 +52,7 @@ import {
 } from "../../src/commands/deploy.js";
 
 const directories: string[] = [];
+const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -46,6 +60,8 @@ afterEach(async () => {
   api.request.mockReset();
   api.multipartRequest.mockReset();
   cloudApiForOrganization.mockClear();
+  cloudWebUrl.mockClear();
+  openBrowser.mockClear();
   await Promise.all(
     directories.splice(0).map((directory) =>
       // Retry transient filesystem errors while removing Git repositories.
@@ -306,6 +322,128 @@ describe("deploy agent contract", () => {
     expect(api.multipartRequest).not.toHaveBeenCalled();
   });
 
+  it("returns the canonical dashboard for the managed-upload regression", async () => {
+    const directory = await project("travel-agent-demo");
+    const serverId = "00000000-0000-4000-8000-000000000001";
+    cloudWebUrl.mockReturnValueOnce("https://manufact.com");
+    api.multipartRequest.mockResolvedValue({
+      server: {
+        id: serverId,
+        slug: "wild-cloud-example",
+        mcpUrl: "https://wild-cloud-example.run.mcp-use.com/mcp",
+      },
+      deploymentId: "00000000-0000-4000-8000-000000000002",
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(runDeploy([directory, "--no-github", "--json"])).resolves.toBe(
+      0
+    );
+
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toEqual({
+      sourceType: "managed",
+      serverId,
+      deploymentId: "00000000-0000-4000-8000-000000000002",
+      status: "pending",
+      webUrl: `https://manufact.com/cloud/primary-demo/servers/${serverId}/overview`,
+    });
+    expect(openBrowser).not.toHaveBeenCalled();
+  });
+
+  it("encodes the selected organization and server ID as separate route segments", async () => {
+    const directory = await project("encoded-dashboard");
+    cloudApiForOrganization.mockResolvedValueOnce({
+      api,
+      organizationId: "org_2",
+      organizationSlug: "other org/?#",
+    });
+    api.multipartRequest.mockResolvedValue({
+      server: { id: "server/id?#", slug: null },
+      deploymentId: "dep_1",
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--org", "org_2", "--no-github", "--json"])
+    ).resolves.toBe(0);
+
+    expect(cloudApiForOrganization).toHaveBeenCalledWith("org_2");
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+      webUrl:
+        "https://cloud.example.test/cloud/other%20org%2F%3F%23/servers/server%2Fid%3F%23/overview",
+    });
+  });
+
+  it.each([null, ""])(
+    "keeps successful deployments without inventing a dashboard for slug %j",
+    async (organizationSlug) => {
+      const directory = await project("missing-org-slug");
+      cloudApiForOrganization.mockResolvedValueOnce({
+        api,
+        organizationId: "org_1",
+        organizationSlug,
+      });
+      api.multipartRequest.mockResolvedValue({
+        server: { id: "srv_1", slug: "not-an-org" },
+        deploymentId: "dep_1",
+      });
+      const stdout = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation(() => true);
+
+      await expect(
+        runDeploy([directory, "--no-github", "--json"])
+      ).resolves.toBe(0);
+
+      expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+        serverId: "srv_1",
+        deploymentId: "dep_1",
+        status: "pending",
+        webUrl: null,
+      });
+      expect(openBrowser).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["primary-demo", null])(
+    "opens only a canonical dashboard for slug %j",
+    async (organizationSlug) => {
+      const directory = await project("open-dashboard");
+      cloudApiForOrganization.mockResolvedValueOnce({
+        api,
+        organizationId: "org_1",
+        organizationSlug,
+      });
+      api.multipartRequest.mockResolvedValue({
+        server: { id: "srv_1", slug: "wrong-dashboard" },
+        deploymentId: "dep_1",
+      });
+      vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+      const stderr = vi
+        .spyOn(process.stderr, "write")
+        .mockImplementation(() => true);
+
+      await expect(
+        runDeploy([directory, "--no-github", "--open"])
+      ).resolves.toBe(0);
+
+      if (organizationSlug === null) {
+        expect(openBrowser).not.toHaveBeenCalled();
+        expect(stderr.mock.calls.flat().join("")).toContain(
+          "no dashboard slug"
+        );
+      } else {
+        expect(openBrowser).toHaveBeenCalledExactlyOnceWith(
+          "https://cloud.example.test/cloud/primary-demo/servers/srv_1/overview"
+        );
+      }
+    }
+  );
+
   it("creates a managed server from a local source archive", async () => {
     const directory = await project("managed-app");
     await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
@@ -375,6 +513,8 @@ describe("deploy agent contract", () => {
       sourceType: "managed",
       serverId: "srv_1",
       deploymentId: "dep_1",
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_1/overview",
     });
     expect(
       JSON.parse(
@@ -390,6 +530,220 @@ describe("deploy agent contract", () => {
     });
   });
 
+  it("applies .gitignore patterns and negation when packaging managed servers", async () => {
+    const directory = await project("gitignore-managed-app");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await writeFile(
+      join(directory, ".gitignore"),
+      [
+        "# Ignore local database",
+        "*.sqlite",
+        "",
+        "# Ignore temporary logs with negation exception",
+        "logs/*",
+        "!logs/keep.log",
+        "",
+        "# Directory pattern with trailing slash",
+        "temp-cache/",
+        "",
+        "# Root-anchored pattern",
+        "/root-only.txt",
+        "",
+        "# Relative path glob",
+        "nested/*.tmp",
+      ].join("\n")
+    );
+    await writeFile(join(directory, "data.sqlite"), "binary data\n");
+    await mkdir(join(directory, "logs"));
+    await writeFile(join(directory, "logs", "app.log"), "error\n");
+    await writeFile(join(directory, "logs", "keep.log"), "retained\n");
+    await mkdir(join(directory, "temp-cache"));
+    await writeFile(join(directory, "temp-cache", "scratch.json"), "123\n");
+    await writeFile(join(directory, "root-only.txt"), "ignored at root\n");
+    await mkdir(join(directory, "sub"));
+    await writeFile(
+      join(directory, "sub", "root-only.txt"),
+      "included in sub\n"
+    );
+    await mkdir(join(directory, "nested"));
+    await writeFile(join(directory, "nested", "one.tmp"), "temp\n");
+    await mkdir(join(directory, "nested", "deep"));
+    await writeFile(
+      join(directory, "nested", "deep", "two.tmp"),
+      "not matched by nested/*.tmp\n"
+    );
+
+    api.multipartRequest.mockResolvedValue({
+      server: { id: "srv_gitignore", slug: "gitignore-managed-app" },
+      deploymentId: "dep_gitignore",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--no-github", "--region", "US", "--json"])
+    ).resolves.toBe(0);
+
+    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
+    const entries = await archiveEntries(form.get("sourceFile") as Blob);
+
+    // Included files
+    expect(entries).toContain("app/index.ts");
+    expect(entries).toContain("app/.gitignore");
+    expect(entries).toContain("app/logs/keep.log");
+    expect(entries).toContain("app/sub/root-only.txt");
+    expect(entries).toContain("app/nested/deep/two.tmp");
+
+    // Excluded files by .gitignore
+    expect(entries).not.toContain("app/data.sqlite");
+    expect(entries).not.toContain("app/logs/app.log");
+    expect(entries).not.toContain("app/root-only.txt");
+    expect(entries).not.toContain("app/nested/one.tmp");
+    expect(entries.some((entry) => entry.includes("temp-cache"))).toBe(false);
+  });
+
+  it("ensures critical baseline exclusions cannot be bypassed by .gitignore negation", async () => {
+    const directory = await project("gitignore-bypass-safety");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await writeFile(
+      join(directory, ".gitignore"),
+      ["!.env", "!.envrc", "!.git", "!node_modules", "!.DS_Store"].join("\n")
+    );
+    await writeFile(join(directory, ".env"), "SECRET=leak\n");
+    await writeFile(join(directory, ".envrc"), "SECRET=leak\n");
+    await writeFile(join(directory, ".DS_Store"), "os metadata\n");
+    await mkdir(join(directory, "node_modules"));
+    await writeFile(
+      join(directory, "node_modules", "dep.js"),
+      "console.log('dep');\n"
+    );
+    await mkdir(join(directory, ".git"));
+    await writeFile(join(directory, ".git", "config"), "[core]\n");
+
+    api.multipartRequest.mockResolvedValue({
+      server: { id: "srv_bypass", slug: "gitignore-bypass-safety" },
+      deploymentId: "dep_bypass",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--no-github", "--region", "US", "--json"])
+    ).resolves.toBe(0);
+
+    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
+    const entries = await archiveEntries(form.get("sourceFile") as Blob);
+
+    expect(entries).toContain("app/index.ts");
+    expect(entries).not.toContain("app/.env");
+    expect(entries).not.toContain("app/.envrc");
+    expect(entries).not.toContain("app/.DS_Store");
+    expect(entries.some((entry) => entry.includes("node_modules"))).toBe(false);
+    expect(entries).not.toContain("app/.git/config");
+    expect(entries.some((entry) => entry.includes("/.git/"))).toBe(false);
+  });
+
+  it("preserves case-sensitive Git ignore matching in archive contents", async () => {
+    const directory = await project("gitignore-case-sensitive");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await writeFile(join(directory, ".gitignore"), "config.ts\n");
+    await writeFile(
+      join(directory, "Config.ts"),
+      "export const title = 'Config';\n"
+    );
+    await mkdir(join(directory, "nested"));
+    await writeFile(
+      join(directory, "nested", "config.ts"),
+      "export const title = 'config';\n"
+    );
+    await writeFile(
+      join(directory, "nested", "other.ts"),
+      "export const other = true;\n"
+    );
+
+    api.multipartRequest.mockResolvedValue({
+      server: { id: "srv_case", slug: "gitignore-case-sensitive" },
+      deploymentId: "dep_case",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--no-github", "--region", "US", "--json"])
+    ).resolves.toBe(0);
+
+    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
+    const entries = await archiveEntries(form.get("sourceFile") as Blob);
+
+    // Case-distinct allowed file is preserved
+    expect(entries).toContain("app/Config.ts");
+    // Traversal inside nested directory succeeds for non-ignored files
+    expect(entries).toContain("app/nested/other.ts");
+    // Matching-case exclusion control is excluded
+    expect(entries).not.toContain("app/nested/config.ts");
+  });
+
+  it("settles the archive collector without unhandled rejection when .gitignore is a directory", async () => {
+    const directory = await project("gitignore-is-directory");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await mkdir(join(directory, ".gitignore"));
+
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          user_id: "u1",
+          email: "test@example.com",
+          profiles: [
+            { id: "org_1", profile_name: "Org", slug: "org", role: "admin" },
+          ],
+          default_profile_id: "org_1",
+        })
+      );
+    });
+
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", () => resolve())
+    );
+    const port = (server.address() as { port: number }).port;
+    const binPath = fileURLToPath(
+      new URL("../../dist/bin.js", import.meta.url)
+    );
+
+    try {
+      await execFileAsync(
+        process.execPath,
+        [binPath, "deploy", directory, "--no-github", "--json"],
+        {
+          env: {
+            ...process.env,
+            MCP_USE_API_KEY: "test_key",
+            MCP_USE_CLOUD_API_URL: `http://127.0.0.1:${port}/api/v1`,
+          },
+        }
+      );
+      expect.unreachable("expected deploy to fail");
+    } catch (error: unknown) {
+      const execError = error as {
+        code?: number;
+        stderr: string;
+        stdout: string;
+      };
+      expect(execError.code).toBe(1);
+      const lines = execError.stderr.trim().split(/\r?\n/).filter(Boolean);
+      expect(lines).toHaveLength(1);
+      const parsed = JSON.parse(lines[0]!);
+      expect(parsed).toMatchObject({
+        error: {
+          code: "command_failed",
+          message: expect.stringMatching(/EISDIR|EPERM/),
+        },
+      });
+      expect(execError.stderr).not.toContain("UnhandledPromiseRejection");
+      expect(execError.stderr).not.toContain("triggerUncaughtException");
+    } finally {
+      server.closeAllConnections?.();
+      server.close();
+    }
+  });
+
   it("accepts -y as the documented non-interactive consent alias", async () => {
     const directory = await project("short-yes");
     api.multipartRequest.mockResolvedValue({
@@ -402,6 +756,94 @@ describe("deploy agent contract", () => {
       runDeploy([directory, "--no-github", "--new", "-y", "--json"])
     ).resolves.toBe(0);
   });
+
+  it.each([
+    "https://notgithub.com/example/lookalike.git",
+    "https://git.example.com/mirror/github.com/example/lookalike.git",
+    "git@notgithub.com:example/lookalike.git",
+    "git@github.com.evil.com:example/lookalike.git",
+    "https://github.com:8443/example/custom-port.git",
+    "https://github.com:443/example/explicit-default-port.git",
+    "ssh://git@github.com:22/example/ssh-port.git",
+    "git://github.com:9418/example/git-port.git",
+    "https://github.com/example/query.git?ref=main",
+    "https://github.com/example/hash.git#main",
+    "file://github.com/example/local-path.git",
+    "ftp://github.com/example/unsupported-protocol.git",
+    "custom://github.com/example/unsupported-protocol.git",
+    "https:/github.com/example/missing-slash.git",
+    "https:github.com/example/missing-authority.git",
+    String.raw`https:\github.com\example\backslash-path.git`,
+    "https://github.com/example/nested/../normalized-path.git",
+    "https://github.com/./dot-owner.git",
+    "https://github.com/example/..",
+    "git@github.com:../dot-owner.git",
+    "git@github.com:example/..",
+  ])("rejects an unsupported GitHub origin: %s", async (remote) => {
+    const directory = await project("lookalike-origin");
+    initializeRepository(directory, remote);
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
+
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
+      error: {
+        code: "unsupported_remote",
+        details: { remote },
+      },
+    });
+    expect(api.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "https://GitHub.com/example/case-insensitive.git",
+      "example/case-insensitive",
+    ],
+    ["git@github.com:example/scp-style.git", "example/scp-style"],
+    ["git@GITHUB.COM:example/upper-host.git", "example/upper-host"],
+    ["ssh://git@github.com/example/ssh-style.git", "example/ssh-style"],
+    ["http://github.com/example/http-style.git", "example/http-style"],
+    ["git://github.com/example/git-style.git", "example/git-style"],
+  ])(
+    "accepts supported GitHub remote syntax: %s",
+    async (remote, repository) => {
+      const directory = await project("supported-origin");
+      initializeRepository(directory, remote);
+      api.request.mockImplementation(
+        async (path: string, init?: { body?: string }) => {
+          if (path.startsWith("/github/installations?")) {
+            return {
+              installations: [
+                {
+                  id: "installation-row",
+                  installationId: "123",
+                  account: { login: "example", type: "Organization" },
+                },
+              ],
+            };
+          }
+          if (path.includes("/access")) return { hasAccess: true };
+          if (path === "/servers") {
+            expect(JSON.parse(init?.body ?? "{}")).toMatchObject({
+              type: "github",
+              repoFullName: repository,
+            });
+            return {
+              server: { id: "srv_supported", slug: "supported-origin" },
+              deploymentId: "dep_supported",
+            };
+          }
+          throw new Error(`Unexpected request: ${path}`);
+        }
+      );
+      vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+      await expect(runDeploy([directory, "--json"])).resolves.toBe(0);
+    }
+  );
 
   it("rejects an unsupported origin with recovery commands", async () => {
     const directory = await project("unsupported-origin");
@@ -827,7 +1269,9 @@ describe("deploy agent contract", () => {
       throw new Error(`Unexpected request: ${path}`);
     });
     api.multipartRequest.mockResolvedValue({ commitSha: "abc123" });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
 
     await expect(runDeploy([directory, "--json"])).resolves.toBe(0);
 
@@ -842,6 +1286,10 @@ describe("deploy agent contract", () => {
         branch: "main",
         trigger: "redeploy",
       }),
+    });
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_existing/overview",
     });
   });
 
@@ -1015,7 +1463,9 @@ describe("deploy agent contract", () => {
         throw new Error(`Unexpected request: ${path}`);
       }
     );
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
 
     await expect(
       runDeploy([
@@ -1034,6 +1484,10 @@ describe("deploy agent contract", () => {
         encoding: "utf8",
       }).trim()
     ).toBe("");
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_github/overview",
+    });
   });
 
   it("synchronizes configuration before a linked GitHub redeploy", async () => {
@@ -1065,7 +1519,9 @@ describe("deploy agent contract", () => {
       if (path === "/deployments") return { id: "dep_github_config" };
       throw new Error(`Unexpected request: ${path}`);
     });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
 
     await expect(
       runDeploy([
@@ -1108,6 +1564,10 @@ describe("deploy agent contract", () => {
         branch: "main",
         trigger: "manual",
       }),
+    });
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_github_config/overview",
     });
   });
 });

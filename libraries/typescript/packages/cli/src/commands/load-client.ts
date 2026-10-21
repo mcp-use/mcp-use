@@ -17,7 +17,8 @@ type ClientPackage = typeof import("@mcp-use/client");
 
 const CLIENT_SDK_DIR = join(GLOBAL_STATE_DIR, "client-sdk");
 const CLIENT_PACKAGE = "@mcp-use/client";
-const DEFAULT_PEER_RANGE = "^2.0.0-alpha.0";
+/** Used only if the CLI's own package.json can't be read. */
+const DEFAULT_PEER_RANGE = "^2.0.1";
 
 const INSTALL_HINT = [
   `[mcp-use] ${CLIENT_PACKAGE} is not installed.`,
@@ -154,7 +155,12 @@ function packageManagerInstallArgs(dependency: string): [string, string[]] {
   return ["npm", ["install", dependency]];
 }
 
-function readClientPeerRange(): string {
+/**
+ * @internal Read the `@mcp-use/client` peer range from this package's own
+ * manifest: `../package.json` from the built `dist/` chunk, or
+ * `../../package.json` from `src/commands/`.
+ */
+export function readClientPeerRange(): string {
   for (const relative of ["../package.json", "../../package.json"]) {
     try {
       const raw = readFileSync(new URL(relative, import.meta.url), "utf8");
@@ -162,7 +168,7 @@ function readClientPeerRange(): string {
         name?: unknown;
         peerDependencies?: Record<string, string>;
       };
-      if (pkg.name !== "mcp-use") continue;
+      if (pkg.name !== "@mcp-use/cli") continue;
       const range = pkg.peerDependencies?.[CLIENT_PACKAGE];
       if (typeof range === "string" && range.length > 0) return range;
     } catch {
@@ -232,17 +238,41 @@ function isClientPackageMissing(error: unknown): boolean {
   return false;
 }
 
-function spawnAndWait(
+/**
+ * Quote one argument for `cmd.exe`. Inside double quotes `cmd.exe` keeps `^`,
+ * `|`, `&`, `<` and `>` literally, so a semver range such as `^2.0.0` or
+ * `^2.0.1 || ^2.1.0` reaches the package manager unchanged. Arguments are
+ * package names, version ranges and fixed subcommands, which never contain
+ * `"` or `%`.
+ */
+function quoteWindowsShellArg(arg: string): string {
+  return `"${arg}"`;
+}
+
+/** @internal Exported for tests that run a fake package manager. */
+export function spawnAndWait(
   command: string,
   args: string[],
   cwd: string
 ): Promise<number> {
   return new Promise((resolveCode, reject) => {
-    const child = spawn(command, args, {
-      cwd,
-      stdio: "inherit",
-      shell: process.platform === "win32",
-    });
+    // npm and pnpm are .cmd shims on Windows, which Node only runs through a
+    // shell. Pass them as one command string: Node warns (DEP0190) when an
+    // args array is combined with `shell: true`. Quote each argument, or
+    // `cmd.exe` strips the `^` from version ranges and treats `||` as an
+    // operator.
+    const isWindows = process.platform === "win32";
+    const child = spawn(
+      isWindows
+        ? [command, ...args.map(quoteWindowsShellArg)].join(" ")
+        : command,
+      isWindows ? [] : args,
+      {
+        cwd,
+        stdio: "inherit",
+        shell: isWindows,
+      }
+    );
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       resolveCode(signal === "SIGINT" ? 130 : (code ?? 1));

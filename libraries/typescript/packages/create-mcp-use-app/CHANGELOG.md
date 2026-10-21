@@ -1,5 +1,63 @@
 # create-mcp-use-app
 
+## 2.1.0
+
+### Minor Changes
+
+- e4ff892: Customize the page a browser sees at the MCP URL with a `landing.tsx` in the MCP root. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`), and `mcp-use start` serves the built page. The page renders on the server and hydrates in the browser. Without `landing.tsx`, the built-in page is served as before.
+  - `mcp-use/landing` adds React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`, with the `LandingServerInfo`, `InstallTargets` and per-client target types. Server info always ships to the page; each list ships only when a module in the `landing.tsx` import graph imports its hook, and a list hook without its data throws an error that says to import it.
+  - `getInstallTargets({ url, name })` returns the Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and Manufact Inspector install links and commands, keyed by client, for use outside the server such as on a docs site. The built-in page now builds its links with it.
+  - `landing.tsx` can `export const metadata` (`LandingMetadata`: `title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags. Missing fields keep the server defaults.
+  - Tailwind classes work in `landing.tsx` with no CSS file, and CSS imports are bundled. In dev, edits use Fast Refresh, creating or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` for the page's assets.
+  - Every `create-mcp-use-app` template now includes a Tailwind-styled `landing.tsx` similar to the built-in page. The `blank` and `mcp-server` templates add `react`, `react-dom`, `@types/react` and `@types/react-dom`, and every template's `tsconfig.json` typechecks `landing.tsx`.
+
+## 2.1.0-canary.0
+
+### Minor Changes
+
+- 52d8d99: Customize the page a browser sees at the MCP URL with a `landing.tsx` in the MCP root. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`), and `mcp-use start` serves the built page. The page renders on the server and hydrates in the browser. Without `landing.tsx`, the built-in page is served as before.
+  - `mcp-use/landing` adds React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`, with the `LandingServerInfo`, `InstallTargets` and per-client target types. Server info always ships to the page; each list ships only when a module in the `landing.tsx` import graph imports its hook, and a list hook without its data throws an error that says to import it.
+  - `getInstallTargets({ url, name })` returns the Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and Manufact Inspector install links and commands, keyed by client, for use outside the server such as on a docs site. The built-in page now builds its links with it.
+  - `landing.tsx` can `export const metadata` (`LandingMetadata`: `title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags. Missing fields keep the server defaults.
+  - Tailwind classes work in `landing.tsx` with no CSS file, and CSS imports are bundled. In dev, edits use Fast Refresh, creating or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` for the page's assets.
+  - Every `create-mcp-use-app` template now includes a Tailwind-styled `landing.tsx` similar to the built-in page. The `blank` and `mcp-server` templates add `react`, `react-dom`, `@types/react` and `@types/react-dom`, and every template's `tsconfig.json` typechecks `landing.tsx`.
+
+## 2.0.10
+
+### Patch Changes
+
+- 6bf3a79: Install dependencies on Windows. `--install` and the install prompt started npm and pnpm without a shell, which cannot run their `.cmd` shims, so the install step failed with `spawn npm ENOENT` and asked for a manual install. On Windows the package manager now runs through the shell; macOS and Linux are unchanged.
+
+## 2.0.10-canary.0
+
+### Patch Changes
+
+- 368b835: Install dependencies on Windows. `--install` and the install prompt started npm and pnpm without a shell, which cannot run their `.cmd` shims, so the install step failed with `spawn npm ENOENT` and asked for a manual install. On Windows the package manager now runs through the shell; macOS and Linux are unchanged.
+
+## 2.0.9
+
+### Patch Changes
+
+- 24bf7b0: A scaffold that fails before copying the template no longer leaves an empty project directory behind. An unknown or invalid `--template`, or a GitHub template that can't be cloned, used to leave `my-project/` in place, so retrying with a valid template failed with `Directory "my-project" already exists!` until the directory was deleted by hand.
+
+## 2.0.9-canary.0
+
+### Patch Changes
+
+- b3408b9: A scaffold that fails before copying the template no longer leaves an empty project directory behind. An unknown or invalid `--template`, or a GitHub template that can't be cloned, used to leave `my-project/` in place, so retrying with a valid template failed with `Directory "my-project" already exists!` until the directory was deleted by hand.
+
+## 2.0.8
+
+### Patch Changes
+
+- 8dc3750: Print `pnpm run deploy` instead of `pnpm deploy` in the post-scaffold summary. `deploy` is also a built-in pnpm command, so on pnpm 9 and 10 `pnpm deploy` failed with `ERR_PNPM_CANNOT_DEPLOY` instead of running the project's `deploy` script.
+
+## 2.0.8-canary.0
+
+### Patch Changes
+
+- b99caea: Print `pnpm run deploy` instead of `pnpm deploy` in the post-scaffold summary. `deploy` is also a built-in pnpm command, so on pnpm 9 and 10 `pnpm deploy` failed with `ERR_PNPM_CANNOT_DEPLOY` instead of running the project's `deploy` script.
+
 ## 2.0.7
 
 ### Patch Changes

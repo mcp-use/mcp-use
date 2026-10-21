@@ -669,36 +669,57 @@ class CdpClient {
   }
 }
 
-async function chromeExecutable(): Promise<string> {
+// Windows install locations as [environment variable, path under it]. The
+// two original Chrome locations come first so existing setups pick the same
+// browser. Edge ships with Windows; older Chrome installers used
+// Program Files (x86).
+const WINDOWS_BROWSERS: readonly (readonly [string, string])[] = [
+  ["PROGRAMFILES", "Google\\Chrome\\Application\\chrome.exe"],
+  ["LOCALAPPDATA", "Google\\Chrome\\Application\\chrome.exe"],
+  ["PROGRAMFILES(X86)", "Google\\Chrome\\Application\\chrome.exe"],
+  ["PROGRAMFILES(X86)", "Microsoft\\Edge\\Application\\msedge.exe"],
+  ["PROGRAMFILES", "Microsoft\\Edge\\Application\\msedge.exe"],
+  ["PROGRAMFILES", "BraveSoftware\\Brave-Browser\\Application\\brave.exe"],
+  ["LOCALAPPDATA", "BraveSoftware\\Brave-Browser\\Application\\brave.exe"],
+];
+
+/**
+ * Browser executables to try for a local capture, in preference order. A
+ * configured `MCP_USE_CHROME_PATH`, `PUPPETEER_EXECUTABLE_PATH` or
+ * `CHROME_PATH` comes first.
+ */
+export function browserCandidates(
+  platform: NodeJS.Platform,
+  env: NodeJS.ProcessEnv
+): string[] {
   const configured =
-    process.env["MCP_USE_CHROME_PATH"] ??
-    process.env["PUPPETEER_EXECUTABLE_PATH"] ??
-    process.env["CHROME_PATH"];
-  const candidates = [
-    configured,
-    ...(process.platform === "darwin"
+    env["MCP_USE_CHROME_PATH"] ??
+    env["PUPPETEER_EXECUTABLE_PATH"] ??
+    env["CHROME_PATH"];
+  const installed =
+    platform === "darwin"
       ? [
           "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
           "/Applications/Chromium.app/Contents/MacOS/Chromium",
           "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
           "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
         ]
-      : process.platform === "win32"
-        ? [
-            `${process.env["PROGRAMFILES"] ?? ""}\\Google\\Chrome\\Application\\chrome.exe`,
-            `${process.env["LOCALAPPDATA"] ?? ""}\\Google\\Chrome\\Application\\chrome.exe`,
-          ]
+      : platform === "win32"
+        ? WINDOWS_BROWSERS.flatMap(([variable, path]) => {
+            const root = env[variable];
+            return root ? [`${root}\\${path}`] : [];
+          })
         : [
             "/usr/bin/google-chrome",
             "/usr/bin/google-chrome-stable",
             "/usr/bin/chromium",
             "/usr/bin/chromium-browser",
-          ]),
-  ].filter(
-    (candidate): candidate is string =>
-      candidate !== undefined && candidate !== ""
-  );
-  for (const candidate of candidates) {
+          ];
+  return configured ? [configured, ...installed] : installed;
+}
+
+async function chromeExecutable(): Promise<string> {
+  for (const candidate of browserCandidates(process.platform, process.env)) {
     try {
       await access(candidate);
       return candidate;

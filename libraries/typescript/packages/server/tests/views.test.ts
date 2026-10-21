@@ -6,7 +6,14 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+  existsSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   afterAll,
@@ -22,6 +29,8 @@ import { z } from "zod";
 import { MCPServer, registerViews } from "../src/index.js";
 import type { MetaObject } from "../src/index.js";
 import { synthesizeViewDocument } from "../src/views/document.js";
+import { createViewAssetsHandler } from "../src/views/routes.js";
+import type { ExternalViewManifestEntry } from "../src/views/types.js";
 import { buildToolUiMeta } from "../src/views/wire.js";
 
 const UI_CAPABILITIES = {
@@ -72,6 +81,10 @@ function primeViews(server: MCPServer): void {
     "product-search-result": {
       kind: "inline",
       js: 'console.log("product-search-result");',
+      viewConfig: {
+        displayModes: ["inline", "fullscreen"],
+        preferredDisplayMode: "fullscreen",
+      },
       css: ".results { color: red; }",
     },
     "orphan-view": {
@@ -505,6 +518,22 @@ describe("views server core (e2e over HTTP)", () => {
     });
   });
 
+  it("copies the view description to openai/widgetDescription on list and read", async () => {
+    const { resources } = await plainClient.listResources();
+    const view = resources.find(
+      (r) => r.uri === "ui://views/product-search-result.html"
+    );
+    expect(view?._meta?.["openai/widgetDescription"]).toBe(
+      "Product search results grid"
+    );
+    const read = await plainClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(read.contents[0]?._meta?.["openai/widgetDescription"]).toBe(
+      "Product search results grid"
+    );
+  });
+
   it("emits ui meta on resources/read content items for plain clients too", async () => {
     const read = await plainClient.readResource({
       uri: "ui://views/product-search-result.html",
@@ -523,6 +552,26 @@ describe("views server core (e2e over HTTP)", () => {
       permissions: { clipboardWrite: {} },
       domain: "https://views.example.com",
       prefersBorder: true,
+    });
+  });
+
+  it("serves frontend display modes on HTML content before app initialization", async () => {
+    const read = await plainClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(read.contents[0]?._meta?.["openai/ui"]).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
+      preferredDisplayMode: "fullscreen",
+    });
+    expect(read.contents[0]?._meta?.["ui"]).toMatchObject({
+      permissions: { clipboardWrite: {} },
+      prefersBorder: true,
+    });
+    const orphan = await plainClient.readResource({
+      uri: "ui://views/orphan-view.html",
+    });
+    expect(orphan.contents[0]?._meta?.["openai/ui"]).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
     });
   });
 
@@ -656,6 +705,7 @@ describe("views server core (e2e over HTTP)", () => {
       (r) => r.uri === "ui://views/app-only-view.html"
     );
     expect(appOnly?.description).toBeUndefined();
+    expect(appOnly?._meta).not.toHaveProperty("openai/widgetDescription");
     const ui = appOnly?._meta?.["ui"] as Record<string, unknown> | undefined;
     expect(ui).toMatchObject({
       csp: {
@@ -1142,6 +1192,54 @@ describe("views HTTP routes", () => {
       expect(publicFile.headers["access-control-allow-origin"]).toBe("*");
     } finally {
       rmSync(publicPath, { force: true });
+    }
+  });
+});
+
+describe("views bundle asset handler", () => {
+  it("keeps encoded traversal inside the requested view bundle", async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), "mcp-view-assets-"));
+    try {
+      const viewsRoot = join(projectRoot, ".mcp-use/build/views");
+      for (const name of ["a", "b"]) {
+        mkdirSync(join(viewsRoot, name, "assets"), { recursive: true });
+        writeFileSync(join(viewsRoot, name, "assets/entry.js"), "export {};");
+      }
+      mkdirSync(join(viewsRoot, "public"), { recursive: true });
+      writeFileSync(join(viewsRoot, "public/file.txt"), "public");
+      const external: ExternalViewManifestEntry = {
+        kind: "external",
+        entry: "assets/entry.js",
+        css: [],
+      };
+      const handler = createViewAssetsHandler(
+        "/mcp",
+        new Map([
+          ["a", external],
+          ["b", external],
+        ]),
+        { projectRoot }
+      );
+      if (handler === undefined) {
+        throw new Error("expected a view assets handler");
+      }
+      const get = (path: string) =>
+        handler(
+          new Request(`https://server.example.test/mcp/_mcp-use/views/${path}`)
+        );
+
+      expect((await get("a/assets/entry.js")).status).toBe(200);
+      // `%2f` survives URL parsing, so only the handler's own decoding and
+      // segment checks keep requests inside `.mcp-use/build/views/<name>/`.
+      for (const path of [
+        "a/..%2fb%2fassets%2fentry.js",
+        "a/assets%2f..%2f..%2fpublic%2ffile.txt",
+        "a%2f..%2fb/assets/entry.js",
+      ]) {
+        expect((await get(path)).status).toBe(404);
+      }
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
     }
   });
 });

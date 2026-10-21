@@ -267,9 +267,11 @@ export class CloudApi {
 }
 
 /** Create a cloud client for an optional organization id or slug. */
-export async function cloudApiForOrganization(
-  selector?: string
-): Promise<{ api: CloudApi; organizationId: string }> {
+export async function cloudApiForOrganization(selector?: string): Promise<{
+  api: CloudApi;
+  organizationId: string;
+  organizationSlug: string | null;
+}> {
   const config = await readCloudConfig();
   const identity = await (await CloudApi.create()).identity();
   const organization =
@@ -287,6 +289,7 @@ export async function cloudApiForOrganization(
   return {
     api: await CloudApi.create(organization.id),
     organizationId: organization.id,
+    organizationSlug: organization.slug,
   };
 }
 

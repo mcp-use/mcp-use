@@ -3,12 +3,26 @@
  */
 
 import type { Plugin } from "vite";
+import { sanitizeContextDiagnostic } from "./context-diagnostics.js";
 
 import type { DiscoveredView } from "./views.js";
 import { VIRTUAL_VIEW_PREFIX, VIRTUAL_VIEW_RESOLVED_PREFIX } from "./views.js";
 
-const VIRTUAL_TAILWIND_ID = "virtual:mcp-use/tailwind.css";
-const VIRTUAL_TAILWIND_RESOLVED_ID = `\0${VIRTUAL_TAILWIND_ID}`;
+/** CLI-managed Tailwind stylesheet imported by view and landing entries. */
+export const VIRTUAL_TAILWIND_ID = "virtual:mcp-use/tailwind.css";
+/** Module graph id of {@link VIRTUAL_TAILWIND_ID}. */
+export const VIRTUAL_TAILWIND_RESOLVED_ID = `\0${VIRTUAL_TAILWIND_ID}`;
+/**
+ * Source of {@link VIRTUAL_TAILWIND_ID}. Tailwind scans the Vite root, so
+ * classes in any project file under it, `landing.tsx` included, are emitted.
+ *
+ * Host theme is applied via ext-apps applyDocumentTheme (data-theme on html)
+ * and optional .dark wrappers — not OS prefers-color-scheme.
+ */
+export const TAILWIND_STYLESHEET = [
+  '@import "tailwindcss";',
+  "@custom-variant dark (&:where(.dark, .dark *, [data-theme=dark], [data-theme=dark] *));",
+].join("\n");
 const VIRTUAL_CSP_RUNTIME_ID = "virtual:mcp-use/csp-runtime";
 const VIRTUAL_CSP_RUNTIME_RESOLVED_ID = `\0${VIRTUAL_CSP_RUNTIME_ID}`;
 
@@ -32,6 +46,7 @@ export const VIEW_REACT_OPTIMIZE_DEPS = {
     // first document can finish mounting and subsequent edits use Fast Refresh.
     "mcp-use > @modelcontextprotocol/ext-apps",
     "mcp-use > @modelcontextprotocol/server",
+    "mcp-use > @modelcontextprotocol/core",
     // The published MCP Apps starter installs Zod at the project root. The
     // Apps runtime reaches it through a lazy protocol-runtime import, which
     // Vite's static scan cannot see; discovering it after the HMR socket is
@@ -93,6 +108,25 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS,
       };
     },
+    configureServer(server) {
+      if (!options.dev) return;
+      const rates = new WeakMap<object, { second: number; count: number }>();
+      server.ws.on(
+        "mcp-use:context-diagnostic",
+        (data: unknown, client: object) => {
+          const second = Math.floor(Date.now() / 1000);
+          const rate = rates.get(client);
+          if (rate?.second === second && rate.count >= 80) return;
+          rates.set(client, {
+            second,
+            count: rate?.second === second ? rate.count + 1 : 1,
+          });
+          const diagnostic = sanitizeContextDiagnostic(data);
+          if (diagnostic)
+            console.log(`[mcp-use context] ${JSON.stringify(diagnostic)}`);
+        }
+      );
+    },
     applyToEnvironment(environment) {
       return (options.environments ?? ["client"]).includes(environment.name);
     },
@@ -121,12 +155,7 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         ].join("\n");
       }
       if (id === VIRTUAL_TAILWIND_RESOLVED_ID) {
-        // Host theme is applied via ext-apps applyDocumentTheme (data-theme on
-        // html) and optional .dark wrappers — not OS prefers-color-scheme.
-        return [
-          '@import "tailwindcss";',
-          "@custom-variant dark (&:where(.dark, .dark *, [data-theme=dark], [data-theme=dark] *));",
-        ].join("\n");
+        return TAILWIND_STYLESHEET;
       }
       if (!id.startsWith(VIRTUAL_VIEW_RESOLVED_PREFIX)) {
         return undefined;
@@ -150,13 +179,29 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         lines.push(`import ${JSON.stringify(VIRTUAL_TAILWIND_ID)};`);
       lines.push(
         `import { bootstrapView } from "mcp-use/react";`,
-        `import * as viewModule from ${JSON.stringify(view.entryPath)};`,
-        `bootstrapView(viewModule);`
+        `import * as viewModule from ${JSON.stringify(view.entryPath)};`
       );
+      if (options.dev !== undefined) {
+        lines.push(`window.__mcpContextTrace ??= { events: [], sequence: 0 };`);
+      }
+      lines.push(`bootstrapView(viewModule);`);
       if (options.dev !== undefined) {
         lines.push(
           `if (import.meta.hot) {`,
           `  import.meta.hot.accept();`,
+          `  let contextSequence = import.meta.hot.data.contextSequence ?? 0;`,
+          `  const contextTimer = setInterval(() => {`,
+          `    const trace = window.__mcpContextTrace;`,
+          `    for (const event of trace?.events ?? []) {`,
+          `      if (event.seq <= contextSequence) continue;`,
+          `      contextSequence = event.seq;`,
+          `      import.meta.hot.send("mcp-use:context-diagnostic", event);`,
+          `    }`,
+          `  }, 500);`,
+          `  import.meta.hot.dispose((data) => {`,
+          `    data.contextSequence = contextSequence;`,
+          `    clearInterval(contextTimer);`,
+          `  });`,
           `}`
         );
       }

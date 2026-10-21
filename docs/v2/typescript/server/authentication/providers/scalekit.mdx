@@ -23,8 +23,10 @@ Optional `audience` is an extra value that must also appear in `aud`. It does no
 ```bash
 MCP_USE_OAUTH_SCALEKIT_ENVIRONMENT_URL=https://your-env.scalekit.dev
 MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID=res_your_resource
-MCP_URL=https://mcp.example.com/mcp
+MCP_URL=https://mcp.example.com
 ```
+
+`MCP_URL` is the public origin without a path. mcp-use appends `basePath` (default `/mcp`) to form the advertised MCP URL, `https://mcp.example.com/mcp` here. A value that includes a path makes the `MCPServer` constructor throw.
 
 ```typescript
 import { MCPServer } from "mcp-use";

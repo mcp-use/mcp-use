@@ -37,7 +37,7 @@ The integration has three files:
 | File | Purpose |
 | --- | --- |
 | `views/generative-ui/catalog.ts` | The components the model may use, plus validation shared by the tool and the view |
-| `src/index.ts` | The `render-ui` tool, which accepts and returns `{ spec }` |
+| `index.ts` | Your server entry, which registers the `render-ui` tool that accepts and returns `{ spec }` |
 | `views/generative-ui/view.tsx` | Converts the spec to A2UI messages and renders `<A2uiSurface>` |
 
 ### Install A2UI
@@ -219,11 +219,11 @@ export type UISpec = z.infer<typeof specSchema>;
 
 The tool description is the model's only guide to the catalog, so it lists every component, the binding rules, and a small example. The callback returns the validated spec in `structuredContent`, and `view` attaches the `generative-ui` view to the result.
 
-```typescript src/index.ts
+```typescript index.ts
 import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
-import { specSchema } from "../views/generative-ui/catalog.js";
+import { specSchema } from "./views/generative-ui/catalog.js";
 
 const server = new MCPServer({
   name: "a2ui-generative-ui",

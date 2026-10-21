@@ -274,6 +274,79 @@ describe("runBuild", () => {
     expect(String(error)).not.toContain("no views were primed");
   });
 
+  it("evaluates the entry in the build phase and restores the environment", async () => {
+    const cwd = copyFixture("build-phase");
+    dirs.push(cwd);
+    const indexPath = join(cwd, "src/index.ts");
+    const source = readFileSync(indexPath, "utf8").replace(
+      'import { MCPServer } from "mcp-use";',
+      [
+        'import { isBuilding, MCPServer } from "mcp-use";',
+        "",
+        "// Like an entry that needs a secret, except while building.",
+        'if (!isBuilding()) throw new Error("MCP_USE_GITHUB_CLIENT_ID must be set");',
+      ].join("\n")
+    );
+    writeFileSync(indexPath, source);
+    const before = {
+      MCP_URL: process.env.MCP_URL,
+      MCP_USE_PHASE: process.env.MCP_USE_PHASE,
+    };
+
+    await runBuild({ cwd });
+    expect(process.env.MCP_URL).toBe(before.MCP_URL);
+    expect(process.env.MCP_USE_PHASE).toBe(before.MCP_USE_PHASE);
+
+    writeFileSync(
+      indexPath,
+      `${source}\nthrow new Error("entry failed at import");\n`
+    );
+    await expect(runBuild({ cwd })).rejects.toThrow("entry failed at import");
+    expect(process.env.MCP_URL).toBe(before.MCP_URL);
+    expect(process.env.MCP_USE_PHASE).toBe(before.MCP_USE_PHASE);
+  });
+
+  it.each([
+    ["NODE_ENV is unset", undefined],
+    ["the project .env sets NODE_ENV=development", "NODE_ENV=development\n"],
+  ])(
+    "compiles server JSX for production when %s",
+    async (_case, dotenv) => {
+      // Like a server that renders a page itself, such as a custom OAuth
+      // consent page.
+      const cwd = copyFixture("build-server-jsx");
+      dirs.push(cwd);
+      if (dotenv !== undefined) writeFileSync(join(cwd, ".env"), dotenv);
+      writeFileSync(
+        join(cwd, "src/page.tsx"),
+        "export function Page() {\n  return <main>consent</main>;\n}\n"
+      );
+      const indexPath = join(cwd, "src/index.ts");
+      writeFileSync(
+        indexPath,
+        readFileSync(indexPath, "utf8").replace(
+          'import { MCPServer } from "mcp-use";',
+          'import { MCPServer } from "mcp-use";\nimport { Page } from "./page.js";\n(globalThis as { page?: unknown }).page = Page;'
+        )
+      );
+      // Run as `mcp-use build` does, without a NODE_ENV of its own.
+      vi.stubEnv("NODE_ENV", undefined);
+      try {
+        await runBuild({ cwd });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+
+      const built = readFileSync(
+        join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"),
+        "utf8"
+      );
+      expect(built).toContain("react/jsx-runtime");
+      expect(built).not.toContain("jsx-dev-runtime");
+    },
+    60_000
+  );
+
   it("honors an --entry override", async () => {
     const cwd = copyFixture("build-entry");
     dirs.push(cwd);
@@ -410,6 +483,7 @@ describe("runBuild (views)", () => {
           "react-dom/client",
           "mcp-use > @modelcontextprotocol/ext-apps",
           "mcp-use > @modelcontextprotocol/server",
+          "mcp-use > @modelcontextprotocol/core",
           "zod",
         ],
       },
@@ -578,6 +652,16 @@ describe("runBuild (views)", () => {
       });
       const text = (readBody["result"] as { contents: { text: string }[] })
         .contents[0]!.text;
+      expect(
+        (
+          readBody["result"] as {
+            contents: { _meta: Record<string, unknown> }[];
+          }
+        ).contents[0]?._meta["openai/ui"]
+      ).toEqual({
+        availableDisplayModes: ["inline", "fullscreen"],
+        preferredDisplayMode: "fullscreen",
+      });
       expect(text).toContain('id="root"');
       expect(text).toMatch(/<script type="module" src="/);
       expect(text).toContain("/mcp/_mcp-use/views/product-search-result/");
@@ -726,6 +810,13 @@ describe("runBuild (views)", () => {
     });
     const text = (readBody["result"] as { contents: { text: string }[] })
       .contents[0]!.text;
+    expect(
+      (readBody["result"] as { contents: { _meta: Record<string, unknown> }[] })
+        .contents[0]?._meta["openai/ui"]
+    ).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
+      preferredDisplayMode: "fullscreen",
+    });
     expect(text).toContain('<script type="module">');
     expect(text).not.toContain('<script type="module" src=');
     expect(text).toContain("<style>");

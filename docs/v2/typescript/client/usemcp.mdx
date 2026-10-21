@@ -21,23 +21,32 @@ Use **`McpClientProvider`** for multi-server apps. Use standalone **`useMcp`** o
 ## Provider setup
 
 ```tsx
+import { useEffect } from "react";
+import {
+  McpClientProvider,
+  useMcpClient,
+  useMcpServer,
+} from "@mcp-use/client/react";
+
 function App() {
   return (
-    <McpClientProvider defaultAutoProxyFallback>
+    <McpClientProvider>
       <Dashboard />
     </McpClientProvider>
   );
 }
 
 function Dashboard() {
-  const { addServer, servers } = useMcpClient();
+  const { addServer, servers, storageLoaded } = useMcpClient();
 
   useEffect(() => {
+    // Wait for the provider's initial server load before adding servers.
+    if (!storageLoaded) return;
     addServer("demo", {
       url: "http://localhost:3000/mcp",
       displayName: "Demo",
     });
-  }, [addServer]);
+  }, [addServer, storageLoaded]);
 
   return servers.map((s) => <ServerPanel key={s.id} serverId={s.id} />);
 }
@@ -59,6 +68,11 @@ function ServerPanel({ serverId }: { serverId: string }) {
   );
 }
 ```
+
+Call `addServer` only after `storageLoaded` is `true`. When the provider finishes
+its initial load, it replaces its server list with the servers from
+`storageProvider` and the `mcpServers` prop, if either is set, so a server
+added earlier is dropped. `addServer` ignores an ID that is already registered.
 
 ## Connection states
 
@@ -117,6 +131,12 @@ export default function OAuthCallback() {
 ```
 
 Override with `defaultCallbackUrl` on the provider or `callbackUrl` per server.
+
+`McpClientProvider` skips connecting its servers only on a page whose path ends
+in `/oauth/callback`. A connection attempt on the callback page can replace the
+in-flight PKCE verifier before `onMcpAuthorization()` exchanges the code. If
+your callback URL uses a different path, render that route outside
+`McpClientProvider`.
 
 ## Proxy fallback
 

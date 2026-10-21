@@ -105,6 +105,8 @@ const registration = await (
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       client_name: "e2e",
+      // Better Auth 1.7 requires native registration for HTTP loopback callbacks.
+      application_type: "native",
       redirect_uris: [redirectUri],
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
@@ -121,7 +123,7 @@ check(
 );
 const clientId = registration.client_id;
 
-async function authorize(scope, grant) {
+async function authorize(scope, grant, requestedResource = mcp) {
   const verifier = randomBytes(32).toString("base64url");
   const challengeValue = createHash("sha256")
     .update(verifier)
@@ -134,7 +136,7 @@ async function authorize(scope, grant) {
     code_challenge: challengeValue,
     code_challenge_method: "S256",
     state: randomBytes(8).toString("hex"),
-    resource: mcp,
+    resource: requestedResource,
     ...(scope !== undefined && { scope }),
   }).toString();
   let next = url.href;
@@ -152,7 +154,7 @@ async function authorize(scope, grant) {
             redirect_uri: redirectUri,
             client_id: clientId,
             code_verifier: verifier,
-            resource: mcp,
+            resource: requestedResource,
           }),
         })
       ).json();
@@ -204,6 +206,19 @@ async function authorize(scope, grant) {
   }
   throw new Error("too many hops");
 }
+
+// The patched provider must reject resources outside the server's allowlist.
+let rejectedResource = false;
+try {
+  await authorize(
+    "demo:protected",
+    undefined,
+    "https://unregistered.example/mcp"
+  );
+} catch (error) {
+  rejectedResource = String(error).includes("error=invalid_target");
+}
+check("authorization rejects an unconfigured resource", rejectedResource);
 
 function tokenScopes(accessToken) {
   const payload = JSON.parse(

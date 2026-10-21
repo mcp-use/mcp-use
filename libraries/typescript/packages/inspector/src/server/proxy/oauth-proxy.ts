@@ -12,13 +12,23 @@
 import { lookup } from "node:dns/promises";
 import { Buffer } from "node:buffer";
 import { isIP } from "node:net";
-import type { Context, Hono, Next } from "hono";
+import type { Context, Hono } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
-  inspectorRateLimitResponse,
+  inspectorApiRateLimit,
 } from "../rate-limit.js";
+
+/**
+ * Metadata bodies come from a caller-chosen server, and the route accepts
+ * top-level navigations (no Origin). Never let one render as a page on the
+ * Inspector's origin.
+ */
+const METADATA_HEADERS = {
+  "Content-Type": "application/json",
+  "X-Content-Type-Options": "nosniff",
+};
 
 type OAuthEndpointKind =
   | "registration"
@@ -134,16 +144,7 @@ export function mountOAuthProxy(
   const origins = new Set(allowedOrigins.map(normalizeOrigin));
   const bindings = new Map<string, Binding>();
   const confidentialClients = new Map<string, ConfidentialClient>();
-  const rateLimit = async (c: Context, next: Next) => {
-    try {
-      // RateLimiterMemory prefixes and stringifies keys. The Hono request
-      // wrapper therefore maps every request to one mounted-instance budget.
-      await configuredRateLimiter.consume(c.req as unknown as string);
-    } catch (error) {
-      return inspectorRateLimitResponse(c, error);
-    }
-    return next();
-  };
+  const rateLimit = inspectorApiRateLimit(configuredRateLimiter);
 
   app.use(`${basePath}/*`, async (c, next) => {
     const origin = c.req.header("Origin");
@@ -224,10 +225,7 @@ export function mountOAuthProxy(
       }
       const raw = await readCapped(upstream, maxResponseBodyBytes);
       if (!upstream.ok) {
-        return c.body(raw, upstream.status as never, {
-          "Content-Type":
-            upstream.headers.get("content-type") ?? "application/json",
-        });
+        return c.body(raw, upstream.status as never, METADATA_HEADERS);
       }
       const metadata = parseObject(raw);
 
@@ -251,10 +249,7 @@ export function mountOAuthProxy(
       bindings.set(key, binding);
       pruneBindings(bindings);
 
-      return c.body(raw, 200, {
-        "Content-Type":
-          upstream.headers.get("content-type") ?? "application/json",
-      });
+      return c.body(raw, 200, METADATA_HEADERS);
     } catch (error) {
       return proxyError(c, error, enableLogging, logPrefix);
     }

@@ -8,6 +8,7 @@
 export { MCPServer } from "./server.js";
 export type { ListenOptions } from "./server.js";
 export { createMcpMount } from "./mount-mcp.js";
+export { isBuilding } from "./build-phase.js";
 export type { MountMcpOptions, McpMount } from "./mount-mcp.js";
 export {
   composeFetch,
@@ -51,6 +52,7 @@ export type {
   InputResponses,
   PromptMessage,
   ReadResourceResult,
+  ResourceLink,
 } from "@modelcontextprotocol/server";
 /**
  * Official SDK descriptor metadata contracts. Tools use
@@ -144,6 +146,7 @@ export type {
 } from "./openapi/index.js";
 export type {
   OAuthAuth,
+  OAuthUpstreamToken,
   OAuthMode,
   RequestClientContext,
   RequestContext,
@@ -153,12 +156,14 @@ export type {
   InferToolInput,
   InferToolName,
   InferToolOutput,
+  FileEntrypointInput,
   ToolCallback,
   ToolDefinition,
   ToolRef,
   ToolResult,
   ToolSecurityScheme,
   ToolViewConfig,
+  ToolViewEntrypoint,
 } from "./tools.js";
 export type {
   ExternalViewManifestEntry,
@@ -226,3 +231,16 @@ export type {
   ProxyServerConfig,
   ProxyTool,
 } from "./mcp-proxy.js";
+
+export type {
+  SettingsField,
+  SettingsFields,
+  SettingsValues,
+  SettingsLayoutGroup,
+  SettingsRegistration,
+} from "./settings.js";
+export type {
+  MentionSearchParams,
+  MentionSearchResult,
+  MentionsRegistration,
+} from "./mentions.js";

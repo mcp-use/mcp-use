@@ -370,7 +370,7 @@ curl -s http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"protected_profile","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"curl","version":"0"},"io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
-To test the full sign-in and retry loop in Claude or ChatGPT, run the example with `pnpm dev --tunnel`, restart it with `MCP_URL` set to the tunnel's origin, and add the tunnel's `/mcp` URL as a custom connector. The example's README lists every item and a test checklist.
+To test the full sign-in and retry loop in Claude or ChatGPT, run the example with `pnpm dev --tunnel`, restart it with `MCP_URL` set to the tunnel's origin, and add the tunnel's `/mcp` URL as a custom connector in Claude or under Plugins → Add → Add Custom MCP Server in ChatGPT. The example's README lists every item and a test checklist.
 
 ## Next steps
 

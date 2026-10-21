@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
   cpSync,
@@ -27,6 +27,8 @@ import {
 import {
   deriveProjectInfo,
   findUnsafeEntries,
+  getDeployCommand,
+  runPackageManager,
   updateIndexTs,
   updatePackageJson,
 } from "./utils.js";
@@ -102,37 +104,6 @@ function parseCli(argv: string[]): {
       bun: values.bun as boolean | undefined,
     },
   };
-}
-
-function runPackageManager(
-  packageManager: string,
-  args: string[],
-  cwd: string
-): Promise<{ stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(packageManager, args, {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
-    });
-
-    let stderr = "";
-    child.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve({ stderr });
-      } else {
-        reject(new Error(`${packageManager} install failed:\n${stderr}`));
-      }
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
-  });
 }
 
 function detectPackageManager(): string | null {
@@ -642,6 +613,11 @@ async function copyTemplate(
   );
 }
 
+/**
+ * Copy a template into `dest`, creating it. The project directory is only
+ * created here, so a scaffold that fails earlier (unknown template, failed
+ * clone) leaves nothing behind for the next attempt to trip over.
+ */
 function copyDirectoryWithProcessing(
   src: string,
   dest: string,
@@ -649,6 +625,7 @@ function copyDirectoryWithProcessing(
   isDevelopment: boolean
 ) {
   const entries = readdirSync(src, { withFileTypes: true });
+  mkdirSync(dest, { recursive: true });
 
   for (const entry of entries) {
     if (entry.name === ".git") {
@@ -660,7 +637,6 @@ function copyDirectoryWithProcessing(
     const destPath = join(dest, destName);
 
     if (entry.isDirectory()) {
-      mkdirSync(destPath, { recursive: true });
       copyDirectoryWithProcessing(srcPath, destPath, versions, isDevelopment);
     } else if (entry.name === "package.json" || entry.name.endsWith(".json")) {
       const processedContent = processTemplateFile(
@@ -924,10 +900,6 @@ async function main(): Promise<void> {
   }
   const versions = { "mcp-use": mcpUseVersion };
 
-  if (!useCurrentDir) {
-    mkdirSync(projectPath, { recursive: true });
-  }
-
   console.log(ansi.cyan(`🚀 Creating MCP server "${displayName}"...`));
 
   const validatedTemplate = validateTemplateName(selectedTemplate);
@@ -1075,6 +1047,7 @@ async function main(): Promise<void> {
     console.log("   ├── public/");
     console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
+    console.log("   ├── landing.tsx (page shown at the MCP URL)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
@@ -1091,12 +1064,14 @@ async function main(): Promise<void> {
     console.log("   │       └── MeshGradient.tsx");
     console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
+    console.log("   ├── landing.tsx (page shown at the MCP URL)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
   } else if (validatedTemplate === "mcp-server") {
     console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
+    console.log("   ├── landing.tsx (page shown at the MCP URL)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
@@ -1117,11 +1092,7 @@ async function main(): Promise<void> {
   console.log(ansi.cyan(`   ${getDevCommand(usedPackageManager)}`));
   console.log("");
   console.log(ansi.bold("📤 To deploy:"));
-  console.log(
-    ansi.cyan(
-      `   ${usedPackageManager === "pnpm" ? "pnpm" : usedPackageManager === "bun" ? "bun run" : "npm run"} deploy`
-    )
-  );
+  console.log(ansi.cyan(`   ${getDeployCommand(usedPackageManager)}`));
   console.log("");
   if (options.dev) {
     console.log(
