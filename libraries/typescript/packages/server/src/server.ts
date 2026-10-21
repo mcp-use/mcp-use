@@ -138,7 +138,7 @@ import {
   buildEntrypointMeta,
   validateEntrypointInput,
 } from "./views/entrypoints.js";
-import { isUsageDisabled, recordUsage } from "./usage.js";
+import { isLikelyBot, isUsageDisabled, recordUsage } from "./usage.js";
 import { registerSkillsRuntime } from "./skills/runtime.js";
 import {
   registerSkills,
@@ -1435,6 +1435,25 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     );
   }
 
+  #trackLandingView(request: Request): void {
+    // HEAD is a link checker or monitor probing the page, not a visit.
+    if (request.method === "HEAD") return;
+    recordUsage(
+      "landing",
+      "viewed",
+      {
+        page: this.#landingPage === undefined ? "built_in" : "custom",
+        dev:
+          this.#landingPage === undefined
+            ? this.#viewsDevMode
+            : this.#landingPage.dev === true,
+        public_landing: this.#config.publicLandingPage === true,
+        likely_bot: isLikelyBot(request.headers.get("user-agent")),
+      },
+      { sampleRate: 0.1, serverRoot: this.#viewsProjectRoot }
+    );
+  }
+
   #usageScopeId(): string {
     this.#usageScope ??= crypto.randomUUID();
     return this.#usageScope;
@@ -1873,6 +1892,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         if (!isHtmlNavigationRequest(request)) {
           return mcpRouteHandler(request);
         }
+        this.#trackLandingView(request);
         const respond = async (): Promise<Response> => {
           const { createLandingPageResponse } =
             await import("./landing-handler.js");
