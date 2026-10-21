@@ -642,7 +642,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     const duration = Math.round(performance.now() - startedAt);
     console.log(
       `[mcp-use] built ${relative(options.cwd, entry)} → ` +
-        `${relative(options.cwd, paths.build)}/${BUILD_ENTRY_NAME} (${duration}ms)`
+        `${relative(options.cwd, join(paths.build, BUILD_ENTRY_NAME))} (${duration}ms)`
     );
     return;
   }
@@ -803,6 +803,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const viewNames = views.map((v) => v.name).join(", ");
   console.log(
     `[mcp-use] built ${relative(options.cwd, entry)} + views (${viewNames}) → ` +
-      `${relative(options.cwd, paths.build)}/${BUILD_ENTRY_NAME} (${duration}ms)`
+      `${relative(options.cwd, join(paths.build, BUILD_ENTRY_NAME))} (${duration}ms)`
   );
 }
