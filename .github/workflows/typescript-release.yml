@@ -152,17 +152,14 @@ jobs:
           VERIFY_DELAY_SECONDS: 10
         run: pnpm release-channel verify --plan canary-release-plan.json
 
-      - name: Push verified canary versions and tags
+      - name: Tag and push verified canary packages
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
 
-          # Expose the version commit to Railway only after npm verification.
-          # A concurrent branch update must fail rather than deploy unverified code.
           git fetch --tags --force
-          git push origin HEAD:canary
 
           cd libraries/typescript
           pnpm changeset tag
@@ -302,6 +299,14 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
+
+      - name: Push verified canary version commit
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        run: |
+          # GITHUB_TOKEN pushes do not start another Actions run. Expose this
+          # commit to native deployments only after all release work succeeds.
+          # A concurrent branch update must fail rather than overwrite it.
+          git push origin HEAD:canary
 
       # ============================================================================
       # MAIN BRANCH: Stable release workflow

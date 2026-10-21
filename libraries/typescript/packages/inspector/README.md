@@ -312,15 +312,8 @@ Deploy the MCP Inspector to your own infrastructure with a single Docker contain
 
 The official Docker image is available on [Docker Hub](https://hub.docker.com/r/mcpuse/inspector).
 
-Hosted production and dev Inspectors use Railway's native GitHub integration
-(`main` and `canary`) with **Wait for CI** enabled. The release workflow publishes
-and verifies npm packages before Railway builds. Canary's version commit is pushed
-only after verification. The Dockerfile installs the exact version in
-`package.json`, so an unavailable release fails the build instead of serving an
-older dist-tag. Docker Hub builds can select another exact release with the
-`VERSION` build argument; Railway services should leave that variable unset.
-During promotion, a prerelease version on `main` cannot deploy to production;
-the stable exit-prerelease commit is required.
+Building the Dockerfile installs the exact Inspector version in `package.json`.
+Select another published version with `--build-arg VERSION=x.y.z`.
 
 **Quick Start:**
 

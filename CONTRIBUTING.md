@@ -307,6 +307,21 @@ You'll be prompted to:
 
 Commit the generated `.changeset/*.md` file with your changes.
 
+### Hosted Inspector releases
+
+Railway follows `main` for production Inspector and `canary` for dev, with
+**Wait for CI** enabled on both native GitHub triggers. Leave the Railway
+`VERSION` variable unset: the Dockerfile installs the exact version in the
+commit's `package.json`, and copying that manifest invalidates the install cache.
+Production rejects prerelease versions on `main`, retaining the previous stable
+deployment until the exit-prerelease commit publishes a stable version.
+
+The canary release workflow versions and builds packages locally, publishes to
+npm, verifies the packed artifacts and dist-tags, and creates tags and release
+notes before pushing the version commit. That final `GITHUB_TOKEN` push does not
+start recursive Actions runs; the published artifacts have already passed the
+release workflow's verification before Railway can see the new version commit.
+
 ### TypeScript Coding Standards
 
 - Use TypeScript strict mode
