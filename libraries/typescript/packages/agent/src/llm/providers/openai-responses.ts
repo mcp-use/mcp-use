@@ -16,6 +16,7 @@ import {
   buildEndpoint,
   buildHeaders,
   throwLlmRequestError,
+  toPlainText,
 } from "./openai-shared.js";
 import { tokenUsageFromRecord } from "../usage.js";
 
@@ -49,13 +50,7 @@ export function seedInputFromMessages(
 
   for (const m of messages) {
     if (m.role === "system") {
-      const text =
-        typeof m.content === "string"
-          ? m.content
-          : m.content
-              .filter((p) => p.type === "text")
-              .map((p) => (p as { text: string }).text)
-              .join("\n");
+      const text = toPlainText(m.content);
       if (text) systemParts.push(text);
       continue;
     }
@@ -67,11 +62,12 @@ export function seedInputFromMessages(
       continue;
     }
     if (m.role === "assistant") {
-      if (typeof m.content === "string" && m.content.length > 0) {
+      const text = toPlainText(m.content);
+      if (text.length > 0) {
         input.push({
           type: "message",
           role: "assistant",
-          content: [{ type: "output_text", text: m.content }],
+          content: [{ type: "output_text", text }],
         });
       }
       for (const tc of m.toolCalls ?? []) {

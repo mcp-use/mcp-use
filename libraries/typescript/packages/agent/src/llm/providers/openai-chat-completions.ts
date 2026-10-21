@@ -11,7 +11,7 @@ import type {
   ProviderTool,
 } from "../types.js";
 import { tokenUsageFromRecord } from "../usage.js";
-import { throwLlmRequestError } from "./openai-shared.js";
+import { throwLlmRequestError, toPlainText } from "./openai-shared.js";
 
 export { LlmRequestError } from "./openai-shared.js";
 
@@ -79,12 +79,11 @@ export function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
       continue;
     }
     if (m.role === "assistant") {
+      const text = toPlainText(m.content);
+      const hasToolCalls = Boolean(m.toolCalls?.length);
       const entry: Record<string, unknown> = {
         role: "assistant",
-        content:
-          typeof m.content === "string" && m.content.length > 0
-            ? m.content
-            : null,
+        content: text.length > 0 || !hasToolCalls ? text : null,
       };
       if (m.toolCalls?.length) {
         entry.tool_calls = m.toolCalls.map((tc) => ({
@@ -94,6 +93,10 @@ export function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
         }));
       }
       out.push(entry);
+      continue;
+    }
+    if (m.role === "system") {
+      out.push({ role: "system", content: toPlainText(m.content) });
       continue;
     }
     out.push({ role: m.role, content: toOpenAIContent(m.content) });
