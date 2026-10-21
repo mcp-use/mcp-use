@@ -1,7 +1,12 @@
 import { isToolResultError, toolResultToContent } from "./toolResultParts.js";
 import type { LlmDriver } from "./driver.js";
 import { LlmRequestError } from "./providers/openai-chat-completions.js";
-import type { LlmStreamEvent, ProviderMessage, ProviderTool } from "./types.js";
+import type {
+  LlmStreamEvent,
+  ProviderMessage,
+  ProviderTool,
+  ProviderToolCall,
+} from "./types.js";
 
 interface ToolCallFn {
   (name: string, args: Record<string, unknown>): Promise<unknown>;
@@ -45,11 +50,7 @@ export async function* runToolLoop(
 
     // Buffer tool calls from this turn and assistant text so we can append
     // them to the running transcript before dispatching tools.
-    const pendingToolCalls: {
-      id: string;
-      name: string;
-      args: Record<string, unknown>;
-    }[] = [];
+    const pendingToolCalls: ProviderToolCall[] = [];
     let assistantText = "";
 
     try {
@@ -65,6 +66,9 @@ export async function* runToolLoop(
             id: ev.toolCallId,
             name: ev.toolName,
             args: ev.args,
+            ...(ev.thoughtSignature !== undefined && {
+              thoughtSignature: ev.thoughtSignature,
+            }),
           });
         }
         yield ev;
