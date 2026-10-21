@@ -124,8 +124,20 @@ export interface OpenAPIDocument {
   };
   /** Candidate upstream base URLs; the first is used by default. */
   servers?: Array<{
-    /** Absolute upstream base URL. */
+    /** Absolute upstream base URL, optionally with `{variable}` placeholders. */
     url: string;
+    /** Values for the `{variable}` placeholders in `url`; each `default` is used. */
+    variables?: Record<
+      string,
+      {
+        /** Value substituted for the placeholder. */
+        default: string;
+        /** Allowed values, for documentation only. */
+        enum?: string[];
+        /** Human-readable description of the variable. */
+        description?: string;
+      }
+    >;
   }>;
   /** API operations keyed by URL path template. */
   paths?: Record<string, OpenAPIPathItemObject | OpenAPIReferenceObject>;
@@ -166,7 +178,7 @@ export interface OpenAPIExcludeRule {
 export interface FromOpenAPIOptions {
   /** Parsed, bundled OpenAPI document. */
   spec: OpenAPIDocument;
-  /** Upstream base URL, overriding the first `spec.servers` entry. */
+  /** Absolute http(s) upstream base URL, overriding the first `spec.servers` entry. */
   baseUrl?: string;
   /** MCP server name, overriding `spec.info.title`. */
   name?: string;
