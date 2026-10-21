@@ -6,6 +6,16 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.23" description="October 2026">
+  ## Chat feedback, backgrounds & hosted connections
+  Patch release paired with `mcp-use` v2.11.1, improving chat feedback and keeping hosted MCP requests on the correct route.
+
+- **Fix**: show the thinking indicator after a tool finishes or fails while the assistant request is still active. Keep it hidden while another tool is running or the assistant is writing text (`#2891`)
+- **Fix**: strip the Inspector's DevSpace routing headers before forwarding MCP proxy requests, so hosted MCP servers receive requests for their own hostname (`#2899`)
+- **Fix**: keep the chat mesh gradient visible while opening or closing chat history by redrawing the canvas immediately after resizing, including when animation is paused (`#2900`)
+- **Update**: Updated mcp-use to v2.11.1
+</Update>
+
 <Update label="v20.3.22" description="October 2026">
   ## Tool call timeouts, chat errors & proxy hardening
   Patch release paired with `mcp-use` v2.11.0, fixing a 10-second tool call timeout, surfacing chat failures, and hardening the proxy and OAuth routes.
