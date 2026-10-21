@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.5.1
+
+### Patch Changes
+
+- 8db9382: Revert the `?direct` stylesheet links on `landing.tsx` pages in `mcp-use dev`, which did not fix styles failing to load after reopening a tab.
+
 ## 4.5.1-canary.1
 
 ### Patch Changes
