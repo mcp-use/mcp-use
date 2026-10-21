@@ -52,14 +52,17 @@ export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
       ? inputTokens + outputTokens + uncountedCache
       : undefined);
 
+  const rawInputDetails =
+    usage.input_tokens_details ?? usage.prompt_tokens_details;
+  const rawOutputDetails =
+    usage.output_tokens_details ?? usage.completion_tokens_details;
   const inputDetails =
-    usage.input_tokens_details && typeof usage.input_tokens_details === "object"
-      ? (usage.input_tokens_details as Record<string, unknown>)
+    rawInputDetails && typeof rawInputDetails === "object"
+      ? (rawInputDetails as Record<string, unknown>)
       : undefined;
   const outputDetails =
-    usage.output_tokens_details &&
-    typeof usage.output_tokens_details === "object"
-      ? (usage.output_tokens_details as Record<string, unknown>)
+    rawOutputDetails && typeof rawOutputDetails === "object"
+      ? (rawOutputDetails as Record<string, unknown>)
       : undefined;
   const cachedInputTokens =
     numberAt(usage, "cachedInputTokens", "cache_read_input_tokens") ??
