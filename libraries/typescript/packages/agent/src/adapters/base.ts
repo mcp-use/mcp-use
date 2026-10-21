@@ -148,12 +148,17 @@ export abstract class BaseAdapter<T> {
   /**
    * Create tools from MCP tools in all provided connectors.
    *
+   * Rebuilds converted tools for each loading cycle so adapter-specific names
+   * and dispatch handlers remain in sync. Individual connector loads remain
+   * cached within the cycle.
+   *
    * @param connectors - List of MCP connectors to create tools from.
    * @returns A promise that resolves with all converted tools.
    */
   public async createToolsFromConnectors(
     connectors: BaseConnector[]
   ): Promise<T[]> {
+    this.connectorToolMap.clear();
     const tools: T[] = [];
     for (const connector of connectors) {
       const connectorTools = await this.loadToolsForConnector(connector);
