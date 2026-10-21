@@ -170,6 +170,19 @@ describe("landing page views", () => {
     }
   });
 
+  it("records nothing when anonymized telemetry is turned off", async () => {
+    const { server, events } = await setup(0);
+    process.env["MCP_USE_ANONYMIZED_TELEMETRY"] = "false";
+    try {
+      expect(
+        (await server.fetch(landingRequest({ userAgent: BROWSER }))).status
+      ).toBe(200);
+      expect(await events()).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("skips HEAD, protocol requests, and views outside the sample", async () => {
     const { server, events } = await setup(0);
     try {
