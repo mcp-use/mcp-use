@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.24
+
+### Patch Changes
+
+- 5426c95: Docker builds now default to the exact version in package.json, reject dist-tags and unpublished versions, and start the installed mcp-inspect binary directly while preserving PORT support. Native Railway deployments reject prerelease versions from main. Publish and verify canary packages before pushing their version commit, replacing the custom Railway deployment action.
+
 ## 20.3.24-canary.0
 
 ### Patch Changes

@@ -16,7 +16,10 @@ on:
         type: boolean
         default: false
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+# Canary publication and main's canary reset must not overlap or drop queued releases.
+concurrency:
+  group: ${{ github.workflow }}
+  queue: max
 
 jobs:
   release:
@@ -109,6 +112,7 @@ jobs:
       - name: Version packages (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
         run: |
+          echo "CANARY_RELEASE_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           cd libraries/typescript
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -127,6 +131,15 @@ jobs:
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
         run: pnpm release-channel snapshot --channel canary --output canary-release-plan.json
+
+      - name: Check canary source before publishing
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        run: |
+          git fetch origin refs/heads/canary
+          if [ "$(git rev-parse FETCH_HEAD)" != "$CANARY_RELEASE_SOURCE_SHA" ]; then
+            echo "::error::Canary advanced while building. Run the release from the latest canary commit."
+            exit 1
+          fi
 
       - name: Publish packages (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'

@@ -321,6 +321,10 @@ npm, verifies the packed artifacts and dist-tags, and creates tags and release
 notes before pushing the version commit. That final `GITHUB_TOKEN` push does not
 start recursive Actions runs; the published artifacts have already passed the
 release workflow's verification before Railway can see the new version commit.
+Main and canary releases share a concurrency queue so publication cannot overlap
+with the stable release's canary reset. A canary run stops before publishing if
+its source commit has already been superseded; the final push never overwrites
+concurrent branch updates.
 
 ### TypeScript Coding Standards
 
