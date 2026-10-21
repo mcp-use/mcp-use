@@ -101,7 +101,9 @@ describe("landing page views", () => {
     delete process.env["MCP_USE_TELEMETRY_VALIDATION_ID"];
     process.env["MCP_USE_TELEMETRY_PROJECT_ID"] = "landing-test";
     vi.spyOn(Math, "random").mockReturnValue(random);
-    const fetch = vi.fn(async () => new Response(null, { status: 202 }));
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      async () => new Response(null, { status: 202 })
+    );
     vi.stubGlobal("fetch", fetch);
     const usage = await import("../src/usage.js");
     const { MCPServer } = await import("../src/index.js");
@@ -110,10 +112,7 @@ describe("landing page views", () => {
       await usage.flushUsage();
       return fetch.mock.calls.map(
         ([, init]) =>
-          JSON.parse(String((init as RequestInit).body)).properties as Record<
-            string,
-            unknown
-          >
+          JSON.parse(String(init?.body)).properties as Record<string, unknown>
       );
     };
     return { server, events };
