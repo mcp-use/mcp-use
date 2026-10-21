@@ -1,0 +1,84 @@
+[project]
+name = "mcp-use-analytics"
+version = "0.1.0"
+description = "One-line Manufact analytics for Python MCP servers (FastMCP, the official mcp SDK, mcp-use)."
+authors = [
+    {name = "mcp-use, Inc.", email = "dev@mcp-use.io"},
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+keywords = ["mcp", "model-context-protocol", "analytics", "observability", "fastmcp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+# Zero runtime dependencies: the package only uses the standard library and
+# imports the MCP framework it instruments lazily, from the server it is given.
+dependencies = []
+
+[project.urls]
+Homepage = "https://mcp-use.com"
+Repository = "https://github.com/mcp-use/mcp-use"
+Issues = "https://github.com/mcp-use/mcp-use/issues"
+
+[dependency-groups]
+# Lint and type check tooling (see README "Development").
+dev = [
+    "ruff==0.15.22",
+    "ty>=0.0.1a20",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_use_analytics"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/mcp_use_analytics", "README.md"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "I",  # isort
+    "W",  # pycodestyle warnings
+    "B",  # flake8-bugbear
+    "UP", # pyupgrade
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mcp_use_analytics"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.ty.environment]
+python-version = "3.10"
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.rules]
+possibly-missing-attribute = "ignore"
