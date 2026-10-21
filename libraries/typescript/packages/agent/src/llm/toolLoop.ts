@@ -68,6 +68,7 @@ export async function* runToolLoop(
           });
         }
         yield ev;
+        if (ev.type === "error") return;
       }
     } catch (err) {
       // Preserve structured HTTP errors (429 loginRequired, 402 credits, …) so

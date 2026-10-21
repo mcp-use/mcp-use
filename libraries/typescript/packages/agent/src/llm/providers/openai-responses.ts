@@ -1,3 +1,4 @@
+import { parseToolArguments } from "../toolArguments.js";
 import { parseSSE } from "../sse.js";
 import {
   partitionToolContent,
@@ -209,7 +210,7 @@ function buildResponsesBody(
 interface FunctionCallItem {
   call_id: string;
   name: string;
-  arguments: string;
+  arguments: unknown;
 }
 
 export function extractFunctionCalls(output: unknown[]): FunctionCallItem[] {
@@ -224,7 +225,7 @@ export function extractFunctionCalls(output: unknown[]): FunctionCallItem[] {
     calls.push({
       call_id: row.call_id,
       name: row.name,
-      arguments: typeof row.arguments === "string" ? row.arguments : "{}",
+      arguments: row.arguments,
     });
   }
   return calls;
@@ -247,15 +248,6 @@ function extractMessageText(output: unknown[]): string {
     }
   }
   return parts.join("");
-}
-
-function parseArgs(argsJson: string): Record<string, unknown> {
-  if (!argsJson) return {};
-  try {
-    return JSON.parse(argsJson) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
 }
 
 /** Map Responses SSE JSON events → LlmStreamEvent; returns output[] from response.completed. */
@@ -354,17 +346,28 @@ export async function* streamResponsesTurn(
 
     if (type === "response.function_call_arguments.done") {
       const itemId = typeof parsed.item_id === "string" ? parsed.item_id : "";
-      const argsRaw =
-        typeof parsed.arguments === "string" ? parsed.arguments : "";
+      const argsRaw = parsed.arguments;
       const buf = callBuffers.get(itemId);
       if (buf) {
-        if (argsRaw) buf.argsJson = argsRaw;
+        let args: Record<string, unknown>;
+        try {
+          args = parseToolArguments(
+            argsRaw === "" ? buf.argsJson : argsRaw,
+            buf.name
+          );
+        } catch (err) {
+          yield {
+            type: "error",
+            message: err instanceof Error ? err.message : String(err),
+          };
+          return [];
+        }
         yield {
           type: "tool-call-ready",
           index: buf.index,
           toolCallId: buf.callId,
           toolName: buf.name,
-          args: parseArgs(buf.argsJson || argsRaw),
+          args,
         };
       }
       continue;
@@ -434,7 +437,7 @@ export async function completeResponsesTurn(
     toolCalls: fnCalls.map((c) => ({
       id: c.call_id,
       name: c.name,
-      args: parseArgs(c.arguments),
+      args: parseToolArguments(c.arguments, c.name),
     })),
   };
 }

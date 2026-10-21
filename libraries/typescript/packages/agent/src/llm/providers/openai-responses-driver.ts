@@ -1,3 +1,4 @@
+import { parseToolArguments } from "../toolArguments.js";
 import type { ToolLoopParams } from "../toolLoop.js";
 import type {
   LlmDriver,
@@ -73,22 +74,33 @@ export class OpenAIResponsesDriver implements LlmDriver {
       }
 
       input.push(...output);
-      const functionCalls = extractFunctionCalls(output);
+      let functionCalls: {
+        call_id: string;
+        name: string;
+        args: Record<string, unknown>;
+      }[];
+      try {
+        functionCalls = extractFunctionCalls(output).map((call) => ({
+          call_id: call.call_id,
+          name: call.name,
+          args: parseToolArguments(call.arguments, call.name),
+        }));
+      } catch (err) {
+        yield {
+          type: "error",
+          message: err instanceof Error ? err.message : String(err),
+        };
+        return;
+      }
       if (functionCalls.length === 0) return;
 
       for (const call of functionCalls) {
         if (params.signal?.aborted) return;
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(call.arguments) as Record<string, unknown>;
-        } catch {
-          args = {};
-        }
 
         let result: unknown;
         let isError = false;
         try {
-          result = await params.callTool(call.name, args);
+          result = await params.callTool(call.name, call.args);
           isError = isToolResultError(result);
         } catch (err) {
           isError = true;
