@@ -181,9 +181,9 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11",
+    "vitest": "^4.1.12",
     "zod": "^4.4.3",
-    "vite": "8.0.16"
+    "vite": "8.1.6"
   },
   "publishConfig": {
     "access": "public"

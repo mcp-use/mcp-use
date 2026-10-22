@@ -4,6 +4,7 @@ packages:
 minimumReleaseAge: 4320
 
 overrides:
+  vite: "8.1.6"
   hono: ">=4.13.7"
   qs: ">=6.16.0"
   nanoid@<3.3.18: ^3.3.18
