@@ -24,6 +24,87 @@ When `MCP_ASSETS_URL` is unset, assets use the same origin as `MCP_URL` (or the 
 
 At **`mcp-use build`**, `MCP_ASSETS_URL` rewrites manifest paths to full `https://` URLs for static upload workflows.
 
+## Separate the UI origin from the MCP endpoint
+
+Set `view.domain` to the dedicated HTTPS origin you want ChatGPT to use, such as
+`https://wavebyvento.com`. The MCP endpoint is the URL clients connect to, such as
+`https://wave-by-vento.run.mcp-use.com/mcp`. These values serve different purposes.
+
+```env
+MCP_URL=https://wave-by-vento.run.mcp-use.com
+```
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "wave",
+  version: "1.0.0",
+  basePath: "/mcp",
+});
+
+export const showWave = server.tool(
+  {
+    name: "show-wave",
+    outputSchema: z.object({ message: z.string() }),
+    view: { name: "wave", domain: "https://wavebyvento.com" },
+  },
+  async () => ({
+    structuredContent: { message: "Hello from Wave" },
+    content: [{ type: "text", text: "Opened Wave" }],
+  }),
+);
+
+export default server;
+```
+
+Add the corresponding `views/wave/view.tsx` as described in [MCP Apps](/v2/typescript/mcp-apps).
+On `resources/read`, mcp-use emits host-specific `_meta.ui.domain`:
+
+| Host                                 | Domain output                                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| ChatGPT and other non-Claude clients | `https://wavebyvento.com`                                                                                                      |
+| Claude                               | First 32 hexadecimal characters of SHA-256 of `https://wave-by-vento.run.mcp-use.com/mcp`, followed by `.claudemcpcontent.com` |
+
+Claude hashes the **full endpoint**, including `/mcp`, not the website origin or
+`MCP_ASSETS_URL`. This follows [Claude's domain handling contract](https://claude.com/docs/connectors/building/mcp-apps/cross-compatibility).
+ChatGPT expects a dedicated origin; `openai/widgetDomain` is a compatibility alias
+for `ui.domain`, not a way to repair a conflicting value. See the
+[OpenAI resource metadata reference](https://developers.openai.com/plugins/reference#component-resource-_meta-fields).
+
+### Endpoint resolution and migration
+
+- An origin-only `MCP_URL` combines with the server's `basePath` (default `/mcp`).
+- For View domain resolution, an `MCP_URL` with a path is treated as the full endpoint and hashed verbatim, including a trailing slash or query. With OAuth, keep `MCP_URL` origin-only: OAuth configuration separately requires an origin and appends `basePath`.
+- Without a valid `MCP_URL`, View reads use the request path and query with the forwarded origin, or the request origin when forwarded headers are absent. Configure `MCP_URL` when a proxy hides or rewrites the public path; only trust forwarded headers set by your proxy.
+- Older HTTP(S) `view.domain` values containing `/mcp` or another path are normalized to their origin. Set the intended UI origin explicitly when it differs from the endpoint origin.
+- Existing computed `*.claudemcpcontent.com` values remain unchanged for compatibility. They are Claude-specific and unsuitable for ChatGPT. Replace them with an HTTPS UI origin to use automatic host conversion.
+- An omitted `view.domain` keeps the host default. If no HTTP request or `MCP_URL` is available, Claude falls back to hashing the authored domain; configure the public endpoint for that case.
+
+The SDK identifies Claude by its advertised client name, with a User-Agent fallback
+when no client name is available. Unknown clients receive the UI origin. Domain
+normalization is not submission validation: use an HTTPS origin for ChatGPT and
+verify resource reads in each target host before submitting.
+
+### Preserve generated resource metadata
+
+Remove custom response helpers that overwrite `_meta.ui.domain` after `next()`.
+The SDK applies Claude's conversion before response middleware receives the result;
+a later overwrite replaces the generated value. Keep unrelated additions and preserve
+existing `ui` fields when merging metadata.
+
+Configure the domain through `view.domain`. Tool definition `_meta` and tool result
+`_meta` do not configure the View resource domain. Generated View resources emit
+`ui.domain` without an `openai/widgetDomain` alias. Manually registered resources and
+custom middleware remain author-controlled; if you emit both keys for ChatGPT, keep
+them consistent. Resource listings show the UI origin; Claude conversion happens on reads.
+
+`view.csp.frameDomains` separately allows **nested iframes inside the View**. It does
+not select the View's sandbox origin, identify the MCP endpoint, or fix domain
+validation. Declare it only when the View embeds another page. ChatGPT applies
+additional review to nested frames.
+
 ## CSP merge order
 
 On each `resources/read`, the framework merges CSP in this order (high → low priority):
