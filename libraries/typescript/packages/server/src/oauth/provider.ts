@@ -2,6 +2,7 @@ import type {
   AuthInfo as OAuthAuthInfo,
   OAuthMetadata,
   OAuthTokenVerifier,
+  JSONRPCMessage,
 } from "@modelcontextprotocol/server";
 import type { Context } from "hono";
 
@@ -221,6 +222,29 @@ export type OAuthMetadataSource =
   | ((resource: URL) => OAuthMetadata);
 
 /**
+ * Result of a provider-owned request-admission check.
+ *
+ * Return a Response to refuse or otherwise handle the request. To admit it,
+ * return the bearer token associated with the verified SDK authentication data.
+ * Return `{ type: "defer" }` to use the built-in bearer verifier and its
+ * signed-out policy, including anonymous access permitted by `mixedAuth`.
+ */
+export type OAuthAdmissionResult =
+  | Response
+  | { type: "defer" }
+  | { bearer: string; authInfo: OAuthAuthInfo };
+
+/**
+ * Authenticates an MCP request before mcp-use runs its built-in OAuth gate.
+ * Messages are supplied as an array for both single requests and JSON-RPC
+ * batches; malformed or empty bodies produce an empty array.
+ */
+export type OAuthAdmissionHook = (
+  request: Request,
+  messages: JSONRPCMessage[]
+) => Promise<OAuthAdmissionResult>;
+
+/**
  * Options for {@link oauthCustomProvider}.
  *
  * @typeParam TUser - Application user type exposed to authenticated callbacks.
@@ -242,6 +266,19 @@ export interface CustomOAuthProviderOptions<
   oauthMetadata: TMetadata;
   /** Maps verified SDK auth information into mcp-use callback identity data. */
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
+  /**
+   * Optional request-admission hook for OAuth adapters that authenticate
+   * requests outside the standard bearer verifier.
+   *
+   * It runs for MCP endpoint requests served through both `server.fetch` and
+   * `server.listen()`. Return a Response to short-circuit the request, return
+   * the presented bearer token and verified AuthInfo to admit it, or return
+   * `{ type: "defer" }` to use the built-in bearer verifier. Deferring also
+   * preserves the built-in mixed-auth policy for requests without credentials.
+   * mcp-use still enforces the provider's required scopes and tool security
+   * schemes against the returned AuthInfo.
+   */
+  admit?: OAuthAdmissionHook;
   /**
    * Optional hook invoked once while the server mounts. Providers use it to
    * install MCP middleware, provider-owned tools, resources, and prompts, or
@@ -306,6 +343,10 @@ export function oauthCustomProvider<
     );
   }
 
+  if (options.admit !== undefined && typeof options.admit !== "function") {
+    throw new TypeError("admit must be a function when provided");
+  }
+
   if (options.setup !== undefined && typeof options.setup !== "function") {
     throw new TypeError("setup must be a function when provided");
   }
@@ -339,6 +380,7 @@ export function oauthCustomProvider<
     createTokenVerifier: options.createTokenVerifier,
     oauthMetadata: options.oauthMetadata,
     mapAuthInfo: options.mapAuthInfo,
+    ...(options.admit !== undefined && { admit: options.admit }),
     ...(options.setup !== undefined && { setup: options.setup }),
     ...(options.resource !== undefined && { resource: options.resource }),
     ...(options.requiredScopes !== undefined && {
