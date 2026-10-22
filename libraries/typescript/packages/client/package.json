@@ -84,7 +84,7 @@
     "jsdom": "^27.0.0",
     "react": "^19.2.3",
     "react-test-renderer": "^19.2.4",
-    "vitest": "^4.1.11",
+    "vitest": "^4.1.12",
     "zod": "^4.2.0"
   },
   "publishConfig": {
