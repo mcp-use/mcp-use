@@ -1087,6 +1087,7 @@ describe("view resource reads through resources/read middleware", () => {
   const seenDomains: unknown[] = [];
   const seenViews: unknown[] = [];
   const observed: string[] = [];
+  let url: string;
   let client: Client;
   let claudeClient: Client;
 
@@ -1144,7 +1145,7 @@ describe("view resource reads through resources/read middleware", () => {
   });
 
   beforeAll(async () => {
-    const { url } = await server.listen(0);
+    ({ url } = await server.listen(0));
     client = new Client(
       { name: "plain-client", version: "1.0.0" },
       { versionNegotiation: { mode: { pin: "2026-07-28" } } }
@@ -1186,7 +1187,7 @@ describe("view resource reads through resources/read middleware", () => {
     const read = await claudeClient.readResource({
       uri: "ui://views/product-search-result.html",
     });
-    const hashed = "36009c725adb9960af4aebe6278959e8.claudemcpcontent.com";
+    const hashed = `${createHash("sha256").update(url).digest("hex").slice(0, 32)}.claudemcpcontent.com`;
     expect(seenDomains).toEqual([hashed]);
     const ui = read.contents[0]?._meta?.["ui"] as
       | Record<string, unknown>
