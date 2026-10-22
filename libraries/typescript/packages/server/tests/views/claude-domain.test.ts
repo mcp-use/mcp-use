@@ -5,6 +5,7 @@ import {
   computeClaudeResourceDomain,
   isClaudeClient,
 } from "../../src/views/claude-domain.js";
+import { buildResourceUiMeta } from "../../src/views/wire.js";
 
 describe("Claude resource domains", () => {
   it("detects Claude clients by advertised client name", () => {
@@ -117,5 +118,62 @@ describe("Claude resource domains", () => {
 
     expect(applied).toBe(meta);
     expect(applied["ui"]).not.toHaveProperty("domain");
+  });
+});
+
+describe("UI origin and MCP endpoint identity", () => {
+  it("uses the full endpoint for Claude independently of the website origin", async () => {
+    const meta = buildResourceUiMeta({ domain: "https://website.example.com" });
+    const result = await applyClaudeResourceDomain(
+      meta,
+      { name: "Claude" },
+      undefined,
+      "https://example.com/mcp"
+    );
+    expect(result["ui"]).toMatchObject({
+      domain: "c3d80a4ed901ee05b21755a88273b4a4.claudemcpcontent.com",
+    });
+    expect(meta["ui"]).toMatchObject({ domain: "https://website.example.com" });
+  });
+
+  it.each(["ChatGPT", "other-client"])(
+    "emits an exact origin for %s from a legacy endpoint value",
+    async (name) => {
+      const meta = buildResourceUiMeta({
+        domain: "https://example.com/mcp?legacy=1#fragment",
+      });
+      const result = await applyClaudeResourceDomain(
+        meta,
+        { name },
+        undefined,
+        "https://example.com/mcp"
+      );
+      expect(result["ui"]).toMatchObject({ domain: "https://example.com" });
+      expect(result).not.toHaveProperty("openai/widgetDomain");
+    }
+  );
+
+  it("preserves explicit computed Claude domains even when an endpoint is available", async () => {
+    const domain = "c3d80a4ed901ee05b21755a88273b4a4.claudemcpcontent.com";
+    const result = await applyClaudeResourceDomain(
+      { ui: { domain } },
+      { name: "Claude" },
+      undefined,
+      "https://different.example/mcp"
+    );
+    expect(result["ui"]).toEqual({ domain });
+  });
+
+  it("does not opt an undeclared view into a dedicated domain", async () => {
+    const meta = buildResourceUiMeta(undefined);
+    expect(
+      await applyClaudeResourceDomain(
+        meta,
+        { name: "Claude" },
+        undefined,
+        "https://example.com/mcp"
+      )
+    ).toBe(meta);
+    expect(meta["ui"]).not.toHaveProperty("domain");
   });
 });
