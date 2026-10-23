@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -17,6 +19,8 @@ vi.mock("../../src/commands/client.js", async (importOriginal) => ({
 
 import { runScreenshot } from "../../src/commands/screenshot.js";
 
+const nativeFetch = globalThis.fetch;
+
 beforeEach(() => {
   mocks.openDirectConnection.mockResolvedValue(mocks);
   mocks.openSavedConnection.mockResolvedValue(mocks);
@@ -28,8 +32,7 @@ beforeEach(() => {
     contents: [{ text: "<html></html>" }],
   });
   mocks.disconnect.mockResolvedValue(undefined);
-  const nativeFetch = globalThis.fetch;
-  vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
     if (String(input) === "https://inspector.example.test/inspector/health") {
       return Promise.resolve(
         Response.json({
@@ -40,8 +43,6 @@ beforeEach(() => {
         })
       );
     }
-    // Malformed URLs exercise fetch's native error/cause without opening a socket.
-    if (String(input).startsWith("not a url")) return nativeFetch(input, init);
     throw new Error(`Unexpected fetch: ${String(input)}`);
   });
 });
@@ -52,6 +53,60 @@ afterEach(() => {
 });
 
 describe("screenshot URL error classification", () => {
+  it.each([false, true])(
+    "reports an Inspector health-check network failure with json=%s",
+    async (json) => {
+      const requestedPaths: Array<string | undefined> = [];
+      const server = createServer((request, response) => {
+        requestedPaths.push(request.url);
+        response.destroy();
+      });
+      await new Promise<void>((resolve) =>
+        server.listen(0, "127.0.0.1", resolve)
+      );
+      try {
+        const address = server.address();
+        if (address === null || typeof address === "string") {
+          throw new Error("Expected a TCP test server.");
+        }
+        vi.mocked(globalThis.fetch).mockImplementation(nativeFetch);
+        const stdout = vi
+          .spyOn(process.stdout, "write")
+          .mockImplementation(() => true);
+        const stderr = vi
+          .spyOn(process.stderr, "write")
+          .mockImplementation(() => true);
+        const args = [
+          "--mcp",
+          "https://mcp.example.test/mcp",
+          "--tool",
+          "show",
+          "--inspector",
+          `http://127.0.0.1:${address.port}`,
+        ];
+        if (json) args.push("--json");
+
+        await expect(runScreenshot(args)).resolves.toBe(1);
+
+        expect(requestedPaths).toContain("/inspector/health");
+        expect(mocks.disconnect).toHaveBeenCalledOnce();
+        expect(stdout).not.toHaveBeenCalled();
+        const output = stderr.mock.calls.map(([text]) => text).join("");
+        if (json) {
+          expect(output.trim().split("\n")).toHaveLength(1);
+          expect(JSON.parse(output)).toEqual({
+            error: { code: "command_failed", message: "fetch failed" },
+          });
+        } else {
+          expect(output).toBe("fetch failed\n");
+        }
+      } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    }
+  );
+
   it.each(["--mcp", "--inspector", "--cdp-url"])(
     "rejects malformed %s before connecting or calling a tool",
     async (option) => {
