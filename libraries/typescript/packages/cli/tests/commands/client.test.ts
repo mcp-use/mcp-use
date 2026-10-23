@@ -799,11 +799,9 @@ describe("client OAuth browser UX", () => {
       setStdinTty(true);
       mocks.triggerOAuth = true;
       mocks.waitForOAuth = true;
-      let pressEnter!: (value: string) => void;
       mocks.question.mockImplementation(
         (_message: string, options?: { signal: AbortSignal }) =>
-          new Promise<string>((resolve, reject) => {
-            pressEnter = resolve;
+          new Promise<string>((_resolve, reject) => {
             options?.signal.addEventListener("abort", () =>
               reject(new DOMException("Aborted", "AbortError"))
             );
@@ -830,13 +828,52 @@ describe("client OAuth browser UX", () => {
       finish();
       await expect(result).resolves.toBe(outcome === "success" ? 0 : 1);
       expect(mocks.closePrompt).toHaveBeenCalledOnce();
-      pressEnter("");
-      await Promise.resolve();
+      await new Promise<void>((resolve) => setImmediate(resolve));
       expect(mocks.openBrowser).not.toHaveBeenCalled();
       expect(stderr).not.toContain(AUTHORIZATION_LAUNCHER_URL);
       if (outcome !== "success") expect(stderr).toContain(`OAuth ${outcome}`);
     }
   );
+
+  it("ignores Enter when OAuth finishes before the prompt continuation runs", async () => {
+    setStdinTty(true);
+    mocks.triggerOAuth = true;
+    mocks.waitForOAuth = true;
+    let pressEnter!: (value: string) => void;
+    mocks.question.mockReturnValue(
+      new Promise<string>((resolve) => {
+        pressEnter = resolve;
+      })
+    );
+    let authorize!: () => void;
+    mocks.getAuthorizationCode.mockReturnValue(
+      new Promise<void>((resolve) => {
+        authorize = resolve;
+      })
+    );
+
+    const result = runClient([
+      "connect",
+      "finished-oauth-enter",
+      "https://mcp.example.com/mcp",
+    ]);
+    try {
+      await vi.waitFor(() =>
+        expect(mocks.openerReturned).toHaveBeenCalledOnce()
+      );
+      authorize();
+      pressEnter("");
+      await expect(result).resolves.toBe(0);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(mocks.closePrompt).toHaveBeenCalledOnce();
+      expect(mocks.openBrowser).not.toHaveBeenCalled();
+      expect(stderr).not.toContain(AUTHORIZATION_LAUNCHER_URL);
+    } finally {
+      authorize();
+      pressEnter("");
+      await result;
+    }
+  });
 
   it("offers the manual URL if the interactive prompt fails", async () => {
     setStdinTty(true);
