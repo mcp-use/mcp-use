@@ -79,10 +79,7 @@ export async function runServers(argv: readonly string[]): Promise<number> {
     if (subcommand === "env") return await env(argv.slice(1), json);
     throw new UsageError("Usage: mcp-use servers <list|get|update|delete|env>");
   } catch (error) {
-    return reportError(
-      error instanceof TypeError ? new UsageError(error.message) : error,
-      json
-    );
+    return reportError(error, json);
   }
 }
 
