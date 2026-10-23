@@ -17,7 +17,6 @@ const NATIVE_USAGE_ERROR_CODES = new Set([
   "ERR_PARSE_ARGS_UNKNOWN_OPTION",
   "ERR_PARSE_ARGS_INVALID_OPTION_VALUE",
   "ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL",
-  "ERR_INVALID_URL",
 ]);
 
 /** Usage error reported with exit code 2 by the CLI boundary. */
@@ -51,6 +50,15 @@ export class CommandError extends Error {
 export class CommandUsageError extends CommandError {
   /** Process exit code for command choices that must be supplied explicitly. */
   readonly exitCode = 2;
+}
+
+/** Parse a user-supplied URL, keeping usage classification at the input boundary. */
+export function parseUrlArgument(value: string, label: string): URL {
+  try {
+    return new URL(value);
+  } catch {
+    throw new UsageError(`${label} must be a valid absolute URL.`);
+  }
 }
 
 /** Whether a command should emit machine-readable output. */

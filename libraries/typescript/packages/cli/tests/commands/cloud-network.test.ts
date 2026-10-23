@@ -66,6 +66,34 @@ const commands = [
 ];
 
 describe.each(commands)("$name network failures", ({ run }) => {
+  it.each(["MCP_USE_CLOUD_API_URL", "MCP_API_URL"])(
+    "reports malformed %s as a usage error before fetching",
+    async (variable) => {
+      vi.stubEnv("MCP_USE_CLOUD_API_URL", undefined);
+      vi.stubEnv(variable, "not a url");
+      const fetch = vi.spyOn(globalThis, "fetch");
+      const stdout = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation(() => true);
+      const stderr = vi
+        .spyOn(process.stderr, "write")
+        .mockImplementation(() => true);
+
+      await expect(run(["--json"])).resolves.toBe(2);
+
+      expect(fetch).not.toHaveBeenCalled();
+      expect(stdout).not.toHaveBeenCalled();
+      expect(
+        JSON.parse(stderr.mock.calls.map(([text]) => text).join(""))
+      ).toEqual({
+        error: {
+          code: "usage_error",
+          message: `${variable} must be a valid absolute URL.`,
+        },
+      });
+    }
+  );
+
   it.each([false, true])("exits 1 with json=%s", async (json) => {
     const stdout = vi
       .spyOn(process.stdout, "write")

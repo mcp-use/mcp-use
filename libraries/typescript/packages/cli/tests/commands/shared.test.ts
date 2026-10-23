@@ -37,7 +37,6 @@ describe("command error classification", () => {
         }),
     ],
     ["unexpected positional", () => parseArgs({ args: ["unexpected"] })],
-    ["invalid URL", () => new URL("not a URL")],
   ])("reports native %s errors as usage errors", (_name, run) => {
     const stderr = vi
       .spyOn(process.stderr, "write")
@@ -47,6 +46,18 @@ describe("command error classification", () => {
     expect(reportError(error, true)).toBe(2);
     expect(JSON.parse(String(stderr.mock.calls[0]![0]))).toMatchObject({
       error: { code: "usage_error" },
+    });
+  });
+
+  it("treats URL errors outside argument validation as operational failures", () => {
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    const error = caughtError(() => new URL("invalid remote resource"));
+
+    expect(reportError(error, true)).toBe(1);
+    expect(JSON.parse(String(stderr.mock.calls[0]![0]))).toMatchObject({
+      error: { code: "command_failed" },
     });
   });
 

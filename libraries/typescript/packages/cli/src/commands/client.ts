@@ -13,6 +13,7 @@ import {
   confirm,
   GLOBAL_STATE_DIR,
   openBrowser,
+  parseUrlArgument,
   pathExists,
   printResult,
   readJson,
@@ -92,7 +93,7 @@ async function connect(
   }
   const [name, rawUrl] = positionals as [string, string];
   validateName(name);
-  const url = new URL(rawUrl);
+  const url = parseUrlArgument(rawUrl, "Server URL");
   if (!["http:", "https:"].includes(url.protocol)) {
     throw new UsageError("Client URLs must use http or https.");
   }
