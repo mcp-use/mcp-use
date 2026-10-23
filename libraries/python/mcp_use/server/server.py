@@ -483,7 +483,7 @@ class MCPServer(FastMCP):
                 session_id = self._get_session_id_from_request()
 
                 context = ServerMiddlewareContext(
-                    message=request.params,
+                    message=getattr(request, "params", None),
                     method=method,
                     timestamp=datetime.now(UTC),
                     transport=self._transport_type,
