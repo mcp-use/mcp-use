@@ -19,18 +19,25 @@ export async function* parseSSE(
   const reader = body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
+  let skipLeadingLF = false;
 
   try {
     while (true) {
       if (signal?.aborted) return;
       const { value, done } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      let text = decoder.decode(value, { stream: true });
+      if (!text) continue;
+
+      // A CRLF can span decoded chunks, including empty UTF-8 chunks.
+      if (skipLeadingLF && text.startsWith("\n")) text = text.slice(1);
+      skipLeadingLF = text.endsWith("\r");
+      buffer += text.replace(/\r\n?/g, "\n");
 
       let sep: number;
-      while ((sep = indexOfEventSeparator(buffer)) !== -1) {
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
         const raw = buffer.slice(0, sep);
-        buffer = buffer.slice(sep).replace(/^(\r\n\r\n|\n\n|\r\r)/, "");
+        buffer = buffer.slice(sep + 2);
         const parsed = parseSseBlock(raw);
         if (parsed) yield parsed;
       }
@@ -47,14 +54,6 @@ export async function* parseSSE(
       // ignore
     }
   }
-}
-
-function indexOfEventSeparator(s: string): number {
-  const a = s.indexOf("\n\n");
-  const b = s.indexOf("\r\n\r\n");
-  if (a === -1) return b;
-  if (b === -1) return a;
-  return Math.min(a, b);
 }
 
 function parseSseBlock(raw: string): SseEvent | null {
