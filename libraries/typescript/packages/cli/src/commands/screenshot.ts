@@ -248,10 +248,7 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     );
     return 0;
   } catch (error) {
-    return reportError(
-      error instanceof TypeError ? new UsageError(error.message) : error,
-      json
-    );
+    return reportError(error, json);
   } finally {
     await browser?.close().catch(() => {});
     await localInspector?.close().catch(() => {});

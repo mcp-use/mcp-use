@@ -394,6 +394,27 @@ describe("client JSON output", () => {
   });
 });
 
+describe("client connection errors", () => {
+  it("reports a connection TypeError as an operational failure", async () => {
+    mocks.connectError = new TypeError("fetch failed");
+
+    await expect(
+      runClient([
+        "connect",
+        "unreachable",
+        "https://mcp.example.com/mcp",
+        "--no-oauth",
+        "--json",
+      ])
+    ).resolves.toBe(1);
+
+    expect(stdout).toBe("");
+    expect(JSON.parse(stderr)).toEqual({
+      error: { code: "command_failed", message: "fetch failed" },
+    });
+  });
+});
+
 describe("client tool arguments", () => {
   it("sends a plain value containing := as a string", async () => {
     await runClient([

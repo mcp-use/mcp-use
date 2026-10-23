@@ -67,10 +67,7 @@ export async function runClient(argv: readonly string[]): Promise<number> {
     }
     return await savedServerCommand(first, normalizedArgv.slice(1), json);
   } catch (error) {
-    return reportError(
-      error instanceof TypeError ? new UsageError(error.message) : error,
-      json
-    );
+    return reportError(error, json);
   }
 }
 

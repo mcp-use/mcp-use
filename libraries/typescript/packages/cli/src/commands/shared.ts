@@ -13,6 +13,13 @@ import { basename, dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { openBrowser as launchBrowser } from "../cli/open-browser.js";
 
+const NATIVE_USAGE_ERROR_CODES = new Set([
+  "ERR_PARSE_ARGS_UNKNOWN_OPTION",
+  "ERR_PARSE_ARGS_INVALID_OPTION_VALUE",
+  "ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL",
+  "ERR_INVALID_URL",
+]);
+
 /** Usage error reported with exit code 2 by the CLI boundary. */
 export class UsageError extends Error {
   /** Process exit code for malformed command lines. */
@@ -74,7 +81,12 @@ export function reportError(error: unknown, json: boolean): number {
     error instanceof UsageError ||
     (error instanceof CommandError &&
       "exitCode" in error &&
-      error.exitCode === 2);
+      error.exitCode === 2) ||
+    // Node also uses TypeError for operational failures, including fetch.
+    (error instanceof TypeError &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      NATIVE_USAGE_ERROR_CODES.has(error.code));
   const operational = error instanceof CommandError;
   const code = operational
     ? error.code

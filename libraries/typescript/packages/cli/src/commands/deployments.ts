@@ -70,10 +70,7 @@ export async function runDeployments(argv: readonly string[]): Promise<number> {
       "Usage: mcp-use deployments <list|get|logs|restart|stop|delete>"
     );
   } catch (error) {
-    return reportError(
-      error instanceof TypeError ? new UsageError(error.message) : error,
-      json
-    );
+    return reportError(error, json);
   }
 }
 

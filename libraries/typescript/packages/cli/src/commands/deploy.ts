@@ -311,10 +311,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       json,
     });
   } catch (error) {
-    return reportError(
-      error instanceof TypeError ? new UsageError(error.message) : error,
-      json
-    );
+    return reportError(error, json);
   }
 }
 
