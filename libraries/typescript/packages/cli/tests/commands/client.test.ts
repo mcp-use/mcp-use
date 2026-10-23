@@ -26,9 +26,12 @@ const mocks = vi.hoisted(() => ({
   createInterface: vi.fn(),
   loadClientPackage: vi.fn(),
   logger: { level: "info" },
+  getAuthorizationCode: vi.fn(),
+  openerReturned: vi.fn(),
   openBrowser: vi.fn(),
   question: vi.fn(),
   triggerOAuth: false,
+  waitForOAuth: false,
 }));
 
 vi.mock("node:readline/promises", () => ({
@@ -77,7 +80,9 @@ beforeEach(async () => {
   mocks.connectError = undefined;
   mocks.connectCall.mockReset();
   mocks.triggerOAuth = false;
+  mocks.waitForOAuth = false;
   mocks.logger.level = "info";
+  mocks.getAuthorizationCode.mockReturnValue(new Promise(() => {}));
   homeDirectory = await mkdtemp(join(tmpdir(), "mcp-use-client-"));
   vi.stubEnv("HOME", homeDirectory);
   vi.stubEnv("USERPROFILE", homeDirectory);
@@ -126,7 +131,7 @@ beforeEach(async () => {
     createOAuthProvider: async (
       _url: string,
       options: { openBrowser: (url: string) => Promise<void> }
-    ) => ({ options }),
+    ) => ({ options, getAuthorizationCode: mocks.getAuthorizationCode }),
     MCPClient: class {
       constructor(config: {
         mcpServers: Record<string, { authProvider?: unknown }>;
@@ -142,9 +147,11 @@ beforeEach(async () => {
           | undefined;
         if (mocks.triggerOAuth && provider !== undefined) {
           await provider.options.openBrowser(AUTHORIZATION_LAUNCHER_URL);
+          mocks.openerReturned();
           if (mocks.logger.level === "silent") {
             await new Promise<never>(() => {});
           }
+          if (mocks.waitForOAuth) await mocks.getAuthorizationCode();
         }
         return connection;
       }
@@ -744,6 +751,163 @@ describe("client protocol selection", () => {
 });
 
 describe("client OAuth browser UX", () => {
+  it("leaves the SDK handshake free while waiting for Enter", async () => {
+    setStdinTty(true);
+    mocks.triggerOAuth = true;
+    mocks.waitForOAuth = true;
+    let pressEnter!: (value: string) => void;
+    mocks.question.mockReturnValue(
+      new Promise<string>((resolve) => {
+        pressEnter = resolve;
+      })
+    );
+    let authorize!: () => void;
+    mocks.getAuthorizationCode.mockReturnValue(
+      new Promise<void>((resolve) => {
+        authorize = resolve;
+      })
+    );
+
+    const result = runClient([
+      "connect",
+      "delayed-enter",
+      "https://mcp.example.com/mcp",
+    ]);
+    try {
+      await vi.waitFor(() =>
+        expect(mocks.openerReturned).toHaveBeenCalledOnce()
+      );
+      expect(mocks.openBrowser).not.toHaveBeenCalled();
+      pressEnter("");
+      await vi.waitFor(() =>
+        expect(mocks.openBrowser).toHaveBeenCalledWith(
+          AUTHORIZATION_LAUNCHER_URL
+        )
+      );
+      authorize();
+      await expect(result).resolves.toBe(0);
+    } finally {
+      pressEnter("");
+      authorize();
+      await result;
+    }
+  });
+
+  it.each(["success", "timeout", "cancelled"] as const)(
+    "closes a pending prompt on OAuth %s without opening a browser",
+    async (outcome) => {
+      setStdinTty(true);
+      mocks.triggerOAuth = true;
+      mocks.waitForOAuth = true;
+      mocks.question.mockImplementation(
+        (_message: string, options?: { signal: AbortSignal }) =>
+          new Promise<string>((_resolve, reject) => {
+            options?.signal.addEventListener("abort", () =>
+              reject(new DOMException("Aborted", "AbortError"))
+            );
+          })
+      );
+      let finish!: () => void;
+      mocks.getAuthorizationCode.mockReturnValue(
+        new Promise<void>((resolve, reject) => {
+          finish = () =>
+            outcome === "success"
+              ? resolve()
+              : reject(new Error(`OAuth ${outcome}`));
+        })
+      );
+
+      const result = runClient([
+        "connect",
+        `finished-oauth-${outcome}`,
+        "https://mcp.example.com/mcp",
+      ]);
+      await vi.waitFor(() =>
+        expect(mocks.openerReturned).toHaveBeenCalledOnce()
+      );
+      finish();
+      await expect(result).resolves.toBe(outcome === "success" ? 0 : 1);
+      expect(mocks.closePrompt).toHaveBeenCalledOnce();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(mocks.openBrowser).not.toHaveBeenCalled();
+      expect(stderr).not.toContain(AUTHORIZATION_LAUNCHER_URL);
+      if (outcome !== "success") expect(stderr).toContain(`OAuth ${outcome}`);
+    }
+  );
+
+  it("ignores Enter when OAuth finishes before the prompt continuation runs", async () => {
+    setStdinTty(true);
+    mocks.triggerOAuth = true;
+    mocks.waitForOAuth = true;
+    let pressEnter!: (value: string) => void;
+    mocks.question.mockReturnValue(
+      new Promise<string>((resolve) => {
+        pressEnter = resolve;
+      })
+    );
+    let authorize!: () => void;
+    mocks.getAuthorizationCode.mockReturnValue(
+      new Promise<void>((resolve) => {
+        authorize = resolve;
+      })
+    );
+
+    const result = runClient([
+      "connect",
+      "finished-oauth-enter",
+      "https://mcp.example.com/mcp",
+    ]);
+    try {
+      await vi.waitFor(() =>
+        expect(mocks.openerReturned).toHaveBeenCalledOnce()
+      );
+      authorize();
+      pressEnter("");
+      await expect(result).resolves.toBe(0);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(mocks.closePrompt).toHaveBeenCalledOnce();
+      expect(mocks.openBrowser).not.toHaveBeenCalled();
+      expect(stderr).not.toContain(AUTHORIZATION_LAUNCHER_URL);
+    } finally {
+      authorize();
+      pressEnter("");
+      await result;
+    }
+  });
+
+  it("offers the manual URL if the interactive prompt fails", async () => {
+    setStdinTty(true);
+    mocks.triggerOAuth = true;
+    mocks.waitForOAuth = true;
+    mocks.question.mockRejectedValue(new Error("Input unavailable"));
+    let authorize!: () => void;
+    mocks.getAuthorizationCode.mockReturnValue(
+      new Promise<void>((resolve) => {
+        authorize = resolve;
+      })
+    );
+
+    const result = runClient([
+      "connect",
+      "manual-oauth",
+      "https://mcp.example.com/mcp",
+    ]);
+    try {
+      await vi.waitFor(() =>
+        expect(stderr).toContain(
+          `Open this URL to authenticate:\n${AUTHORIZATION_LAUNCHER_URL}\n`
+        )
+      );
+      expect(mocks.openBrowser).not.toHaveBeenCalled();
+      expect(mocks.closePrompt).toHaveBeenCalledOnce();
+      authorize();
+      await expect(result).resolves.toBe(0);
+    } finally {
+      authorize();
+      await result;
+    }
+  });
+
   it("validates saved command options before connecting or starting OAuth", async () => {
     await runClient([
       "connect",
@@ -774,7 +938,8 @@ describe("client OAuth browser UX", () => {
 
     expect(mocks.question).toHaveBeenCalledOnce();
     expect(mocks.question).toHaveBeenCalledWith(
-      "This server requires OAuth. Press Enter to open your browser."
+      "This server requires OAuth. Press Enter to open your browser.",
+      { signal: expect.any(AbortSignal) }
     );
     expect(mocks.openBrowser).toHaveBeenCalledWith(AUTHORIZATION_LAUNCHER_URL);
     expect(mocks.question.mock.invocationCallOrder[0]).toBeLessThan(
