@@ -40,6 +40,7 @@ class MockWebSocket extends EventTarget {
   static readonly CLOSED = 3;
   static readonly instances: MockWebSocket[] = [];
   static keepaliveSupported = true;
+  static authRejection: { code: number; reason: string } | undefined;
 
   readonly sent: string[] = [];
   binaryType = "blob";
@@ -60,7 +61,12 @@ class MockWebSocket extends EventTarget {
     this.sent.push(data);
     const message = JSON.parse(data) as { type?: string };
     if (message.type === "authenticate") {
+      const rejection = MockWebSocket.authRejection;
       queueMicrotask(() => {
+        if (rejection !== undefined) {
+          this.close(rejection.code, rejection.reason);
+          return;
+        }
         this.dispatchEvent(
           messageEvent(
             JSON.stringify({
@@ -111,6 +117,7 @@ describe("createTunnelManager", () => {
     requestBody = undefined;
     MockWebSocket.instances.length = 0;
     MockWebSocket.keepaliveSupported = true;
+    MockWebSocket.authRejection = undefined;
     vi.stubGlobal("WebSocket", MockWebSocket);
     vi.stubGlobal(
       "fetch",
@@ -130,6 +137,16 @@ describe("createTunnelManager", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it("fails setup when the relay closes without accepting the connection", async () => {
+    MockWebSocket.authRejection = { code: 1008, reason: "Invalid token" };
+    const tunnel = createTunnelManager(stateFilePath);
+
+    await expect(tunnel.start(3000)).rejects.toThrow(
+      "Tunnel setup failed (1008: Invalid token)"
+    );
+    expect(deleteRequests).toBe(1);
   });
 
   it("uses the configured relay and requested subdomain", async () => {
