@@ -876,6 +876,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     callback: ResourceCallback<TUser, HasOAuth<TUser>, TEnv>
   ): this {
     this.#assertNotStarted("resource", definition.name);
+    for (const [name, entry] of this.#resources) {
+      if (name !== definition.name && entry.definition.uri === definition.uri)
+        throw new Error(
+          `Resource URI "${definition.uri}" is already registered by "${name}"`
+        );
+    }
     const previous = this.#resources.get(definition.name);
     if (previous !== undefined)
       this.#proxiedResources.delete(previous.definition.uri);
