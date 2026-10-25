@@ -370,6 +370,7 @@ Remix a complete MCP App, inspect the source, or deploy it as a starting point:
 - [Discord community](https://discord.gg/XkNkSkMz3V)
 - [Manufact](https://manufact.com)
 - [MIT license](https://github.com/mcp-use/mcp-use/blob/main/LICENSE)
+- [Mode VC Radar MCP](https://modevc.com/api/mcp) - Read-only venture capital & AI market research MCP server (39 empirical AI charts, 3,650 VC firms, SEC Form D filings, and 18 founder financial calculators; free Streamable HTTP at https://modevc.com/api/mcp).
 
 ## Contributors
 
