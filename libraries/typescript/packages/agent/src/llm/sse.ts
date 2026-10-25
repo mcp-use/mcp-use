@@ -42,6 +42,11 @@ export async function* parseSSE(
     }
   } finally {
     try {
+      await reader.cancel();
+    } catch {
+      // Cleanup must not replace a response or consumer error.
+    }
+    try {
       reader.releaseLock();
     } catch {
       // ignore
