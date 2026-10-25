@@ -247,8 +247,9 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
   ): Promise<boolean>;
   /**
    * Send a log message notification to the client during tool execution.
-   * Messages below the request's log level are dropped; modern clients
-   * receive nothing unless the request opts in with a log level.
+   * Messages below the client's log level are dropped. Modern clients receive
+   * nothing unless the request opts in with a log level. Legacy clients use the
+   * level set by `logging/setLevel`, or receive every message when none is set.
    */
   sendLog(
     level:
