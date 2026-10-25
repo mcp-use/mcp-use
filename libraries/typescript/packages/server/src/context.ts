@@ -245,7 +245,12 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
     total?: number,
     message?: string
   ): Promise<boolean>;
-  /** Send a log message notification to the client during tool execution. */
+  /**
+   * Send a log message notification to the client during tool execution.
+   * Messages below the client's log level are dropped. Modern clients receive
+   * nothing unless the request opts in with a log level. Legacy clients use the
+   * level set by `logging/setLevel`, or receive every message when none is set.
+   */
   sendLog(
     level:
       | "debug"
@@ -533,14 +538,9 @@ export function toRequestContext<TEnv extends Env = Env>(
       data: unknown,
       logger?: string
     ): Promise<void> {
-      await ctx.mcpReq.notify({
-        method: "notifications/message",
-        params: {
-          level,
-          data,
-          ...(logger !== undefined && { logger }),
-        },
-      });
+      // The SDK drops messages below the request's log level, and in the modern
+      // era sends nothing unless the request opted in with a log level.
+      await ctx.mcpReq.log(level, data, logger);
     },
   };
   if (http !== undefined) {

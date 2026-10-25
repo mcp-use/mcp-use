@@ -139,6 +139,8 @@ describe("requestLogger (via MCPServer.fetch)", () => {
           );
           const body = await request.json();
           body.params._meta.progressToken = "logging-progress";
+          // Modern clients opt in to log messages per request.
+          body.params._meta["io.modelcontextprotocol/logLevel"] = "info";
           const url =
             transport === "listen" ? (await server.listen(0)).url : request.url;
           const progressRequest = new Request(url, {

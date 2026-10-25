@@ -3,6 +3,7 @@
  */
 import {
   Client,
+  LOG_LEVEL_META_KEY,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -417,7 +418,10 @@ describe("elicitation and input_required", () => {
   });
 
   it("sends request-scoped logging notifications", async () => {
-    const result = await client.callTool({ name: "emit-log" });
+    const result = await client.callTool({
+      name: "emit-log",
+      _meta: { [LOG_LEVEL_META_KEY]: "info" },
+    });
 
     expect(result.content).toContainEqual({ type: "text", text: "Log sent" });
     expect(logMessages).toContainEqual({
