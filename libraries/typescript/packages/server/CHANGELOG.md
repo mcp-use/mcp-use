@@ -1,5 +1,20 @@
 # mcp-use
 
+## 2.12.0-canary.3
+
+### Patch Changes
+
+- d0068bc: Require Vite 8.1.6 or newer within Vite 8 for the optional Vite integration peer, so older versions affected by development-server file access and launch-editor vulnerabilities no longer satisfy the supported range.
+
+## 2.12.0-canary.2
+
+### Patch Changes
+
+- 9ac5e82: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+- Updated dependencies [9ac5e82]
+  - @mcp-use/cli@4.5.3-canary.1
+  - @mcp-use/inspector@20.3.25-canary.2
+
 ## 2.12.0-canary.1
 
 ### Minor Changes
