@@ -32,14 +32,13 @@ export function isClaudeClient(
 }
 
 /**
- * Derive the `*.claudemcpcontent.com` domain Claude expects for an authored
- * `view.domain`.
+ * Derive the `*.claudemcpcontent.com` domain Claude expects for an MCP endpoint.
  *
  * The subdomain is the first 32 hex characters of the SHA-256 digest of the
- * authored domain string verbatim, path included. Idempotent: a value that
+ * endpoint string verbatim, path included. Idempotent: a value that
  * already ends in the Claude suffix is returned unchanged.
  *
- * @param domain - Authored `view.domain` string, verbatim.
+ * @param domain - Full public MCP endpoint URL, verbatim, or a computed domain.
  * @returns The hashed Claude resource domain.
  */
 export async function computeClaudeResourceDomain(
@@ -72,12 +71,16 @@ export async function computeClaudeResourceDomain(
  * @param clientInfo - Client identity for the current request.
  * @param userAgent - HTTP user-agent fallback for legacy requests that carry
  * no per-request client identity.
+ * @param mcpEndpoint - Full public MCP endpoint, including its path. When
+ * unavailable, retains the legacy behavior of hashing the authored domain.
+ * An already computed Claude domain is preserved for compatibility.
  * @returns Resource `_meta` to send on the wire.
  */
 export async function applyClaudeResourceDomain(
   meta: Record<string, unknown>,
   clientInfo: Partial<Implementation> | undefined,
-  userAgent?: string | null
+  userAgent?: string | null,
+  mcpEndpoint?: string
 ): Promise<Record<string, unknown>> {
   const effectiveClientInfo =
     typeof clientInfo?.name === "string" ||
@@ -103,7 +106,11 @@ export async function applyClaudeResourceDomain(
     ...meta,
     [UI_META_KEY]: {
       ...(ui as Record<string, unknown>),
-      domain: await computeClaudeResourceDomain(domain),
+      domain: await computeClaudeResourceDomain(
+        domain.endsWith(CLAUDE_RESOURCE_DOMAIN_SUFFIX)
+          ? domain
+          : (mcpEndpoint ?? domain)
+      ),
     },
   };
 }

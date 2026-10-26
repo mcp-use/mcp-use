@@ -138,7 +138,7 @@ import {
   buildEntrypointMeta,
   validateEntrypointInput,
 } from "./views/entrypoints.js";
-import { isUsageDisabled, recordUsage } from "./usage.js";
+import { isLikelyBot, isUsageDisabled, recordUsage } from "./usage.js";
 import { registerSkillsRuntime } from "./skills/runtime.js";
 import {
   registerSkills,
@@ -147,6 +147,7 @@ import {
   type SkillsSnapshot,
 } from "./skills/types.js";
 import { supportsViews } from "./views/capabilities.js";
+import { resolveMcpEndpoint } from "./views/origin.js";
 import type {
   EmbeddedViewAssets,
   ViewRegistrationOptions,
@@ -1435,6 +1436,25 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     );
   }
 
+  #trackLandingView(request: Request): void {
+    // HEAD is a link checker or monitor probing the page, not a visit.
+    if (request.method === "HEAD") return;
+    recordUsage(
+      "landing",
+      "viewed",
+      {
+        page: this.#landingPage === undefined ? "built_in" : "custom",
+        dev:
+          this.#landingPage === undefined
+            ? this.#viewsDevMode
+            : this.#landingPage.dev === true,
+        public_landing: this.#config.publicLandingPage === true,
+        likely_bot: isLikelyBot(request.headers.get("user-agent")),
+      },
+      { sampleRate: 0.1, serverRoot: this.#viewsProjectRoot }
+    );
+  }
+
   #usageScopeId(): string {
     this.#usageScope ??= crypto.randomUUID();
     return this.#usageScope;
@@ -1873,6 +1893,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         if (!isHtmlNavigationRequest(request)) {
           return mcpRouteHandler(request);
         }
+        this.#trackLandingView(request);
         const respond = async (): Promise<Response> => {
           const { createLandingPageResponse } =
             await import("./landing-handler.js");
@@ -2519,12 +2540,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           basePath,
           viewName
         );
-        // Claude serves view resources from a hashed sandbox origin derived
-        // from the authored domain. Applied on read only, matching v1.
+        // UI origin and MCP endpoint identity are separate. Claude hashes the
+        // full public endpoint, never the website or asset origin.
         const meta = await applyClaudeResourceDomain(
           buildResourceUiMeta(authorFacts, readOptions),
           requestClientInfo(ctx),
-          (req ?? metaOptions.request)?.headers.get("user-agent")
+          (req ?? metaOptions.request)?.headers.get("user-agent"),
+          resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
+            authorFacts?.domain
         );
         return {
           contents: [
