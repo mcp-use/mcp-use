@@ -229,6 +229,66 @@ describe("Responses SSE event mapping", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    {
+      name: "response.failed",
+      event: {
+        type: "response.failed",
+        response: { error: { message: "The response failed." } },
+      },
+      message: "The response failed.",
+    },
+    {
+      name: "response.failed without an error message",
+      event: { type: "response.failed", response: {} },
+      message: "OpenAI response failed",
+    },
+    {
+      name: "response.incomplete",
+      event: {
+        type: "response.incomplete",
+        response: { incomplete_details: { reason: "max_output_tokens" } },
+      },
+      message: "OpenAI response incomplete: max_output_tokens",
+    },
+    {
+      name: "response.incomplete without a reason",
+      event: { type: "response.incomplete", response: {} },
+      message: "OpenAI response incomplete: unknown reason",
+    },
+  ])("emits an error instead of done for $name", async ({ event, message }) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          sseResponse([
+            { type: "response.output_text.delta", delta: "Partial answer" },
+            event,
+          ])
+        )
+    );
+
+    const turn = streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-4o-mini", apiKey: "k" },
+      input: [{ role: "user", content: "hello" }],
+    });
+    const events: LlmStreamEvent[] = [];
+    for (;;) {
+      const next = await turn.next();
+      if (next.done) {
+        expect(next.value).toEqual([]);
+        break;
+      }
+      events.push(next.value);
+    }
+
+    expect(events).toEqual([
+      { type: "text-delta", delta: "Partial answer" },
+      { type: "error", message },
+    ]);
+  });
+
   it("emits tool-call-args-delta and tool-call-ready against the call_id", async () => {
     vi.stubGlobal(
       "fetch",
