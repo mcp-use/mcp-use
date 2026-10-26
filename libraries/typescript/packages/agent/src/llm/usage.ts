@@ -21,7 +21,11 @@ function detailRecords(
   const records: Record<string, unknown>[] = [];
   for (const key of keys) {
     const candidate = usage[key];
-    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+    if (
+      candidate &&
+      typeof candidate === "object" &&
+      !Array.isArray(candidate)
+    ) {
       records.push(candidate as Record<string, unknown>);
     }
   }
@@ -83,7 +87,8 @@ export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
   // `output_tokens_details`, but Chat Completions reports the same counters under
   // `prompt_tokens_details` / `completion_tokens_details`. Reading only the
   // Responses names dropped cached and reasoning tokens for every Chat Completions
-  // response, even though both were present and already counted in prompt_tokens.
+  // response, even though cached tokens are already counted in prompt_tokens and
+  // reasoning tokens in completion_tokens.
   const inputDetails = detailRecords(
     usage,
     "input_tokens_details",
