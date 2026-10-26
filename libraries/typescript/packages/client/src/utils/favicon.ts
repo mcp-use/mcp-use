@@ -13,9 +13,7 @@ function parseHostname(serverUrl: string): string | null {
 }
 
 function isPrivateIPv4(h: string): boolean {
-  const [first, second] = h
-    .split(".")
-    .map((part) => Number.parseInt(part, 10));
+  const [first, second] = h.split(".").map((part) => Number.parseInt(part, 10));
 
   if (first === 10 || first === 127) return true;
   if (first === 192 && second === 168) return true;
@@ -46,7 +44,8 @@ function isPrivateIPv6(h: string): boolean {
 }
 
 function isLocalHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
+  // A trailing dot is the DNS root form (`printer.local.`); strip it before the suffix checks.
+  const h = hostname.toLowerCase().replace(/\.$/, "");
   if (h === "localhost" || h.endsWith(".localhost")) return true;
   if (h.endsWith(".local")) return true;
   if (h === "host.docker.internal" || h === "0.0.0.0") return true;

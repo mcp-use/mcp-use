@@ -85,9 +85,26 @@ describe("detectFavicon", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("skips mDNS hostnames", async () => {
+  it("skips mDNS hostnames, including the DNS root form", async () => {
     expect(await detectFavicon("http://printer.local/mcp")).toBeNull();
+    expect(await detectFavicon("http://printer.local./mcp")).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still looks up addresses just outside the private ranges", async () => {
+    for (const host of [
+      ipv4(100, 63, 255, 255),
+      ipv4(100, 128, 0, 1),
+      ipv4(169, 253, 0, 1),
+      ipv4(172, 32, 0, 1),
+    ]) {
+      fetchMock.mockResolvedValueOnce({ ok: false });
+      await detectFavicon(`http://${host}/mcp`);
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining(host),
+        expect.any(Object)
+      );
+    }
   });
 
   it("still looks up public addresses", async () => {
