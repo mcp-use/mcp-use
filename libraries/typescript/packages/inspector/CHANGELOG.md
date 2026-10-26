@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.3.25
+
+### Patch Changes
+
+- 5a6f679: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 5a6f679: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 1589353: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+
 ## 20.3.25-canary.2
 
 ### Patch Changes

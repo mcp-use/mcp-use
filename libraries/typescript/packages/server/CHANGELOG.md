@@ -1,5 +1,22 @@
 # mcp-use
 
+## 2.12.0
+
+### Minor Changes
+
+- 5a6f679: Separate View UI origins from MCP endpoint identity. Normalize HTTP(S) `view.domain` values to origins for ChatGPT and derive Claude resource domains from the full public MCP endpoint, including its path, using existing `MCP_URL` or request URL configuration. Preserve computed Claude domains and host defaults. Document migration, metadata precedence, proxy limitations, and nested-frame CSP in the SDK guide and repository agent skills.
+
+### Patch Changes
+
+- 5a6f679: Record anonymous landing page views in the SDK's usage telemetry. Each sampled HTML `GET` to the MCP endpoint sends a `landing.viewed` event that says whether the page is built-in or custom, whether it was served by a dev server, whether the page is public, and whether the user agent looks automated (a crawler, link unfurler, HTTP library, or missing user agent). The user agent itself is never sent. `MCP_USE_ANONYMIZED_TELEMETRY=false` turns it off along with the other usage events.
+- 1589353: Require Vite 8.1.6 or newer within Vite 8 for the optional Vite integration peer, so older versions affected by development-server file access and launch-editor vulnerabilities no longer satisfy the supported range.
+- 1589353: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+- Updated dependencies [5a6f679]
+- Updated dependencies [5a6f679]
+- Updated dependencies [1589353]
+  - @mcp-use/inspector@20.3.25
+  - @mcp-use/cli@4.5.3
+
 ## 2.12.0-canary.3
 
 ### Patch Changes
