@@ -1,5 +1,12 @@
 # @mcp-use/cli
 
+## 4.5.3
+
+### Patch Changes
+
+- 5a6f679: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 1589353: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+
 ## 4.5.3-canary.1
 
 ### Patch Changes
