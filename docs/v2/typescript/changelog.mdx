@@ -17,6 +17,7 @@ rss: true
 - **Fix** (server): an origin-only `MCP_URL` uses `basePath` to identify the endpoint; a path-bearing `MCP_URL` is used verbatim. Without `MCP_URL`, use the public request URL. Preserve precomputed Claude domains and host defaults; without an HTTP request or `MCP_URL`, fall back to hashing the authored domain (`#2511`)
 - **New** (server): sample 10% of HTML `GET` requests to built-in and custom landing pages as `landing.viewed` usage events, recording page type, dev mode, the public landing-page setting, and whether the user agent appears automated. Skip `HEAD` requests and never send the user agent string. Set `MCP_USE_ANONYMIZED_TELEMETRY=false` to disable usage events (`#2910`)
 - **Documentation**: expand the [View CSP guide](/v2/typescript/mcp-apps/content-security-policy) and [migration notes](/v2/typescript/server/migration) with domain identity, metadata precedence, proxy limitations, and nested-frame CSP guidance (`#2511`)
+- **Fix** (@mcp-use/cli): upgrade Vite to v8.1.6 to address development-server file access and bundled launch-editor vulnerabilities; refresh patched transitive dependencies, including follow-redirects and markdown-it (`#2912`)
 - **Update**: Updated @mcp-use/cli to v4.5.3
 - **Update**: Updated @mcp-use/inspector to v20.3.25; see the [Inspector changelog](/inspector/changelog)
 </Update>
