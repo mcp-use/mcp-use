@@ -121,7 +121,8 @@ overrides:
   baseline-browser-mapping: ^2.11.0
   browserslist: ^4.28.7
   markdown-it: ^14.3.3
-  katex: ^0.18.2
+  # Keep the trust-restriction fix while avoiding deprecated 0.18.11.
+  katex: 0.18.10
   mermaid: ^11.16.1
   smol-toml: ^1.7.1
   proxy-addr: ">=2.0.8"
