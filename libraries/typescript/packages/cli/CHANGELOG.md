@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.5.3
+
+### Patch Changes
+
+- 5a6f679: Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 4.5.3-canary.0
 
 ### Patch Changes
