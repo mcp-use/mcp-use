@@ -370,6 +370,28 @@ export async function* streamResponsesTurn(
       continue;
     }
 
+    if (type === "response.failed") {
+      const response = parsed.response as Record<string, unknown> | undefined;
+      const error = response?.error as Record<string, unknown> | undefined;
+      const message =
+        typeof error?.message === "string"
+          ? error.message
+          : "OpenAI response failed";
+      yield { type: "error", message };
+      return [];
+    }
+
+    if (type === "response.incomplete") {
+      const response = parsed.response as Record<string, unknown> | undefined;
+      const details = response?.incomplete_details as
+        | Record<string, unknown>
+        | undefined;
+      const reason =
+        typeof details?.reason === "string" ? details.reason : "unknown reason";
+      yield { type: "error", message: `OpenAI response incomplete: ${reason}` };
+      return [];
+    }
+
     if (type === "response.completed") {
       const response = parsed.response as Record<string, unknown> | undefined;
       if (response && Array.isArray(response.output)) {
