@@ -65,6 +65,39 @@ describe("Anthropic cache counters", () => {
       })
     ).toMatchObject({ cachedInputTokens: 3, totalTokens: 14 });
   });
+
+  it("reads Chat Completions detail counters, not only the Responses names", () => {
+    // Chat Completions reports prompt_tokens_details/completion_tokens_details; the
+    // Responses API uses input_tokens_details/output_tokens_details. Reading only the
+    // Responses names dropped both counters for every Chat Completions response.
+    expect(
+      tokenUsageFromRecord({
+        prompt_tokens: 10,
+        completion_tokens: 4,
+        total_tokens: 14,
+        prompt_tokens_details: { cached_tokens: 3 },
+        completion_tokens_details: { reasoning_tokens: 2 },
+      })
+    ).toEqual({
+      inputTokens: 10,
+      outputTokens: 4,
+      totalTokens: 14,
+      cachedInputTokens: 3,
+      cacheCreationInputTokens: undefined,
+      reasoningTokens: 2,
+    });
+  });
+
+  it("keeps reported zero detail counters instead of treating them as absent", () => {
+    expect(
+      tokenUsageFromRecord({
+        prompt_tokens: 10,
+        completion_tokens: 4,
+        prompt_tokens_details: { cached_tokens: 0 },
+        completion_tokens_details: { reasoning_tokens: 0 },
+      })
+    ).toMatchObject({ cachedInputTokens: 0, reasoningTokens: 0 });
+  });
 });
 
 describe("mergeTokenUsage", () => {

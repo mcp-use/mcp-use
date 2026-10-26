@@ -13,6 +13,33 @@ function numberAt(
   return undefined;
 }
 
+/** Collect the object-valued detail records for any of the given keys. */
+function detailRecords(
+  usage: Record<string, unknown>,
+  ...keys: string[]
+): Record<string, unknown>[] {
+  const records: Record<string, unknown>[] = [];
+  for (const key of keys) {
+    const candidate = usage[key];
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+      records.push(candidate as Record<string, unknown>);
+    }
+  }
+  return records;
+}
+
+/** First finite counter found in any of the given records. */
+function firstNumberIn(
+  records: Record<string, unknown>[],
+  ...keys: string[]
+): number | undefined {
+  for (const record of records) {
+    const found = numberAt(record, ...keys);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
 /** Normalize exact provider-reported token counters. Never estimates usage. */
 export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -52,21 +79,27 @@ export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
       ? inputTokens + outputTokens + uncountedCache
       : undefined);
 
-  const inputDetails =
-    usage.input_tokens_details && typeof usage.input_tokens_details === "object"
-      ? (usage.input_tokens_details as Record<string, unknown>)
-      : undefined;
-  const outputDetails =
-    usage.output_tokens_details &&
-    typeof usage.output_tokens_details === "object"
-      ? (usage.output_tokens_details as Record<string, unknown>)
-      : undefined;
+  // The Responses API nests these counters under `input_tokens_details` /
+  // `output_tokens_details`, but Chat Completions reports the same counters under
+  // `prompt_tokens_details` / `completion_tokens_details`. Reading only the
+  // Responses names dropped cached and reasoning tokens for every Chat Completions
+  // response, even though both were present and already counted in prompt_tokens.
+  const inputDetails = detailRecords(
+    usage,
+    "input_tokens_details",
+    "prompt_tokens_details"
+  );
+  const outputDetails = detailRecords(
+    usage,
+    "output_tokens_details",
+    "completion_tokens_details"
+  );
   const cachedInputTokens =
     numberAt(usage, "cachedInputTokens", "cache_read_input_tokens") ??
-    (inputDetails ? numberAt(inputDetails, "cached_tokens") : undefined);
+    firstNumberIn(inputDetails, "cached_tokens");
   const reasoningTokens =
     numberAt(usage, "reasoningTokens", "thoughtsTokenCount") ??
-    (outputDetails ? numberAt(outputDetails, "reasoning_tokens") : undefined);
+    firstNumberIn(outputDetails, "reasoning_tokens");
 
   if (
     inputTokens === undefined &&
