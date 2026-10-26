@@ -518,7 +518,7 @@ function buildHeaders(
     if (parameter.in !== "header") continue;
     const value = params[inputName];
     if (value === undefined || value === null || value === "") continue;
-    headers[parameter.name] = String(value);
+    headers[parameter.name] = serializeHeaderParameter(value);
   }
   if (options.auth?.type === "bearer" && options.auth.token) {
     headers["authorization"] = `Bearer ${options.auth.token}`;
@@ -548,7 +548,38 @@ function appendQueryParam(url: URL, name: string, value: unknown): void {
     }
     return;
   }
+  if (isPlainObject(value)) {
+    for (const [propertyName, propertyValue] of Object.entries(value)) {
+      if (
+        propertyValue !== undefined &&
+        propertyValue !== null &&
+        propertyValue !== ""
+      ) {
+        // OpenAPI's default query serialization is form + explode=true, so
+        // object properties become separate query parameters.
+        url.searchParams.append(propertyName, String(propertyValue));
+      }
+    }
+    return;
+  }
   url.searchParams.set(name, String(value));
+}
+
+function serializeHeaderParameter(value: unknown): string {
+  if (isPlainObject(value)) {
+    return Object.entries(value)
+      .flatMap(([key, item]) => [key, String(item)])
+      .join(",");
+  }
+  return String(value);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value) as object | null;
+  return prototype === Object.prototype || prototype === null;
 }
 
 function ensureTrailingSlash(url: string): string {
