@@ -22,9 +22,15 @@ export class LlmRequestError extends Error {
   }
 }
 
+/**
+ * Joins the configured base URL with an endpoint path.
+ *
+ * A configured base URL may end with slashes (`http://localhost:8000/v1/`);
+ * they are stripped so the request never hits a doubled path segment.
+ */
 export function buildEndpoint(config: ProviderConfig, path: string): string {
   const base = config.baseUrl ?? OPENAI_BASE_URL;
-  return `${base.replace(/\/$/, "")}${path}`;
+  return `${base.replace(/\/+$/, "")}${path}`;
 }
 
 export function buildHeaders(config: ProviderConfig): Record<string, string> {

@@ -11,7 +11,11 @@ import type {
   ProviderTool,
 } from "../types.js";
 import { tokenUsageFromRecord } from "../usage.js";
-import { throwLlmRequestError } from "./openai-shared.js";
+import {
+  buildEndpoint,
+  buildHeaders,
+  throwLlmRequestError,
+} from "./openai-shared.js";
 
 export { LlmRequestError } from "./openai-shared.js";
 
@@ -20,23 +24,6 @@ interface ChatParams {
   messages: ProviderMessage[];
   tools?: ProviderTool[];
   signal?: AbortSignal;
-}
-
-const OPENAI_BASE_URL = "https://api.openai.com/v1";
-
-function buildEndpoint(config: ProviderConfig, path: string): string {
-  return `${config.baseUrl ?? OPENAI_BASE_URL}${path}`;
-}
-
-function buildHeaders(config: ProviderConfig): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...config.extraHeaders,
-  };
-  if (config.apiKey) {
-    headers.Authorization = `Bearer ${config.apiKey}`;
-  }
-  return headers;
 }
 
 function toOpenAIContent(content: string | ContentPart[]): unknown {
