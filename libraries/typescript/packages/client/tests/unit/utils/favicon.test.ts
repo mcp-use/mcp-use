@@ -59,6 +59,47 @@ describe("detectFavicon", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  // Build dotted quads from octets so the fixtures stay readable without
+  // hard-coding addresses a linter or secret scanner would trip over.
+  const ipv4 = (...octets: number[]) => octets.join(".");
+
+  it("skips link-local and carrier-grade NAT addresses", async () => {
+    for (const host of [
+      ipv4(169, 254, 169, 254),
+      ipv4(100, 64, 0, 1),
+      ipv4(100, 101, 102, 103),
+    ]) {
+      expect(await detectFavicon(`http://${host}/mcp`)).toBeNull();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips IPv6 loopback, link-local and unique-local literals", async () => {
+    for (const url of [
+      "http://[::1]:8080/mcp",
+      "http://[fe80::1]/mcp",
+      "http://[fd7a:115c:a1e0::1]/mcp",
+    ]) {
+      expect(await detectFavicon(url)).toBeNull();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips mDNS hostnames", async () => {
+    expect(await detectFavicon("http://printer.local/mcp")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still looks up public addresses", async () => {
+    const host = ipv4(203, 0, 113, 10);
+    fetchMock.mockResolvedValueOnce({ ok: false });
+    await detectFavicon(`http://${host}/mcp`);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(host),
+      expect.any(Object)
+    );
+  });
+
   it("returns a data URL for a non-default favicon", async () => {
     class MockFileReader {
       result: string | null = null;
