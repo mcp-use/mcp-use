@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.25-canary.2
+
+### Patch Changes
+
+- 9ac5e82: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+
 ## 20.3.25-canary.1
 
 ### Patch Changes
