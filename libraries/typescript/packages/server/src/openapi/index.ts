@@ -550,26 +550,33 @@ function appendQueryParam(url: URL, name: string, value: unknown): void {
   }
   if (isPlainObject(value)) {
     for (const [propertyName, propertyValue] of Object.entries(value)) {
-      if (
-        propertyValue !== undefined &&
-        propertyValue !== null &&
-        propertyValue !== ""
-      ) {
+      if (propertyValue !== undefined && propertyValue !== null) {
         // OpenAPI's default query serialization is form + explode=true, so
         // object properties become separate query parameters.
-        url.searchParams.append(propertyName, String(propertyValue));
+        url.searchParams.append(
+          propertyName,
+          serializeParameterValue(propertyValue)
+        );
       }
     }
     return;
   }
-  url.searchParams.set(name, String(value));
+  url.searchParams.append(name, String(value));
 }
 
 function serializeHeaderParameter(value: unknown): string {
   if (isPlainObject(value)) {
     return Object.entries(value)
-      .flatMap(([key, item]) => [key, String(item)])
+      .filter(([, item]) => item !== undefined && item !== null)
+      .flatMap(([key, item]) => [key, serializeParameterValue(item)])
       .join(",");
+  }
+  return String(value);
+}
+
+function serializeParameterValue(value: unknown): string {
+  if (Array.isArray(value) || isPlainObject(value)) {
+    return JSON.stringify(value);
   }
   return String(value);
 }

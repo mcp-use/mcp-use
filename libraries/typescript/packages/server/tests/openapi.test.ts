@@ -293,6 +293,14 @@ describe("MCPServer.fromOpenAPI", () => {
                   properties: {
                     color: { type: "string" },
                     size: { type: "number" },
+                    q: { type: "string" },
+                    meta: {
+                      type: "object",
+                      properties: { source: { type: "string" } },
+                      required: ["source"],
+                      additionalProperties: false,
+                    },
+                    optionalValue: { type: "string", nullable: true },
                   },
                   required: ["color", "size"],
                   additionalProperties: false,
@@ -306,10 +314,23 @@ describe("MCPServer.fromOpenAPI", () => {
                   properties: {
                     color: { type: "string" },
                     size: { type: "number" },
+                    q: { type: "string" },
+                    meta: {
+                      type: "object",
+                      properties: { source: { type: "string" } },
+                      required: ["source"],
+                      additionalProperties: false,
+                    },
+                    optionalValue: { type: "string", nullable: true },
                   },
                   required: ["color", "size"],
                   additionalProperties: false,
                 },
+              },
+              {
+                name: "color",
+                in: "query",
+                schema: { type: "string" },
               },
             ],
             responses: { "200": { description: "ok" } },
@@ -330,18 +351,31 @@ describe("MCPServer.fromOpenAPI", () => {
       const result = await connection.client.callTool({
         name: "getObjects",
         arguments: {
-          filter: { color: "red", size: 3 },
-          "x-filter": { color: "red", size: 3 },
+          filter: {
+            color: "red",
+            size: 3,
+            q: "",
+            meta: { source: "test" },
+            optionalValue: null,
+          },
+          "x-filter": {
+            color: "red",
+            size: 3,
+            q: "",
+            meta: { source: "test" },
+            optionalValue: null,
+          },
+          color: "blue",
         },
       });
 
       expect(result.isError).toBeFalsy();
       expect(captured[0]).toMatchObject({
         method: "GET",
-        url: "/v1/objects?color=red&size=3",
+        url: "/v1/objects?color=red&size=3&q=&meta=%7B%22source%22%3A%22test%22%7D&color=blue",
       });
       expect(captured[0]?.headers).toMatchObject({
-        "x-filter": "color,red,size,3",
+        "x-filter": 'color,red,size,3,q,,meta,{"source":"test"}',
       });
     } finally {
       await connection.close();

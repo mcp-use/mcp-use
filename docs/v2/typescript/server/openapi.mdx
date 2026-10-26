@@ -78,8 +78,16 @@ Supported media types are `application/json`, `application/*+json`, and
 specific media types containing `+json`. Other body encodings are not sent.
 
 Array query values are serialized as repeated keys:
-`?tag=one&tag=two`. OpenAPI query serialization styles such as comma-separated
-or deep-object encoding are not interpreted.
+`?tag=one&tag=two`. Object query parameters use OpenAPI's default `form` style
+with `explode: true`, so each property becomes its own query key. For example,
+`{ color: "red", size: 3 }` becomes `?color=red&size=3`. Object header parameters
+use the default `simple` style with `explode: false`, so the same value becomes
+`color,red,size,3`.
+
+Null and undefined object properties are omitted; empty strings are preserved.
+Nested object and array properties are encoded as JSON strings. Explicit
+`style`/`explode` overrides and non-default query styles such as
+`deepObject` are not interpreted.
 
 ## Understand tool names
 
