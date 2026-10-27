@@ -1,127 +1,14 @@
-Script started on 2026-10-27 13:16:34+08:00 [COMMAND="bash evidence/record-regression.sh" <not executed on terminal>]
-=== upstream main: issue regression tests should fail ===
-Scope: all 59 workspace projects
-✓ Lockfile passes supply-chain policies (verified 1m ago)
-Lockfile is up to date, resolution step is skipped
-Already up to date
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/cli/node_modules/.bin/mcp-tunnel. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/tunnel/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/cli/node_modules/.bin/mcp-inspect. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/inspector/dist/cli.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/blank/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-apps/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-server/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/inspector/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/cli/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/node_modules/.bin/mcp-inspect. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/inspector/dist/cli.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/auth0/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/better-auth/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/clerk/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/convex/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/keycloak/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/mixed-oauth/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/oauth-proxy-firebase/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/oauth-proxy-github/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/supabase/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/workos/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/basic/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/conformance/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/daytona/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/elicitation/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/events/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/landing-page/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/middleware/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/nextjs/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/nextjs-standalone/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/notifications/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/openapi/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/proxy/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/public-landing/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/railway/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/resource-template-completion/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sampling/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/arktype/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/typebox/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/zod/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/security/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sentry/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sessionless-lifecycle/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/skills-over-mcp/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/tanstack-start/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/upstash/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/vercel/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/a2ui/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/basic/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/bookshop/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/excalidraw/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/file-upload/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/generative-ui/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/property-search/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/story-writer/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/tic-tac-toe/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/view-state/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/dist/bin.js'
-
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/cli/node_modules/.bin/mcp-tunnel. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/cli/node_modules/@mcp-use/tunnel/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/cli/node_modules/.bin/mcp-inspect. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/cli/node_modules/@mcp-use/inspector/dist/cli.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/inspector/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/inspector/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/node_modules/@mcp-use/cli/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/node_modules/.bin/mcp-inspect. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/node_modules/@mcp-use/inspector/dist/cli.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/blank/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/blank/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-apps/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-apps/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/better-auth/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/better-auth/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/auth0/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/auth0/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-server/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-server/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/clerk/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/clerk/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/convex/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/convex/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/keycloak/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/keycloak/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/mixed-oauth/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/mixed-oauth/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/oauth-proxy-firebase/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/oauth-proxy-firebase/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/oauth-proxy-github/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/oauth-proxy-github/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/supabase/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/supabase/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/workos/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/auth/workos/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/basic/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/basic/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/conformance/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/conformance/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/daytona/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/daytona/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/elicitation/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/elicitation/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/events/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/events/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/landing-page/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/landing-page/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/middleware/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/middleware/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/nextjs/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/nextjs/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/nextjs-standalone/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/nextjs-standalone/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/notifications/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/notifications/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/openapi/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/openapi/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/proxy/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/proxy/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/public-landing/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/public-landing/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/railway/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/railway/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/resource-template-completion/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/resource-template-completion/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sampling/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sampling/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/arktype/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/arktype/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/typebox/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/typebox/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/zod/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/schema-libraries/zod/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/security/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/security/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sentry/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sentry/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sessionless-lifecycle/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/sessionless-lifecycle/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/skills-over-mcp/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/skills-over-mcp/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/upstash/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/upstash/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/tanstack-start/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/tanstack-start/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/vercel/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/vercel/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/a2ui/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/a2ui/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/basic/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/basic/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/bookshop/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/bookshop/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/excalidraw/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/excalidraw/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/file-upload/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/file-upload/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/generative-ui/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/generative-ui/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/property-search/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/property-search/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/story-writer/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/story-writer/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/tic-tac-toe/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/tic-tac-toe/node_modules/mcp-use/dist/bin.js'
-[WARN] Failed to create bin at /workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/view-state/node_modules/.bin/mcp-use. ENOENT: no such file or directory, open '/workspace/contrib/mcp-use/libraries/typescript/packages/server/examples/views/view-state/node_modules/mcp-use/dist/bin.js'
-Done in 2.1s using pnpm v11.13.1
+Script started on 2026-10-27 13:35:32+08:00 [COMMAND="npx --yes --package=node@22.22.2 --call "bash evidence/record-regression.sh"" <not executed on terminal>]
+=== upstream main: terminal-event regressions should fail ===
 
  RUN  v4.1.12 /workspace/contrib/mcp-use/libraries/typescript/packages/agent
 
- ❯ src/llm/__tests__/openai-responses.test.ts (12 tests | 2 failed | 10 skipped) 29ms
-     × emits an error for 'failed responses' instead of completing 27ms
+ ❯ src/llm/__tests__/openai-responses.test.ts (13 tests | 3 failed | 10 skipped) 29ms
+     × emits an error for 'failed responses' instead of completing 25ms
      × emits an error for 'incomplete responses' instead of completing 1ms
+     × emits an error when the stream ends before a terminal response event 1ms
 
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  src/llm/__tests__/openai-responses.test.ts > Responses SSE event mapping > emits an error for 'failed responses' instead of completing
 AssertionError: expected [ { type: 'text-delta', …(1) }, …(1) ] to deeply equal [ { type: 'text-delta', …(1) }, …(1) ]
@@ -149,7 +36,7 @@ AssertionError: expected [ { type: 'text-delta', …(1) }, …(1) ] to deeply eq
     311|         { type: "text-delta", delta: "partial answer" },
     312|         { type: "error", message },
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
 
  FAIL  src/llm/__tests__/openai-responses.test.ts > Responses SSE event mapping > emits an error for 'incomplete responses' instead of completing
 AssertionError: expected [ { type: 'text-delta', …(1) }, …(1) ] to deeply equal [ { type: 'text-delta', …(1) }, …(1) ]
@@ -177,27 +64,55 @@ AssertionError: expected [ { type: 'text-delta', …(1) }, …(1) ] to deeply eq
     311|         { type: "text-delta", delta: "partial answer" },
     312|         { type: "error", message },
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/llm/__tests__/openai-responses.test.ts > Responses SSE event mapping > emits an error when the stream ends before a terminal response event
+AssertionError: expected [ { type: 'text-delta', …(1) }, …(1) ] to deeply equal [ { type: 'text-delta', …(1) }, …(1) ]
+
+- Expected
++ Received
+
+@@ -2,9 +2,8 @@
+    {
+      "delta": "partial answer",
+      "type": "text-delta",
+    },
+    {
+-     "message": "OpenAI Responses stream ended before a terminal response event",
+-     "type": "error",
++     "type": "done",
+    },
+  ]
+
+ ❯ src/llm/__tests__/openai-responses.test.ts:342:20
+    340|     }
+    341|
+    342|     expect(events).toEqual([
+       |                    ^
+    343|       { type: "text-delta", delta: "partial answer" },
+    344|       {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
 
 
  Test Files  1 failed (1)
-      Tests  2 failed | 10 skipped (12)
-   Start at  13:16:40
-   Duration  249ms (transform 99ms, setup 0ms, import 119ms, tests 29ms, environment 0ms)
+      Tests  3 failed | 10 skipped (13)
+   Start at  13:35:36
+   Duration  461ms (transform 309ms, setup 0ms, import 330ms, tests 29ms, environment 0ms)
 
-undefined
+
 /workspace/contrib/mcp-use/libraries/typescript/packages/agent:
 [ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run src/llm/__tests__/openai-responses.test.ts -t 'emits an error'
-=== candidate fix: issue regression tests should pass ===
+=== candidate fix: terminal-event regressions should pass ===
 
  RUN  v4.1.12 /workspace/contrib/mcp-use/libraries/typescript/packages/agent
 
 
  Test Files  1 passed (1)
-      Tests  2 passed | 10 skipped (12)
-   Start at  13:16:43
-   Duration  232ms (transform 95ms, setup 0ms, import 115ms, tests 20ms, environment 0ms)
+      Tests  3 passed | 10 skipped (13)
+   Start at  13:37:16
+   Duration  614ms (transform 192ms, setup 0ms, import 228ms, tests 39ms, environment 0ms)
 
 upstream_exit=1 fixed_exit=0
 
-Script done on 2026-10-27 13:16:44+08:00 [COMMAND_EXIT_CODE="0"]
+Script done on 2026-10-27 13:37:17+08:00 [COMMAND_EXIT_CODE="0"]

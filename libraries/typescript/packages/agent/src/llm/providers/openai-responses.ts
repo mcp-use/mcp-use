@@ -287,6 +287,7 @@ export async function* streamResponsesTurn(
   >();
   let nextIndex = 0;
   let completedOutput: unknown[] = [];
+  let completed = false;
 
   for await (const ev of parseSSE(res.body, params.signal)) {
     if (!ev.data || ev.data === "[DONE]") continue;
@@ -371,6 +372,7 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.completed") {
+      completed = true;
       const response = parsed.response as Record<string, unknown> | undefined;
       if (response && Array.isArray(response.output)) {
         completedOutput = response.output;
@@ -419,6 +421,14 @@ export async function* streamResponsesTurn(
       yield { type: "error", message };
       return [];
     }
+  }
+
+  if (!completed) {
+    yield {
+      type: "error",
+      message: "OpenAI Responses stream ended before a terminal response event",
+    };
+    return [];
   }
 
   yield { type: "done" };

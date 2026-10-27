@@ -315,6 +315,41 @@ describe("Responses SSE event mapping", () => {
     }
   );
 
+  it("emits an error when the stream ends before a terminal response event", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          sseResponse([
+            { type: "response.output_text.delta", delta: "partial answer" },
+          ])
+        )
+    );
+
+    const turn = streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-4o-mini", apiKey: "k" },
+      input: [{ role: "user", content: "hello" }],
+      tools: TOOLS,
+    });
+    const events: LlmStreamEvent[] = [];
+    for (;;) {
+      const next = await turn.next();
+      if (next.done) break;
+      events.push(next.value);
+    }
+
+    expect(events).toEqual([
+      { type: "text-delta", delta: "partial answer" },
+      {
+        type: "error",
+        message:
+          "OpenAI Responses stream ended before a terminal response event",
+      },
+    ]);
+    expect(events).not.toContainEqual({ type: "done" });
+  });
+
   it("yields AgentSteps for a streamed OpenAI Responses tool call", async () => {
     vi.stubGlobal(
       "fetch",
