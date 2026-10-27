@@ -84,8 +84,9 @@ class BaseAdapter(Generic[T], ABC):
                 schema["anyOf"] = [{"type": t} for t in schema["type"]]
                 del schema["type"]  # Remove 'type' and standardize to 'anyOf'
 
-            # Fix enum handling - ensure enum fields are properly typed as strings
-            if "enum" in schema and "type" not in schema:
+            # Only string enums need the converter's string-type workaround.
+            # Other enums may contain numbers, booleans, or null.
+            if "enum" in schema and "type" not in schema and all(isinstance(value, str) for value in schema["enum"]):
                 schema["type"] = "string"
 
             for key, value in schema.items():
