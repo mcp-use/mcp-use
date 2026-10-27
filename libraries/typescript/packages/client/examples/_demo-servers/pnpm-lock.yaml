@@ -11,6 +11,7 @@ overrides:
   nanoid@<3.3.18: ^3.3.18
   proxy-addr: '>=2.0.8'
   source-map-js: '>=1.2.2'
+  body-parser: '>=2.4.0'
 
 importers:
 
@@ -18,10 +19,10 @@ importers:
     dependencies:
       mcp-use:
         specifier: ^2.8.2
-        version: 2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.4.3)
+        version: 2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.6.7)
       zod:
-        specifier: ^4.2.0
-        version: 4.4.3
+        specifier: ^4.6.6
+        version: 4.6.7
     devDependencies:
       tsx:
         specifier: ^4.20.0
@@ -533,8 +534,8 @@ packages:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
     engines: {node: '>= 0.6'}
 
-  body-parser@2.3.0:
-    resolution: {integrity: sha512-2cGmJupaNgg+QUwVLAucDuWuoMZ6EX9iHDRswZ5lsNYEmwPaRknMPCLZz07yTzVq/83p4o/wzbDZbBrTvGGTIw==}
+  body-parser@2.4.0:
+    resolution: {integrity: sha512-Ifk1KcLrxaGt1occQagQNFNNOqRt1LFuehEnHHzB8Z6cRgIxRU1TBaiIsUiCdA+gy5PL7Y1IX31DNKkRmxtXjQ==}
     engines: {node: '>=18'}
 
   bytes@3.1.2:
@@ -559,6 +560,10 @@ packages:
 
   content-type@2.0.0:
     resolution: {integrity: sha512-j/O/d7GcZCyNl7/hwZAb606rzqkyvaDctLmckbxLzHvFBzTJHuGEdodATcP3yIRoDrLHkIATJuvzbFlp/ki2cQ==}
+    engines: {node: '>=18'}
+
+  content-type@2.1.0:
+    resolution: {integrity: sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag==}
     engines: {node: '>=18'}
 
   cookie-signature@1.2.2:
@@ -1124,8 +1129,8 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
-  zod@4.4.3:
-    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -1242,14 +1247,14 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@mcp-use/cli@4.3.2(@mcp-use/inspector@20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.4.3)))(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)':
+  '@mcp-use/cli@4.3.2(@mcp-use/inspector@20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.6.7)))(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)':
     dependencies:
       '@tailwindcss/vite': 4.3.3(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))
       '@vitejs/plugin-react': 6.0.5(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))
       tailwindcss: 4.3.3
       vite: 8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)
     optionalDependencies:
-      '@mcp-use/inspector': 20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.4.3))
+      '@mcp-use/inspector': 20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.6.7))
     transitivePeerDependencies:
       - '@rolldown/plugin-babel'
       - '@types/node'
@@ -1266,10 +1271,10 @@ snapshots:
       - tsx
       - yaml
 
-  '@mcp-use/inspector@20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.4.3))':
+  '@mcp-use/inspector@20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.6.7))':
     optionalDependencies:
       express: 5.2.1
-      mcp-use: 2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.4.3)
+      mcp-use: 2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.6.7)
 
   '@modelcontextprotocol/client@2.3.1':
     dependencies:
@@ -1279,25 +1284,25 @@ snapshots:
       eventsource-parser: 3.1.0
       jose: 6.2.3
       pkce-challenge: 5.0.1
-      zod: 4.4.3
+      zod: 4.6.7
 
   '@modelcontextprotocol/core@2.3.1':
     dependencies:
-      zod: 4.4.3
+      zod: 4.6.7
 
-  '@modelcontextprotocol/ext-apps@2.0.3(@modelcontextprotocol/client@2.3.1)(@modelcontextprotocol/core@2.3.1)(@modelcontextprotocol/server@2.3.1)(zod@4.4.3)':
+  '@modelcontextprotocol/ext-apps@2.0.3(@modelcontextprotocol/client@2.3.1)(@modelcontextprotocol/core@2.3.1)(@modelcontextprotocol/server@2.3.1)(zod@4.6.7)':
     dependencies:
       '@modelcontextprotocol/client': 2.3.1
       '@modelcontextprotocol/core': 2.3.1
       '@standard-schema/spec': 1.1.0
-      zod: 4.4.3
+      zod: 4.6.7
     optionalDependencies:
       '@modelcontextprotocol/server': 2.3.1
 
   '@modelcontextprotocol/server@2.3.1':
     dependencies:
       '@modelcontextprotocol/core': 2.3.1
-      zod: 4.4.3
+      zod: 4.6.7
 
   '@napi-rs/wasm-runtime@1.2.5(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
@@ -1450,10 +1455,10 @@ snapshots:
       negotiator: 1.0.0
     optional: true
 
-  body-parser@2.3.0:
+  body-parser@2.4.0:
     dependencies:
       bytes: 3.1.2
-      content-type: 2.0.0
+      content-type: 2.1.0
       debug: 4.4.3
       http-errors: 2.0.1
       iconv-lite: 0.7.3
@@ -1487,6 +1492,9 @@ snapshots:
     optional: true
 
   content-type@2.0.0:
+    optional: true
+
+  content-type@2.1.0:
     optional: true
 
   cookie-signature@1.2.2:
@@ -1584,7 +1592,7 @@ snapshots:
   express@5.2.1:
     dependencies:
       accepts: 2.0.0
-      body-parser: 2.3.0
+      body-parser: 2.4.0
       content-disposition: 1.1.0
       content-type: 1.0.5
       cookie: 0.7.2
@@ -1812,13 +1820,13 @@ snapshots:
   math-intrinsics@1.1.0:
     optional: true
 
-  mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.4.3):
+  mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.6.7):
     dependencies:
-      '@mcp-use/cli': 4.3.2(@mcp-use/inspector@20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.4.3)))(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)
-      '@mcp-use/inspector': 20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.4.3))
+      '@mcp-use/cli': 4.3.2(@mcp-use/inspector@20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.6.7)))(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)
+      '@mcp-use/inspector': 20.3.18(express@5.2.1)(mcp-use@2.8.2(@types/node@26.1.1)(esbuild@0.28.1)(express@5.2.1)(jiti@2.7.0)(tsx@4.23.1)(vite@8.1.6(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))(zod@4.6.7))
       '@modelcontextprotocol/client': 2.3.1
       '@modelcontextprotocol/core': 2.3.1
-      '@modelcontextprotocol/ext-apps': 2.0.3(@modelcontextprotocol/client@2.3.1)(@modelcontextprotocol/core@2.3.1)(@modelcontextprotocol/server@2.3.1)(zod@4.4.3)
+      '@modelcontextprotocol/ext-apps': 2.0.3(@modelcontextprotocol/client@2.3.1)(@modelcontextprotocol/core@2.3.1)(@modelcontextprotocol/server@2.3.1)(zod@4.6.7)
       '@modelcontextprotocol/server': 2.3.1
       hono: 4.13.11
       jose: 6.2.3
@@ -2096,4 +2104,4 @@ snapshots:
   wrappy@1.0.2:
     optional: true
 
-  zod@4.4.3: {}
+  zod@4.6.7: {}
