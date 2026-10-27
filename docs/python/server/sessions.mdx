@@ -4,9 +4,11 @@ description: Using session IDs in MCP servers
 icon: "id-card"
 ---
 
-Sessions keep per-client state (caching, auth, limits). Managed by the MCP SDK via `mcp-session-id` HTTP header (spec: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management).
+In implementations using the 2025-11-25 MCP protocol, session IDs can associate requests with per-client state such as caches and rate limits. The SDK behavior described below uses the `Mcp-Session-Id` HTTP header.
 
-## How it works
+**Protocol version:** MCP 2026-07-28 removed protocol-level session management and the `Mcp-Session-Id` header. The examples on this page describe the older session-based behavior, not a requirement for clients or servers implementing the newer revision. See the [2025-11-25 session management specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management) and the [2026-07-28 transport specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports).
+
+## Legacy session flow (2025-11-25)
 
 - SDK generates a UUID when no session header is present.
 - Server returns it in `mcp-session-id` on initialize.
@@ -53,6 +55,6 @@ class SessionCache(Middleware):
 
 ## Notes
 
-- Only available on Streamable HTTP transport; stdio has no sessions.
+- The session-header flow above applies to the legacy Streamable HTTP revision, not stdio or MCP 2026-07-28.
 - Use per-session storage to avoid data leakage.
 - Keep session data lean; expire if needed.
