@@ -223,6 +223,56 @@ export default function WeatherCard() {
 
 [Build your first MCP App →](https://mcp-use.com/docs/typescript/mcp-apps/quickstart)
 
+## Create ChatGPT Plugin Extensions
+
+Build ChatGPT Plugin Extensions with interactive Views that users can open alongside their conversation. Use `useModelContext` to let them add content from a View to the conversation, such as a book to discuss or analytics to explore.
+
+<table><tr><td>
+<details>
+<summary><strong><code>add-book.tsx</code></strong> — Share a selected book with the model</summary>
+
+```tsx
+import { useModelContext } from "mcp-use/react";
+
+export default function AddBook() {
+  const { add, pending, error } = useModelContext();
+
+  async function shareBook() {
+    try {
+      await add("selected-book", {
+        type: "text",
+        title: "The Great Gatsby",
+        text: "Selected book: The Great Gatsby by F. Scott Fitzgerald",
+      });
+    } catch (error) {
+      console.error("Could not share the book", error);
+    }
+  }
+
+  return (
+    <>
+      <button disabled={pending} onClick={shareBook}>
+        {pending ? "Adding…" : "Add book to chat"}
+      </button>
+      {error && <p role="alert">{error.message}</p>}
+    </>
+  );
+}
+```
+
+</details>
+</td></tr></table>
+
+**Little Bookshop**
+
+https://github.com/user-attachments/assets/2f9b56c1-f149-430e-b5b6-a258c08491e6
+
+**Manufact Analytics**
+
+https://github.com/user-attachments/assets/e488c66e-8f65-4930-8e08-711bdf12ec6e
+
+[Explore ChatGPT Plugin Extensions →](https://mcp-use.com/docs/typescript/mcp-apps/chatgpt-extensions)
+
 ## Build
 
 Create the production build:
