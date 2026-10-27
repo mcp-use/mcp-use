@@ -263,6 +263,58 @@ describe("Responses SSE event mapping", () => {
     });
   });
 
+  it.each([
+    {
+      name: "failed responses",
+      terminalEvent: {
+        type: "response.failed",
+        response: { error: { message: "The model request failed" } },
+      },
+      message: "The model request failed",
+    },
+    {
+      name: "incomplete responses",
+      terminalEvent: {
+        type: "response.incomplete",
+        response: { incomplete_details: { reason: "max_output_tokens" } },
+      },
+      message: "OpenAI Responses request incomplete: max_output_tokens",
+    },
+  ])(
+    "emits an error for $name instead of completing",
+    async ({ terminalEvent, message }) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            sseResponse([
+              { type: "response.output_text.delta", delta: "partial answer" },
+              terminalEvent,
+            ])
+          )
+      );
+
+      const turn = streamResponsesTurn({
+        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "k" },
+        input: [{ role: "user", content: "hello" }],
+        tools: TOOLS,
+      });
+      const events: LlmStreamEvent[] = [];
+      for (;;) {
+        const next = await turn.next();
+        if (next.done) break;
+        events.push(next.value);
+      }
+
+      expect(events).toEqual([
+        { type: "text-delta", delta: "partial answer" },
+        { type: "error", message },
+      ]);
+      expect(events).not.toContainEqual({ type: "done" });
+    }
+  );
+
   it("yields AgentSteps for a streamed OpenAI Responses tool call", async () => {
     vi.stubGlobal(
       "fetch",

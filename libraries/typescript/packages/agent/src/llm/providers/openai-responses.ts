@@ -382,6 +382,35 @@ export async function* streamResponsesTurn(
       continue;
     }
 
+    if (type === "response.failed" || type === "response.incomplete") {
+      const response = parsed.response as Record<string, unknown> | undefined;
+      const providerError = response?.error as
+        | Record<string, unknown>
+        | undefined;
+      const errorMessage =
+        typeof providerError?.message === "string"
+          ? providerError.message
+          : type === "response.failed"
+            ? "OpenAI Responses request failed"
+            : undefined;
+      const incompleteDetails = response?.incomplete_details as
+        | Record<string, unknown>
+        | undefined;
+      const reason =
+        typeof incompleteDetails?.reason === "string"
+          ? incompleteDetails.reason
+          : undefined;
+      yield {
+        type: "error",
+        message:
+          errorMessage ??
+          (reason
+            ? `OpenAI Responses request incomplete: ${reason}`
+            : "OpenAI Responses request incomplete"),
+      };
+      return [];
+    }
+
     if (type === "error") {
       const message =
         typeof parsed.message === "string"
