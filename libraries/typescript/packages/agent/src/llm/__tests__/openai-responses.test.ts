@@ -243,6 +243,11 @@ describe("Responses SSE event mapping", () => {
       event: { type: "response.failed", response: {} },
       message: "OpenAI response failed",
     },
+    ...["", " \t\n "].map((message) => ({
+      name: `response.failed with blank message ${JSON.stringify(message)}`,
+      event: { type: "response.failed", response: { error: { message } } },
+      message: "OpenAI response failed",
+    })),
     {
       name: "response.incomplete",
       event: {
@@ -256,6 +261,14 @@ describe("Responses SSE event mapping", () => {
       event: { type: "response.incomplete", response: {} },
       message: "OpenAI response incomplete: unknown reason",
     },
+    ...["", " \t\n "].map((reason) => ({
+      name: `response.incomplete with blank reason ${JSON.stringify(reason)}`,
+      event: {
+        type: "response.incomplete",
+        response: { incomplete_details: { reason } },
+      },
+      message: "OpenAI response incomplete: unknown reason",
+    })),
   ])("emits an error instead of done for $name", async ({ event, message }) => {
     vi.stubGlobal(
       "fetch",

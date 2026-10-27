@@ -374,7 +374,7 @@ export async function* streamResponsesTurn(
       const response = parsed.response as Record<string, unknown> | undefined;
       const error = response?.error as Record<string, unknown> | undefined;
       const message =
-        typeof error?.message === "string"
+        typeof error?.message === "string" && error.message.trim()
           ? error.message
           : "OpenAI response failed";
       yield { type: "error", message };
@@ -387,7 +387,9 @@ export async function* streamResponsesTurn(
         | Record<string, unknown>
         | undefined;
       const reason =
-        typeof details?.reason === "string" ? details.reason : "unknown reason";
+        typeof details?.reason === "string" && details.reason.trim()
+          ? details.reason
+          : "unknown reason";
       yield { type: "error", message: `OpenAI response incomplete: ${reason}` };
       return [];
     }

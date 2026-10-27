@@ -59,6 +59,28 @@ main().catch(console.error);
 
 For each tool call, `stream()` can yield an initial step with an empty `observation`, followed by another step containing the tool result. A `for await` loop receives the steps but does not expose the generator's final return value.
 
+## Error handling
+
+When OpenAI Responses ends with `response.failed` or `response.incomplete`, consuming `stream()` throws instead of returning a final answer. The `await stream.next()` promise rejects, or a `for await` loop throws. Partial output is discarded and is not saved to conversation memory.
+
+With an initialized `agent`, catch errors while consuming the stream:
+
+```typescript
+try {
+  const stream = agent.stream({ prompt: "Summarize the project scripts." });
+  while (true) {
+    const next = await stream.next();
+    if (next.done) {
+      console.log("Final answer:", next.value);
+      break;
+    }
+    console.log("Tool step:", next.value);
+  }
+} catch (error) {
+  console.error("Stream failed:", error);
+}
+```
+
 ## Stream provider-neutral events
 
 `streamEvents()` uses the same `LlmStreamEvent` variants for every supported provider.

@@ -1,5 +1,5 @@
 ---
-"@mcp-use/agent": patch
+"@mcp-use/agent": minor
 ---
 
-Surface errors when OpenAI Responses streams fail or end incomplete.
+`stream()` now throws on failed or incomplete OpenAI Responses instead of returning partial output.
