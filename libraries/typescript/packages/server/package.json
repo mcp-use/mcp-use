@@ -177,12 +177,12 @@
     "@types/react-dom": "^19.2.3",
     "emulate": "0.12.1",
     "es-module-lexer": "^2.3.0",
-    "happy-dom": "^20.10.6",
+    "happy-dom": "^21.0.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.12",
-    "zod": "^4.4.3",
+    "zod": "^4.6.6",
     "vite": "8.1.6"
   },
   "publishConfig": {

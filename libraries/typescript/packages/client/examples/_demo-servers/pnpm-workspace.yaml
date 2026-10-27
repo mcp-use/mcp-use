@@ -1,6 +1,9 @@
 packages:
   - .
 
+allowBuilds:
+  esbuild: set this to true or false
+
 minimumReleaseAge: 4320
 
 overrides:
@@ -10,3 +13,4 @@ overrides:
   nanoid@<3.3.18: ^3.3.18
   proxy-addr: ">=2.0.8"
   source-map-js: ">=1.2.2"
+  body-parser: ">=2.4.0"

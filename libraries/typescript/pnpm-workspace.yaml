@@ -58,15 +58,15 @@ overrides:
   react-router-dom: ^8.3.0
   qs: ">=6.16.0"
   preact: ">=10.28.2"
-  zod: 4.4.3
+  zod: 4.6.6
   # A2UI's renderer and schema conversion currently require the Zod 3 API.
   "mcp-use-example-a2ui>zod": 3.25.76
   "@a2ui/react>zod": 3.25.76
   "@a2ui/web_core>zod": 3.25.76
   # Better Auth 1.7 uses Zod's validate API, added after the workspace pin.
-  "@better-auth/core>zod": ^4.5.4
-  "@better-auth/oauth-provider>zod": ^4.5.4
-  "better-auth>zod": ^4.5.4
+  "@better-auth/core>zod": ^4.6.6
+  "@better-auth/oauth-provider>zod": ^4.6.6
+  "better-auth>zod": ^4.6.6
   jsondiffpatch: ">=0.7.2"
   esbuild: 0.27.1
   vite: "8.1.6"
@@ -75,17 +75,17 @@ overrides:
   js-yaml: ^4.3.2
   flatted: ">=3.4.2"
   tar: ">=7.5.21"
-  undici: ">=7.29.1 <8"
+  undici: ">=7.30.1 <8"
   "@hono/node-server": ">=2.0.5"
   hono: ">=4.13.7"
   express-rate-limit: ">=8.2.2"
-  dompurify: ">=3.4.13"
+  dompurify: ">=3.4.17"
   minimatch: ">=10.2.6"
   rollup: ">=4.59.0"
   "@modelcontextprotocol/sdk": "^1.32.1"
   ai: ">=5.0.52"
   axios: ">=1.20.0"
-  body-parser: ">=2.3.0"
+  body-parser: ">=2.4.0"
   brace-expansion: ^5.0.12
   "@isaacs/brace-expansion": ">=5.0.9"
   picomatch: ">=4.0.4"
@@ -105,8 +105,8 @@ overrides:
   vitest: 4.1.12
   ws: ">=8.20.1"
   uuid: ">=13.0.1 <14"
-  fast-uri: ^4.1.5
-  ip-address: ">=10.7.1"
+  fast-uri: ^4.2.3
+  ip-address: ">=10.7.4"
   postcss: ">=8.5.23"
   sharp: ">=0.35.4"
   langsmith: ">=0.6.0"
@@ -128,6 +128,7 @@ overrides:
   proxy-addr: ">=2.0.8"
   shell-quote: ">=1.11.0"
   source-map-js: ">=1.2.2"
+  next: ">=16.4.1 <17"
 
 allowBuilds:
   # firebase-admin pulls it in. Its postinstall only bakes a web app config
