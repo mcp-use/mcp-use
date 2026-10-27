@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.1.1
+
+### Patch Changes
+
+- c0a5218: Scaffold new projects with Zod 4.6.6 or later, which fixes a memory exhaustion issue when validating large arrays (GHSA-mrhx-c7xc-m3w5).
+
 ## 2.1.1-canary.0
 
 ### Patch Changes
