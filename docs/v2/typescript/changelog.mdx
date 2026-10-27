@@ -6,6 +6,14 @@ tag: "New"
 rss: true
 ---
 
+<Update label="create-mcp-use-app v2.1.1" description="October 2026">
+  ## Patched template dependencies
+  Patch release for `create-mcp-use-app` only. `mcp-use`, `@mcp-use/cli`, and `@mcp-use/inspector` are unchanged.
+
+- **Fix** (create-mcp-use-app): the `mcp-server` and `mcp-apps` templates require `zod` `^4.6.6`, which fails oversized arrays against their length limit before validating each element. Earlier versions can exhaust memory on large arrays ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)) (`#2956`)
+- **Update**: Updated create-mcp-use-app to v2.1.1
+</Update>
+
 <Update label="v2.12.0" description="October 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.12.0&title=View%20origins%20%26%20endpoint%20identity&date=2026-10&lang=typescript" alt="Release 2.12.0" />
