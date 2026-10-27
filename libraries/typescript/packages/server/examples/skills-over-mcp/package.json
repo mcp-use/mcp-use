@@ -12,6 +12,6 @@
     "typecheck": "tsc --noEmit",
     "verify": "node ../verify-examples.mjs --example=skills-over-mcp"
   },
-  "dependencies": { "mcp-use": "workspace:*", "zod": "^4.4.3" },
+  "dependencies": { "mcp-use": "workspace:*", "zod": "^4.6.6" },
   "devDependencies": { "@types/node": "^22.20.0", "typescript": "^7.0.2", "vite": "^8.1.6" }
 }

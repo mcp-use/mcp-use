@@ -1,0 +1,16 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.25",
+    "@mcp-use/cli": "4.5.3",
+    "@mcp-use/client": "2.4.5",
+    "create-mcp-use-app": "2.1.0",
+    "@mcp-use/inspector": "20.3.25",
+    "mcp-use": "2.12.0",
+    "@mcp-use/tunnel": "0.2.2"
+  },
+  "changesets": [
+    "patch-dependabot-zod"
+  ]
+}
