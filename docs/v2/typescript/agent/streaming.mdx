@@ -61,7 +61,7 @@ For each tool call, `stream()` can yield an initial step with an empty `observat
 
 ## Error handling
 
-When OpenAI Responses ends with `response.failed` or `response.incomplete`, consuming `stream()` throws instead of returning a final answer. The `await stream.next()` promise rejects, or a `for await` loop throws. Partial output is discarded and is not saved to conversation memory.
+When OpenAI Responses ends with `response.failed` or `response.incomplete`, consuming `stream()` throws instead of returning a final answer. The `await stream.next()` promise rejects, or a `for await` loop throws. Partial output is discarded and is not saved to conversation memory. `streamEvents()` does not throw for these events; it yields an `error` event and ends without `done`.
 
 With an initialized `agent`, catch errors while consuming the stream:
 
