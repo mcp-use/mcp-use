@@ -5,13 +5,12 @@
  * The library entry, bin, and production `start` path therefore never
  * evaluate Vite or an unrelated command implementation.
  */
-import { resolve } from "node:path";
-
 import {
   parseArgs,
   stripForwardingSeparator,
   type ParsedArgs,
 } from "./args.js";
+import { resolveProjectRoot } from "./project-root.js";
 
 // Node 25 exposes `localStorage` through a warning-producing lazy getter when
 // no --localstorage-file is configured. CLI/server code does not use that
@@ -264,7 +263,7 @@ async function typecheckCommand(args: ParsedArgs): Promise<number> {
   try {
     const { runTypecheck } = await import("../commands/typecheck.js");
     return await runTypecheck({
-      cwd: resolve(process.cwd(), args.path ?? "."),
+      cwd: resolveProjectRoot(process.cwd(), args.path),
       ...(args.entry !== undefined && { entry: args.entry }),
       ...(args.mcpDir !== undefined && { mcpDir: args.mcpDir }),
       ...(args.passthrough.length > 0 && { tscArgs: args.passthrough }),
@@ -281,7 +280,7 @@ async function startCommand(args: ParsedArgs): Promise<number> {
   try {
     const { runStart } = await import("../commands/start.js");
     started = await runStart({
-      cwd: resolve(process.cwd(), args.path ?? "."),
+      cwd: resolveProjectRoot(process.cwd(), args.path),
       port: args.port,
       host: args.host,
       ...(args.inspector === true && { withInspector: true }),
@@ -325,7 +324,7 @@ async function cliCommand(
   args: ParsedArgs
 ): Promise<number> {
   const options: CliCommandOptions = {
-    cwd: resolve(process.cwd(), args.path ?? "."),
+    cwd: resolveProjectRoot(process.cwd(), args.path),
     ...(args.entry !== undefined && { entry: args.entry }),
     ...(args.mcpDir !== undefined && { mcpDir: args.mcpDir }),
     ...(args.viewsDir !== undefined && { viewsDir: args.viewsDir }),
