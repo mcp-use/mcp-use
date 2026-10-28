@@ -35,7 +35,7 @@ async def main():
     client = MCPClient.from_dict(config)
 
     # Create LLM
-    llm = ChatOpenAI(model="gpt-5")
+    llm = ChatOpenAI(model="gpt-5.6-sol")
 
     # Create agent with the client
     agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)

@@ -11,7 +11,7 @@ from mcp_use import MCPAgent, MCPClient
 async def main():
     client = MCPClient()
     agent = MCPAgent(
-        llm=ChatOpenAI(model_name="gpt-5"),
+        llm=ChatOpenAI(model_name="gpt-5.6-sol"),
         client=client,
     )
 

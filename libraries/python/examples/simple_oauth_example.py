@@ -27,7 +27,7 @@ async def main():
     #     }
     # )
 
-    llm = ChatOpenAI(model="gpt-5", temperature=0)
+    llm = ChatOpenAI(model="gpt-5.6-sol", temperature=0)
     agent = MCPAgent(llm=llm, client=client, pretty_print=True, max_steps=50)
 
     response = await agent.run(query="What are my latest linear issues")

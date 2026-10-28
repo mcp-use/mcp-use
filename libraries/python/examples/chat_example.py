@@ -25,7 +25,7 @@ async def run_memory_chat():
     }
     # Create MCPClient from config file
     client = MCPClient(config=config)
-    llm = ChatOpenAI(model="gpt-5")
+    llm = ChatOpenAI(model="gpt-5.6-sol")
 
     # Create agent with memory_enabled=True
     agent = MCPAgent(

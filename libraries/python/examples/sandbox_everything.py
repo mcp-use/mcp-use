@@ -45,7 +45,7 @@ async def main():
     client = MCPClient(config=sandboxed_server, sandbox=True, sandbox_options=sandbox_options)
 
     # Create LLM and agent
-    llm = ChatOpenAI(model="gpt-5", temperature=0)
+    llm = ChatOpenAI(model="gpt-5.6-sol", temperature=0)
     agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
 
     try:

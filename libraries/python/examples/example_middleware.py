@@ -82,7 +82,7 @@ async def main():
     client = MCPClient(config=config, middleware=[MutationMiddleware(), TimingMiddleware()])
 
     # Create LLM
-    llm = ChatOpenAI(model="gpt-5")
+    llm = ChatOpenAI(model="gpt-5.6-sol")
 
     # Create agent with the client
     agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
