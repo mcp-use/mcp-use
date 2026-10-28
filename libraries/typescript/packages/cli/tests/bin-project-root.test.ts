@@ -71,8 +71,10 @@ describe("resolveProjectRoot", () => {
           env: { ...process.env, MCP_USE_TEST_PROJECT_DIR: longPath },
         }
       ).trim();
-      if (!/~\\d+$/.test(basename(shortPath))) {
-        skip("DOS 8.3 aliases unavailable for this fixture (8dot3name may be disabled)");
+      if (!/~\d+$/.test(basename(shortPath))) {
+        skip(
+          "DOS 8.3 aliases unavailable for this fixture (8dot3name may be disabled)"
+        );
       }
 
       const root = resolveProjectRoot(shortPath);
