@@ -44,7 +44,7 @@ interface ToolNamespaceInfo {
  */
 export abstract class BaseCodeExecutor {
   protected client: MCPClient;
-  protected _connecting: boolean = false;
+  private connectionPromise: Promise<void> | null = null;
 
   constructor(client: MCPClient) {
     this.client = client;
@@ -76,24 +76,23 @@ export abstract class BaseCodeExecutor {
       (s) => !activeSessions.includes(s)
     );
 
-    // Prevent race conditions with a lock
-    if (missingServers.length > 0 && !this._connecting) {
-      this._connecting = true;
+    // Share the complete connection attempt, including its failure, with every
+    // execution rather than letting callers continue with incomplete sessions.
+    if (this.connectionPromise) {
+      await this.connectionPromise;
+      return;
+    }
+
+    if (missingServers.length > 0) {
+      logger.debug(
+        `Connecting to configured servers for code execution: ${missingServers.join(", ")}`
+      );
+      const connection = this.client.createAllSessions().then(() => {});
+      this.connectionPromise = connection;
       try {
-        logger.debug(
-          `Connecting to configured servers for code execution: ${missingServers.join(", ")}`
-        );
-        await this.client.createAllSessions();
+        await connection;
       } finally {
-        this._connecting = false;
-      }
-    } else if (missingServers.length > 0 && this._connecting) {
-      // Wait for connection to complete if already in progress
-      logger.debug("Waiting for ongoing server connection...");
-      // Simple polling for now
-      const startWait = Date.now();
-      while (this._connecting && Date.now() - startWait < 5000) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        this.connectionPromise = null;
       }
     }
   }
