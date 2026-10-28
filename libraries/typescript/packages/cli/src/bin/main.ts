@@ -264,8 +264,12 @@ async function typecheckCommand(args: ParsedArgs): Promise<number> {
     const { runTypecheck } = await import("../commands/typecheck.js");
     return await runTypecheck({
       cwd: resolveProjectRoot(process.cwd(), args.path),
-      ...(args.entry !== undefined && { entry: resolveAbsoluteProjectPath(args.entry) }),
-      ...(args.mcpDir !== undefined && { mcpDir: resolveAbsoluteProjectPath(args.mcpDir) }),
+      ...(args.entry !== undefined && {
+        entry: resolveAbsoluteProjectPath(args.entry),
+      }),
+      ...(args.mcpDir !== undefined && {
+        mcpDir: resolveAbsoluteProjectPath(args.mcpDir),
+      }),
       ...(args.passthrough.length > 0 && { tscArgs: args.passthrough }),
     });
   } catch (error) {
@@ -325,9 +329,15 @@ async function cliCommand(
 ): Promise<number> {
   const options: CliCommandOptions = {
     cwd: resolveProjectRoot(process.cwd(), args.path),
-    ...(args.entry !== undefined && { entry: resolveAbsoluteProjectPath(args.entry) }),
-    ...(args.mcpDir !== undefined && { mcpDir: resolveAbsoluteProjectPath(args.mcpDir) }),
-    ...(args.viewsDir !== undefined && { viewsDir: resolveAbsoluteProjectPath(args.viewsDir) }),
+    ...(args.entry !== undefined && {
+      entry: resolveAbsoluteProjectPath(args.entry),
+    }),
+    ...(args.mcpDir !== undefined && {
+      mcpDir: resolveAbsoluteProjectPath(args.mcpDir),
+    }),
+    ...(args.viewsDir !== undefined && {
+      viewsDir: resolveAbsoluteProjectPath(args.viewsDir),
+    }),
     ...(!args.viewsConfig && { viewsConfig: false }),
     ...(args.port !== undefined && { port: args.port }),
     ...(args.host !== undefined && { host: args.host }),

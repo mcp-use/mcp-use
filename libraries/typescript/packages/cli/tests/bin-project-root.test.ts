@@ -37,7 +37,9 @@ describe("resolveProjectRoot", () => {
       process.platform === "win32" ? realpathSync.native(dir) : dir;
     const project = join(parent, "project");
     mkdirSync(project);
-    expect(resolveProjectRoot(parent, "project")).toBe(resolve(parent, "project"));
+    expect(resolveProjectRoot(parent, "project")).toBe(
+      resolve(parent, "project")
+    );
   });
 
   it("preserves missing paths so existing command errors still apply", () => {
