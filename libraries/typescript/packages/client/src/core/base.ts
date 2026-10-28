@@ -64,7 +64,8 @@ export abstract class BaseMCPClient {
   /**
    * Map of server names to their active sessions.
    */
-  protected sessions: Record<string, MCPSession> = {};
+  // Server names may match Object.prototype properties, including __proto__.
+  protected sessions: Record<string, MCPSession> = Object.create(null);
 
   /**
    * Tracks teardown by session identity so overlapping cleanup paths share the
