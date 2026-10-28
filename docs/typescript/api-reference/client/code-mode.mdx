@@ -53,7 +53,7 @@ Returns `ExecutionResult`:
 
 Search tools across active sessions. `detailLevel`: `"names" | "descriptions" | "full"`.
 
-Returns `ToolSearchResponse` with `results` and `meta` (counts, namespaces).
+Returns `ToolSearchResponse` with `results` and `meta` (counts, namespaces). The in-sandbox `search_tools(query, detailLevel)` helper returns the same `{ meta, results }` envelope on both executors, so code can read `results` (and `meta.result_count`) without branching on the executor. The two executors can still differ on which tools a query matches until #2728 lands.
 
 ## Executors
 
