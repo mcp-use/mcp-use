@@ -81,13 +81,20 @@ describe("code executor connection concurrency", () => {
     const first = executor.execute();
     const second = executor.execute();
     const results = Promise.allSettled([first, second]);
-    connection.reject(new Error("handshake failed"));
+    const error = new Error("handshake failed");
+    connection.reject(error);
     await vi.advanceTimersByTimeAsync(100);
     const settled = await results;
     expect(settled.map((result) => result.status)).toEqual([
       "rejected",
       "rejected",
     ]);
+    for (const result of settled) {
+      if (result.status === "rejected") {
+        expect(result.reason).toBe(error);
+        expect(result.reason.message).toBe("handshake failed");
+      }
+    }
     await executor.execute();
     expect(client.createAllSessions).toHaveBeenCalledTimes(2);
   });
