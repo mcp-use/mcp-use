@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -8,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resolveProjectRoot } from "../src/bin/project-root.js";
@@ -58,14 +59,25 @@ describe("resolveProjectRoot", () => {
 
   it.skipIf(process.platform !== "win32")(
     "canonicalizes Windows paths before watching files",
-    async () => {
-      // GitHub's Windows runner typically uses an 8.3 path in TEMP (RUNNER~1).
-      const shortPath = temporaryDir();
-      const root = resolveProjectRoot(shortPath);
-      expect(root).toBe(realpathSync.native(shortPath));
-      if (/~\d+(?=[\\/]|$)/.test(shortPath)) {
-        expect(root).not.toMatch(/~\d+(?=[\\/]|$)/);
+    async ({ skip }) => {
+      const longPath = temporaryDir();
+      // Ask Windows for the fixture's actual 8.3 alias; TEMP itself is not
+      // guaranteed to be a short path. %~fsI expands to a full short path.
+      const shortPath = execFileSync(
+        process.env.ComSpec ?? "cmd.exe",
+        ["/d", "/c", 'for %I in ("%MCP_USE_TEST_PROJECT_DIR%") do @echo %~fsI'],
+        {
+          encoding: "utf8",
+          env: { ...process.env, MCP_USE_TEST_PROJECT_DIR: longPath },
+        }
+      ).trim();
+      if (!/~\\d+$/.test(basename(shortPath))) {
+        skip("DOS 8.3 aliases unavailable for this fixture (8dot3name may be disabled)");
       }
+
+      const root = resolveProjectRoot(shortPath);
+      expect(root).toBe(realpathSync.native(longPath));
+      expect(root).not.toBe(shortPath);
 
       const watcher = watch(root, { recursive: true });
       try {
