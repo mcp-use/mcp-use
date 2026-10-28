@@ -65,7 +65,7 @@ export abstract class BaseCodeExecutor {
 
   /**
    * Ensure all configured MCP servers are connected before execution.
-   * Prevents race conditions with a connection lock.
+   * Shares completion and failure of the in-flight connection attempt.
    */
   protected async ensureServersConnected(): Promise<void> {
     const configuredServers = this.client.getServerNames();
