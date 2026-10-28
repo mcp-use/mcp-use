@@ -40,6 +40,15 @@ new MCPClient(config, {
 
 Runs code with tool namespaces exposed as `serverName.toolName(args)`.
 
+A server name that is not a valid JavaScript identifier also gets a sanitized alias, so `my-server` can be called as `my_server`. Every character outside `[A-Za-z0-9_]` becomes `_`:
+
+```javascript
+// server "my-server" with a tool "do_thing"
+const result = await my_server.do_thing({ a: 1 });
+```
+
+Two limits follow from the sanitizing rule and are the same for the VM and E2B executors: names that sanitize to the same alias share one namespace (`my-server` and `my.server` both become `my_server`), and a name that starts with a digit sanitizes to something that still cannot be written as a bare identifier (`123-server` → `123_server`; reach it as `globalThis["123_server"]`). A name that sanitizes to a built-in helper (`search-tools` → `search_tools`) is not aliased, so the helper keeps working.
+
 Returns `ExecutionResult`:
 
 | Field | Type |
