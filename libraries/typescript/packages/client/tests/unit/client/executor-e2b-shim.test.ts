@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { Tool } from "@modelcontextprotocol/client";
 import { E2BCodeExecutor } from "../../../src/code-mode/executor-e2b.js";
 import type { MCPClient } from "../../../src/core/node.js";
@@ -83,5 +83,122 @@ describe("E2BCodeExecutor shim generation", () => {
 
     const { global } = evalShim(shim);
     expect(global["my_server"]).toBeDefined();
+  });
+});
+
+describe("E2BCodeExecutor stdout bridge", () => {
+  function createExecutor(
+    stdoutChunks: string[],
+    write = vi.fn().mockResolvedValue(undefined)
+  ) {
+    const callTool = vi.fn().mockResolvedValue({
+      content: [{ type: "text", text: '{"ok":true}' }],
+    });
+    const executor = new E2BCodeExecutor(
+      {
+        getServerNames: () => ["tools"],
+        getAllActiveSessions: () => ({
+          tools: {
+            connector: {
+              tools: [makeTool("echo")],
+              callTool,
+            },
+          },
+        }),
+      } as unknown as MCPClient,
+      { apiKey: "test" }
+    );
+    (executor as any).codeExecSandbox = {
+      files: { write },
+      commands: {
+        run: vi.fn(async (_command: string, options: any) => {
+          for (const chunk of stdoutChunks) {
+            await options.onStdout(chunk);
+          }
+          return {
+            stdout: "__MCP_RESULT_START__\nnull\n__MCP_RESULT_END__",
+            stderr: "",
+            exitCode: 0,
+          };
+        }),
+      },
+    };
+
+    return { executor, callTool, write };
+  }
+
+  it("buffers a tool call split across stdout callbacks", async () => {
+    const { executor, callTool, write } = createExecutor([
+      '{"type":"__MCP_TOOL_CALL__","id":"call-1","server":"tools",',
+      '"tool":"echo","args":{"message":"hi"}}\n',
+    ]);
+
+    await executor.execute("return null;");
+
+    expect(callTool).toHaveBeenCalledWith("echo", { message: "hi" });
+    expect(write).toHaveBeenCalledWith(
+      "/tmp/mcp_result_call-1.json",
+      '{"data":{"ok":true}}'
+    );
+  });
+
+  it("processes multiple complete tool calls from one stdout callback", async () => {
+    const { executor, callTool, write } = createExecutor([
+      '{"type":"__MCP_TOOL_CALL__","id":"call-1","server":"tools","tool":"echo","args":{"message":"first"}}\n' +
+        '{"type":"__MCP_TOOL_CALL__","id":"call-2","server":"tools","tool":"echo","args":{"message":"second"}}\n',
+    ]);
+
+    await executor.execute("return null;");
+
+    expect(callTool).toHaveBeenNthCalledWith(1, "echo", {
+      message: "first",
+    });
+    expect(callTool).toHaveBeenNthCalledWith(2, "echo", {
+      message: "second",
+    });
+    expect(write).toHaveBeenCalledWith(
+      "/tmp/mcp_result_call-2.json",
+      '{"data":{"ok":true}}'
+    );
+  });
+
+  it("skips malformed bridge records and processes the following record", async () => {
+    const { executor, callTool } = createExecutor([
+      '{"type":"__MCP_TOOL_CALL__","id":"invalid"\n' +
+        '{"type":"__MCP_TOOL_CALL__","id":"call-1","server":"tools","tool":"echo","args":{"message":"valid"}}\n',
+    ]);
+
+    await executor.execute("return null;");
+
+    expect(callTool).toHaveBeenCalledTimes(1);
+    expect(callTool).toHaveBeenCalledWith("echo", { message: "valid" });
+  });
+
+  it("keeps a trailing partial bridge record undispatched", async () => {
+    const { executor, callTool } = createExecutor([
+      '{"type":"__MCP_TOOL_CALL__","id":"call-1","server":"tools",',
+    ]);
+
+    await executor.execute("return null;");
+
+    expect(callTool).not.toHaveBeenCalled();
+  });
+
+  it("does not let a failed result write escape the stdout callback", async () => {
+    const write = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValue(new Error("write failed"));
+    const { executor, callTool } = createExecutor(
+      [
+        '{"type":"__MCP_TOOL_CALL__","id":"call-1","server":"tools","tool":"echo","args":{}}\n',
+      ],
+      write
+    );
+
+    const result = await executor.execute("return null;");
+
+    expect(callTool).toHaveBeenCalledWith("echo", {});
+    expect(result.error).toBeNull();
   });
 });
