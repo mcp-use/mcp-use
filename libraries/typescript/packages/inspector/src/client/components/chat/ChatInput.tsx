@@ -16,6 +16,8 @@ interface ChatInputProps {
   isLoading: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   attachments: MessageAttachment[];
+  /** Context rows above the text, before attachment previews. */
+  contextRows?: number;
   placeholder?: string;
   className?: string;
   showAttachButton?: boolean;
@@ -41,6 +43,7 @@ export function ChatInput({
   isLoading,
   textareaRef,
   attachments,
+  contextRows = 0,
   placeholder = "Ask a question",
   className,
   showAttachButton = true,
@@ -79,7 +82,12 @@ export function ChatInput({
     <div className="relative w-full" data-chat-input-variant={variant}>
       {/* Attachment Previews */}
       {!isFullscreen && hasAttachments && (
-        <div className="absolute top-0 left-0 right-0 z-20 p-3 flex gap-2 flex-wrap">
+        <div
+          className={cn(
+            "absolute left-0 right-0 z-20 p-3 flex gap-2 flex-wrap",
+            contextRows >= 2 ? "top-20" : contextRows === 1 ? "top-12" : "top-0"
+          )}
+        >
           {attachments.map((attachment, index) => (
             <div
               key={index}
@@ -124,8 +132,10 @@ export function ChatInput({
             ? "field-sizing-fixed h-11 min-h-11 max-h-11 resize-none overflow-hidden py-2.5 pl-4 pr-12"
             : "p-4 pb-14 min-h-[150px] max-h-[300px]",
           shape.container,
-          !isFullscreen && hasAttachments && "pt-20",
-          className
+          className,
+          !isFullscreen &&
+            hasAttachments &&
+            (contextRows >= 2 ? "pt-40" : contextRows === 1 ? "pt-32" : "pt-20")
         )}
         rows={isFullscreen ? 1 : undefined}
         disabled={!isConnected || isLoading}
