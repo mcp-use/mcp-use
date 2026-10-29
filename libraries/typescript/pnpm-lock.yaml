@@ -487,7 +487,7 @@ importers:
         version: 1.6.0(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@hono/node-server':
         specifier: '>=2.0.5'
-        version: 2.0.12(hono@4.13.11)
+        version: 2.1.3(hono@4.13.11)
       '@mcp-use/agent':
         specifier: workspace:*
         version: link:../agent
@@ -693,7 +693,7 @@ importers:
         version: 1.7.6(@better-auth/core@1.7.6(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(@opentelemetry/api@1.9.1)(better-call@1.4.0(patch_hash=4d82de13a4359cd6eb958fab5e3ca7ee9efdf49df453cb993294eab1e85a0088)(zod@4.6.6))(jose@6.2.12)(kysely@0.29.3)(nanostores@1.4.0))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-auth@1.7.6(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.60(crossws@0.4.12(srvx@1.0.5))(esbuild@0.27.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(rolldown@1.2.8)(rollup@4.60.1)(vite@8.1.6(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)))(next@16.4.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@22.20.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.1.12))(better-call@1.4.0(patch_hash=4d82de13a4359cd6eb958fab5e3ca7ee9efdf49df453cb993294eab1e85a0088)(zod@4.6.6))
       '@hono/node-server':
         specifier: '>=2.0.5'
-        version: 2.0.12(hono@4.13.11)
+        version: 2.1.3(hono@4.13.11)
       better-auth:
         specifier: '>=1.7.6'
         version: 1.7.6(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.60(crossws@0.4.12(srvx@1.0.5))(esbuild@0.27.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(rolldown@1.2.8)(rollup@4.60.1)(vite@8.1.6(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)))(next@16.4.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@22.20.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.1.12)
@@ -2736,6 +2736,12 @@ packages:
 
   '@hono/node-server@2.0.12':
     resolution: {integrity: sha512-eWpQYr67tqJLeaSUl0Q+TquuYfUdTibpOJlUMV2FfUP7+KqCC5TufnwnlXL6mobZBJbGAYRd7ZvEBDCbLInjhg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: '>=4.13.7'
+
+  '@hono/node-server@2.1.3':
+    resolution: {integrity: sha512-TA//nWMqPhbfdfneACk6t5a9eqbS9lABEPyKn0/xZTah3H3U2XaVg85rJFl0/Fyit0I552YDHgXGVSf3GwqbUw==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: '>=4.13.7'
@@ -12047,6 +12053,10 @@ snapshots:
     dependencies:
       hono: 4.13.11
 
+  '@hono/node-server@2.1.3(hono@4.13.11)':
+    dependencies:
+      hono: 4.13.11
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -16474,7 +16484,7 @@ snapshots:
 
   emulate@0.5.0(hono@4.13.11):
     dependencies:
-      '@hono/node-server': 2.0.12(hono@4.13.11)
+      '@hono/node-server': 2.1.3(hono@4.13.11)
       commander: 14.0.3
       picocolors: 1.1.1
       yaml: 2.8.3
