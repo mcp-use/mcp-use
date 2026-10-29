@@ -45,7 +45,7 @@ type LoadedResource = ResourceContent & {
   frontmatterValid?: boolean;
 };
 
-interface SkillsTabProps {
+export interface SkillsTabProps {
   skills: Skill[];
   getSkill: (uri: string) => Promise<SkillGetResult>;
   readResource: (uri: string) => Promise<{ contents: ResourceContent[] }>;

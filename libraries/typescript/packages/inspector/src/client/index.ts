@@ -63,6 +63,7 @@ export {
   type ResourcesTabRef,
 } from "./components/ResourcesTab.js";
 export { PromptsTab, type PromptsTabRef } from "./components/PromptsTab.js";
+export { SkillsTab, type SkillsTabProps } from "./components/SkillsTab.js";
 
 // ---------------------------------------------------------------------------
 // Chat components – embeddable chat UI for MCP servers
