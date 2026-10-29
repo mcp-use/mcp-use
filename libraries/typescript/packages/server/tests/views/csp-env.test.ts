@@ -58,8 +58,31 @@ describe("buildMergedResourceCsp", () => {
       "https://platform.example.com",
     ]);
     expect(csp.connectDomains).toEqual(["https://platform.example.com"]);
-    expect(csp.frameDomains).toEqual(["https://platform.example.com"]);
-    expect(csp.baseUriDomains).toEqual(["https://platform.example.com"]);
+    expect(csp.frameDomains).toEqual([]);
+    expect(csp.baseUriDomains).toEqual([]);
+  });
+
+  it("only uses explicit env vars for frame and base-uri domains", () => {
+    process.env.CSP_URLS = "https://platform.example.com";
+    process.env.CSP_FRAME_DOMAINS = "https://embed.example.com";
+    process.env.CSP_BASE_URI_DOMAINS = "https://base.example.com";
+
+    const csp = buildMergedResourceCsp(
+      { csp: { frameDomains: ["https://author-embed.example.com"] } },
+      {
+        serverOrigin: "https://server.example.com",
+        assetsOrigin: "https://server.example.com",
+        explicitAssetsBase: false,
+      }
+    );
+
+    expect(csp.frameDomains).toEqual([
+      "https://author-embed.example.com",
+      "https://embed.example.com",
+    ]);
+    expect(csp.baseUriDomains).toEqual(["https://base.example.com"]);
+    delete process.env.CSP_FRAME_DOMAINS;
+    delete process.env.CSP_BASE_URI_DOMAINS;
   });
 
   it("uses per-category env instead of CSP_URLS for that category", () => {

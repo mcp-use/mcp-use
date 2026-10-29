@@ -42,18 +42,31 @@ function readEnvDomains(name: string): string[] | undefined {
   return parseDomainList(raw);
 }
 
-/** Domains from `CSP_URLS` (shortcut for all categories). */
+/**
+ * Categories the `CSP_URLS` shortcut feeds. Frame and base-uri domains are
+ * opt-in only: hosts such as ChatGPT treat any `frameDomains` entry as a
+ * request to embed third-party iframes.
+ */
+const CSP_URLS_CATEGORIES: ReadonlySet<CspCategory> = new Set([
+  "connectDomains",
+  "resourceDomains",
+]);
+
+/** Domains from `CSP_URLS` (shortcut for connect and resource domains). */
 function readCspUrlsShortcut(): string[] {
   return readEnvDomains("CSP_URLS") ?? [];
 }
 
-/** Per-category env override, or `CSP_URLS` when the category var is unset. */
+/**
+ * Per-category env override, or `CSP_URLS` for connect/resource domains when
+ * the category var is unset.
+ */
 function readEnvDomainsForCategory(category: CspCategory): string[] {
   const perCategory = readEnvDomains(CATEGORY_ENV[category]);
   if (perCategory !== undefined) {
     return perCategory;
   }
-  return readCspUrlsShortcut();
+  return CSP_URLS_CATEGORIES.has(category) ? readCspUrlsShortcut() : [];
 }
 
 /**
@@ -102,8 +115,8 @@ function toWebSocketOrigin(serverOrigin: string): string {
 /**
  * Build final `_meta.ui.csp` from author facts, env vars, and MCP auto-append.
  *
- * Precedence (high → low): author → env (`CSP_*_DOMAINS` or `CSP_URLS`) →
- * MCP auto-append (lowest).
+ * Precedence (high → low): author → env (`CSP_*_DOMAINS`, or `CSP_URLS` for
+ * connect/resource domains) → MCP auto-append (lowest).
  */
 export function buildMergedResourceCsp(
   authorFacts: ViewResourceFacts | undefined,
