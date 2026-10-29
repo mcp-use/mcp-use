@@ -410,6 +410,7 @@ export function widget<
 
 /**
  * Merge several tool results into one (`content` concatenated; objects shallow-merged).
+ * The merged result is an error when any input has `isError: true`.
  *
  * @deprecated Prefer building a single raw {@link CallToolResult} with the
  * desired `content` array.
@@ -454,6 +455,7 @@ export function mix(...results: CallToolResult[]): CallToolResult {
 
   return {
     content: results.flatMap((result) => result.content),
+    ...(results.some((result) => result.isError === true) && { isError: true }),
     ...(structuredContent !== undefined &&
       Object.keys(structuredContent).length > 0 && { structuredContent }),
     ...(_meta !== undefined && Object.keys(_meta).length > 0 && { _meta }),
