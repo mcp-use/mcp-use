@@ -55,6 +55,55 @@ import { ChatTab } from "@mcp-use/inspector/client";
 | `credentials`             | `RequestCredentials`                               | Fetch credentials used by chat streaming requests.                |
 | `extraHeaders`            | `Record<string, string>`                           | Additional headers sent on every streaming `POST`.                |
 | `body`                    | `(messages) => unknown`                            | Custom streaming request body builder.                            |
+| `skillSelection`          | `ChatSkillSelection`                               | Optional controlled skill selection rendered inside the input.    |
+| `systemPromptProvider`    | `ChatSystemPromptProvider`                         | Controlled system prompt and save callback for the input toolbar. |
+
+### Controlled skills and system prompt
+
+Pass `skillSelection` to show the native Add skills picker and removable skill chips inside the composer. The picker uses the complete `connection.skills` catalog, so deselected skills remain available to re-enable.
+
+```tsx
+import { useState } from "react";
+import {
+  ChatTab,
+  type ChatSkillSelection,
+  type ChatTabProps,
+} from "@mcp-use/inspector/client";
+
+function EmbeddedChat(props: ChatTabProps) {
+  const [enabledUris, setEnabledUris] = useState<Set<string>>(() => new Set());
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const skillSelection: ChatSkillSelection = {
+    enabledUris,
+    onChange: setEnabledUris,
+    maxSelected: 8,
+  };
+
+  return (
+    <ChatTab
+      {...props}
+      skillSelection={skillSelection}
+      systemPromptProvider={{
+        prompt,
+        savePrompt: async (value) => setPrompt(value),
+      }}
+    />
+  );
+}
+```
+
+`ChatSkillSelection` is exported from `@mcp-use/inspector/client`:
+
+| Field         | Type                          | Description                                                                              |
+| ------------- | ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `enabledUris` | `ReadonlySet<string>`         | Selected URIs from `connection.skills`. Replace the set when selection changes.          |
+| `onChange`    | `(uris: Set<string>) => void` | Receives the next selected set when the picker or a removal button is used.              |
+| `disabled`    | `boolean`                     | Optionally disables selection controls. Loading or disconnected chat also disables them. |
+| `maxSelected` | `number`                      | Maximum number the picker allows selecting. Defaults to `8`.                             |
+
+For client-side chat, only selected skills are advertised to the model and available through the skill-reading tools for the next turn. An empty set disables all skills. Omitting `skillSelection` keeps automatic discovery of every advertised skill and hides the selection UI. Server-side chat keeps its request body host-owned: use `body` to include the selected URIs in the shape expected by your backend.
+
+`systemPromptProvider` uses the existing compact System Prompt control in the input toolbar. Its `prompt` and `savePrompt` fields can read and persist your application’s chat settings; optional `isLoading`, `isSaving`, and `disabled` fields describe the provider state. Without a provider, Inspector uses its local system-prompt storage.
 
 ## Lower-level components
 
