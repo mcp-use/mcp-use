@@ -97,6 +97,18 @@ describe("resolveRequestOriginFromHeaders", () => {
     ).toBe("https://myapp.example.com");
   });
 
+  it("uses X-Forwarded-Host when Forwarded carries proto without host", () => {
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://127.0.0.1:3000/mcp", {
+          forwarded: "for=203.0.113.7;proto=https",
+          "x-forwarded-proto": "https",
+          "x-forwarded-host": "public.example.com",
+        })
+      )
+    ).toBe("https://public.example.com");
+  });
+
   it("uses X-Forwarded-Proto with the request host when X-Forwarded-Host is absent", () => {
     expect(
       resolveRequestOriginFromHeaders(

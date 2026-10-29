@@ -23,7 +23,7 @@ function readEnv(name: string): string | undefined {
 
 function parseForwardedHeader(
   header: string,
-  requestHost: string
+  fallbackHost: string
 ): string | undefined {
   for (const part of header.split(",")) {
     const params = new Map<string, string>();
@@ -36,7 +36,7 @@ function parseForwardedHeader(
     }
     const proto = params.get("proto");
     if (proto !== undefined && proto !== "") {
-      return `${proto}://${params.get("host") || requestHost}`;
+      return `${proto}://${params.get("host") || fallbackHost}`;
     }
   }
   return undefined;
@@ -46,14 +46,17 @@ function parseForwardedHeader(
  * Resolve origin from forwarded headers or the request URL (no env override).
  *
  * A forwarded protocol is honored on its own. The host comes from the
- * forwarded host when present, otherwise from the request.
+ * forwarded host when present, then `X-Forwarded-Host`, then the request.
  */
 export function resolveRequestOriginFromHeaders(request: Request): string {
   const requestUrl = new URL(request.url);
+  const fallbackHost =
+    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    requestUrl.host;
 
   const forwarded = request.headers.get("forwarded");
   if (forwarded !== null) {
-    const fromForwarded = parseForwardedHeader(forwarded, requestUrl.host);
+    const fromForwarded = parseForwardedHeader(forwarded, fallbackHost);
     if (fromForwarded !== undefined) {
       return fromForwarded;
     }
@@ -62,12 +65,8 @@ export function resolveRequestOriginFromHeaders(request: Request): string {
   const proto = request.headers.get("x-forwarded-proto");
   if (proto !== null) {
     const firstProto = proto.split(",")[0]?.trim();
-    const firstHost = request.headers
-      .get("x-forwarded-host")
-      ?.split(",")[0]
-      ?.trim();
     if (firstProto !== undefined && firstProto !== "") {
-      return `${firstProto}://${firstHost || requestUrl.host}`;
+      return `${firstProto}://${fallbackHost}`;
     }
   }
 
