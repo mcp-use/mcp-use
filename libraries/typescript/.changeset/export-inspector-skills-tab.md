@@ -9,3 +9,5 @@ Build the client entry for browsers so Skills frontmatter parsing does not requi
 Keep the chat header height consistent when embedded with the title and actions hidden, so the conversation tabs stay vertically centered.
 
 Expose optional controlled skill selection inside the shared chat composer, alongside the existing system prompt control.
+
+Respect controlled selections for client-side skill discovery while keeping every advertised skill available in the composer picker.

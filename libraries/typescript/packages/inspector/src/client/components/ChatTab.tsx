@@ -283,6 +283,9 @@ export function ChatTab({
   const [activeView, setActiveView] = useState<ChatView>(defaultView);
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
   const skills = connection.skills ?? [];
+  const clientSideSkills = skillSelection
+    ? skills.filter((skill) => skillSelection.enabledUris.has(skill.uri))
+    : skills;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
   // Track position of trigger for removal in textarea
@@ -376,7 +379,7 @@ export function ChatTab({
   const clientSideChat = useChatMessagesClientSide({
     ...chatHookParams,
     systemPrompt: resolvedSystemPrompt,
-    skills,
+    skills: clientSideSkills,
   });
 
   const {
