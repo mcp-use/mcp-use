@@ -34,6 +34,8 @@ export {
 export {
   oauthCustomProvider,
   type CustomOAuthProviderOptions,
+  type OAuthAdmissionHook,
+  type OAuthAdmissionResult,
   type OAuthExtra,
   type OAuthMetadataSource,
   type OAuthProviderRouteHandler,

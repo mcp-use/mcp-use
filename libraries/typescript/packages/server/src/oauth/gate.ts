@@ -1,3 +1,5 @@
+import { JSONRPCMessageSchema } from "@modelcontextprotocol/core";
+
 import {
   PROTOCOL_VERSION_META_KEY,
   OAuthError,
@@ -6,6 +8,7 @@ import {
   verifyBearerToken,
   type AuthInfo,
   type OAuthTokenVerifier,
+  type JSONRPCMessage,
 } from "@modelcontextprotocol/server";
 
 import { getRequestBag, type FetchMiddleware } from "../fetch-app.js";
@@ -18,11 +21,14 @@ import {
 } from "./challenge.js";
 import type { ToolSecurityScheme } from "../tools.js";
 import { requiresSignIn, schemeScopes } from "./policy.js";
+import type { OAuthAdmissionHook } from "./provider.js";
 
 /** @internal Options for {@link createOAuthGate}. */
 export interface OAuthGateOptions {
   /** Verifier bound to the canonical MCP resource. */
   verifier: OAuthTokenVerifier;
+  /** Optional provider-owned request-admission hook. */
+  admit?: OAuthAdmissionHook;
   /** RFC 9728 metadata URL advertised in every challenge. */
   resourceMetadataUrl: string;
   /** Provider `requiredScopes`, enforced on every sign-in request. */
@@ -84,6 +90,15 @@ function parseMessage(body: unknown): ParsedMessage | undefined {
     id: typeof id === "string" || typeof id === "number" ? id : undefined,
     params: isRecord(params) ? params : undefined,
   };
+}
+
+function messagesFromBody(body: unknown): JSONRPCMessage[] {
+  if (body === undefined || body === null) return [];
+  const values = Array.isArray(body) ? body : [body];
+  return values.flatMap((value) => {
+    const parsed = JSONRPCMessageSchema.safeParse(value);
+    return parsed.success ? [parsed.data as JSONRPCMessage] : [];
+  });
 }
 
 function isModernEnvelope(message: ParsedMessage): boolean {
@@ -245,31 +260,53 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
     // Batches always get HTTP challenges.
     const message = Array.isArray(body) ? undefined : parseMessage(body);
     const requirement = requirementForBody(body);
+    const handleAuthenticationError = (
+      error: unknown,
+      missingToken: boolean
+    ): Response => {
+      if (
+        !(error instanceof OAuthError) ||
+        (error.code !== OAuthErrorCode.InvalidToken &&
+          error.code !== OAuthErrorCode.InsufficientScope)
+      ) {
+        // Verifier outages and unexpected admission failures are server errors.
+        return bearerAuthChallengeResponse(error, { resourceMetadataUrl });
+      }
+      if (error.code === OAuthErrorCode.InsufficientScope) {
+        return refuse(request, message, "insufficient_scope", requirement, {
+          description: error.message,
+        });
+      }
+      return missingToken
+        ? refuse(request, message, "missing_token", requirement)
+        : refuse(request, message, "invalid_token", requirement, {
+            description: error.message,
+          });
+    };
 
     let authInfo: AuthInfo | undefined;
     const authorization = request.headers.get("authorization");
-    if (authorization !== null || requirement.required) {
+    let verifyWithBearer = options.admit === undefined;
+    if (options.admit !== undefined) {
+      let admission: Awaited<ReturnType<OAuthAdmissionHook>>;
+      try {
+        admission = await options.admit(request, messagesFromBody(body));
+      } catch (error) {
+        return handleAuthenticationError(error, false);
+      }
+      if (admission instanceof Response) return admission;
+      if ("type" in admission && admission.type === "defer") {
+        verifyWithBearer = true;
+      } else {
+        authInfo = admission.authInfo;
+      }
+    }
+
+    if (verifyWithBearer && (authorization !== null || requirement.required)) {
       try {
         authInfo = await verifyBearerToken(authorization, { verifier });
       } catch (error) {
-        if (
-          !(error instanceof OAuthError) ||
-          (error.code !== OAuthErrorCode.InvalidToken &&
-            error.code !== OAuthErrorCode.InsufficientScope)
-        ) {
-          // Verifier outages are server errors, not sign-in challenges.
-          return bearerAuthChallengeResponse(error, { resourceMetadataUrl });
-        }
-        if (error.code === OAuthErrorCode.InsufficientScope) {
-          return refuse(request, message, "insufficient_scope", requirement, {
-            description: error.message,
-          });
-        }
-        return authorization === null
-          ? refuse(request, message, "missing_token", requirement)
-          : refuse(request, message, "invalid_token", requirement, {
-              description: error.message,
-            });
+        return handleAuthenticationError(error, authorization === null);
       }
     }
 
