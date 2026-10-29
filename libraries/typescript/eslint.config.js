@@ -295,6 +295,7 @@ export default [
       "packages/server/src/**/*.ts",
       "packages/cli/src/**/*.ts",
       "packages/tunnel/src/**/*.ts",
+      "packages/analytics/src/**/*.ts",
     ],
     languageOptions: {
       parser: tsparser,
@@ -306,6 +307,7 @@ export default [
           "./packages/server/tsconfig.test.json",
           "./packages/cli/tsconfig.test.json",
           "./packages/tunnel/tsconfig.test.json",
+          "./packages/analytics/tsconfig.json",
         ],
         tsconfigRootDir: import.meta.dirname,
       },
