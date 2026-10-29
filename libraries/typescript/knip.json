@@ -22,7 +22,8 @@
     },
     "packages/agent": {
       "entry": ["tests/**/*.ts", "examples/**/*.ts"],
-      "project": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
+      "project": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"],
+      "ignoreDependencies": ["tsx"]
     },
     "packages/tunnel": {
       "entry": ["tests/**/*.ts"],
