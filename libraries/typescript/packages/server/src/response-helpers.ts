@@ -6,11 +6,9 @@ import type { CallToolResult } from "@modelcontextprotocol/server";
  * @deprecated Prefer returning a raw {@link CallToolResult} from tool
  * callbacks. Example: `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }`.
  *
- * @typeParam T - Structured payload type (typically an object).
+ * @typeParam T - Structured payload type.
  */
-export interface TypedCallToolResult<
-  T extends Record<string, unknown> = Record<string, unknown>,
-> {
+export interface TypedCallToolResult<T = Record<string, unknown>> {
   [x: string]: unknown;
   /** Model-visible content blocks. */
   content: CallToolResult["content"];
@@ -294,11 +292,11 @@ export function error(message: string): TypedCallToolResult<never> {
  * @deprecated Prefer
  * `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }`.
  *
- * @typeParam T - Object payload type.
+ * @typeParam T - Object or array payload type.
  * @param data - Object (or array — forwarded to {@link array}) to return.
  * @returns Tool result with JSON text and `structuredContent`.
  */
-export function object<T extends Record<string, unknown>>(
+export function object<T extends Record<string, unknown> | unknown[]>(
   data: T
 ): TypedCallToolResult<T> {
   if (Array.isArray(data)) {
