@@ -27,6 +27,7 @@ import {
 import {
   deriveProjectInfo,
   findUnsafeEntries,
+  getCdCommand,
   getDeployCommand,
   runPackageManager,
   updateIndexTs,
@@ -1084,7 +1085,7 @@ async function main(): Promise<void> {
   console.log("");
   console.log(ansi.bold("🚀 To get started:"));
   if (!useCurrentDir) {
-    console.log(ansi.cyan(`   cd ${displayName}`));
+    console.log(ansi.cyan(`   ${getCdCommand(displayName)}`));
   }
   if (!shouldInstall) {
     console.log(ansi.cyan(`   ${getInstallCommand(usedPackageManager)}`));
