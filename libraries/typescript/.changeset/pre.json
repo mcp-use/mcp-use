@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.25",
+    "@mcp-use/cli": "4.5.5",
+    "@mcp-use/client": "2.4.5",
+    "create-mcp-use-app": "2.1.1",
+    "@mcp-use/inspector": "20.3.27",
+    "mcp-use": "2.12.2",
+    "@mcp-use/tunnel": "0.2.2"
+  },
+  "changesets": [
+    "propagated-d5a339985dee352e",
+    "view-resource-read-middleware"
+  ]
+}
