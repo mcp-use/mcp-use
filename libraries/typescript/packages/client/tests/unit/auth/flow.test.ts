@@ -150,6 +150,32 @@ describe("completeOAuthFlow", () => {
     expect(markFlowComplete).toHaveBeenCalledOnce();
   });
 
+  it("exchanges a confidential-client callback code in the browser opener", async () => {
+    vi.mocked(runAuthPopup).mockResolvedValue({
+      kind: "success",
+      authorizationCode: "authorization-code",
+      issuer: "https://auth.example.com",
+    });
+    vi.mocked(auth).mockResolvedValue("AUTHORIZED");
+    const proxyFetch = vi.fn();
+    const provider = {
+      hasPendingFlow: true,
+      getKey: () => "mcp:auth_server_tokens",
+      getLastAttemptedAuthUrl: () =>
+        "https://auth.example.com/authorize?state=stored-state",
+      getProxyFetch: () => proxyFetch,
+    } as unknown as OAuthClientProvider;
+
+    await completeOAuthFlow(provider, "https://example.com/mcp");
+
+    expect(auth).toHaveBeenCalledWith(provider, {
+      serverUrl: "https://example.com/mcp",
+      authorizationCode: "authorization-code",
+      iss: "https://auth.example.com",
+      fetchFn: proxyFetch,
+    });
+  });
+
   it("launches a prepared browser flow after explicit authentication", async () => {
     vi.mocked(runAuthPopup).mockResolvedValue({ kind: "success" });
     const startAuthorization = vi.fn();

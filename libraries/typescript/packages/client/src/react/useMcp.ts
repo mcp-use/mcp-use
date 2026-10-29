@@ -200,13 +200,20 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const requestedProxyAddress = proxyConfig?.proxyAddress;
 
   const oauthClientId = oauthOptions?.clientId?.trim() || undefined;
+  const oauthClientSecret = oauthOptions?.clientSecret?.trim() || undefined;
   const oauthClientMetadataUrl =
     oauthOptions?.clientMetadataUrl?.trim() || undefined;
   const oauthScope = oauthOptions?.scope?.trim() || undefined;
   const autoFetchUserInfo = oauthOptions?.fetchUserInfo === true;
   const staticClientInfo = useMemo(
-    () => (oauthClientId ? { client_id: oauthClientId } : undefined),
-    [oauthClientId]
+    () =>
+      oauthClientId
+        ? {
+            client_id: oauthClientId,
+            ...(oauthClientSecret ? { client_secret: oauthClientSecret } : {}),
+          }
+        : undefined,
+    [oauthClientId, oauthClientSecret]
   );
 
   // Create a per-instance logger so multiple useMcp instances don't clobber each other's log level.
@@ -1808,6 +1815,14 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
         switch (result.kind) {
           case "success":
+            if (result.authorizationCode) {
+              await auth(freshAuthProvider, {
+                serverUrl: baseUrl,
+                authorizationCode: result.authorizationCode,
+                ...(result.issuer ? { iss: result.issuer } : {}),
+                fetchFn: freshAuthProvider.getProxyFetch?.(),
+              });
+            }
             addLog(
               "info",
               "Authentication succeeded; reconnecting to MCP server..."
