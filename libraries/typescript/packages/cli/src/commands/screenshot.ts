@@ -15,6 +15,7 @@ import {
 } from "./client.js";
 import {
   CommandError,
+  parseUrlArgument,
   printResult,
   reportError,
   UsageError,
@@ -134,10 +135,20 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     const timeout = positive(values.timeout, "--timeout");
     const delay = nonNegative(values.delay, "--delay");
     const headers = parseHeaders(values.header ?? []);
+    const mcpUrl =
+      values.mcp === undefined
+        ? undefined
+        : parseUrlArgument(values.mcp, "--mcp").href;
+    if (values.inspector !== undefined) {
+      parseUrlArgument(values.inspector, "--inspector");
+    }
+    if (values["cdp-url"] !== undefined) {
+      parseUrlArgument(values["cdp-url"], "--cdp-url");
+    }
     connection =
       values.server !== undefined
         ? await openSavedConnection(values.server, 300_000, json)
-        : await openDirectConnection(new URL(values.mcp!).href, headers, json);
+        : await openDirectConnection(mcpUrl!, headers, json);
 
     const tools = await connection.listTools();
     const tool = tools.find((candidate) => candidate.name === values.tool);
@@ -248,10 +259,7 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     );
     return 0;
   } catch (error) {
-    return reportError(
-      error instanceof TypeError ? new UsageError(error.message) : error,
-      json
-    );
+    return reportError(error, json);
   } finally {
     await browser?.close().catch(() => {});
     await localInspector?.close().catch(() => {});

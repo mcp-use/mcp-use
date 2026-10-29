@@ -95,10 +95,7 @@ export async function runIdentity(
     if (command === "logout") return await logout(argv, json);
     return await whoami(argv, json);
   } catch (error) {
-    return reportError(
-      error instanceof TypeError ? new UsageError(error.message) : error,
-      json
-    );
+    return reportError(error, json);
   }
 }
 
