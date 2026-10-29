@@ -138,7 +138,7 @@ export function ChatHeader({
   return (
     <div
       className={cn(
-        "relative flex w-full items-center gap-2 overflow-visible",
+        "relative flex min-h-16 w-full items-center gap-2 overflow-visible",
         inspectorTabHeaderPadding,
         elevatedHeader
           ? "pointer-events-none absolute top-0 right-0 z-50"
