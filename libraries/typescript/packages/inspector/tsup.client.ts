@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: ["src/client/index.ts"],
   format: ["esm"],
+  platform: "browser",
   outDir: "dist/client",
   tsconfig: "tsconfig.client.json",
   splitting: false,
