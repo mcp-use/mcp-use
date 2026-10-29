@@ -247,8 +247,9 @@ export class VMCodeExecutor extends BaseCodeExecutor {
       __tool_namespaces: [],
     };
 
-    // Add tool namespaces
-    const toolNamespaces: Record<string, boolean> = {};
+    // Add tool namespaces. A Set, because a plain object cannot track a server
+    // literally named `__proto__` and would leave it out of __tool_namespaces.
+    const toolNamespaces = new Set<string>();
     const namespaceInfos = this.getToolNamespaces();
 
     for (const { serverName, tools, session } of namespaceInfos) {
@@ -278,11 +279,36 @@ export class VMCodeExecutor extends BaseCodeExecutor {
         };
       }
 
-      sandbox[serverName] = serverNamespace;
-      toolNamespaces[serverName] = true;
+      // defineProperty rather than assignment so a server literally named
+      // `__proto__` becomes an own property instead of replacing the sandbox's
+      // prototype and exposing its tools as bare globals.
+      Object.defineProperty(sandbox, serverName, {
+        value: serverNamespace,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+      // Mirror the E2B shim (executor-e2b.ts): a name that is not a valid JS
+      // identifier (`my-server`, `my.server`) is also reachable through the
+      // sanitized alias, so code written for one executor runs on the other.
+      const safeServerName = serverName.replace(/[^a-zA-Z0-9_]/g, "_");
+      if (
+        safeServerName !== serverName &&
+        // Never shadow a built-in helper: a server named `search-tools` would
+        // otherwise replace `search_tools()` with its tool namespace.
+        !Object.prototype.hasOwnProperty.call(sandbox, safeServerName)
+      ) {
+        Object.defineProperty(sandbox, safeServerName, {
+          value: serverNamespace,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      }
+      toolNamespaces.add(serverName);
     }
 
-    sandbox.__tool_namespaces = Object.keys(toolNamespaces);
+    sandbox.__tool_namespaces = Array.from(toolNamespaces);
 
     return vm.createContext(sandbox);
   }
