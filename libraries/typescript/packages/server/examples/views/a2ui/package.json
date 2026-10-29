@@ -21,7 +21,7 @@
     "mcp-use": "workspace:*",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "zod": "3.25.76",
+    "zod": "4.6.6",
     "zod-v4": "npm:zod@4.6.6"
   },
   "devDependencies": {
