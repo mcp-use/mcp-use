@@ -11,6 +11,8 @@
     "@mcp-use/tunnel": "0.2.2"
   },
   "changesets": [
+    "gemini-thought-signatures",
+    "propagated-743b8af2065e89f9",
     "propagated-d5a339985dee352e",
     "view-resource-read-middleware"
   ]
