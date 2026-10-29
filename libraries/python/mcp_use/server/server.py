@@ -319,7 +319,7 @@ class MCPServer(FastMCP):
                 resource_name = f"{prefix}_{resource_name}"
             self.resource(
                 uri=resource.uri,
-                name=resource.name,
+                name=resource_name,
                 description=resource.description,
                 mime_type=resource.mime_type,
             )(resource.fn)
