@@ -1746,7 +1746,7 @@ describe("views env URL / CSP (e2e)", () => {
     expect(csp?.resourceDomains).not.toContain("https://server.example.com");
   });
 
-  it("applies CSP_URLS to all four categories before MCP auto-append", async () => {
+  it("applies CSP_URLS to connect and resource domains before MCP auto-append", async () => {
     process.env.MCP_URL = "https://server.example.com";
     process.env.CSP_URLS = "https://platform.example.com";
     delete process.env.MCP_ASSETS_URL;
@@ -1786,7 +1786,7 @@ describe("views env URL / CSP (e2e)", () => {
     expect(viewCsp?.connectDomains).toContain("https://server.example.com");
     expect(viewCsp?.resourceDomains?.[0]).toBe("https://platform.example.com");
     expect(viewCsp?.resourceDomains).toContain("https://server.example.com");
-    expect(viewCsp?.frameDomains).toEqual(["https://platform.example.com"]);
-    expect(viewCsp?.baseUriDomains).toEqual(["https://platform.example.com"]);
+    expect(viewCsp?.frameDomains).toEqual([]);
+    expect(viewCsp?.baseUriDomains).toEqual([]);
   });
 });

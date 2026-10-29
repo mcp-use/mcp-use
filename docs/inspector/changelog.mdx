@@ -6,6 +6,18 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.26" description="October 2026">
+  ## Embeddable Skills tab
+  Patch release making the Skills browser and chat skill selection usable from applications that embed the Inspector.
+
+- **New**: export `SkillsTab` and its props from the client entry point so applications can embed the Skills browser (`#2973`)
+- **New**: expose optional controlled skill selection in the shared chat composer, alongside the existing system prompt control (`#2973`)
+- **Fix**: build the client entry for browsers, so Skills frontmatter parsing no longer requires Node.js built-ins (`#2973`)
+- **Fix**: keep the chat header height consistent when embedded with the title and actions hidden, so conversation tabs stay vertically centered (`#2973`)
+- **Fix**: respect controlled selections for client-side skill discovery while keeping every advertised skill in the composer picker (`#2973`)
+- **Update**: Updated mcp-use to v2.12.1
+</Update>
+
 <Update label="v20.3.25" description="October 2026">
   ## Framework release alignment
   Patch release paired with `mcp-use` v2.12.0, which separates View UI origins from Claude sandbox identity and adds sampled anonymous landing-page usage events. This release has no Inspector-specific source changes.

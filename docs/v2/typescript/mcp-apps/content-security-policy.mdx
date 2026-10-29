@@ -142,13 +142,13 @@ MCP Apps CSP fields: `connectDomains`, `resourceDomains`, `frameDomains`, `baseU
 
 ## Global CSP env vars
 
-Use `CSP_URLS` when every view needs the same extra domains (shortcut for **all four** categories):
+Use `CSP_URLS` when every view needs the same extra domains. It applies to `connectDomains` and `resourceDomains` only:
 
 ```env
 CSP_URLS=https://api.example.com,https://cdn.example.com
 ```
 
-Override one category without affecting others:
+Override one category without affecting others. `frameDomains` and `baseUriDomains` are only set by their own variables or by a view's `csp`, because hosts such as ChatGPT treat any frame domain as a request to embed third-party iframes:
 
 ```env
 CSP_CONNECT_DOMAINS=https://api.example.com
