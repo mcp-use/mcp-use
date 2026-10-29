@@ -408,7 +408,7 @@ Create a Pull Request on GitHub with:
 - Clear title and description
 - Link to related issues (use "Closes #123")
 - Screenshots/recordings for UI changes
-- **A before and after video for Inspector or Agent fixes.** If your PR fixes something in the Inspector (`@mcp-use/inspector`) or the Agent (`@mcp-use/agent` or Python's `MCPAgent`), attach a video showing the broken behavior before your change and the fixed behavior after. For Agent fixes, a terminal recording is fine.
+- **A before and after video or screenshots for Inspector changes.** If your PR changes the Inspector (`@mcp-use/inspector`), attach a video recording or screenshots showing the behavior before and after your change.
 
 ### CI Checks
 
