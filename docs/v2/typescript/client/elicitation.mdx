@@ -57,6 +57,10 @@ browser entry and `@mcp-use/client/react` do not export them.
 | `validate(params, content)` | Client-side validation |
 | `getDefaults`, `applyDefaults` | Work with schema defaults |
 
+`validate(params, content)` checks the content you provide. A required field must
+be present even when its schema declares a default. To fill missing values from
+defaults first, use `validate(params, applyDefaults(params, content))`.
+
 ## React
 
 The helpers above are not available in a browser build, so handle the request

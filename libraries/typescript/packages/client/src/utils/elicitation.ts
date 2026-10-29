@@ -105,6 +105,8 @@ export function cancel(): ElicitResult {
 
 /**
  * Validate content against the request's requestedSchema using Zod.
+ * Required fields must be present in content; use applyDefaults explicitly
+ * before validation if schema defaults should supply their values.
  * Converts requestedSchema (JSON Schema) via `z.fromJSONSchema`, then
  * safeParse(content). If conversion fails, returns
  * `{ valid: false, errors: ["Unsupported or invalid schema"] }`.
@@ -117,6 +119,15 @@ export function validate(
     return { valid: true };
   }
   try {
+    const missing = (params.requestedSchema.required ?? []).filter(
+      (name) => !Object.hasOwn(content, name) || content[name] === undefined
+    );
+    if (missing.length > 0) {
+      return {
+        valid: false,
+        errors: missing.map((name) => `${name}: Required`),
+      };
+    }
     const zodSchema = z.fromJSONSchema(params.requestedSchema);
     const result = zodSchema.safeParse(content);
     if (result.success) {
