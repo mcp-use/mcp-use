@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildMergedResourceCsp,
@@ -26,19 +26,27 @@ describe("mergeDomainLists", () => {
   });
 });
 
+const CSP_ENV_VARS = [
+  "CSP_URLS",
+  "CSP_CONNECT_DOMAINS",
+  "CSP_RESOURCE_DOMAINS",
+  "CSP_FRAME_DOMAINS",
+  "CSP_BASE_URI_DOMAINS",
+];
+
 describe("buildMergedResourceCsp", () => {
-  const env = process.env;
+  beforeEach(() => {
+    for (const name of CSP_ENV_VARS) {
+      vi.stubEnv(name, undefined);
+    }
+  });
 
   afterEach(() => {
-    process.env = env;
+    vi.unstubAllEnvs();
   });
 
   it("merges author, CSP_URLS, and MCP auto-append with precedence", () => {
-    delete process.env.CSP_CONNECT_DOMAINS;
-    delete process.env.CSP_RESOURCE_DOMAINS;
-    delete process.env.CSP_FRAME_DOMAINS;
-    delete process.env.CSP_BASE_URI_DOMAINS;
-    process.env.CSP_URLS = "https://platform.example.com";
+    vi.stubEnv("CSP_URLS", "https://platform.example.com");
 
     const csp = buildMergedResourceCsp(
       {
@@ -58,13 +66,34 @@ describe("buildMergedResourceCsp", () => {
       "https://platform.example.com",
     ]);
     expect(csp.connectDomains).toEqual(["https://platform.example.com"]);
-    expect(csp.frameDomains).toEqual(["https://platform.example.com"]);
-    expect(csp.baseUriDomains).toEqual(["https://platform.example.com"]);
+    expect(csp.frameDomains).toEqual([]);
+    expect(csp.baseUriDomains).toEqual([]);
+  });
+
+  it("only uses explicit env vars for frame and base-uri domains", () => {
+    vi.stubEnv("CSP_URLS", "https://platform.example.com");
+    vi.stubEnv("CSP_FRAME_DOMAINS", "https://embed.example.com");
+    vi.stubEnv("CSP_BASE_URI_DOMAINS", "https://base.example.com");
+
+    const csp = buildMergedResourceCsp(
+      { csp: { frameDomains: ["https://author-embed.example.com"] } },
+      {
+        serverOrigin: "https://server.example.com",
+        assetsOrigin: "https://server.example.com",
+        explicitAssetsBase: false,
+      }
+    );
+
+    expect(csp.frameDomains).toEqual([
+      "https://author-embed.example.com",
+      "https://embed.example.com",
+    ]);
+    expect(csp.baseUriDomains).toEqual(["https://base.example.com"]);
   });
 
   it("uses per-category env instead of CSP_URLS for that category", () => {
-    process.env.CSP_URLS = "https://a.com,https://b.com";
-    process.env.CSP_CONNECT_DOMAINS = "https://connect-only.example.com";
+    vi.stubEnv("CSP_URLS", "https://a.com,https://b.com");
+    vi.stubEnv("CSP_CONNECT_DOMAINS", "https://connect-only.example.com");
 
     const csp = buildMergedResourceCsp(undefined, {
       serverOrigin: "https://server.example.com",
@@ -84,11 +113,6 @@ describe("buildMergedResourceCsp", () => {
   });
 
   it("appends assets origin to resourceDomains when MCP_ASSETS_URL is explicit", () => {
-    delete process.env.CSP_URLS;
-    delete process.env.CSP_CONNECT_DOMAINS;
-    delete process.env.CSP_RESOURCE_DOMAINS;
-    delete process.env.CSP_FRAME_DOMAINS;
-    delete process.env.CSP_BASE_URI_DOMAINS;
     const csp = buildMergedResourceCsp(undefined, {
       serverOrigin: "https://server.example.com",
       assetsOrigin: "https://cdn.example.com",
@@ -100,7 +124,6 @@ describe("buildMergedResourceCsp", () => {
   });
 
   it("uses server origin for resourceDomains when assets not explicit", () => {
-    delete process.env.CSP_URLS;
     const csp = buildMergedResourceCsp(undefined, {
       serverOrigin: "https://server.example.com",
       assetsOrigin: "https://server.example.com",
@@ -111,7 +134,6 @@ describe("buildMergedResourceCsp", () => {
   });
 
   it("allows the Vite eval runtime only when HMR is enabled", () => {
-    delete process.env.CSP_URLS;
     const regular = buildMergedResourceCsp(undefined, {
       serverOrigin: "https://server.example.com",
       assetsOrigin: "https://server.example.com",
