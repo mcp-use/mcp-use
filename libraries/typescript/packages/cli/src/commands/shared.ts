@@ -68,6 +68,15 @@ export function printResult(
   }
 }
 
+/** Format a byte size into human-readable units (B, KB, MB, GB). */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
 /** Report a command error using the CLI's text or JSON convention. */
 export function reportError(error: unknown, json: boolean): number {
   const usage =
@@ -96,6 +105,17 @@ export function reportError(error: unknown, json: boolean): number {
     );
   } else {
     process.stderr.write(`${message}\n`);
+    if (operational && hasLargestFiles(error.details)) {
+      process.stderr.write(`\nLargest files included in archive:\n`);
+      for (const file of error.details.largestFiles) {
+        process.stderr.write(
+          `  - ${file.path} (${formatBytes(file.sizeBytes)} uncompressed)\n`
+        );
+      }
+    }
+    if (operational && hasHint(error.details)) {
+      process.stderr.write(`\nHint: ${error.details.hint}\n`);
+    }
     if (operational && hasNextSteps(error.details)) {
       for (const step of error.details.nextSteps) {
         process.stderr.write(`\n${step.description}:\n  ${step.command}\n`);
@@ -103,6 +123,33 @@ export function reportError(error: unknown, json: boolean): number {
     }
   }
   return usage ? 2 : 1;
+}
+
+function hasLargestFiles(value: unknown): value is {
+  largestFiles: Array<{ path: string; sizeBytes: number }>;
+} {
+  if (value === null || typeof value !== "object") return false;
+  const files = (value as { largestFiles?: unknown }).largestFiles;
+  return (
+    Array.isArray(files) &&
+    files.length > 0 &&
+    files.every(
+      (file) =>
+        file !== null &&
+        typeof file === "object" &&
+        typeof (file as { path?: unknown }).path === "string" &&
+        typeof (file as { sizeBytes?: unknown }).sizeBytes === "number"
+    )
+  );
+}
+
+function hasHint(value: unknown): value is { hint: string } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { hint?: unknown }).hint === "string" &&
+    (value as { hint: string }).hint.length > 0
+  );
 }
 
 function hasNextSteps(value: unknown): value is {

@@ -48,8 +48,10 @@ vi.mock("../../src/commands/shared.js", async (importOriginal) => ({
 
 import {
   assertManagedArchiveSize,
+  formatBytes,
   runDeploy,
 } from "../../src/commands/deploy.js";
+import { reportError } from "../../src/commands/shared.js";
 
 const directories: string[] = [];
 const execFileAsync = promisify(execFile);
@@ -1245,6 +1247,180 @@ describe("deploy agent contract", () => {
           nextSteps: expect.any(Array),
         }),
       })
+    );
+  });
+
+  it("formats byte values in human-readable units", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(512)).toBe("512 B");
+    expect(formatBytes(1024)).toBe("1.00 KB");
+    expect(formatBytes(1536)).toBe("1.50 KB");
+    expect(formatBytes(1024 * 1024)).toBe("1.00 MB");
+    expect(formatBytes(80 * 1024 * 1024)).toBe("80.00 MB");
+    expect(formatBytes(1024 * 1024 * 1024)).toBe("1.00 GB");
+  });
+
+  it("enriches archive size error with top bloat contributors and diagnostics", () => {
+    const diagnostics = {
+      fileCount: 42,
+      uncompressedBytes: 120 * 1024 * 1024,
+      largestFiles: [
+        { path: "data/weights.bin", sizeBytes: 65 * 1024 * 1024 },
+        { path: "data/embeddings.bin", sizeBytes: 25 * 1024 * 1024 },
+      ],
+    };
+    let thrownError: unknown;
+    try {
+      assertManagedArchiveSize(85 * 1024 * 1024, diagnostics);
+    } catch (error) {
+      thrownError = error;
+    }
+    expect(thrownError).toBeDefined();
+    expect(thrownError).toMatchObject({
+      code: "archive_too_large",
+      details: {
+        sizeBytes: 85 * 1024 * 1024,
+        maxBytes: 80 * 1024 * 1024,
+        uncompressedBytes: 120 * 1024 * 1024,
+        fileCount: 42,
+        largestFiles: diagnostics.largestFiles,
+        nextSteps: [
+          {
+            description: "Add large files to .gitignore and retry",
+            command: "mcp-use deploy --no-github",
+          },
+        ],
+      },
+    });
+    const message = (thrownError as Error).message;
+    expect(message).toBe("Project archive is 85.00 MB; the maximum is 80 MB.");
+
+    // Verify text mode formatting via reportError
+    const textStderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    reportError(thrownError, false);
+    const textOutput = textStderr.mock.calls.flat().join("");
+    textStderr.mockRestore();
+
+    expect(textOutput).toContain(
+      "Project archive is 85.00 MB; the maximum is 80 MB."
+    );
+    expect(textOutput).toContain("Largest files included in archive:");
+    expect(textOutput).toContain("- data/weights.bin (65.00 MB uncompressed)");
+    expect(textOutput).toContain(
+      "- data/embeddings.bin (25.00 MB uncompressed)"
+    );
+    expect(textOutput).toContain(
+      "Add large files to .gitignore and retry:\n  mcp-use deploy --no-github"
+    );
+
+    // Verify JSON mode formatting via reportError
+    const jsonStderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    reportError(thrownError, true);
+    const jsonOutput = JSON.parse(jsonStderr.mock.calls.flat().join(""));
+    jsonStderr.mockRestore();
+
+    expect(jsonOutput).toMatchObject({
+      error: {
+        code: "archive_too_large",
+        message: "Project archive is 85.00 MB; the maximum is 80 MB.",
+        details: {
+          sizeBytes: 85 * 1024 * 1024,
+          maxBytes: 80 * 1024 * 1024,
+          uncompressedBytes: 120 * 1024 * 1024,
+          fileCount: 42,
+          largestFiles: diagnostics.largestFiles,
+          nextSteps: [
+            {
+              description: "Add large files to .gitignore and retry",
+              command: "mcp-use deploy --no-github",
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("includes directory sprawl hint when file count is high and individual files are small", () => {
+    const diagnostics = {
+      fileCount: 5000,
+      uncompressedBytes: 100 * 1024 * 1024,
+      largestFiles: [{ path: "cache/chunk-1.js", sizeBytes: 50 * 1024 }],
+    };
+    let thrownError: unknown;
+    try {
+      assertManagedArchiveSize(82 * 1024 * 1024, diagnostics);
+    } catch (error) {
+      thrownError = error;
+    }
+    expect(thrownError).toBeDefined();
+    expect(thrownError).toMatchObject({
+      code: "archive_too_large",
+      details: {
+        hint: "Archive contains 5,000 files. Check for unignored build, cache, or dependency directories in .gitignore.",
+      },
+    });
+
+    const textStderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    reportError(thrownError, false);
+    const textOutput = textStderr.mock.calls.flat().join("");
+    textStderr.mockRestore();
+
+    expect(textOutput).toContain(
+      "Hint: Archive contains 5,000 files. Check for unignored build, cache, or dependency directories in .gitignore."
+    );
+  });
+
+  it("excludes files ignored by .gitignore from archive bloat diagnostics", async () => {
+    const directory = await project("diagnostics-gitignore");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await writeFile(
+      join(directory, ".gitignore"),
+      "ignored-bloat.bin\nignored-folder/\n"
+    );
+    await writeFile(
+      join(directory, "ignored-bloat.bin"),
+      Buffer.alloc(1024 * 1024)
+    );
+    await mkdir(join(directory, "ignored-folder"));
+    await writeFile(
+      join(directory, "ignored-folder", "deep.bin"),
+      Buffer.alloc(1024 * 1024)
+    );
+    await writeFile(
+      join(directory, "included-small.txt"),
+      "small file content\n"
+    );
+
+    let recordedDiagnostics: any;
+    api.multipartRequest.mockImplementation(
+      async (path: string, form: FormData) => {
+        return {
+          server: { id: "srv_diag", slug: "diagnostics-gitignore" },
+          deploymentId: "dep_diag",
+        };
+      }
+    );
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--no-github", "--region", "US", "--json"])
+    ).resolves.toBe(0);
+
+    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
+    const blob = form.get("sourceFile") as Blob;
+    expect(blob).toBeDefined();
+    const entries = await archiveEntries(blob);
+    expect(entries).toContain("app/index.ts");
+    expect(entries).toContain("app/included-small.txt");
+    expect(entries).not.toContain("app/ignored-bloat.bin");
+    expect(entries.some((entry) => entry.includes("ignored-folder"))).toBe(
+      false
     );
   });
 
