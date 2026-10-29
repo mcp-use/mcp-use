@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   prepareRelease,
   packageEntries,
@@ -25,10 +26,12 @@ const cli = join(
   "..",
   "bin.js"
 );
-const releaseScript = new URL("./release-channel.mjs", import.meta.url)
-  .pathname;
-const versionScript = new URL("./version-packages.mjs", import.meta.url)
-  .pathname;
+const releaseScript = fileURLToPath(
+  new URL("./release-channel.mjs", import.meta.url)
+);
+const versionScript = fileURLToPath(
+  new URL("./version-packages.mjs", import.meta.url)
+);
 const config = JSON.parse(
   readFileSync(new URL("../.changeset/config.json", import.meta.url), "utf8")
 );
@@ -276,7 +279,14 @@ test("Canary exit runs the production version wrapper and keeps stable peers com
   });
   assert.equal(exit.status, 0, exit.stderr);
   mkdirSync(join(root, "node_modules/.bin"), { recursive: true });
-  symlinkSync(cli, join(root, "node_modules/.bin/changeset"));
+  if (process.platform === "win32") {
+    writeFileSync(
+      join(root, "node_modules/.bin/changeset.cmd"),
+      `@"${process.execPath}" "${cli}" %*\r\n`
+    );
+  } else {
+    symlinkSync(cli, join(root, "node_modules/.bin/changeset"));
+  }
   const result = spawnSync(process.execPath, [versionScript], {
     cwd: root,
     encoding: "utf8",
