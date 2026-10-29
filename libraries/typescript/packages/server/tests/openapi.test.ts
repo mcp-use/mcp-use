@@ -274,6 +274,114 @@ describe("MCPServer.fromOpenAPI", () => {
     }
   });
 
+  it("serializes object query and header parameters using OpenAPI defaults", async () => {
+    captured.length = 0;
+    const spec: OpenAPIDocument = {
+      openapi: "3.1.0",
+      info: { title: "Object Parameters API" },
+      servers: [{ url: upstreamBaseUrl }],
+      paths: {
+        "/objects": {
+          get: {
+            operationId: "getObjects",
+            parameters: [
+              {
+                name: "filter",
+                in: "query",
+                schema: {
+                  type: "object",
+                  properties: {
+                    color: { type: "string" },
+                    size: { type: "number" },
+                    q: { type: "string" },
+                    meta: {
+                      type: "object",
+                      properties: { source: { type: "string" } },
+                      required: ["source"],
+                      additionalProperties: false,
+                    },
+                    optionalValue: { type: "string", nullable: true },
+                  },
+                  required: ["color", "size"],
+                  additionalProperties: false,
+                },
+              },
+              {
+                name: "x-filter",
+                in: "header",
+                schema: {
+                  type: "object",
+                  properties: {
+                    color: { type: "string" },
+                    size: { type: "number" },
+                    q: { type: "string" },
+                    meta: {
+                      type: "object",
+                      properties: { source: { type: "string" } },
+                      required: ["source"],
+                      additionalProperties: false,
+                    },
+                    optionalValue: { type: "string", nullable: true },
+                  },
+                  required: ["color", "size"],
+                  additionalProperties: false,
+                },
+              },
+              {
+                name: "color",
+                in: "query",
+                schema: { type: "string" },
+              },
+            ],
+            responses: { "200": { description: "ok" } },
+          },
+        },
+      },
+    };
+    const connection = await connect(MCPServer.fromOpenAPI({ spec }));
+    try {
+      const { tools } = await connection.client.listTools();
+      expect(tools[0]?.inputSchema).toMatchObject({
+        properties: {
+          filter: { type: "object" },
+          "x-filter": { type: "object" },
+        },
+      });
+
+      const result = await connection.client.callTool({
+        name: "getObjects",
+        arguments: {
+          filter: {
+            color: "red",
+            size: 3,
+            q: "",
+            meta: { source: "test" },
+            optionalValue: null,
+          },
+          "x-filter": {
+            color: "red",
+            size: 3,
+            q: "",
+            meta: { source: "test" },
+            optionalValue: null,
+          },
+          color: "blue",
+        },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(captured[0]).toMatchObject({
+        method: "GET",
+        url: "/v1/objects?color=red&size=3&q=&meta=%7B%22source%22%3A%22test%22%7D&color=blue",
+      });
+      expect(captured[0]?.headers).toMatchObject({
+        "x-filter": 'color,red,size,3,q,,meta,{"source":"test"}',
+      });
+    } finally {
+      await connection.close();
+    }
+  });
+
   it("validates referenced JSON bodies and sends custom-header auth", async () => {
     captured.length = 0;
     const server = MCPServer.fromOpenAPI({
