@@ -103,6 +103,31 @@ server.use("mcp:tools/list", async (ctx, next) => {
 Values set by Hono middleware with `c.set()` are available through `ctx.get()`.
 Client metadata and middleware state belong to the current request only.
 
+## Inspect client capabilities
+
+`ctx.client` exposes metadata that the MCP client declared for the current
+request. Use it to adapt an optional response feature, such as a view, to a
+client that reports support for it. This metadata is client-reported: do not
+use it to identify a user or authorize a request.
+
+```typescript
+server.use("mcp:tools/call", async (ctx, next) => {
+  const client = ctx.client.info();
+
+  if (ctx.client.supportsViews()) {
+    console.log(`Client ${client.name ?? "unknown"} reports view support`);
+  }
+
+  return next();
+});
+```
+
+Use `ctx.client.can("elicitation")` for a top-level capability,
+`ctx.client.extension(id)` for extension settings, and
+`ctx.client.capabilities()` when you need the full declared capability map.
+All of these accessors describe the current request; they do not retain transport
+session state.
+
 ## Add an OAuth scope guard
 
 Configure OAuth before reading `ctx.auth`. In MCP middleware, `ctx.auth` is
