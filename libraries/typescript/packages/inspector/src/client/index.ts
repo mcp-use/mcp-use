@@ -86,6 +86,7 @@ export {
   chatBarTitleFrostedClass,
 } from "./components/chat/chat-bar-styles.js";
 export { ChatInputArea } from "./components/chat/ChatInputArea.js";
+export type { ChatSkillSelection } from "./components/chat/SkillContextChips.js";
 export { ChatLandingForm } from "./components/chat/ChatLandingForm.js";
 export { ConfigurationDialog } from "./components/chat/ConfigurationDialog.js";
 export { ConfigureEmptyState } from "./components/chat/ConfigureEmptyState.js";
