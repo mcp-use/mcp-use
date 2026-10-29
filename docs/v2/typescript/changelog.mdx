@@ -6,6 +6,23 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.2" description="October 2026">
+  ## CSP_URLS scope
+  Patch release limiting the `CSP_URLS` shortcut to connect and resource domains. `@mcp-use/cli`, `@mcp-use/inspector`, and `create-mcp-use-app` are unchanged.
+
+- **Fix** (server): `CSP_URLS` only adds domains to a view's `connectDomains` and `resourceDomains`. It no longer fills `frameDomains` or `baseUriDomains`, which ChatGPT app review reads as a request to embed third-party iframes. Deployments that set `CSP_URLS` for every server, such as Manufact Cloud, no longer declare frame domains on views that don't use iframes (`#2980`)
+- **Update** (server): set `CSP_FRAME_DOMAINS`, `CSP_BASE_URI_DOMAINS`, or a view's `csp` to declare frame or base-uri domains explicitly (`#2980`)
+- **Documentation**: update the [View CSP guide](/v2/typescript/mcp-apps/content-security-policy) and [CLI environment reference](/v2/typescript/api-reference/cli-reference) for the narrower `CSP_URLS` scope (`#2980`)
+</Update>
+
+<Update label="v2.12.1" description="October 2026">
+  ## Embeddable Inspector Skills
+  Patch release updating the bundled Inspector and CLI, with no server API changes.
+
+- **Update**: Updated @mcp-use/inspector to v20.3.26, which exports the Skills tab for embedding and adds controlled skill selection to the chat composer; see the [Inspector changelog](/inspector/changelog) (`#2973`)
+- **Update**: Updated @mcp-use/cli to v4.5.4 with rebuilt bundled workspace code and synchronized internal package metadata
+</Update>
+
 <Update label="create-mcp-use-app v2.1.1" description="October 2026">
   ## Patched template dependencies
   Patch release for `create-mcp-use-app` only. `mcp-use`, `@mcp-use/cli`, and `@mcp-use/inspector` are unchanged.
