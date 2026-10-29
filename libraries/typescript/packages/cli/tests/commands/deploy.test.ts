@@ -1570,6 +1570,109 @@ describe("deploy agent contract", () => {
         "https://cloud.example.test/cloud/primary-demo/servers/srv_github_config/overview",
     });
   });
+
+  async function linkedGitHubProject(name: string): Promise<string> {
+    const directory = await project(name);
+    initializeRepository(directory, `https://github.com/example/${name}.git`);
+    await writeFile(join(directory, ".gitignore"), ".mcp-use/\n");
+    execFileSync("git", ["add", ".gitignore"], { cwd: directory });
+    execFileSync("git", ["commit", "-m", "Ignore local cloud state"], {
+      cwd: directory,
+    });
+    const linkDirectory = join(directory, ".mcp-use", "cloud");
+    await mkdir(linkDirectory, { recursive: true });
+    await writeFile(
+      join(linkDirectory, "link.json"),
+      `${JSON.stringify({
+        organizationId: "org_1",
+        serverId: "srv_env",
+        repository: `example/${name}`,
+        sourceType: "github",
+      })}\n`
+    );
+    api.request.mockImplementation(async (path: string) => {
+      if (path === "/servers/srv_env") {
+        return {
+          id: "srv_env",
+          connectedRepository: { productionBranch: "main" },
+        };
+      }
+      if (path.startsWith("/servers/srv_env/env-variables")) return [];
+      if (path === "/deployments") return { id: "dep_env" };
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    return directory;
+  }
+
+  function createdVariable(): unknown {
+    const call = api.request.mock.calls.find(
+      ([path, init]) =>
+        path === "/servers/srv_env/env-variables" && init?.method === "POST"
+    );
+    return JSON.parse(call?.[1]?.body as string);
+  }
+
+  it("scopes --env to production when deploying the production branch", async () => {
+    const directory = await linkedGitHubProject("env-production");
+
+    await expect(
+      runDeploy([directory, "--env", "FOO=bar", "--json"])
+    ).resolves.toBe(0);
+
+    expect(createdVariable()).toEqual({
+      key: "FOO",
+      value: "bar",
+      branch: null,
+      environments: ["production"],
+    });
+  });
+
+  it("scopes --env to the preview of a non-production branch", async () => {
+    const directory = await linkedGitHubProject("env-preview");
+    execFileSync("git", ["checkout", "-b", "feature-x"], { cwd: directory });
+
+    await expect(
+      runDeploy([directory, "--env", "FOO=bar", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenCalledWith(
+      "/servers/srv_env/env-variables?branch=feature-x"
+    );
+    expect(createdVariable()).toEqual({
+      key: "FOO",
+      value: "bar",
+      branch: "feature-x",
+      environments: ["preview"],
+    });
+    expect(api.request).toHaveBeenCalledWith("/deployments", {
+      method: "POST",
+      body: JSON.stringify({
+        serverId: "srv_env",
+        branch: "feature-x",
+        trigger: "manual",
+      }),
+    });
+  });
+
+  it("scopes --env to production when --branch sets the production branch", async () => {
+    const directory = await linkedGitHubProject("env-branch-flag");
+
+    await expect(
+      runDeploy([directory, "--branch", "main", "--env", "FOO=bar", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenCalledWith("/servers/srv_env", {
+      method: "PATCH",
+      body: JSON.stringify({ productionBranch: "main" }),
+    });
+    expect(createdVariable()).toEqual({
+      key: "FOO",
+      value: "bar",
+      branch: null,
+      environments: ["production"],
+    });
+  });
 });
 
 async function archiveEntries(blob: Blob): Promise<string[]> {
