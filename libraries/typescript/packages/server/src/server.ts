@@ -9,6 +9,7 @@ import {
   PROTOCOL_VERSION_META_KEY,
   isJSONRPCRequest,
   isInputRequiredResult,
+  type AuthInfo,
   type ClientCapabilities,
   type McpHttpHandler,
   type McpRequestContext,
@@ -127,6 +128,7 @@ import type {
   InferToolInput,
   InferToolName,
   InferToolOutput,
+  Tool,
   ToolCallback,
   ToolDefinition,
   ToolRef,
@@ -336,6 +338,38 @@ interface NodeHttpListener {
 export interface ListenOptions {
   /** Explicit bind host; takes precedence over `HOST` and configured `host`. */
   host?: string;
+}
+
+/** Options accepted by {@link MCPServer.listTools}. */
+export interface ListToolsOptions {
+  /**
+   * Public origin (e.g. `"https://example.com"`) used to resolve relative
+   * `public/` tool icon sources when `request` is not provided.
+   */
+  origin?: string | URL;
+  /**
+   * Originating HTTP request forwarded to icon resolution and
+   * `mcp:tools/list` middleware (`ctx.request`).
+   */
+  request?: Request;
+  /**
+   * Verified OAuth/auth info forwarded to `mcp:tools/list` middleware
+   * (`ctx.auth`). When omitted and `request` carries verified auth info,
+   * that auth info is used.
+   */
+  authInfo?: AuthInfo;
+  /**
+   * Session identifier forwarded to `mcp:tools/list` middleware
+   * (`ctx.session.sessionId`).
+   */
+  sessionId?: string;
+  /**
+   * Optional `tools/list` request parameters (such as `cursor` or `_meta`)
+   * forwarded to `mcp:tools/list` middleware (`ctx.params` and `ctx.client`).
+   */
+  params?: Record<string, unknown>;
+  /** Abort signal forwarded to `mcp:tools/list` middleware (`ctx.signal`). */
+  signal?: AbortSignal;
 }
 
 function registerFetchMiddleware<TEnv extends Env>(
@@ -662,6 +696,97 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     return Object.freeze({
       name: definition.name,
     }) as ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>>;
+  }
+
+  /**
+   * Return the tool descriptors produced by `tools/list` in-process, after
+   * schema conversion, `_meta.ui` and `securitySchemes` resolution, OAuth
+   * provider setup, and any `mcp:tools/list` middleware.
+   *
+   * Relative `public/` icon sources are resolved when `options.origin` or
+   * `options.request` is provided and remain relative otherwise. Middleware
+   * runs with an in-process synthetic context unless `options.request`,
+   * `options.authInfo`, `options.sessionId`, or `options.params` are supplied.
+   */
+  async listTools(options: ListToolsOptions = {}): Promise<Tool[]> {
+    this.#assertOpen("listTools()");
+    await this.#ensureSkillsPrimed();
+    const basePath = this.#basePath();
+    if (this.#config.oauth !== undefined) {
+      const resource =
+        this.#oauthResource ??
+        resolveLocalOAuthResource(
+          `http://localhost:${resolveListenPort(undefined, this.#config.port)}`,
+          basePath
+        );
+      this.#runOAuthProviderSetup(resource, basePath);
+    }
+    const iconRequest =
+      options.request ??
+      (options.origin !== undefined
+        ? new Request(new URL(basePath, options.origin))
+        : undefined);
+    const authInfo =
+      options.authInfo ??
+      (options.request !== undefined
+        ? (authInfoFromRequest(options.request) ??
+          getRequestBag(options.request).authInfo)
+        : undefined);
+    const sdkServer = this.#buildSdkServer({
+      era: "modern",
+      ...(iconRequest !== undefined && { requestInfo: iconRequest }),
+      ...(authInfo !== undefined && { authInfo }),
+    });
+    const handler = (
+      sdkServer.server as unknown as {
+        _requestHandlers?: Map<
+          string,
+          (request: unknown, extra: unknown) => Promise<{ tools: Tool[] }>
+        >;
+      }
+    )._requestHandlers?.get("tools/list");
+    if (handler === undefined) {
+      return [];
+    }
+    const params = options.params ?? {};
+    const meta = record(params["_meta"]);
+    const clientInfo = record(meta?.[CLIENT_INFO_META_KEY]);
+    const clientCapabilities = record(meta?.[CLIENT_CAPABILITIES_META_KEY]);
+    const envelope =
+      clientInfo !== undefined || clientCapabilities !== undefined
+        ? {
+            ...(clientInfo !== undefined && {
+              [CLIENT_INFO_META_KEY]: clientInfo,
+            }),
+            ...(clientCapabilities !== undefined && {
+              [CLIENT_CAPABILITIES_META_KEY]: clientCapabilities,
+            }),
+          }
+        : undefined;
+    const { tools } = await handler(
+      { jsonrpc: "2.0", id: 1, method: "tools/list", params },
+      {
+        ...(options.sessionId !== undefined && {
+          sessionId: options.sessionId,
+        }),
+        ...((options.request !== undefined || authInfo !== undefined) && {
+          http: {
+            ...(options.request !== undefined && { req: options.request }),
+            ...(authInfo !== undefined && { authInfo }),
+          },
+        }),
+        mcpReq: {
+          id: 1,
+          method: "tools/list",
+          ...(meta !== undefined && { _meta: meta }),
+          ...(envelope !== undefined && { envelope }),
+          signal: options.signal ?? new AbortController().signal,
+          requestState: () => undefined,
+          notify: async () => {},
+        },
+      }
+    );
+    return tools;
   }
 
   /**
@@ -2308,6 +2433,27 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         ? "resources"
         : "prompts";
 
+    const omitUndefined = <T>(value: T): T => {
+      if (Array.isArray(value)) {
+        return value.map((item) => omitUndefined(item)) as T;
+      }
+      if (typeof value === "object" && value !== null) {
+        const normalized: Record<string, unknown> = {};
+        for (const [key, item] of Object.entries(value)) {
+          if (item !== undefined) {
+            Object.defineProperty(normalized, key, {
+              value: omitUndefined(item),
+              enumerable: true,
+              configurable: true,
+              writable: true,
+            });
+          }
+        }
+        return normalized as T;
+      }
+      return value;
+    };
+
     const wrapListMethod = <M extends ListMethod>(
       method: M,
       resultKey: ListResultKey<NoInfer<M>>,
@@ -2352,7 +2498,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
               `[mcp-use] ${method} handler result is missing a ${resultKey} array`
             );
           }
-          return items as McpMiddlewareResult<M>;
+          const typed = items as McpMiddlewareResult<M>;
+          return transform?.(typed) ?? typed;
         };
         const filtered = await this.#runMcpHook(method, mwCtx, innerFn);
         if (!Array.isArray(filtered)) {
@@ -2360,7 +2507,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             `[mcp-use] ${method} middleware must return a ${resultKey} array`
           );
         }
-        const emitted = transform?.(filtered) ?? filtered;
+        const emitted =
+          transform !== undefined
+            ? (filtered.map((item) =>
+                omitUndefined(item)
+              ) as McpMiddlewareResult<M>)
+            : filtered;
         return {
           ...originalEnvelope,
           [resultKey]: emitted,
@@ -2377,13 +2529,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     wrapListMethod("tools/list", "tools", (tools) =>
       tools.map((tool) => {
         const entry = this.#tools.get(tool.name);
-        const schemes =
-          entry !== undefined && this.#generatesSecuritySchemes(entry)
-            ? entry.schemes
-            : undefined;
-        return schemes === undefined
-          ? tool
-          : ({ ...tool, securitySchemes: schemes } as typeof tool);
+        const normalized = omitUndefined(tool);
+        if (entry !== undefined && this.#generatesSecuritySchemes(entry)) {
+          (
+            normalized as { securitySchemes?: readonly ToolSecurityScheme[] }
+          ).securitySchemes = entry.schemes;
+        }
+        return normalized;
       })
     );
     wrapListMethod("resources/list", "resources");
