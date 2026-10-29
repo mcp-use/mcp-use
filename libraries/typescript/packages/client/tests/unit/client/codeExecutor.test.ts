@@ -36,6 +36,15 @@ describe("CodeExecutor", () => {
     expect(result.result).toBe("async done");
   });
 
+  it("times out code that is still awaiting", async () => {
+    const result = await executor.execute(
+      "await new Promise(() => {}); return 'unreachable';",
+      100
+    );
+    expect(result.result).toBeNull();
+    expect(result.error).toBe("Script execution timed out");
+  });
+
   it("handles errors", async () => {
     const result = await executor.execute("throw new Error('Boom');");
     expect(result.error).toBe("Boom");
