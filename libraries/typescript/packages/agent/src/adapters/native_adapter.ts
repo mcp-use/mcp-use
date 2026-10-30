@@ -195,7 +195,7 @@ export class NativeAdapter extends BaseAdapter<NativeToolEntry> {
     if (mcpPrompt.arguments?.length) {
       for (const arg of mcpPrompt.arguments) {
         properties[arg.name] = { type: "string", description: arg.description };
-        if (arg.required !== false) required.push(arg.name);
+        if (arg.required === true) required.push(arg.name);
       }
     }
 
