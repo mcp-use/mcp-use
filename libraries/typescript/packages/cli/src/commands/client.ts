@@ -447,7 +447,8 @@ async function openConnection(
   authTimeoutMs: number,
   browserMode: BrowserMode = process.stdin.isTTY ? "ask" : "never",
   quiet = false,
-  interactiveCommand = `mcp-use client ${name} tools list`
+  interactiveCommand = `mcp-use client ${name} tools list`,
+  connectionTimeoutMs?: number
 ): Promise<MCPConnection> {
   const { createOAuthProvider, MCPClient, logger } = await loadClientPackage({
     allowInstall: !quiet,
@@ -514,6 +515,9 @@ async function openConnection(
     mcpServers: {
       [name]: {
         url: definition.url,
+        ...(connectionTimeoutMs !== undefined
+          ? { timeout: connectionTimeoutMs }
+          : {}),
         ...(credentials.headers !== undefined
           ? { headers: credentials.headers }
           : {}),
@@ -580,12 +584,15 @@ export async function openSavedConnection(
 /**
  * Open an ad-hoc HTTP MCP connection.
  *
+ * @param connectionTimeoutMs - Optional deadline for the MCP handshake in milliseconds.
+ *
  * @internal
  */
 export async function openDirectConnection(
   url: string,
   headers: Record<string, string>,
-  quiet = false
+  quiet = false,
+  connectionTimeoutMs?: number
 ): Promise<MCPConnection> {
   return openConnection(
     "screenshot",
@@ -593,7 +600,9 @@ export async function openDirectConnection(
     { headers },
     300_000,
     "never",
-    quiet
+    quiet,
+    undefined,
+    connectionTimeoutMs
   );
 }
 

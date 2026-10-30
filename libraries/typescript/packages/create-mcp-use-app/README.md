@@ -179,7 +179,11 @@ npx create-mcp-use-app my-events --template neon
 
 The template includes event CRUD tools, a Drizzle schema, and Neon configuration.
 Follow the generated README to install the Neon CLI, link your project, apply
-the schema, and deploy.
+the schema, and deploy. Then connect the deployed MCP endpoint to Manufact:
+
+```bash
+npx mcp-use deploy --external-url https://example.com/mcp
+```
 
 ### GitHub Repository Templates
 

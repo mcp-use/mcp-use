@@ -1110,6 +1110,9 @@ async function main(): Promise<void> {
   console.log(ansi.cyan(`   ${getDeployCommand(usedPackageManager)}`));
   if (validatedTemplate === "neon") {
     console.log(ansi.cyan("   neon functions get events"));
+    console.log(
+      ansi.cyan("   npx mcp-use deploy --external-url <deployed-mcp-url>")
+    );
   }
   console.log("");
   if (options.dev) {

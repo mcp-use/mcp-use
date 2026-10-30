@@ -243,7 +243,7 @@ See the [Tunneling guide](/tunneling/index) for client setup and testing workflo
 
 ## `deploy`
 
-**Purpose:** Create or update a Manufact Cloud deployment for an MCP server.
+**Purpose:** Create or update a Manufact Cloud deployment, or connect an already-hosted MCP server by URL.
 
 **Syntax:**
 
@@ -257,6 +257,7 @@ mcp-use deploy [path] [options]
 
 | Option                    | Description                                                                            | Default            |
 | ------------------------- | -------------------------------------------------------------------------------------- | ------------------ |
+| `--external-url <url>` | Register or update an existing HTTPS MCP endpoint without uploading source. | None |
 | `--open`                  | Open the deployment in a browser after a successful deploy.                            | Disabled           |
 | `--name <name>`           | Server name. Also names the GitHub repository when the CLI creates one.                | GitHub repository name; with `--no-github`, the `package.json` name or directory name |
 | `--new`                   | Create a new server instead of reusing the linked project.                             | Disabled           |
@@ -280,6 +281,7 @@ mcp-use deploy [path] [options]
 ```bash
 mcp-use deploy
 mcp-use deploy --no-github
+mcp-use deploy --external-url https://example.com/mcp --name events
 mcp-use deploy --name my-server --open
 mcp-use deploy --env DATABASE_URL=postgres://... --env API_KEY=secret
 mcp-use deploy --env-file .env.production
@@ -290,6 +292,9 @@ mcp-use deploy --org manufact-inc --region EU --yes
 ```
 
 **Notes and behavior:**
+
+- `--external-url` connects the exact endpoint you provide, including its path. Include `/mcp` if your server requires it. The URL must use HTTPS and cannot include credentials or a fragment. The CLI first verifies an MCP handshake, with a 30-second connection timeout, before authenticating with Manufact or saving changes. Failed validation exits with `invalid_mcp_server` and leaves existing registrations unchanged. This check requires `@mcp-use/client` (included in the Neon template). The CLI saves a local link and updates the same external server on subsequent runs. Your provider continues to host the server; no build or deployment is started.
+- External registration supports `--name`, `--org`, `--open`, and `--json`. Source, build, environment, and region options cannot be combined with it. To connect a separate server from a project already linked to a hosted deployment, add `--new --yes`.
 
 - The default path deploys from GitHub. When it creates a new GitHub-backed server and the organization has no GitHub App installation, the command exits with `github_installation_required` and a link to the dashboard settings. If the project has no `origin` remote, an interactive run offers to create a private repository, initialize Git, commit, and push to `main`. If the working tree has uncommitted changes, it offers to commit and push them with `git add .`. `--yes` authorizes these Git changes without prompting.
 - `--no-github` packs and uploads local source to a platform-managed repository.
