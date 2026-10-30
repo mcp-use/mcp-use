@@ -191,7 +191,7 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
         // (Note: MCP spec includes type, but SDK TypeScript types don't)
         const zodType: z.ZodType = z.string();
 
-        if (arg.required !== false) {
+        if (arg.required === true) {
           schemaFields[arg.name] = zodType;
         } else {
           schemaFields[arg.name] = zodType.optional();
