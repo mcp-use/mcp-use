@@ -51,12 +51,20 @@ import {
   runDeploy,
 } from "../../src/commands/deploy.js";
 
+const { validateExternalServer } = vi.hoisted(() => ({
+  validateExternalServer: vi.fn(),
+}));
+vi.mock("../../src/commands/external-server.js", () => ({
+  validateExternalServer,
+}));
+
 const directories: string[] = [];
 const execFileAsync = promisify(execFile);
 
 afterEach(async () => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  validateExternalServer.mockReset();
   api.request.mockReset();
   api.multipartRequest.mockReset();
   cloudApiForOrganization.mockClear();
@@ -115,6 +123,7 @@ describe("deploy agent contract", () => {
 
     const output = stdout.mock.calls.flat().join("");
     for (const option of [
+      "--external-url",
       "--org",
       "--name",
       "--branch",
@@ -710,7 +719,15 @@ describe("deploy agent contract", () => {
     try {
       await execFileAsync(
         process.execPath,
-        [binPath, "deploy", directory, "--no-github", "--json"],
+        [
+          binPath,
+          "deploy",
+          directory,
+          "--no-github",
+          "--org",
+          "org_1",
+          "--json",
+        ],
         {
           env: {
             ...process.env,
@@ -1619,3 +1636,190 @@ function tarString(buffer: Buffer, offset: number, length: number): string {
     .toString("utf8")
     .trim();
 }
+
+describe("external URL deployment", () => {
+  it("rejects a failed MCP handshake before cloud auth and preserves an existing link", async () => {
+    const directory = await project("already-linked");
+    const linkPath = join(directory, ".mcp-use/cloud/link.json");
+    await mkdir(join(directory, ".mcp-use/cloud"), { recursive: true });
+    const link = JSON.stringify({
+      organizationId: "org_1",
+      serverId: "srv_external",
+      sourceType: "external",
+    });
+    await writeFile(linkPath, link);
+    const { CommandError } = await import("../../src/commands/shared.js");
+    validateExternalServer.mockRejectedValueOnce(
+      new CommandError("invalid_mcp_server", "MCP handshake failed")
+    );
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    expect(
+      await runDeploy([
+        directory,
+        "--external-url",
+        "https://example.com",
+        "--json",
+      ])
+    ).toBe(1);
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
+      error: { code: "invalid_mcp_server" },
+    });
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+    expect(api.request).not.toHaveBeenCalled();
+    expect(await readFile(linkPath, "utf8")).toBe(link);
+  });
+
+  it("registers an endpoint without Git or a build, then updates the saved link", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mcp-use-external-"));
+    directories.push(directory);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    const endpoint = "https://neon.example.test/function/mcp?branch=preview";
+    api.request.mockResolvedValueOnce({
+      server: { id: "srv_external", slug: "events" },
+      deploymentId: null,
+    });
+    expect(
+      await runDeploy([
+        directory,
+        "--external-url",
+        endpoint,
+        "--name",
+        "Events",
+        "--json",
+      ])
+    ).toBe(0);
+    expect(validateExternalServer).toHaveBeenCalledWith(endpoint);
+    expect(validateExternalServer.mock.invocationCallOrder[0]).toBeLessThan(
+      cloudApiForOrganization.mock.invocationCallOrder[0]!
+    );
+    expect(api.request).toHaveBeenCalledExactlyOnceWith("/servers", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "external",
+        organizationId: "org_1",
+        url: endpoint,
+        name: "Events",
+      }),
+    });
+    expect(api.multipartRequest).not.toHaveBeenCalled();
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toEqual({
+      sourceType: "external",
+      serverId: "srv_external",
+      status: "registered",
+      externalUrl: endpoint,
+      webUrl:
+        "https://cloud.example.test/cloud/primary-demo/servers/srv_external/overview",
+    });
+    expect(
+      JSON.parse(
+        await readFile(join(directory, ".mcp-use/cloud/link.json"), "utf8")
+      )
+    ).toMatchObject({ sourceType: "external", serverId: "srv_external" });
+    api.request.mockClear();
+    api.request.mockResolvedValueOnce({ id: "srv_external", slug: "events" });
+    expect(
+      await runDeploy([
+        directory,
+        "--external-url",
+        "https://neon.example.test/new/mcp",
+        "--json",
+      ])
+    ).toBe(0);
+    expect(api.request).toHaveBeenCalledExactlyOnceWith(
+      "/servers/srv_external",
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          externalUrl: "https://neon.example.test/new/mcp",
+        }),
+      }
+    );
+    api.request.mockClear();
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    expect(await runDeploy([directory, "--json"])).toBe(2);
+    expect(api.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "not-a-url",
+    "http://example.test/mcp",
+    "https://user:secret@example.test/mcp",
+    "https://example.test/mcp#fragment",
+  ])("rejects %s before authentication", async (url) => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    expect(await runDeploy(["--external-url", url, "--json"])).toBe(2);
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "--no-github",
+    "--wait-for-ci",
+    "--env=TOKEN=secret",
+    "--branch=main",
+    "--root-dir=src",
+    "--region=us-east-1",
+    "--build-command=build",
+    "--start-command=start",
+    "--dockerfile=Dockerfile",
+    "--env-file=.env",
+    "--watch-paths=src/**",
+  ])("rejects source option %s before authentication", async (option) => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    expect(
+      await runDeploy([
+        "--external-url",
+        "https://example.test/mcp",
+        option,
+        "--json",
+      ])
+    ).toBe(2);
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+  });
+
+  it.each(["github", "managed"])(
+    "preserves an existing %s link",
+    async (sourceType) => {
+      const directory = await project("existing");
+      const link = {
+        organizationId: "org_1",
+        serverId: "srv_hosted",
+        sourceType,
+      };
+      await mkdir(join(directory, ".mcp-use/cloud"), { recursive: true });
+      const linkPath = join(directory, ".mcp-use/cloud/link.json");
+      await writeFile(linkPath, JSON.stringify(link));
+      vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      expect(
+        await runDeploy([
+          directory,
+          "--external-url",
+          "https://example.test/mcp",
+          "--json",
+        ])
+      ).toBe(2);
+      expect(api.request).not.toHaveBeenCalled();
+      expect(JSON.parse(await readFile(linkPath, "utf8"))).toEqual(link);
+    }
+  );
+
+  it("does not save a link when discovery fails", async () => {
+    const directory = await project("unreachable");
+    api.request.mockRejectedValueOnce(new Error("MCP discovery failed"));
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    expect(
+      await runDeploy([
+        directory,
+        "--external-url",
+        "https://example.test/mcp",
+        "--json",
+      ])
+    ).toBe(1);
+    await expect(
+      readFile(join(directory, ".mcp-use/cloud/link.json"))
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});

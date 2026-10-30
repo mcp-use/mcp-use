@@ -141,11 +141,16 @@ npx mcp-use client neon-events-prod tools list
 
 ## Connect to Manufact by external URL
 
-1. Open your organization in [Manufact](https://manufact.com).
-2. Select **Servers → New Server → Connect an existing server**.
-3. Paste the deployed Neon Function's full HTTPS `/mcp` URL.
-4. Wait for successful discovery and connect the server.
-5. Use the Inspector to call a tool, then run an eval or publishing check.
+Authenticate with Manufact and register the deployed endpoint:
+
+```bash
+npx mcp-use login
+npx mcp-use deploy --external-url "https://<your-branch>-events.compute.<region>.aws.neon.tech/mcp"
+```
+
+Use `--org <id-or-slug>` to select an organization and `--name <name>` to
+set the server name. The CLI saves a local link; running the command again
+updates that server's URL. Open its dashboard to inspect tools and run evals.
 
 Neon continues to host the server and database. To add traffic analytics and sessions,
 open the server's Settings and select **Upgrade to Manufact proxy**, then point

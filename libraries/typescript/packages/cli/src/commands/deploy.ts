@@ -33,6 +33,8 @@ import {
   writePrivateJson,
 } from "./shared.js";
 
+import { validateExternalServer } from "./external-server.js";
+
 const exec = promisify(execFile);
 const MAX_ARCHIVE_BYTES = 80 * 1024 * 1024;
 const EXCLUDED_DIRECTORIES = new Set([
@@ -68,10 +70,13 @@ Source modes:
   GitHub (default)   Deploy the current origin. If none exists, an interactive
                      run can create a private repository; --yes authorizes the
                      same flow without prompts.
+  External URL       Pass --external-url <url> to register an already-hosted
+                     MCP endpoint without uploading or building source.
   Managed upload     Pass --no-github on the first deploy to upload local
                      source. Linked managed projects auto-detect this on retry.
 
 Options:
+  --external-url <url>     Connect an existing HTTPS MCP endpoint
   --org <id-or-slug>       Target organization (default: active organization)
   --name <name>            Cloud server/repository name (default: project name)
   --branch <name>          Branch (default: current Git branch, or main)
@@ -101,6 +106,8 @@ Incompatible combinations:
   --no-github cannot replace a linked GitHub server in place; add --new --yes
   to create a separate managed-source server.
   --watch-paths and --wait-for-ci are GitHub-only.
+  --external-url cannot be combined with source or build options.
+  External URLs must complete an MCP handshake before registration.
 
 Managed archive:
   Uploads the selected project without .git, dependencies, build output,
@@ -111,6 +118,7 @@ Managed archive:
 Examples:
   mcp-use deploy
   mcp-use deploy --yes
+  mcp-use deploy --external-url https://example.com/mcp
   mcp-use deploy --no-github
   mcp-use deploy --no-github --json
   mcp-use deploy --json --yes
@@ -126,7 +134,7 @@ interface ProjectLink {
   serverId: string;
   serverSlug?: string | null;
   repository?: string;
-  sourceType?: "github" | "managed";
+  sourceType?: "github" | "managed" | "external";
 }
 
 interface Installation {
@@ -148,6 +156,7 @@ interface GitProbe {
 }
 
 interface DeployValues {
+  "external-url"?: string;
   org?: string;
   name?: string;
   branch?: string;
@@ -201,6 +210,8 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       );
     }
 
+    validateExternalOptions(values);
+
     const cwd = resolve(positionals[0] ?? process.cwd());
     const linkPath = join(cwd, ".mcp-use", "cloud", "link.json");
 
@@ -210,6 +221,10 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         { yes: values.yes === true, json }
       );
       if (!accepted) return 0;
+    }
+
+    if (values["external-url"] !== undefined) {
+      await validateExternalServer(values["external-url"]);
     }
 
     const { api, organizationId, organizationSlug } =
@@ -232,6 +247,25 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
             },
           ],
         }
+      );
+    }
+
+    if (values["external-url"] !== undefined) {
+      return await connectExternal({
+        api,
+        organizationId,
+        organizationSlug,
+        cwd,
+        linkPath,
+        existing: createNew ? null : existing,
+        values,
+        json,
+      });
+    }
+    if (!createNew && existing?.sourceType === "external") {
+      throw new CommandUsageError(
+        "source_mode_conflict",
+        "This project is linked to an external server. Pass --external-url <url> to update it, or --new --yes to deploy a separate server."
       );
     }
 
@@ -318,6 +352,129 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
   }
 }
 
+function validateExternalOptions(values: DeployValues): void {
+  const endpoint = values["external-url"];
+  if (endpoint === undefined) return;
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new UsageError("--external-url must be an absolute HTTPS URL.");
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.hash ||
+    endpoint.includes("#") ||
+    endpoint.length > 2048
+  ) {
+    throw new UsageError(
+      "--external-url must be an HTTPS URL without credentials or a fragment (maximum 2048 characters)."
+    );
+  }
+  const sourceOptions = [
+    "no-github",
+    "branch",
+    "root-dir",
+    "region",
+    "env",
+    "env-file",
+    "build-command",
+    "start-command",
+    "dockerfile",
+    "watch-paths",
+    "wait-for-ci",
+  ] as const;
+  const incompatible = sourceOptions.filter(
+    (key) => values[key] !== undefined && values[key] !== false
+  );
+  if (incompatible.length > 0) {
+    throw new CommandUsageError(
+      "invalid_argument_combination",
+      `--external-url cannot be combined with ${incompatible.map((key) => `--${key}`).join(", ")}. External servers are hosted by their existing provider.`
+    );
+  }
+}
+
+async function connectExternal(input: {
+  api: CloudApi;
+  organizationId: string;
+  organizationSlug: string | null;
+  cwd: string;
+  linkPath: string;
+  existing: ProjectLink | null;
+  values: DeployValues;
+  json: boolean;
+}): Promise<number> {
+  const { api, existing, values } = input;
+  const externalUrl = values["external-url"]!;
+  if (existing !== null) {
+    // Old link files may not contain a source type. Verify those against the API.
+    const isExternal =
+      existing.sourceType === "external" ||
+      (existing.sourceType === undefined &&
+        (
+          await api.request<{ isExternal: boolean }>(
+            `/servers/${encodeURIComponent(existing.serverId)}`
+          )
+        ).isExternal === true);
+    if (!isExternal) {
+      throw new CommandUsageError(
+        "source_mode_conflict",
+        "This project is linked to a hosted server. Use --external-url <url> --new --yes to connect a separate external server.",
+        { serverId: existing.serverId }
+      );
+    }
+  }
+  const server =
+    existing === null
+      ? (
+          await api.request<CreatedServer>("/servers", {
+            method: "POST",
+            body: JSON.stringify({
+              type: "external",
+              organizationId: input.organizationId,
+              url: externalUrl,
+              ...(values.name !== undefined ? { name: values.name } : {}),
+            }),
+          })
+        ).server
+      : await api.request<CreatedServer["server"]>(
+          `/servers/${encodeURIComponent(existing.serverId)}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              externalUrl,
+              ...(values.name !== undefined ? { name: values.name } : {}),
+            }),
+          }
+        );
+  await writePrivateJson(input.linkPath, {
+    organizationId: input.organizationId,
+    serverId: server.id,
+    serverSlug: server.slug,
+    sourceType: "external",
+  } satisfies ProjectLink);
+  await ensureLocalMcpUseIgnored(input.cwd);
+  const webUrl = input.organizationSlug
+    ? `${cloudWebUrl()}/cloud/${encodeURIComponent(input.organizationSlug)}/servers/${encodeURIComponent(server.id)}/overview`
+    : null;
+  if (values.open === true && webUrl !== null) openBrowser(webUrl);
+  printResult(
+    {
+      sourceType: "external",
+      serverId: server.id,
+      status: "registered",
+      externalUrl,
+      webUrl,
+    },
+    input.json,
+    `External server registered: ${externalUrl}${webUrl ? `\nDashboard: ${webUrl}` : ""}`
+  );
+  return 0;
+}
+
 function parseDeployArguments(argv: readonly string[]): {
   values: DeployValues;
   positionals: string[];
@@ -327,6 +484,7 @@ function parseDeployArguments(argv: readonly string[]): {
     allowPositionals: true,
     strict: true,
     options: {
+      "external-url": { type: "string" },
       org: { type: "string" },
       name: { type: "string" },
       branch: { type: "string" },
