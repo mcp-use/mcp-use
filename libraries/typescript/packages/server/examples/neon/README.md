@@ -33,10 +33,10 @@ neon/
 └── package.json
 ```
 
-## Clone the repository
+## Create a project
 
 ```bash
-npx degit mcp-use/mcp-use/libraries/typescript/packages/server/examples/neon ./neon-events
+npx create-mcp-use-app neon-events --template neon
 cd neon-events
 ```
 
