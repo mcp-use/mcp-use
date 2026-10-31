@@ -129,6 +129,23 @@ describe("resolveRequestOriginFromHeaders", () => {
     ).toBe("https://proxy.example.com");
   });
 
+  it("ignores a forwarded protocol other than http or https", () => {
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://myapp.example.com/mcp", {
+          forwarded: "for=203.0.113.7;proto=javascript",
+        })
+      )
+    ).toBe("http://myapp.example.com");
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://myapp.example.com/mcp", {
+          "x-forwarded-proto": "javascript",
+        })
+      )
+    ).toBe("http://myapp.example.com");
+  });
+
   it("ignores X-Forwarded-Host without X-Forwarded-Proto", () => {
     expect(
       resolveRequestOriginFromHeaders(

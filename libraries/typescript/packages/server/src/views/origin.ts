@@ -34,8 +34,8 @@ function parseForwardedHeader(
       }
       params.set(key.toLowerCase(), rest.join("=").replace(/^"|"$/g, ""));
     }
-    const proto = params.get("proto");
-    if (proto !== undefined && proto !== "") {
+    const proto = params.get("proto")?.toLowerCase();
+    if (proto === "http" || proto === "https") {
       return `${proto}://${params.get("host") || fallbackHost}`;
     }
   }
@@ -45,8 +45,9 @@ function parseForwardedHeader(
 /**
  * Resolve origin from forwarded headers or the request URL (no env override).
  *
- * A forwarded protocol is honored on its own. The host comes from the
- * forwarded host when present, then `X-Forwarded-Host`, then the request.
+ * A forwarded `http` or `https` protocol is honored on its own, and any other
+ * value is ignored. The host comes from the forwarded host when present, then
+ * `X-Forwarded-Host`, then the request.
  */
 export function resolveRequestOriginFromHeaders(request: Request): string {
   const requestUrl = new URL(request.url);
@@ -64,8 +65,8 @@ export function resolveRequestOriginFromHeaders(request: Request): string {
 
   const proto = request.headers.get("x-forwarded-proto");
   if (proto !== null) {
-    const firstProto = proto.split(",")[0]?.trim();
-    if (firstProto !== undefined && firstProto !== "") {
+    const firstProto = proto.split(",")[0]?.trim().toLowerCase();
+    if (firstProto === "http" || firstProto === "https") {
       return `${firstProto}://${fallbackHost}`;
     }
   }
