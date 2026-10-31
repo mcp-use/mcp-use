@@ -87,6 +87,75 @@ describe("resolveRequestOriginFromHeaders", () => {
       )
     ).toBe("https://fruit.example.com");
   });
+
+  it("uses Forwarded proto with the request host when host is absent", () => {
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://myapp.example.com/mcp", {
+          forwarded: "for=203.0.113.7;proto=https",
+        })
+      )
+    ).toBe("https://myapp.example.com");
+  });
+
+  it("uses X-Forwarded-Host when Forwarded carries proto without host", () => {
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://127.0.0.1:3000/mcp", {
+          forwarded: "for=203.0.113.7;proto=https",
+          "x-forwarded-host": "public.example.com",
+        })
+      )
+    ).toBe("https://public.example.com");
+  });
+
+  it("uses X-Forwarded-Proto with the request host when X-Forwarded-Host is absent", () => {
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://myapp.example.com/mcp", {
+          "x-forwarded-proto": "https",
+        })
+      )
+    ).toBe("https://myapp.example.com");
+  });
+
+  it("uses X-Forwarded-Host when present", () => {
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://127.0.0.1:3000/mcp", {
+          "x-forwarded-proto": "https,http",
+          "x-forwarded-host": "proxy.example.com, 10.0.0.1",
+        })
+      )
+    ).toBe("https://proxy.example.com");
+  });
+
+  it("ignores a forwarded protocol other than http or https", () => {
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://myapp.example.com/mcp", {
+          forwarded: "for=203.0.113.7;proto=javascript",
+        })
+      )
+    ).toBe("http://myapp.example.com");
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://myapp.example.com/mcp", {
+          "x-forwarded-proto": "javascript",
+        })
+      )
+    ).toBe("http://myapp.example.com");
+  });
+
+  it("ignores X-Forwarded-Host without X-Forwarded-Proto", () => {
+    expect(
+      resolveRequestOriginFromHeaders(
+        req("http://127.0.0.1:3000/mcp", {
+          "x-forwarded-host": "proxy.example.com",
+        })
+      )
+    ).toBe("http://127.0.0.1:3000");
+  });
 });
 
 describe("resolveMcpEndpoint", () => {
