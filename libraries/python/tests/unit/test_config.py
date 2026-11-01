@@ -39,6 +39,32 @@ class TestConfigLoading(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             load_config_file("/tmp/nonexistent_file.json")
 
+    def test_load_config_file_preserves_utf8_values(self):
+        """Test loading UTF-8 JSON does not depend on the platform locale."""
+        test_config = {"mcpServers": {"mémoire": {"args": ["café.py"]}}}
+
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as temp:
+            json.dump(test_config, temp, ensure_ascii=False)
+            temp_path = temp.name
+
+        try:
+            self.assertEqual(load_config_file(temp_path), test_config)
+        finally:
+            os.unlink(temp_path)
+
+    def test_load_config_file_accepts_utf8_bom(self):
+        """Test loading UTF-8 JSON with a byte-order mark."""
+        test_config = {"mcpServers": {"test": {"url": "https://example.com/é"}}}
+
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8-sig", delete=False) as temp:
+            json.dump(test_config, temp, ensure_ascii=False)
+            temp_path = temp.name
+
+        try:
+            self.assertEqual(load_config_file(temp_path), test_config)
+        finally:
+            os.unlink(temp_path)
+
 
 class TestConnectorCreation(unittest.TestCase):
     """Tests for connector creation from configuration."""
