@@ -23,7 +23,7 @@ _telemetry = Telemetry()
 
 
 def load_config_file(filepath: str) -> dict[str, Any]:
-    """Load a configuration file.
+    """Load a UTF-8 JSON configuration file, accepting an optional BOM.
 
     Args:
         filepath: Path to the configuration file
@@ -31,7 +31,7 @@ def load_config_file(filepath: str) -> dict[str, Any]:
     Returns:
         The parsed configuration
     """
-    with open(filepath) as f:
+    with open(filepath, encoding="utf-8-sig") as f:
         return json.load(f)
 
 

@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from mcp_use.client.auth.bearer import BearerAuth
@@ -38,6 +39,24 @@ class TestConfigLoading(unittest.TestCase):
         """Test loading a non-existent file raises FileNotFoundError."""
         with self.assertRaises(FileNotFoundError):
             load_config_file("/tmp/nonexistent_file.json")
+
+    def test_load_config_file_utf8_and_bom(self):
+        """UTF-8 configs preserve non-ASCII names, with or without a BOM."""
+        config = {"mcpServers": {"mémoire": {"command": "python", "args": ["café.py"]}}}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "mcp.json"
+            for encoding in ("utf-8", "utf-8-sig"):
+                with self.subTest(encoding=encoding):
+                    path.write_text(json.dumps(config, ensure_ascii=False), encoding=encoding)
+                    self.assertEqual(load_config_file(str(path)), config)
+
+    def test_load_config_file_rejects_invalid_json_after_bom(self):
+        """A BOM must not cause malformed JSON to be accepted."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "mcp.json"
+            path.write_text('{"mcpServers":', encoding="utf-8-sig")
+            with self.assertRaises(json.JSONDecodeError):
+                load_config_file(str(path))
 
 
 class TestConnectorCreation(unittest.TestCase):
