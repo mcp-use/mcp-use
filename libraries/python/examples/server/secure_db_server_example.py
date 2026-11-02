@@ -56,10 +56,6 @@ import duckdb
 import sqlglot
 from mcp.server.lowlevel.server import request_ctx
 from mcp.types import CallToolRequestParams, PaginatedRequestParams, ToolAnnotations
-from mcp_use.server import Context, MCPServer
-from mcp_use.server.auth import AccessToken, BearerAuthProvider, get_access_token
-from mcp_use.server.auth.dependencies import set_access_token
-from mcp_use.server.middleware import CallNext, Middleware, ServerMiddlewareContext
 from pydantic import BaseModel, Field
 from sqlglot import exp
 from sqlglot.errors import ParseError
@@ -68,6 +64,10 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from mcp_use.server import Context, MCPServer
+from mcp_use.server.auth import AccessToken, BearerAuthProvider, get_access_token
+from mcp_use.server.auth.dependencies import set_access_token
+from mcp_use.server.middleware import CallNext, Middleware, ServerMiddlewareContext
 
 # =============================================================================
 # Layer 1: RBAC Roles & Middleware
@@ -153,14 +153,15 @@ class CallerPrincipal(BaseModel):
     authenticated_via: str = "default_fallback"
 
 
-_current_principal: ContextVar[CallerPrincipal] = ContextVar(
+_current_principal: ContextVar[CallerPrincipal | None] = ContextVar(
     "current_principal",
-    default=CallerPrincipal(),
+    default=None,
 )
 
 
 def get_current_principal() -> CallerPrincipal:
-    return _current_principal.get()
+    p = _current_principal.get()
+    return p if p is not None else CallerPrincipal()
 
 
 def set_current_principal(p: CallerPrincipal) -> None:
@@ -349,7 +350,9 @@ class RBACMiddleware(Middleware):
         if explicit:
             principal = resolve_token(explicit)
             if not principal:
-                raise PermissionError("Invalid token. Use 'token-viewer-demo', 'token-analyst-demo', or 'token-admin-demo'.")
+                raise PermissionError(
+                    "Invalid token. Use 'token-viewer-demo', 'token-analyst-demo', or 'token-admin-demo'."
+                )
             return principal
 
         env_token = os.environ.get("MCP_DEFAULT_TOKEN")
@@ -485,7 +488,7 @@ class SQLValidator:
         except ParseError as exc:
             raise SQLSecurityError(f"SQL syntax error: {exc}", "SYNTAX_ERROR") from exc
 
-        if len(statements) != 1 or not isinstance(statements[0], (exp.Select, exp.Union, exp.Intersect, exp.Except)):
+        if len(statements) != 1 or not isinstance(statements[0], exp.Select | exp.Union | exp.Intersect | exp.Except):
             raise SQLSecurityError("Only read-only SELECT queries are allowed.", "FORBIDDEN_STATEMENT_TYPE")
 
         ast = statements[0]
@@ -509,13 +512,21 @@ class SQLValidator:
             on_clause = join.args.get("on")
             has_using = bool(join.args.get("using"))
             if join_kind == "CROSS" or (not on_clause and not has_using):
-                raise SQLSecurityError("Unconstrained CROSS JOIN or Cartesian comma-join is forbidden.", "CARTESIAN_JOIN_DOS")
+                raise SQLSecurityError(
+                    "Unconstrained CROSS JOIN or Cartesian comma-join is forbidden.", "CARTESIAN_JOIN_DOS"
+                )
             if on_clause:
                 if not list(on_clause.find_all(exp.Column)):
-                    raise SQLSecurityError("Degenerate Cartesian JOIN with literal tautology (e.g. ON 1=1) is forbidden.", "CARTESIAN_JOIN_DOS")
+                    raise SQLSecurityError(
+                        "Degenerate Cartesian JOIN with literal tautology (e.g. ON 1=1) is forbidden.",
+                        "CARTESIAN_JOIN_DOS",
+                    )
                 for eq in on_clause.find_all(exp.EQ, exp.GTE, exp.LTE):
                     if eq.left == eq.right:
-                        raise SQLSecurityError("Degenerate Cartesian JOIN with self-comparison tautology (e.g. ON x=x) is forbidden.", "CARTESIAN_JOIN_DOS")
+                        raise SQLSecurityError(
+                            "Degenerate Cartesian JOIN with self-comparison tautology (e.g. ON x=x) is forbidden.",
+                            "CARTESIAN_JOIN_DOS",
+                        )
 
         # Table & Column RBAC checks
         cte_aliases = {cte.alias_or_name.lower() for cte in ast.find_all(exp.CTE) if cte.alias_or_name}
@@ -537,7 +548,9 @@ class SQLValidator:
                 if not isinstance(star.parent, exp.Count):
                     for t in tables:
                         if PII_COLUMNS_BY_TABLE.get(t):
-                            raise SQLSecurityError(f"SELECT * blocked on PII table '{t}' for analyst.", "RBAC_WILDCARD_PII")
+                            raise SQLSecurityError(
+                                f"SELECT * blocked on PII table '{t}' for analyst.", "RBAC_WILDCARD_PII"
+                            )
 
         for lim_node in ast.find_all(exp.Limit):
             if lim_node.expression is not None:
@@ -617,9 +630,18 @@ class SecureDBEngine:
                 billing_email VARCHAR, stripe_customer_id VARCHAR
             );
             INSERT INTO organizations VALUES
-                ('org_01', 'Acme Robotics AI', 'enterprise', 4800.0, 'eu-central-1', '2026-01-15 09:00:00', 'finance@acme.ai', 'cus_111'),
-                ('org_02', 'Vanguard Quant Labs', 'enterprise', 6200.0, 'us-east-1', '2026-02-02 14:30:00', 'ops@vanguard.io', 'cus_222'),
-                ('org_03', 'Helios Biotech', 'scale', 1490.0, 'eu-west-1', '2026-02-19 11:15:00', 'billing@helios.bio', 'cus_333');
+                (
+                    'org_01', 'Acme Robotics AI', 'enterprise', 4800.0, 'eu-central-1',
+                    '2026-01-15 09:00:00', 'finance@acme.ai', 'cus_111'
+                ),
+                (
+                    'org_02', 'Vanguard Quant Labs', 'enterprise', 6200.0, 'us-east-1',
+                    '2026-02-02 14:30:00', 'ops@vanguard.io', 'cus_222'
+                ),
+                (
+                    'org_03', 'Helios Biotech', 'scale', 1490.0, 'eu-west-1',
+                    '2026-02-19 11:15:00', 'billing@helios.bio', 'cus_333'
+                );
 
             CREATE TABLE mcp_servers (
                 server_id VARCHAR PRIMARY KEY, org_id VARCHAR, server_name VARCHAR,
@@ -627,18 +649,36 @@ class SecureDBEngine:
                 avg_cold_start_ms DOUBLE, deployed_at TIMESTAMP, webhook_secret VARCHAR
             );
             INSERT INTO mcp_servers VALUES
-                ('srv_101', 'org_01', 'robotics-telemetry', 'python-uv', 'streamable-http', 'healthy', 1024, 310.5, '2026-09-01 10:00:00', 'whsec_secret1'),
-                ('srv_102', 'org_02', 'market-tick-analytics', 'python-uv', 'streamable-http', 'healthy', 2048, 190.2, '2026-09-15 09:45:00', 'whsec_secret2'),
-                ('srv_103', 'org_03', 'alphafold-bridge', 'dockerfile', 'streamable-http', 'healthy', 4096, 620.4, '2026-09-25 08:00:00', 'whsec_secret3');
+                (
+                    'srv_101', 'org_01', 'robotics-telemetry', 'python-uv', 'streamable-http',
+                    'healthy', 1024, 310.5, '2026-09-01 10:00:00', 'whsec_secret1'
+                ),
+                (
+                    'srv_102', 'org_02', 'market-tick-analytics', 'python-uv', 'streamable-http',
+                    'healthy', 2048, 190.2, '2026-09-15 09:45:00', 'whsec_secret2'
+                ),
+                (
+                    'srv_103', 'org_03', 'alphafold-bridge', 'dockerfile', 'streamable-http',
+                    'healthy', 4096, 620.4, '2026-09-25 08:00:00', 'whsec_secret3'
+                );
 
             CREATE TABLE tool_invocations (
                 invocation_id VARCHAR PRIMARY KEY, server_id VARCHAR, org_id VARCHAR, tool_name VARCHAR,
                 status VARCHAR, latency_ms DOUBLE, tokens_saved INTEGER, invoked_at TIMESTAMP, client_ip VARCHAR
             );
             INSERT INTO tool_invocations VALUES
-                ('inv_1', 'srv_101', 'org_01', 'query_joint_states', 'success', 42.5, 1850, '2026-10-25 10:01:00', '192.168.1.10'),
-                ('inv_2', 'srv_102', 'org_02', 'execute_analytical_sql', 'success', 21.0, 4200, '2026-10-25 11:10:00', '10.0.0.5'),
-                ('inv_3', 'srv_103', 'org_03', 'align_binding_pocket', 'success', 310.2, 7900, '2026-10-25 12:00:00', '172.16.0.4');
+                (
+                    'inv_1', 'srv_101', 'org_01', 'query_joint_states', 'success', 42.5,
+                    1850, '2026-10-25 10:01:00', '192.168.1.10'
+                ),
+                (
+                    'inv_2', 'srv_102', 'org_02', 'execute_analytical_sql', 'success', 21.0,
+                    4200, '2026-10-25 11:10:00', '10.0.0.5'
+                ),
+                (
+                    'inv_3', 'srv_103', 'org_03', 'align_binding_pocket', 'success', 310.2,
+                    7900, '2026-10-25 12:00:00', '172.16.0.4'
+                );
 
             CREATE TABLE subscriptions (
                 subscription_id VARCHAR PRIMARY KEY, org_id VARCHAR, plan_tier VARCHAR,
@@ -646,23 +686,38 @@ class SecureDBEngine:
                 stripe_customer_id VARCHAR
             );
             INSERT INTO subscriptions VALUES
-                ('sub_1', 'org_01', 'enterprise', 5000000, 3100000, 'active', '2026-11-15 00:00:00', 'cus_111'),
-                ('sub_2', 'org_02', 'enterprise', 10000000, 8900000, 'active', '2026-11-02 00:00:00', 'cus_222');
+                (
+                    'sub_1', 'org_01', 'enterprise', 5000000, 3100000, 'active',
+                    '2026-11-15 00:00:00', 'cus_111'
+                ),
+                (
+                    'sub_2', 'org_02', 'enterprise', 10000000, 8900000, 'active',
+                    '2026-11-02 00:00:00', 'cus_222'
+                );
 
             CREATE TABLE api_keys (
                 key_id VARCHAR PRIMARY KEY, org_id VARCHAR, scope_role VARCHAR,
                 key_hash VARCHAR, raw_token_prefix VARCHAR, created_at TIMESTAMP, last_used_at TIMESTAMP
             );
             INSERT INTO api_keys VALUES
-                ('key_901', 'org_01', 'admin', 'sha256:abcd', 'mnf_live_abcd', '2026-01-16 10:00:00', '2026-10-26 08:30:00'),
-                ('key_902', 'org_02', 'analyst', 'sha256:efgh', 'mnf_live_efgh', '2026-02-03 11:00:00', '2026-10-26 09:00:00');
+                (
+                    'key_901', 'org_01', 'admin', 'sha256:abcd', 'mnf_live_abcd',
+                    '2026-01-16 10:00:00', '2026-10-26 08:30:00'
+                ),
+                (
+                    'key_902', 'org_02', 'analyst', 'sha256:efgh', 'mnf_live_efgh',
+                    '2026-02-03 11:00:00', '2026-10-26 09:00:00'
+                );
 
             CREATE TABLE security_incidents (
                 incident_id VARCHAR PRIMARY KEY, org_id VARCHAR, role VARCHAR,
                 attack_vector VARCHAR, blocked_sql VARCHAR, detected_at TIMESTAMP
             );
             INSERT INTO security_incidents VALUES
-                ('inc_501', 'org_01', 'analyst', 'COMMENT_SMUGGLING', 'SELECT * FROM orgs -- bypass', '2026-10-25 10:00:00');
+                (
+                    'inc_501', 'org_01', 'analyst', 'COMMENT_SMUGGLING',
+                    'SELECT * FROM orgs -- bypass', '2026-10-25 10:00:00'
+                );
             """
         )
 
@@ -685,7 +740,9 @@ class SecureDBEngine:
                         "row_count": cnt,
                         "access_tier": "admin_only" if t in ADMIN_ONLY_TABLES else "analyst_and_admin",
                         "safe_columns": list(SAFE_COLUMNS_BY_TABLE[t]),
-                        "restricted_pii_columns": pii_cols if role == Role.ADMIN else f"{len(pii_cols)} restricted column(s)",
+                        "restricted_pii_columns": pii_cols
+                        if role == Role.ADMIN
+                        else f"{len(pii_cols)} restricted column(s)",
                     }
                 )
         return catalog
@@ -695,14 +752,20 @@ class SecureDBEngine:
         if t not in ALL_KNOWN_TABLES:
             raise ValueError(f"Unknown table '{table_name}'.")
         if role != Role.ADMIN and t in ADMIN_ONLY_TABLES:
-            self.audit.record(role, "describe_table", "BLOCKED_RBAC", "RBAC_TABLE_RESTRICTED", f"Table '{t}' is restricted.")
+            self.audit.record(
+                role,
+                "describe_table",
+                "BLOCKED_RBAC",
+                "RBAC_TABLE_RESTRICTED",
+                f"Table '{t}' is restricted.",
+            )
             raise PermissionError(f"Access denied: table '{t}' requires admin role.")
 
         with self._lock:
             info = self.conn.execute(f"PRAGMA table_info('{t}')").fetchall()
         pii_set = PII_COLUMNS_BY_TABLE.get(t, frozenset())
         cols = []
-        for cid, col_name, col_type, notnull, dflt, pk in info:
+        for _cid, col_name, col_type, _notnull, _dflt, pk in info:
             is_pii = col_name.lower() in pii_set
             cols.append(
                 {
@@ -788,8 +851,15 @@ TableNameLiteral = Literal[
     "security_incidents",
 ]
 
+
 class SecureDBExampleServer(MCPServer):
-    def __init__(self, *args: Any, hybrid_auth_provider: ExampleBearerAuthProvider | None = None, strict_auth: bool = False, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        hybrid_auth_provider: ExampleBearerAuthProvider | None = None,
+        strict_auth: bool = False,
+        **kwargs: Any,
+    ) -> None:
         self._hybrid_auth_provider = hybrid_auth_provider or ExampleBearerAuthProvider()
         self._strict_auth = strict_auth
         super().__init__(*args, **kwargs)
