@@ -38,6 +38,7 @@ function hasRequestedSchema(
 /**
  * Get default values from the elicitation request's requestedSchema (form mode).
  * For URL mode or when no schema is present, returns an empty object.
+ * Array defaults are copied so callers can edit them without changing the schema.
  */
 export function getDefaults(params: ElicitParams): ElicitContent {
   const content: ElicitContent = {};
@@ -51,10 +52,11 @@ export function getDefaults(params: ElicitParams): ElicitContent {
       if (
         typeof v === "string" ||
         typeof v === "number" ||
-        typeof v === "boolean" ||
-        (Array.isArray(v) && v.every((x) => typeof x === "string"))
+        typeof v === "boolean"
       ) {
-        content[fieldName] = v as string | number | boolean | string[];
+        content[fieldName] = v;
+      } else if (Array.isArray(v) && v.every((x) => typeof x === "string")) {
+        content[fieldName] = [...v];
       }
     }
   }
