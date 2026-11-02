@@ -8,7 +8,7 @@ icon: "bug"
 
 Use the Inspector to debug a widget before you try it in a production host. The fastest loop is: connect your server, run the tool that returns the widget, inspect the widget data, then test layout, display modes, and CSP.
 
-For building widgets, start with [Build widgets](/typescript/mcp-apps/widgets). For hook fields and host actions, use the [`useWidget()` API reference](/typescript/api-reference/react/usewidget).
+For building widgets, start with [Build widgets](/typescript/mcp-apps/widgets). For hook fields and host actions, use the [`useWidget()` API reference](/v1/typescript/api-reference/react/usewidget).
 
 ## Connect the widget server
 
@@ -48,7 +48,7 @@ Use the protocol toggle when it appears:
 
 Prefer `useWidget()` and other `mcp-use/react` hooks in widget code. They abstract over the runtime differences that the Inspector is testing.
 
-See [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) when you need ChatGPT-specific behavior.
+See [Apps SDK compatibility](/v1/typescript/mcp-apps/apps-sdk-compatibility) when you need ChatGPT-specific behavior.
 
 ## Inspect props, output, metadata, and state
 
@@ -114,11 +114,11 @@ If no widget appears, start with the smallest failing case.
 | Tool result appears, but no widget appears. | Confirm `widget.name` matches a folder under `resources/`. |
 | Widget frame appears blank. | Check iframe console errors and missing required props. |
 | Widget loads in permissive CSP only. | Add the required domains to widget CSP. |
-| ChatGPT protocol fails, but MCP Apps works. | Check [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility). |
+| ChatGPT protocol fails, but MCP Apps works. | Check [Apps SDK compatibility](/v1/typescript/mcp-apps/apps-sdk-compatibility). |
 | A widget action fails. | Verify the tool name, arguments, auth state, and iframe console logs. |
 
 ## Next steps
 
 - Use [Build widgets](/typescript/mcp-apps/widgets) to review the server and widget structure.
 - Use [Interactivity](/typescript/mcp-apps/interactivity) to add tool calls, state, follow-up messages, and display controls.
-- Use [`useWidget()`](/typescript/api-reference/react/usewidget) for the full hook reference.
+- Use [`useWidget()`](/v1/typescript/api-reference/react/usewidget) for the full hook reference.

@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 
 export const changelogs = [
-  "docs/v2/typescript/changelog.mdx",
+  "docs/typescript/changelog.mdx",
   "docs/inspector/changelog.mdx",
 ];
 
@@ -169,9 +169,15 @@ export function checkChangelogs(options) {
   const { baseBranch, headBranch, head } = options;
   // Guard here as well as in the workflow so other PRs never need changelogs.
   if (baseBranch !== "main" || headBranch !== "canary") return [];
-  const { ancestor, readIfPresent } = comparison(options);
+  const { git, ancestor, readIfPresent } = comparison(options);
   return changelogs.flatMap((path) => {
-    const previous = new Set(changelogEntries(readIfPresent(ancestor, path)));
+    const baselinePath =
+      path === changelogs[0] &&
+      !git("ls-tree", "--name-only", ancestor, "--", path)
+        ? "docs/v2/typescript/changelog.mdx"
+        : path;
+    const baseline = readIfPresent(ancestor, baselinePath);
+    const previous = new Set(changelogEntries(baseline));
     const updated = changelogEntries(readIfPresent(head, path)).some(
       (entry) => !previous.has(entry),
     );

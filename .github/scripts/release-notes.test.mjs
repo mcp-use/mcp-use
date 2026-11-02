@@ -118,6 +118,15 @@ test("canary to main requires both MDX changelogs", (t) => {
   assert.deepEqual(f.checkChangelog(), []);
 });
 
+test("a moved TypeScript changelog retains its old baseline", (t) => {
+  const oldPath = "docs/v2/typescript/changelog.mdx";
+  const f = fixture(t, { existingChangelogs: [oldPath, changelogs[1]] });
+  f.write(changelogs[0], entry);
+  assert.equal(f.checkChangelog().length, 2);
+  f.write(changelogs[0], '<Update label="v1.1.0">New feature</Update>\n' + entry);
+  assert.equal(f.checkChangelog().length, 1);
+});
+
 test("metadata, whitespace, empty entries, and generated changelogs do not count", (t) => {
   const f = fixture(t);
   for (const path of changelogs) {

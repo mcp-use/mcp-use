@@ -1,136 +1,186 @@
 ---
 title: "Custom Provider"
-description: "Use a Dynamic Client Registration OAuth provider with a TypeScript MCP server."
+description: "Integrate a DCR-capable OAuth authorization server with an MCP server."
 icon: "code"
 ---
 
-Use `oauthCustomProvider` when your identity provider supports Dynamic Client Registration but mcp-use does not have a built-in provider for it. The MCP client registers with the upstream provider, and your MCP server verifies the resulting access token.
+Use `oauthCustomProvider` when your authorization server supports Dynamic Client Registration (DCR) but mcp-use does not provide a built-in adapter. The MCP client registers upstream; your server publishes metadata, verifies access tokens, and maps verified claims into application identity.
 
-If your provider only supports a pre-registered application with a fixed `clientId` and `clientSecret`, use [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) instead.
+## Required contract
 
-This guide shows the shape of a custom provider. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthcustomprovider) for exact required fields, optional fields, defaults, and return contracts.
-
-## Confirm the provider supports DCR
-
-Before using `oauthCustomProvider`, confirm the provider's OAuth metadata advertises the full flow that MCP clients will use. Server-side `authEndpoint` and `tokenEndpoint` config does not repair incomplete upstream metadata.
-
-```text
-GET https://auth.example.com/.well-known/oauth-authorization-server
-```
-
-At minimum, look for authorization, token, and registration endpoints:
-
-```json
-{
-  "authorization_endpoint": "https://auth.example.com/oauth/authorize",
-  "token_endpoint": "https://auth.example.com/oauth/token",
-  "registration_endpoint": "https://auth.example.com/oauth/register"
-}
-```
-
-Without a registration endpoint, MCP clients cannot register themselves upstream.
-
-## Configure token verification
-
-Your custom provider must verify access tokens and return the verified payload.
+Import `MCPServer` from `mcp-use` and the provider contract from `mcp-use/oauth`.
 
 ```typescript
-import { createRemoteJWKSet, jwtVerify } from "jose";
 import { MCPServer } from "mcp-use";
-import { oauthCustomProvider } from "mcp-use/oauth";
+import {
+  createJwtVerifier,
+  oauthCustomProvider,
+  type OAuthAuthInfo,
+  type OAuthMetadata,
+} from "mcp-use/oauth";
 
 const issuer = "https://auth.example.com";
-const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
+
+const oauthMetadata = {
+  issuer,
+  authorization_endpoint: `${issuer}/oauth/authorize`,
+  token_endpoint: `${issuer}/oauth/token`,
+  registration_endpoint: `${issuer}/oauth/register`,
+  response_types_supported: ["code"],
+  grant_types_supported: ["authorization_code", "refresh_token"],
+  code_challenge_methods_supported: ["S256"],
+} satisfies OAuthMetadata;
+
+type AppUser = {
+  id: string;
+  email?: string;
+  organizationId?: string;
+};
 
 const server = new MCPServer({
   name: "custom-auth-server",
   version: "1.0.0",
-  oauth: oauthCustomProvider({
-    issuer,
-    authEndpoint: `${issuer}/oauth/authorize`,
-    tokenEndpoint: `${issuer}/oauth/token`,
-    jwksUrl: `${issuer}/.well-known/jwks.json`,
-    async verifyToken(token) {
-      const { payload } = await jwtVerify(token, jwks, {
-        issuer,
-        audience: "https://your-api.example.com",
-      });
+  oauth: oauthCustomProvider<AppUser>({
+    oauthMetadata,
 
-      return { payload: payload as Record<string, unknown> };
+    createTokenVerifier(resource) {
+      return createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
+        resource,
+      });
     },
-    getUserInfo(payload) {
+
+    mapAuthInfo(authInfo: OAuthAuthInfo) {
+      const payload = authInfo.extra?.payload as Record<string, unknown>;
+      if (typeof payload.sub !== "string") {
+        throw new Error("Verified token is missing sub");
+      }
+
       return {
-        userId: payload.sub as string,
-        email: payload.email as string | undefined,
-        name: payload.name as string | undefined,
-        roles: (payload.roles as string[]) ?? [],
+        user: {
+          id: payload.sub,
+          email: typeof payload.email === "string" ? payload.email : undefined,
+          organizationId:
+            typeof payload.organization_id === "string"
+              ? payload.organization_id
+              : undefined,
+        },
+        payload,
+        permissions: Array.isArray(payload.permissions)
+          ? payload.permissions.filter(
+              (value): value is string => typeof value === "string",
+            )
+          : [],
       };
     },
   }),
 });
 
-await server.listen(3000);
+export default server;
 ```
 
-The provider metadata at the issuer must advertise the registration endpoint. Do not skip signature, issuer, or audience checks for deployed servers.
+`createTokenVerifier(resource)` receives the resolved canonical MCP resource. The verifier must validate token signature or introspection, issuer, expiry, and that resource, then return SDK auth information including `scopes`, `expiresAt`, and the validated `resource`. `resource` must be a `URL` matching the MCP resource, `clientId` must be a string (`""` when the token has no client), and `expiresAt` must be in the future, in Unix seconds. Auth information that breaks this contract is refused like an invalid token.
 
-## Normalize user claims
+If your authorization server issues standard JWTs, `createJwtVerifier` does all of that for you and is the same helper the built-in providers use. Given a `jwksUrl`, it checks the signature, issuer, required `exp` and `sub` claims, and resource binding. It then returns the auth information in the shape the SDK expects.
 
-Use `getUserInfo` to map provider-specific claims into fields your tools can read consistently.
+For standards-conformant JWT access tokens, the verifier checks the [`aud` claim](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.3) for the MCP resource URL. The `aud` claim can be a string or an array containing the resource URL. [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707.html#section-2) defines `resource` as an authorization and token request parameter, not as a JWT access-token claim. For compatibility with providers that include a non-standard `resource` claim, the verifier accepts a string-valued `resource` claim equal to the MCP resource URL and uses it instead of `aud`. Pass `audience` when the provider's JWT audience differs from the MCP resource.
+
+Write the verifier by hand when the provider does not issue JWTs, for example when you have to call a token introspection endpoint. Reject an invalid, expired, or revoked token by throwing `new OAuthError(OAuthErrorCode.InvalidToken, message)`, both exported from `mcp-use/oauth`. The client then gets the same sign-in challenge as for a missing token; see [How hosts see a refused call](/typescript/server/authentication/mixed-auth#how-hosts-see-a-refused-call) for the format each host receives. An error that is not an `OAuthError`, such as a failed request to an unreachable introspection endpoint, is answered with `500`.
+
+`oauthMetadata` is the authorization server's RFC 8414 metadata. It must describe the actual upstream endpoints and include the `registration_endpoint` used by MCP clients.
+
+`mapAuthInfo(authInfo)` receives only verified SDK auth information. It must return:
+
+- `user`: your provider-specific normalized user, with `id` as the stable subject;
+- `payload`: the verified claims or introspection response;
+- `permissions`: application permissions derived from verified data.
+
+The server exposes those values as `ctx.auth.user`, `ctx.auth.payload`, and `ctx.auth.permissions`. `ctx.auth.scopes` remains the verifier's verified `authInfo.scopes`.
+
+## Extend the server from the provider
+
+Some authorization models need more than token verification: a consent step exposed as a tool, or a policy check before every tool call. Pass an optional `setup(host)` hook and the server invokes it once while mounting, before the first request is served.
 
 ```typescript
-getUserInfo(payload) {
-  return {
-    userId: payload.sub as string,
-    email: payload.email as string | undefined,
-    organizationId: payload["https://example.com/org_id"],
-    permissions: (payload.permissions as string[]) ?? [],
-  };
-}
+import { oauthCustomProvider, type OAuthProviderHost } from "mcp-use/oauth";
+
+const oauth = oauthCustomProvider<AppUser>({
+  createTokenVerifier,
+  oauthMetadata,
+  mapAuthInfo,
+  setup(host: OAuthProviderHost<AppUser>) {
+    for (const tool of host.listTools()) {
+      if (tool.annotations?.destructiveHint && !tool._meta?.["shop/tags"]) {
+        throw new Error(`Destructive tool "${tool.name}" needs shop/tags`);
+      }
+    }
+
+    host.use("mcp:tools/call", async (ctx, next) => {
+      // Let the consent tool through, or consent could never be recorded.
+      if (ctx.params.name === "grant_consent") return next();
+      if (!(await isAllowed(ctx.auth, ctx.params.name))) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Complete consent first." }],
+        };
+      }
+      return next();
+    });
+
+    host.tool(
+      { name: "grant_consent", description: "Record consent." },
+      async (_params, ctx) => recordConsent(ctx.auth.user),
+    );
+
+    host.instructions((current) =>
+      `${current ?? ""}\n\nCall grant_consent before other tools.`.trim(),
+    );
+  },
+});
 ```
 
-After this mapping, tools can use `ctx.auth.user.organizationId` without parsing raw claims. Top-level `ctx.auth.permissions` is populated from the raw verified payload's `permissions` claim; if you only return permissions from `getUserInfo`, read them from `ctx.auth.user.permissions`.
+The host exposes:
 
-## Verify the setup
+| Member                                           | Purpose                                                                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `resourceUrl`, `basePath`                        | The resolved canonical resource URL and the MCP endpoint path.                                                                 |
+| `mode`, `listenHost`                             | Mount mode and listener address (`listenHost` is undefined in handler mode).                                                     |
+| `route(method, path, handler)`                   | Registers a public provider route under the MCP base path; the handler must validate requests, including CSRF protection.        |
+| `mixedAuth`                                      | Whether the server accepts signed-out clients. Throw from `setup` if your model needs anonymous discovery and this is `false`. |
+| `use(pattern, handler)`                          | Registers `mcp:` middleware, like `server.use()`.                                                                              |
+| `tool`, `resource`, `resourceTemplate`, `prompt` | Register provider-owned items, like the `server` methods of the same name.                                                     |
+| `listTools()`                                    | Returns every tool registered so far, so the provider can validate the application's tools.                                    |
+| `instructions(transform)`                        | Rewrites the instructions text advertised to clients. Each call receives the result of the previous one.                       |
 
-Run the server and connect with an OAuth-capable MCP client.
+Provider-owned items go through the same OAuth gate as application items, and `ctx.auth` carries the provider's user type. On a [mixed authentication](/typescript/server/authentication/mixed-auth) server, a provider tool can declare `securitySchemes` exactly like an application tool: with `noauth`, signed-out clients can call it and `ctx.auth` is optional. Resources, resource templates, and prompts always require sign-in. `mcp:` middleware also runs on signed-out calls to `noauth` tools, so check `ctx.auth` before relying on it. Registering a name that the application already uses throws, so reserved names never silently replace application items.
 
-```bash
-npm run dev
-```
+`setup` must be synchronous, and the host only works while it runs; calling it later throws. If `setup` throws or returns a promise, the server does not start, and every later request fails with the same error.
 
-Confirm these cases:
+## Verify the integration
 
-- The client discovers OAuth metadata with a registration endpoint.
-- The client registers with the upstream provider.
-- Invalid tokens are rejected.
-- Authenticated tool calls include normalized fields in `ctx.auth`.
+Test that:
+
+- the client discovers metadata containing the correct registration endpoint;
+- client registration, PKCE authorization, and token exchange happen upstream;
+- tokens with the wrong issuer, expiry, signature, or MCP resource are rejected;
+- mapped identity and permissions contain only verified data.
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card
-    title="OAuth Proxy"
-    icon="shuffle"
-    href="/typescript/server/authentication/providers/oauth-proxy"
-  >
-    Use a provider that does not support Dynamic Client Registration.
-  </Card>
-  <Card
     title="User Context"
     icon="user"
     href="/typescript/server/authentication/user-context"
   >
-    Use normalized user claims inside tools.
+    Use the mapped user, scopes, and permissions in callbacks.
   </Card>
   <Card
-    title="Custom provider API reference"
-    icon="terminal"
-    href="/typescript/api-reference/server/auth-providers#oauthcustomprovider"
+    title="OAuth overview"
+    icon="shield-check"
+    href="/typescript/server/authentication/index"
   >
-    Look up exact custom provider options and contracts.
-  </Card>
-  <Card title="jose" icon="key" href="https://github.com/panva/jose">
-    Verify JWTs against a remote JWKS.
+    Compare built-in providers.
   </Card>
 </CardGroup>
