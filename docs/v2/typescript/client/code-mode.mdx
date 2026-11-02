@@ -9,28 +9,40 @@ Code mode exposes `execute_code` and `search_tools` so agents run JavaScript wit
 ## Enable
 
 ```typescript
+import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import { MCPClient } from "@mcp-use/client";
+
+const directory = resolve("./data");
+await mkdir(directory, { recursive: true });
 
 const client = new MCPClient(
   {
     mcpServers: {
       fs: {
         command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-filesystem", "./data"],
+        args: ["-y", "@modelcontextprotocol/server-filesystem", directory],
       },
     },
   },
   { codeMode: true },
 );
 
-const result = await client.executeCode(`
-  const files = await fs.list_directory({ path: "." });
-  return files.length;
-`);
+try {
+  const result = await client.executeCode(`
+    return await fs.list_directory({ path: ${JSON.stringify(directory)} });
+  `);
 
-console.log(result.result, result.logs, result.error);
-await client.close();
+  console.log(result.result, result.logs, result.error);
+} finally {
+  await client.close();
+}
 ```
+
+The filesystem server's `list_directory` tool returns a formatted string, so
+`result.result` contains the directory listing. A string's `.length` counts
+characters, not directory entries. The example creates `./data` if needed and
+uses its absolute path for both the server's allowed directory and the tool call.
 
 ## Executors
 
