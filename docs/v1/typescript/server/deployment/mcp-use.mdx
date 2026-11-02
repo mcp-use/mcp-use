@@ -134,8 +134,8 @@ mcp-use servers update <id-or-slug> --watch-paths ""
 
 ### Branch URLs and sessions
 
-- The **production branch** serves the canonical URL `https://<slug>.deploy.mcp-use.com/mcp`. Pushing to it swaps the running container, so live MCP sessions on the canonical URL receive `mcp_session_terminated` and clients reconnect.
-- Every other branch gets its own stable preview URL `https://<slug>--br-<branch>.deploy.mcp-use.com/mcp`, so you can test changes against real clients before merging. Preview deployments require the Hobby plan or higher.
+- The **production branch** serves the canonical URL `https://<slug>.run.mcp-use.com/mcp`. Pushing to it swaps the running container, so live MCP sessions on the canonical URL receive `mcp_session_terminated` and clients reconnect.
+- Every other branch gets its own stable preview URL `https://<slug>--br-<branch>.run.mcp-use.com/mcp`, so you can test changes against real clients before merging. Preview deployments require the Hobby plan or higher.
 
 `mcp-use servers update --branch <name>` changes which branch is the production branch after creation.
 
