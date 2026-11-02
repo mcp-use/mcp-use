@@ -67,7 +67,9 @@ Set `memoryEnabled: false` when every call must start with only the system promp
 ```typescript
 const agent = new MCPAgent({
   llm: "openai/gpt-4o",
-  mcpServers,
+  mcpServers: {
+    filesystem: { command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "./"] },
+  },
   memoryEnabled: false,
 });
 

@@ -10,10 +10,12 @@ Use `oauthAuth0Provider` when Auth0 is the authorization server. MCP clients reg
 
 In the [Auth0 Dashboard](https://manage.auth0.com):
 
-1. Enable the Resource Parameter Compatibility Profile.
+1. In **Settings > Advanced**, enable the Resource Parameter Compatibility Profile.
 2. Promote the login connections MCP clients may use to domain-level connections.
 3. Create an API whose identifier is the canonical MCP resource, such as `https://mcp.example.com/mcp`.
 4. Use the `rfc9068_profile_authz` token dialect if tools need Auth0 permissions in access tokens.
+
+To promote a connection with the Auth0 CLI, run `auth0 api patch connections/YOUR_CONNECTION_ID --data '{"is_domain_connection": true}'`.
 
 The API identifier must match the resource that mcp-use resolves for token verification. The provider has no `audience` option; it checks the token audience against that resource.
 

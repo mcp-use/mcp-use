@@ -22,7 +22,7 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-server.tool(
+export const lookupInventory = server.tool(
   {
     name: "lookup-inventory",
     description: "Return available inventory for one SKU.",
@@ -45,6 +45,8 @@ server.tool(
 
 export default server;
 ```
+
+Export statically declared tool refs so generated view types include them for `useCallTool`. Use `useDynamicTool<Args, Result>` for runtime-registered tools.
 
 Field descriptions become hints for clients and models. The schema validates
 input before the callback runs and supplies the callback's inferred TypeScript

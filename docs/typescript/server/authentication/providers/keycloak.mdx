@@ -8,6 +8,8 @@ Use `oauthKeycloakProvider` when a Keycloak realm is the authorization server. M
 
 ## Prepare Keycloak
 
+Use Keycloak 26.4 or later for RFC 8414 authorization-server metadata. For browser clients on Keycloak 26.6 or later, configure the **Allowed Registration Web Origins** policy with each client origin.
+
 Configure Dynamic Client Registration for the hosts used by your MCP clients. Keep redirect URI policies strict, and add browser client origins when browser-based clients require them.
 
 For production, only require Initial Access Tokens after confirming that every intended MCP client can send one during registration. The mcp-use provider verifies tokens; it does not perform registration on the client's behalf.

@@ -61,9 +61,9 @@ main().catch(console.error);
 A successful run prints a text answer based on the files the MCP server returned.
 
 <Note>
-  Initialization is manual by default. Call `await agent.initialize()` before
-  `run()`, `stream()`, or `streamEvents()`. Set `autoInitialize: true` only when
-  you want the first call to initialize the agent for you.
+  Simplified mode (using a `"provider/model"` string) initializes automatically by
+  default. Explicit mode initializes manually by default; call `await agent.initialize()`
+  before `run()`, `stream()`, or `streamEvents()`, or set `autoInitialize: true`.
 </Note>
 
 ## Understand the runtime defaults

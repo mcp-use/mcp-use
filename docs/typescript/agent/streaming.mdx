@@ -129,7 +129,7 @@ Accumulate `text-delta` values when your UI needs the complete final answer. `st
 | `error` | A model-loop error message |
 | `done` | The tool loop finished |
 
-Tool execution failures are emitted as `tool-result` with `isError: true`. Other streaming failures can appear as `error`. Decide whether your UI should show a partial answer, retry, or fail the request.
+Tool execution failures are emitted as `tool-result` with `isError: true`. Other streaming failures can appear as `error`. Provider request failures, such as HTTP 429 or 402 responses, can also throw `LlmRequestError` from the `for await` loop. Catch those exceptions around the loop (as `main().catch` does above) and decide whether to show a partial answer, retry, or fail the request.
 
 ## Cancel a stream
 

@@ -57,6 +57,7 @@ Apply descriptions, defaults, and refinements before wrapping the field:
 
 ```typescript
 import { completable } from "mcp-use";
+import { projects } from "./projects"; // Your application data source.
 
 server.prompt(
   {
@@ -104,11 +105,14 @@ contains the provider's mapped user:
 import { MCPServer } from "mcp-use";
 import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
 
+const domain = process.env.AUTH0_DOMAIN;
+if (!domain) throw new Error("AUTH0_DOMAIN is required");
+
 const authenticatedServer = new MCPServer({
   name: "personal-prompts",
   version: "1.0.0",
   oauth: oauthAuth0Provider({
-    domain: process.env.AUTH0_DOMAIN!,
+    domain,
   }),
 });
 

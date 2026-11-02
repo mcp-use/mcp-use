@@ -187,7 +187,7 @@ server.prompt(
   async ({ notes }) => text(`Summarize this incident:\n\n${notes}`),
 );
 
-await server.sendPromptsListChanged();
+// Call server.sendPromptsListChanged() when prompts change at runtime.
 ```
 
 See [Notifications](/v1/typescript/server/notifications) for server-to-client notification patterns.

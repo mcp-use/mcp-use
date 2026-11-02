@@ -24,6 +24,7 @@ const spec = (await response.json()) as OpenAPIDocument;
 const server = MCPServer.fromOpenAPI({
   spec,
   baseUrl: "https://api.example.com",
+  // An unset INVENTORY_TOKEN omits the Authorization header.
   headers: { "x-client": "inventory-mcp" },
   auth: {
     type: "bearer",

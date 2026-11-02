@@ -164,6 +164,7 @@ server.tool(
       headers: { Authorization: `Bearer ${ctx.auth.accessToken}` },
     });
 
+    if (!response.ok) return error("Unable to fetch the Google profile.");
     return object(await response.json());
   },
 );

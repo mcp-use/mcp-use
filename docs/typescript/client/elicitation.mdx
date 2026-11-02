@@ -65,17 +65,15 @@ form requests with their schema defaults:
 
 ```tsx
 import { useMcp, type ElicitResult } from "@mcp-use/client/react";
+import { requestUserToOpenAndConfirm } from "./elicitation-ui"; // Your application UI.
 
 const mcp = useMcp({
   url: "http://localhost:3000/mcp",
   onElicitation: async (params): Promise<ElicitResult> => {
     if (params.mode === "url") {
-      window.open(params.url, "_blank", "noopener");
-      // The tool call continues as soon as this resolves, so accept only
-      // after the user confirms they finished the external flow.
-      const finished = window.confirm(
-        `${params.message}\n\nSelect OK after you finish in the new tab.`
-      );
+      // Render params.url as a link the user clicks and wait for confirmation.
+      // Do not accept until the user completes the external flow.
+      const finished = await requestUserToOpenAndConfirm(params.url, params.message);
       return { action: finished ? "accept" : "cancel" };
     }
     const content: NonNullable<ElicitResult["content"]> = {};
@@ -88,6 +86,8 @@ const mcp = useMcp({
   },
 });
 ```
+
+Implement `requestUserToOpenAndConfirm` in your UI to display a clickable link and resolve only after the user confirms completion or cancels. Opening a popup from this asynchronous callback can be blocked by the browser.
 
 With the provider, use `pendingElicitationRequests` and `approveElicitation` / `rejectElicitation`.
 

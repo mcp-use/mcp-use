@@ -80,7 +80,7 @@ server.tool(
       return error("Unauthorized");
     }
 
-    const orgId = ctx.auth.user.org_id as string | undefined;
+    const orgId = ctx.auth.user.organizationId;
 
     if (!orgId) {
       return error("Organization context required.");
@@ -95,7 +95,7 @@ server.tool(
 );
 ```
 
-The SDK preserves `org_role` and `org_slug` on `ctx.auth.user`. When Clerk includes `org_permissions`, the SDK maps them to `ctx.auth.user.permissions`. Treat these fields as optional and guard before using them.
+The SDK maps `org_id`, `org_role`, and `org_slug` to `ctx.auth.user.organizationId`, `organizationRole`, and `organizationSlug`. Organization permissions are exposed on `ctx.auth.permissions`. Treat the organization fields as optional and guard before using them.
 
 ## Verify the setup
 

@@ -8,7 +8,7 @@ Content Security Policy (CSP) controls which domains your views can fetch from, 
 
 ## Server and asset origins
 
-Set **`MCP_URL`** to your server's public origin (OAuth resource URL, API calls, CSP `connectDomains`):
+Set **`MCP_URL`** to your server's public URL (OAuth resource URL, API calls, CSP `connectDomains`). For view domain resolution, a path is retained as part of the endpoint identity; CSP uses only the origin. OAuth requires an origin-only `MCP_URL` and appends the server base path:
 
 ```env
 MCP_URL=https://myserver.com

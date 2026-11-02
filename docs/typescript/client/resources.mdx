@@ -79,13 +79,20 @@ Resolve a template to a concrete URI in your application, then pass that URI to
 
 ## Subscribe to updates
 
-If the server supports resource subscriptions, subscribe and unsubscribe with
-the same concrete URI:
+`subscribeToResource()` uses the legacy `resources/subscribe` request for
+sessionful servers that support it. It does not use the stateless
+`subscriptions/listen` flow described in [server subscriptions](/typescript/server/subscriptions).
+Subscribe and unsubscribe with the same concrete URI:
 
 ```typescript
-await connection.subscribeToResource("file:///config.json");
+connection.on("notification", (notification) => {
+  if (notification.method === "notifications/resources/updated") {
+    console.log("Resource updated", notification.params);
+  }
+});
 
-// Receive notifications/resources/updated through your notification handler.
+await connection.subscribeToResource("file:///config.json");
+// Keep the connection open while awaiting updates.
 
 await connection.unsubscribeFromResource("file:///config.json");
 ```

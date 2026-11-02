@@ -145,6 +145,8 @@ The host exposes:
 | Member                                           | Purpose                                                                                                                        |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | `resourceUrl`, `basePath`                        | The resolved canonical resource URL and the MCP endpoint path.                                                                 |
+| `mode`, `listenHost`                             | Mount mode and listener address (`listenHost` is undefined in handler mode).                                                     |
+| `route(method, path, handler)`                   | Registers a public provider route under the MCP base path; the handler must validate requests, including CSRF protection.        |
 | `mixedAuth`                                      | Whether the server accepts signed-out clients. Throw from `setup` if your model needs anonymous discovery and this is `false`. |
 | `use(pattern, handler)`                          | Registers `mcp:` middleware, like `server.use()`.                                                                              |
 | `tool`, `resource`, `resourceTemplate`, `prompt` | Register provider-owned items, like the `server` methods of the same name.                                                     |

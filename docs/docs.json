@@ -880,6 +880,10 @@
   },
   "redirects": [
     {
+      "source": "/v1/typescript/client/migration",
+      "destination": "/typescript/client/migration"
+    },
+    {
       "source": "/v1",
       "destination": "/v1/typescript/getting-started/welcome"
     },

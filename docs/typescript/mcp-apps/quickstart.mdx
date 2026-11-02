@@ -112,7 +112,7 @@ export const showApp = server.tool(
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     console.log(`The app name was: ${appName}`);
-    const data = { message: `The MCP App starter for ${appName} is ready!` };
+    const data = { message: `The MCP App starter for ${appName ?? "your app"} is ready!` };
 
     return {
       content: [{ type: "text", text: data.message }],
@@ -207,7 +207,7 @@ Use the Inspector to confirm that the server and view work.
 1. Open `http://localhost:3000/mcp/inspector`.
 2. Go to the **Tools** tab.
 3. Select `show-app`.
-4. Run the tool with `{ "appName": "My App" }`. Without `appName`, the result message contains `undefined`.
+4. Run the tool with `{ "appName": "My App" }`. Without `appName`, the result message uses "your app".
 5. Confirm that the view renders below the tool result and its heading shows "My App". The handler waits 1.5 seconds, so the view can show a loading skeleton first.
 6. Select **Say Hello** in the view. Confirm that it shows `Tool Response: Hello, mcp-use!`.
 

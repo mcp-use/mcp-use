@@ -100,6 +100,8 @@ Use [server authentication](/v1/typescript/server/authentication/index) to verif
 Use middleware when the limit applies to a class of operations rather than one tool.
 
 ```typescript
+// Single-process demo only: this map retains session keys until the process exits.
+// Use a shared store with expiry for production.
 const callsBySession = new Map<string, number[]>();
 
 server.use("mcp:tools/call", async (ctx, next) => {

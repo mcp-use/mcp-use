@@ -72,10 +72,10 @@ export const searchOrders = server.tool(
     },
   },
   async ({ status, fromDate, toDate, limit }) => {
-    const orders = await orders.search({ status, fromDate, toDate, limit });
+    const matchingOrders = await orders.search({ status, fromDate, toDate, limit });
     return {
-      content: [{ type: "text", text: JSON.stringify({ orders }) }],
-      structuredContent: { orders },
+      content: [{ type: "text", text: JSON.stringify({ orders: matchingOrders }) }],
+      structuredContent: { orders: matchingOrders },
     };
   },
 );
@@ -181,7 +181,7 @@ export const searchProducts = server.tool(
     },
   },
   async ({ query }) => {
-    const results = await searchProducts(query);
+    const results = await catalog.searchProducts(query); // Your application data source.
     const data = { query, results };
 
     return {
