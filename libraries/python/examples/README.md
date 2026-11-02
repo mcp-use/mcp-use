@@ -26,6 +26,7 @@
 | [server/server_example.py](server/server_example.py) | Basic server with tools, resources, prompts, and annotations |
 | [server/middleware_example.py](server/middleware_example.py) | Server middleware (logging, auth, rate limiting) |
 | [server/context_example.py](server/context_example.py) | Server context usage (logging, sampling, notifications) |
+| [server/secure_db_server_example.py](server/secure_db_server_example.py) | Sandboxed analytical database with 4-layer defense, RBAC, and watchdog interrupts |
 
 ## Agent Examples
 
