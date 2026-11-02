@@ -28,6 +28,19 @@ describe("elicitation array defaults", () => {
     if (!Array.isArray(first.tags)) throw new Error("Expected array default");
     first.tags.push("blue");
 
+    const applied = applyDefaults(params, {});
+    if (!Array.isArray(applied.tags)) throw new Error("Expected array default");
+    applied.tags.push("blue");
+
+    const accepted = acceptWithDefaults(params);
+    if (
+      accepted.action !== "accept" ||
+      !Array.isArray(accepted.content?.tags)
+    ) {
+      throw new Error("Expected accepted array default");
+    }
+    accepted.content.tags.push("blue");
+
     expect(defaultTags).toEqual(["red"]);
     expect(getDefaults(params)).toEqual({ tags: ["red"] });
     expect(applyDefaults(params, {})).toEqual({ tags: ["red"] });
