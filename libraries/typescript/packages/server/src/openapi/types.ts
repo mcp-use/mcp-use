@@ -178,7 +178,7 @@ export interface OpenAPIExcludeRule {
 export interface FromOpenAPIOptions {
   /** Parsed, bundled OpenAPI document. */
   spec: OpenAPIDocument;
-  /** Upstream base URL, overriding the first `spec.servers` entry. */
+  /** Absolute http(s) upstream base URL, overriding the first `spec.servers` entry. */
   baseUrl?: string;
   /** MCP server name, overriding `spec.info.title`. */
   name?: string;
