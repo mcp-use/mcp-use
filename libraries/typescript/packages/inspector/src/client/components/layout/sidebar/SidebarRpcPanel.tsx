@@ -12,6 +12,9 @@ export function SidebarRpcPanel({
     <aside
       aria-label="RPC Panel"
       aria-hidden={!open}
+      ref={(panel) => {
+        if (panel) panel.inert = !open;
+      }}
       className={cn(
         "relative hidden min-h-0 shrink-0 flex-col overflow-hidden transition-[width,margin] duration-200 ease-out lg:flex",
         open ? "w-(--rpc-panel-width) lg:mr-[18px]" : "w-0 lg:mr-0"
