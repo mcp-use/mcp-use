@@ -33,6 +33,8 @@ import {
   writePrivateJson,
 } from "./shared.js";
 
+export { formatBytes } from "./shared.js";
+
 const exec = promisify(execFile);
 const MAX_ARCHIVE_BYTES = 80 * 1024 * 1024;
 const EXCLUDED_DIRECTORIES = new Set([
@@ -145,6 +147,24 @@ interface GitProbe {
   branch?: string;
   dirty?: boolean;
   unavailable?: boolean;
+}
+
+/** File entry recorded for archive diagnostics. */
+export interface ArchiveFileEntry {
+  path: string;
+  sizeBytes: number;
+}
+
+/** Diagnostic metrics collected while assembling a project archive. */
+export interface ArchiveDiagnostics {
+  fileCount: number;
+  uncompressedBytes: number;
+  largestFiles: ArchiveFileEntry[];
+}
+
+/** Result of packing a project for deployment. */
+export interface PackedProject extends ArchiveDiagnostics {
+  buffer: Buffer;
 }
 
 interface DeployValues {
@@ -411,8 +431,9 @@ async function deployManaged(input: {
     values["env-file"],
     values.env ?? []
   );
-  const archive = await packProject(projectRoot);
-  assertManagedArchiveSize(archive.byteLength);
+  const packed = await packProject(projectRoot);
+  assertManagedArchiveSize(packed.buffer.byteLength, packed);
+  const archive = packed.buffer;
 
   const branch = values.branch ?? "main";
   const name = values.name ?? (await projectName(sourceRoot));
@@ -491,22 +512,40 @@ async function deployManaged(input: {
 }
 
 /** Validate the compressed upload size before making a multipart request. */
-export function assertManagedArchiveSize(sizeBytes: number): void {
+export function assertManagedArchiveSize(
+  sizeBytes: number,
+  diagnostics?: ArchiveDiagnostics
+): void {
   if (sizeBytes <= MAX_ARCHIVE_BYTES) return;
-  throw new CommandError(
-    "archive_too_large",
-    `Project archive is ${(sizeBytes / 1024 / 1024).toFixed(2)} MB; the maximum is 80 MB.`,
-    {
-      sizeBytes,
-      maxBytes: MAX_ARCHIVE_BYTES,
-      nextSteps: [
-        {
-          description: "Exclude large generated files and retry",
-          command: "mcp-use deploy --no-github",
-        },
-      ],
-    }
-  );
+  const largestFiles = diagnostics?.largestFiles ?? [];
+  const message = `Project archive is ${(sizeBytes / 1024 / 1024).toFixed(2)} MB; the maximum is 80 MB.`;
+  const hint =
+    diagnostics !== undefined &&
+    diagnostics.fileCount > 2000 &&
+    (largestFiles.length === 0 ||
+      (largestFiles[0] !== undefined &&
+        largestFiles[0].sizeBytes < 1024 * 1024))
+      ? `Archive contains ${diagnostics.fileCount.toLocaleString("en-US")} files. Check for unignored build, cache, or dependency directories in .gitignore.`
+      : undefined;
+
+  throw new CommandError("archive_too_large", message, {
+    sizeBytes,
+    maxBytes: MAX_ARCHIVE_BYTES,
+    ...(diagnostics?.uncompressedBytes !== undefined
+      ? { uncompressedBytes: diagnostics.uncompressedBytes }
+      : {}),
+    ...(diagnostics?.fileCount !== undefined
+      ? { fileCount: diagnostics.fileCount }
+      : {}),
+    ...(largestFiles.length > 0 ? { largestFiles } : {}),
+    ...(hint !== undefined ? { hint } : {}),
+    nextSteps: [
+      {
+        description: "Add large files to .gitignore and retry",
+        command: "mcp-use deploy --no-github",
+      },
+    ],
+  });
 }
 
 async function deployGitHub(input: {
@@ -1417,17 +1456,49 @@ async function installationFor(
   return undefined;
 }
 
-async function packProject(projectRoot: string): Promise<Buffer> {
+interface MutableDiagnostics {
+  fileCount: number;
+  uncompressedBytes: number;
+  largestFiles: ArchiveFileEntry[];
+}
+
+function trackLargestFile(
+  largest: ArchiveFileEntry[],
+  entry: ArchiveFileEntry,
+  limit = 5
+): void {
+  const smallestTracked = largest[largest.length - 1];
+  if (
+    largest.length < limit ||
+    (smallestTracked !== undefined &&
+      entry.sizeBytes > smallestTracked.sizeBytes)
+  ) {
+    largest.push(entry);
+    largest.sort(
+      (a, b) => b.sizeBytes - a.sizeBytes || a.path.localeCompare(b.path)
+    );
+    if (largest.length > limit) {
+      largest.length = limit;
+    }
+  }
+}
+
+async function packProject(projectRoot: string): Promise<PackedProject> {
   const ig = await loadGitIgnore(projectRoot);
   const gzip = createGzip();
   const chunks: Buffer[] = [];
+  const diagnostics: MutableDiagnostics = {
+    fileCount: 0,
+    uncompressedBytes: 0,
+    largestFiles: [],
+  };
   const collecting = (async () => {
     for await (const chunk of gzip) {
       chunks.push(Buffer.from(chunk as Buffer));
     }
   })();
   try {
-    await addDirectoryToArchive(gzip, projectRoot, "", ig);
+    await addDirectoryToArchive(gzip, projectRoot, "", ig, diagnostics);
     await writeArchiveChunk(gzip, Buffer.alloc(1024));
     gzip.end();
   } catch (error) {
@@ -1436,7 +1507,12 @@ async function packProject(projectRoot: string): Promise<Buffer> {
     throw error;
   }
   await collecting;
-  return Buffer.concat(chunks);
+  return {
+    buffer: Buffer.concat(chunks),
+    fileCount: diagnostics.fileCount,
+    uncompressedBytes: diagnostics.uncompressedBytes,
+    largestFiles: diagnostics.largestFiles,
+  };
 }
 
 async function loadGitIgnore(projectRoot: string): Promise<Ignore | undefined> {
@@ -1454,7 +1530,8 @@ async function addDirectoryToArchive(
   gzip: ReturnType<typeof createGzip>,
   projectRoot: string,
   relativeDirectory: string,
-  ig?: Ignore
+  ig?: Ignore,
+  diagnostics?: MutableDiagnostics
 ): Promise<void> {
   const directory = await opendir(
     relativeDirectory === ""
@@ -1491,8 +1568,22 @@ async function addDirectoryToArchive(
 
     if (stats.isDirectory()) {
       await writeTarHeader(gzip, { ...common, type: "directory", size: 0 });
-      await addDirectoryToArchive(gzip, projectRoot, relativePath, ig);
+      await addDirectoryToArchive(
+        gzip,
+        projectRoot,
+        relativePath,
+        ig,
+        diagnostics
+      );
     } else if (stats.isFile()) {
+      if (diagnostics !== undefined) {
+        diagnostics.fileCount += 1;
+        diagnostics.uncompressedBytes += stats.size;
+        trackLargestFile(diagnostics.largestFiles, {
+          path: posixPath,
+          sizeBytes: stats.size,
+        });
+      }
       await writeTarHeader(gzip, {
         ...common,
         type: "file",
