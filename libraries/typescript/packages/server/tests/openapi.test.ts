@@ -9,7 +9,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   MCPServer,
@@ -324,6 +324,47 @@ describe("MCPServer.fromOpenAPI", () => {
         "content-type": "application/json",
         "x-api-key": "secret",
       });
+    } finally {
+      await connection.close();
+    }
+  });
+
+  it("aborts the upstream request when the MCP call is cancelled", async () => {
+    let upstreamSignal: AbortSignal | undefined;
+    let upstreamStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      upstreamStarted = resolve;
+    });
+    const hangingFetch = ((_url: unknown, init?: RequestInit) => {
+      upstreamSignal = init?.signal ?? undefined;
+      upstreamStarted();
+      return new Promise<Response>((_resolve, reject) => {
+        upstreamSignal?.addEventListener("abort", () =>
+          reject(upstreamSignal?.reason)
+        );
+      });
+    }) as typeof fetch;
+    const server = MCPServer.fromOpenAPI({
+      spec: createSpec(),
+      fetch: hangingFetch,
+    });
+    const connection = await connect(server);
+    try {
+      const controller = new AbortController();
+      const call = connection.client
+        .callTool(
+          { name: "failUpstream", arguments: {} },
+          { signal: controller.signal }
+        )
+        .catch(() => undefined);
+      await started;
+      expect(upstreamSignal).toBeDefined();
+      expect(upstreamSignal?.aborted).toBe(false);
+
+      controller.abort();
+      await call;
+
+      await vi.waitFor(() => expect(upstreamSignal?.aborted).toBe(true));
     } finally {
       await connection.close();
     }
