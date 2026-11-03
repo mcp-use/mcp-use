@@ -70,6 +70,7 @@ export async function loadServerIcon(params: {
     update: (previous?: ServerInfoWithIcon) => ServerInfoWithIcon | undefined
   ) => void;
   addLog: AddLog;
+  isCurrent?: () => boolean;
 }): Promise<string | null> {
   try {
     const iconUrl = params.serverInfo.icons?.[0]?.src;
@@ -80,6 +81,20 @@ export async function loadServerIcon(params: {
         if (!response.ok) {
           throw new Error(`Icon request failed with status ${response.status}`);
         }
+        const contentType = response.headers
+          .get("content-type")
+          ?.split(";")[0]
+          .trim()
+          .toLowerCase();
+        if (
+          !contentType ||
+          (!contentType.startsWith("image/") &&
+            contentType !== "application/octet-stream")
+        ) {
+          throw new Error(
+            `Unsupported icon content type: ${contentType || "unknown"}`
+          );
+        }
         const blob = await response.blob();
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -88,24 +103,34 @@ export async function loadServerIcon(params: {
           reader.readAsDataURL(blob);
         });
 
-        if (params.isMounted()) {
-          params.setServerInfo((previous) =>
-            previous ? { ...previous, icon: base64 } : undefined
+        if (!params.isMounted() || !(params.isCurrent?.() ?? true)) {
+          params.addLog(
+            "debug",
+            "Connection aborted after icon loading - connection is no longer active"
           );
-          params.addLog("debug", "Server icon converted to base64");
+          return null;
         }
+
+        params.setServerInfo((previous) =>
+          previous ? { ...previous, icon: base64 } : undefined
+        );
+        params.addLog("debug", "Server icon converted to base64");
         return base64;
       } catch (error) {
-        params.addLog("debug", "Server icon unavailable, using fallback:", error);
+        params.addLog(
+          "debug",
+          "Server icon unavailable, using fallback:",
+          error
+        );
       }
     }
 
     if (params.url) {
       const favicon = await detectFavicon(params.url);
-      if (!params.isMounted()) {
+      if (!params.isMounted() || !(params.isCurrent?.() ?? true)) {
         params.addLog(
           "debug",
-          "Connection aborted after favicon detection - component unmounted"
+          "Connection aborted after favicon detection - connection is no longer active"
         );
         return null;
       }

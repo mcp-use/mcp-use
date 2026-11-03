@@ -13,6 +13,7 @@ vi.mock("../../../src/utils/favicon.js", () => ({
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.mocked(detectFavicon).mockReset();
 });
 
 describe("deriveOAuthProxyUrl", () => {
@@ -92,6 +93,62 @@ describe("loadServerIcon", () => {
 
     expect(result).toBe("data:image/png;base64,icon");
     expect(detectFavicon).toHaveBeenCalledWith("https://example.com/mcp");
+  });
+
+  it("falls back when a successful icon response is not an image", async () => {
+    vi.mocked(detectFavicon).mockResolvedValue("data:image/png;base64,icon");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<html>Not an icon</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      })
+    );
+
+    const result = await loadServerIcon({
+      serverInfo: {
+        name: "demo",
+        icons: [{ src: "https://example.com/icon.svg" }],
+      },
+      url: "https://example.com/mcp",
+      isMounted: () => true,
+      setServerInfo: vi.fn(),
+      addLog: vi.fn(),
+    });
+
+    expect(result).toBe("data:image/png;base64,icon");
+    expect(detectFavicon).toHaveBeenCalledWith("https://example.com/mcp");
+  });
+
+  it("does not apply a favicon from an outdated connection", async () => {
+    let resolveFavicon!: (favicon: string) => void;
+    vi.mocked(detectFavicon).mockReturnValue(
+      new Promise((resolve) => {
+        resolveFavicon = resolve;
+      })
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Not Found", { status: 404 })
+    );
+    const setServerInfo = vi.fn();
+    let isCurrent = true;
+
+    const loading = loadServerIcon({
+      serverInfo: {
+        name: "old-server",
+        icons: [{ src: "https://old.example.com/icon.svg" }],
+      },
+      url: "https://old.example.com/mcp",
+      isMounted: () => true,
+      isCurrent: () => isCurrent,
+      setServerInfo,
+      addLog: vi.fn(),
+    });
+
+    isCurrent = false;
+    resolveFavicon("data:image/png;base64,old-icon");
+
+    expect(await loading).toBeNull();
+    expect(setServerInfo).not.toHaveBeenCalled();
   });
 });
 
