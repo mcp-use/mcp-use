@@ -86,6 +86,32 @@ describe("corsFetchMiddleware", () => {
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 
+  it("ignores response-only CORS headers mistakenly sent in a request", async () => {
+    const fetch = composeFetch(
+      async () => new Response("ok"),
+      corsFetchMiddleware({ origin: "https://app.example.com" })
+    );
+
+    const headers = {
+      Origin: "https://app.example.com",
+      "Access-Control-Allow-Origin": "https://other.example.com",
+    };
+    const response = await fetch(
+      new Request("http://localhost/mcp", { method: "POST", headers })
+    );
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://app.example.com"
+    );
+
+    const preflight = await fetch(
+      new Request("http://localhost/mcp", { method: "OPTIONS", headers })
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://app.example.com"
+    );
+  });
+
   it("is a no-op when disabled", async () => {
     const fetch = composeFetch(
       async () => new Response("ok"),
