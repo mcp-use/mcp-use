@@ -74,23 +74,30 @@ export async function loadServerIcon(params: {
   try {
     const iconUrl = params.serverInfo.icons?.[0]?.src;
     if (iconUrl) {
-      params.addLog("info", "Server provided icon:", iconUrl);
-      const response = await fetch(iconUrl);
-      const blob = await response.blob();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      try {
+        params.addLog("info", "Server provided icon:", iconUrl);
+        const response = await fetch(iconUrl);
+        if (!response.ok) {
+          throw new Error(`Icon request failed with status ${response.status}`);
+        }
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
 
-      if (params.isMounted()) {
-        params.setServerInfo((previous) =>
-          previous ? { ...previous, icon: base64 } : undefined
-        );
-        params.addLog("debug", "Server icon converted to base64");
+        if (params.isMounted()) {
+          params.setServerInfo((previous) =>
+            previous ? { ...previous, icon: base64 } : undefined
+          );
+          params.addLog("debug", "Server icon converted to base64");
+        }
+        return base64;
+      } catch (error) {
+        params.addLog("debug", "Server icon unavailable, using fallback:", error);
       }
-      return base64;
     }
 
     if (params.url) {

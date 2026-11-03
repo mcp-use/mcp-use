@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   deriveOAuthProxyUrl,
+  loadServerIcon,
   startConnectionHealthMonitoring,
 } from "../../../src/react/useMcp-helpers.js";
+import { detectFavicon } from "../../../src/utils/favicon.js";
+
+vi.mock("../../../src/utils/favicon.js", () => ({
+  detectFavicon: vi.fn(),
+}));
 
 afterEach(() => {
   vi.useRealTimers();
@@ -63,6 +69,29 @@ describe("startConnectionHealthMonitoring", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
 
     cleanup();
+  });
+});
+
+describe("loadServerIcon", () => {
+  it("falls back to favicon detection when the server icon request fails", async () => {
+    vi.mocked(detectFavicon).mockResolvedValue("data:image/png;base64,icon");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Not Found", { status: 404 })
+    );
+
+    const result = await loadServerIcon({
+      serverInfo: {
+        name: "demo",
+        icons: [{ src: "https://example.com/icon.svg" }],
+      },
+      url: "https://example.com/mcp",
+      isMounted: () => true,
+      setServerInfo: vi.fn(),
+      addLog: vi.fn(),
+    });
+
+    expect(result).toBe("data:image/png;base64,icon");
+    expect(detectFavicon).toHaveBeenCalledWith("https://example.com/mcp");
   });
 });
 
