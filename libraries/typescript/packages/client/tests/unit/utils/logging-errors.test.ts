@@ -1,3 +1,4 @@
+import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../../../src/utils/logging.js";
 
@@ -6,6 +7,34 @@ afterEach(() => {
 });
 
 describe("logger Error arguments", () => {
+  it("preserves errors created in another JavaScript realm", () => {
+    const output = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error: Error = runInNewContext('new Error("Cross-realm failure")');
+    expect(error).not.toBeInstanceOf(Error);
+
+    logger.warn("Request failed:", error);
+
+    expect(output).toHaveBeenCalledWith(
+      expect.stringContaining("Error: Cross-realm failure")
+    );
+    expect(output).toHaveBeenCalledWith(expect.stringContaining(error.stack!));
+  });
+
+  it("falls back to the error message if reading its stack throws", () => {
+    const output = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = new Error("Connection closed");
+    Object.defineProperty(error, "stack", {
+      get() {
+        throw new Error("Stack formatter failed");
+      },
+    });
+
+    expect(() => logger.warn("Request failed:", error)).not.toThrow();
+    expect(output).toHaveBeenCalledWith(
+      expect.stringContaining("Error: Connection closed")
+    );
+  });
+
   it.each(["warn", "error"] as const)(
     "preserves an error's message and stack at %s level",
     (level) => {
