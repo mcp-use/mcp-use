@@ -61,6 +61,10 @@ test("restart redeploys the same server and branch", async ({ cloud, cli }) => {
 
 Use `test` from `cli-test.ts` and `describe`/`expect` from `vitest`.
 
+For table tests, use `test.for(cases)(name, ([a, b], { cli, cloud }) => …)`.
+`test.each` does not pass the fixtures. `tests/help-contract.test.ts` and
+`tests/bin.test.ts` show both forms.
+
 ## The `cloud` fixture
 
 A fresh fake Cloud per test, listening on `127.0.0.1` on a free port.
@@ -141,6 +145,19 @@ few human-mode tests for formats people or scripts read, such as tables.
 **Polling commands.** The CLI sleeps for real between polls (one second for
 build logs). Give the fake two replies, not ten, so the test stays fast and
 still proves the loop advances and stops.
+
+**Projects that import `mcp-use`, React or zod.** `cli.cwd` lives in the OS
+temp directory, where those packages don't resolve. For `build`, `dev` or
+`typecheck` on a real project, copy a fixture with `copyFixture()` from
+`tests/build/helpers.ts`. It sits under the package and links `mcp-use`.
+Then pass `cwd` (or `--path`) to `cli.run`.
+
+**Saved state.** Seed files under `cli.home` before the run and read them
+back after it; `tests/client/client-saved.test.ts` does this for
+`~/.mcp-use/client/servers.json`. To prove a command made no network call,
+point it at `cloud.origin`. Any request then shows up in `cloud.requests`, so
+the same test file can pair the "no request" case with one that does send
+a request.
 
 **Non-mcp-use projects.** Manufact Cloud must work for any project. When a
 command reads the project, cover at least one case where `cli.cwd` is not an
