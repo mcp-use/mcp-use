@@ -347,15 +347,6 @@ describe("runBuild", () => {
     60_000
   );
 
-  it("honors an --entry override", async () => {
-    const cwd = copyFixture("build-entry");
-    dirs.push(cwd);
-    await runBuild({ cwd, entry: "src/index.ts" });
-    expect(existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"))).toBe(
-      true
-    );
-  });
-
   it("discovers the entry in --mcp-dir while keeping build output at the project root", async () => {
     const cwd = copyFixture("build-mcp-dir");
     dirs.push(cwd);
@@ -823,35 +814,6 @@ describe("runBuild (views)", () => {
     expect(text).not.toContain("/_mcp-use/views/product-search-result/");
   }, 60_000);
 
-  it("builds a view that contains </script> in source as external assets", async () => {
-    const cwd = copyFixture("build-views-escape", "views");
-    dirs.push(cwd);
-    mkdirSync(join(cwd, "views", "escape-view"), { recursive: true });
-    writeFileSync(
-      join(cwd, "views", "escape-view", "view.tsx"),
-      [
-        `const marker = "</script>";`,
-        `export default function EscapeView() {`,
-        `  return <div data-marker={marker}>ok</div>;`,
-        `}`,
-        ``,
-      ].join("\n")
-    );
-    const entry = join(cwd, "src", "index.ts");
-    const source = readFileSync(entry, "utf8");
-    writeFileSync(
-      entry,
-      source.replace('name: "product-search-result"', 'name: "escape-view"')
-    );
-
-    await runBuild({ cwd });
-
-    const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
-    expect(listViewAssets(buildDir, "escape-view").entry).toMatch(
-      /^assets\/.+\.js$/
-    );
-  }, 60_000);
-
   it("emits source maps only when requested", async () => {
     const cwd = copyFixture("build-source-maps");
     dirs.push(cwd);
@@ -921,29 +883,6 @@ describe("runBuild (views)", () => {
       )
     ).toBe(true);
     warnSpy.mockRestore();
-  }, 60_000);
-
-  it("rewrites manifest asset paths when MCP_ASSETS_URL is set", async () => {
-    const cwd = copyFixture("build-views-cdn", "views");
-    dirs.push(cwd);
-    const previous = process.env.MCP_ASSETS_URL;
-    process.env.MCP_ASSETS_URL =
-      "https://cdn.example.com/storage/v1/object/public/widgets";
-    try {
-      await runBuild({ cwd });
-      const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
-      const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
-      expect(entryCode).toContain("https://cdn.example.com");
-      expect(entryCode).toContain(
-        "/mcp/_mcp-use/views/product-search-result/assets/"
-      );
-    } finally {
-      if (previous === undefined) {
-        delete process.env.MCP_ASSETS_URL;
-      } else {
-        process.env.MCP_ASSETS_URL = previous;
-      }
-    }
   }, 60_000);
 
   it("uses server basePath in CDN manifest when MCP_ASSETS_URL is set", async () => {

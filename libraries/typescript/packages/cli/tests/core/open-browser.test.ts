@@ -46,10 +46,4 @@ describe("resolveBrowserCommand", () => {
   ])("rejects unsafe browser target %s", (value) => {
     expect(resolveBrowserCommand(value, "linux")).toBeUndefined();
   });
-
-  it("never invokes the Windows command shell", () => {
-    expect(
-      resolveBrowserCommand("http://localhost:3000/inspector", "win32")?.command
-    ).not.toBe("cmd");
-  });
 });

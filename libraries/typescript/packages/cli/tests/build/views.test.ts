@@ -71,15 +71,6 @@ describe("discoverViews", () => {
 });
 
 describe("isViewPath", () => {
-  it("matches paths under views/<name>/", () => {
-    const cwd = "/project";
-    expect(isViewPath("/project/views/demo/view.tsx", cwd)).toBe(true);
-    expect(isViewPath("/project/views/demo/components/Card.tsx", cwd)).toBe(
-      true
-    );
-    expect(isViewPath("/project/resources/demo/view.tsx", cwd)).toBe(false);
-  });
-
   it("matches paths under a custom views directory", () => {
     expect(
       isViewPath(

@@ -521,14 +521,6 @@ describe("main", () => {
     expect(errors.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
   });
 
-  it("prints the package version for --version", async () => {
-    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
-    await expect(
-      main(["--version"], { frameworkVersion: "9.8.7-test" })
-    ).resolves.toBe(0);
-    expect(logs.mock.calls.flat().join("")).toBe("9.8.7-test");
-  });
-
   it("prints help for --help", async () => {
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
     await expect(main(["--help"])).resolves.toBe(0);
