@@ -488,8 +488,21 @@ async function openConnection(
             process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
             return;
           }
-          await waitForOAuthEnter();
-          openBrowser(url);
+          // Return control to the SDK before waiting for user input. Otherwise
+          // its HTTP connection timeout also limits the interactive OAuth wait.
+          // The Node provider owns that wait and its authTimeoutMs deadline.
+          const authorization = (
+            authProvider as unknown as {
+              getAuthorizationCode(): Promise<string>;
+            }
+          ).getAuthorizationCode();
+          void waitForOAuthEnter(authorization)
+            .then((confirmed) => {
+              if (confirmed) openBrowser(url);
+            })
+            .catch(() => {
+              process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
+            });
         },
         // Conditional exports select NodeOAuthOptions at runtime. TypeScript
         // resolves the package's browser-default declaration in this build.
@@ -660,15 +673,28 @@ function resolveBrowserMode(options: {
   return "ask";
 }
 
-async function waitForOAuthEnter(): Promise<void> {
+async function waitForOAuthEnter(
+  authorization: Promise<unknown>
+): Promise<boolean> {
+  const controller = new AbortController();
+  // Stop reading stdin if the flow finishes elsewhere, expires, or is cancelled.
+  void authorization.then(
+    () => controller.abort(),
+    () => controller.abort()
+  );
   const prompt = createInterface({
     input: process.stdin,
     output: process.stderr,
   });
   try {
     await prompt.question(
-      "This server requires OAuth. Press Enter to open your browser."
+      "This server requires OAuth. Press Enter to open your browser.",
+      { signal: controller.signal }
     );
+    return !controller.signal.aborted;
+  } catch (error) {
+    if (controller.signal.aborted) return false;
+    throw error;
   } finally {
     prompt.close();
   }
