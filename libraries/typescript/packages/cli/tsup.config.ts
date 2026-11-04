@@ -6,23 +6,25 @@ const cliPackage = JSON.parse(
 ) as { version: string };
 
 export default defineConfig({
+  // Dist entry names stay stable (`commands/*`) so the published layout and
+  // the server package's CLI budget test do not depend on the source layout.
   entry: {
     index: "src/index.ts",
     bin: "src/bin.ts",
     "internal/skills-loader": "src/skills/node-loader.ts",
     "internal/vite": "src/internal/vite.ts",
-    "next-server-shims": "src/cli/next-server-shims.ts",
-    "commands/start": "src/commands/start.ts",
-    "commands/dev": "src/commands/dev.ts",
-    "commands/build": "src/commands/build.ts",
-    "commands/typecheck": "src/commands/typecheck.ts",
-    "commands/identity": "src/commands/identity.ts",
-    "commands/organizations": "src/commands/organizations.ts",
-    "commands/servers": "src/commands/servers.ts",
-    "commands/deployments": "src/commands/deployments.ts",
-    "commands/deploy": "src/commands/deploy.ts",
-    "commands/client": "src/commands/client.ts",
-    "commands/screenshot": "src/commands/screenshot.ts",
+    "next-server-shims": "src/build/next-server-shims.ts",
+    "commands/start": "src/build/commands/start.ts",
+    "commands/dev": "src/build/commands/dev.ts",
+    "commands/build": "src/build/commands/build.ts",
+    "commands/typecheck": "src/build/commands/typecheck.ts",
+    "commands/identity": "src/cloud/identity.ts",
+    "commands/organizations": "src/cloud/organizations.ts",
+    "commands/servers": "src/cloud/servers.ts",
+    "commands/deployments": "src/cloud/deployments.ts",
+    "commands/deploy": "src/cloud/deploy.ts",
+    "commands/client": "src/client/client.ts",
+    "commands/screenshot": "src/client/screenshot.ts",
   },
   format: ["esm"],
   target: "node22",
