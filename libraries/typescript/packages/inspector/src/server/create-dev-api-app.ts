@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { registerInspectorProxyRoutes } from "./proxy-routes.js";
+import { registerInspectorOAuthMetadata } from "./oauth-metadata.js";
 
 /** Hono app for inspector dev API routes (MCP proxy + OAuth BFF). */
 export function createDevApiApp(): Hono {
@@ -30,6 +31,7 @@ export function createDevApiApp(): Hono {
     oauthProxyAllowedOrigins: [],
     oauthProxyAllowLoopback: true,
   });
+  registerInspectorOAuthMetadata(app);
 
   return app;
 }
