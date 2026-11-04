@@ -268,6 +268,9 @@ export function startConnectionHealthMonitoring(params: {
   healthCheckTimeoutMs?: number;
 }): () => void {
   let healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+  let reconnectRequested = false;
   let lastSuccessfulCheck = Date.now();
   // ponytail: many MCP servers only accept POST; one 405/404 disables HEAD polling.
   let headProbeUnsupported = false;
@@ -275,7 +278,7 @@ export function startConnectionHealthMonitoring(params: {
   const healthCheckTimeoutMs = params.healthCheckTimeoutMs ?? 30000;
 
   const checkConnectionHealth = async () => {
-    if (headProbeUnsupported) {
+    if (stopped || reconnectRequested || headProbeUnsupported) {
       return;
     }
     if (!params.isMountedRef.current || params.stateRef.current !== "ready") {
@@ -295,6 +298,7 @@ export function startConnectionHealthMonitoring(params: {
       const authHeaders = params.getAuthHeaders
         ? await params.getAuthHeaders()
         : {};
+      if (stopped || reconnectRequested) return;
       const healthCheckHeaders = {
         ...params.allHeaders,
         ...authHeaders,
@@ -307,6 +311,7 @@ export function startConnectionHealthMonitoring(params: {
         headers: healthCheckHeaders,
         signal: AbortSignal.timeout(5000),
       });
+      if (stopped || reconnectRequested) return;
 
       if (response.status === 405 || response.status === 404) {
         headProbeUnsupported = true;
@@ -324,6 +329,7 @@ export function startConnectionHealthMonitoring(params: {
         throw new Error(`Server returned ${response.status}`);
       }
     } catch {
+      if (stopped || reconnectRequested) return;
       const timeSinceLastSuccess = Date.now() - lastSuccessfulCheck;
       if (timeSinceLastSuccess > healthCheckTimeoutMs) {
         params.addLog(
@@ -337,12 +343,15 @@ export function startConnectionHealthMonitoring(params: {
         }
 
         if (params.autoReconnectRef.current && params.isMountedRef.current) {
+          reconnectRequested = true;
           params.setState("discovering");
           params.addLog("info", "Auto-reconnecting to MCP server...");
 
-          setTimeout(
+          reconnectTimeout = setTimeout(
             () => {
+              reconnectTimeout = null;
               if (
+                !stopped &&
                 params.isMountedRef.current &&
                 params.stateRef.current === "discovering"
               ) {
@@ -363,9 +372,14 @@ export function startConnectionHealthMonitoring(params: {
     healthCheckIntervalMs
   );
   return () => {
+    stopped = true;
     if (healthCheckInterval) {
       clearInterval(healthCheckInterval);
       healthCheckInterval = null;
+    }
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
     }
   };
 }
