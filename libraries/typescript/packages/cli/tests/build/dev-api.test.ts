@@ -184,11 +184,15 @@ describe("createDevApiHandler", () => {
       async () => new Response("fallback")
     );
 
-    await handler(new Request(`${origin}/api/inspector/api/dev/info`));
-    currentBasePath = "/api";
-    const res = await handler(
+    const before = await handler(
       new Request(`${origin}/api/inspector/api/dev/info`)
     );
-    expect(res.status).toBe(200);
+    expect(await before.text()).toBe("fallback");
+
+    currentBasePath = "/api";
+    const after = await handler(
+      new Request(`${origin}/api/inspector/api/dev/info`)
+    );
+    expect(await after.json()).toMatchObject({ fromCli: true });
   });
 });

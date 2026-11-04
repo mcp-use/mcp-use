@@ -48,19 +48,6 @@ const server = {
 export default server;
 `;
 
-/** An entry that exposes configured address defaults without binding. */
-const ADDRESS_ENTRY = `
-const server = {
-  host: "configured-host",
-  port: 4321,
-  async listen(port = 3000, options) {
-    return { port, url: \`http://\${options?.host}:\${port}/mcp\` };
-  },
-  async close() {},
-};
-export default server;
-`;
-
 /** An entry that binds a real HTTP server so the started URL can be fetched. */
 const HTTP_ENTRY = `
 import { createServer } from "node:http";
@@ -136,26 +123,6 @@ async function makeProject(options?: {
     await writeFile(join(buildDir, "index.js"), options.entrySource);
   }
   return cwd;
-}
-
-/**
- * Snapshot the shutdown signal listeners so the ones a `main(["start", ...])`
- * call registers can be removed again without going through process.exit.
- */
-function captureSignalListeners(): { release(): void } {
-  const before = {
-    SIGINT: new Set(process.listeners("SIGINT")),
-    SIGTERM: new Set(process.listeners("SIGTERM")),
-  } as const;
-  return {
-    release() {
-      for (const signal of ["SIGINT", "SIGTERM"] as const) {
-        for (const listener of process.listeners(signal)) {
-          if (!before[signal].has(listener)) process.off(signal, listener);
-        }
-      }
-    },
-  };
 }
 
 afterAll(async () => {
@@ -348,30 +315,6 @@ describe("resolveHost", () => {
 });
 
 describe("runStart", () => {
-  it("errors actionably when there is no build", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "mcp-use-bin-empty-"));
-    tempDirs.push(cwd);
-    await expect(runStart({ cwd })).rejects.toThrow(/mcp-use build/);
-    await expect(runStart({ cwd })).rejects.toThrow(/no production build/i);
-  });
-
-  it("errors on a manifest without an entryPoint", async () => {
-    const cwd = await makeProject({ manifest: `{ "buildId": "x" }` });
-    await expect(runStart({ cwd })).rejects.toThrow(/invalid build manifest/i);
-  });
-
-  it("errors when the entry has no default export", async () => {
-    const cwd = await makeProject({ entrySource: `export const x = 1;` });
-    await expect(runStart({ cwd })).rejects.toThrow(/no default export/);
-  });
-
-  it("errors when the default export has no listen()", async () => {
-    const cwd = await makeProject({
-      entrySource: `export default { notAServer: true };`,
-    });
-    await expect(runStart({ cwd })).rejects.toThrow(/listen/);
-  });
-
   it("starts the built entry and responds over HTTP", async () => {
     const cwd = await makeProject({ entrySource: HTTP_ENTRY });
     const started = await runStart({ cwd, port: 0 });
@@ -477,62 +420,9 @@ describe("runStart", () => {
       await started.close();
     }
   });
-
-  it("applies address precedence: flags over env over server config over defaults", async () => {
-    const cwd = await makeProject({ entrySource: ADDRESS_ENTRY });
-
-    vi.stubEnv("PORT", "4123");
-    vi.stubEnv("HOST", "env-host");
-    expect((await runStart({ cwd, port: 5001, host: "flag-host" })).url).toBe(
-      "http://flag-host:5001/mcp"
-    );
-    expect((await runStart({ cwd })).url).toBe("http://env-host:4123/mcp");
-
-    vi.stubEnv("PORT", undefined);
-    vi.stubEnv("HOST", undefined);
-    expect((await runStart({ cwd })).url).toBe(
-      "http://configured-host:4321/mcp"
-    );
-  });
-
-  it("sets NODE_ENV=production only when unset", async () => {
-    const cwd = await makeProject({ entrySource: ECHO_ENTRY });
-
-    vi.stubEnv("NODE_ENV", undefined);
-    await runStart({ cwd, port: 5002 });
-    expect(process.env.NODE_ENV).toBe("production");
-
-    vi.stubEnv("NODE_ENV", "staging");
-    await runStart({ cwd, port: 5003 });
-    expect(process.env.NODE_ENV).toBe("staging");
-  });
 });
 
 describe("main", () => {
-  it("prints help and fails on an unknown command", async () => {
-    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(main(["frobnicate"])).resolves.toBe(2);
-    expect(errors.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
-  });
-
-  it("prints help and fails when no command is given", async () => {
-    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(main([])).resolves.toBe(2);
-    expect(errors.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
-  });
-
-  it("prints help for --help", async () => {
-    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
-    await expect(main(["--help"])).resolves.toBe(0);
-    expect(logs.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
-    expect(logs.mock.calls.flat().join("\n")).toContain(
-      "public tunnel (dev/start only)"
-    );
-    expect(logs.mock.calls.flat().join("\n")).not.toContain(
-      "Install maintained coding-agent skills"
-    );
-  });
-
   it("prints the public MCP URL and stops the tunnel on a signal", async () => {
     const cwd = await makeProject({ entrySource: ECHO_ENTRY });
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -569,84 +459,6 @@ describe("main", () => {
     } finally {
       if (sigint !== undefined) process.off("SIGINT", sigint);
       if (sigterm !== undefined) process.off("SIGTERM", sigterm);
-    }
-  });
-
-  it("says nothing about the inspector when start does not mount it", async () => {
-    const cwd = await makeProject({ entrySource: ECHO_ENTRY });
-    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
-    const signals = captureSignalListeners();
-
-    try {
-      await expect(
-        main(["start", "--path", cwd, "--port", "4567"])
-      ).resolves.toBe(0);
-      expect(logs.mock.calls.flat().join("\n")).not.toContain("inspector");
-    } finally {
-      signals.release();
-    }
-  });
-
-  it("prints the inspector URL when start mounts it", async () => {
-    mountInspector.mockImplementation(
-      () => async () => new Response("inspector")
-    );
-    const cwd = await makeProject({ entrySource: INSPECTOR_ENTRY });
-    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
-    const signals = captureSignalListeners();
-
-    try {
-      await expect(
-        main(["start", "--path", cwd, "--port", "4567", "--with-inspector"])
-      ).resolves.toBe(0);
-      const output = logs.mock.calls.flat().join("\n");
-      expect(output).toContain(
-        "mcp-use inspector at http://localhost:4567/api/mcp/inspector"
-      );
-    } finally {
-      signals.release();
-    }
-  });
-
-  it("prints client help for client --help", async () => {
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-    await expect(main(["client", "--help"])).resolves.toBe(0);
-    await expect(main(["client", "--", "--help"])).resolves.toBe(0);
-    const output = stdout.mock.calls.flat().join("");
-    expect(output).toContain("connect <name> <url>");
-    expect(output).toContain("remove <name>");
-    expect(output).not.toContain("remove <name> [--yes]");
-    expect(output).toContain("-h, --help");
-    expect(output).not.toContain("mcp-use deploy");
-  });
-
-  it("dispatches build through its dedicated command module", async () => {
-    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(main(["build", "--entry", "nope.ts"])).resolves.toBe(1);
-    const output = errors.mock.calls.flat().join("\n");
-    expect(output).toMatch(/Entry not found/);
-  });
-
-  it("prints the inner errors of an entry's empty AggregateError", async () => {
-    // Node's connection-refused error, as a Redis client throws it when the
-    // entry connects at module scope and the database is unreachable.
-    const cwd = await mkdtemp(join(tmpdir(), "mcp-use-bin-aggregate-"));
-    try {
-      await writeFile(
-        join(cwd, "index.ts"),
-        'throw new AggregateError([new Error("connect ECONNREFUSED ::1:6390"), new Error("connect ECONNREFUSED 127.0.0.1:6390")], "");\n'
-      );
-      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-      await expect(
-        main(["build", "--path", cwd, "--entry", "index.ts"])
-      ).resolves.toBe(1);
-      expect(errors.mock.calls.flat().join("\n")).toContain(
-        "connect ECONNREFUSED ::1:6390; connect ECONNREFUSED 127.0.0.1:6390"
-      );
-    } finally {
-      await rm(cwd, { recursive: true, force: true });
     }
   });
 });

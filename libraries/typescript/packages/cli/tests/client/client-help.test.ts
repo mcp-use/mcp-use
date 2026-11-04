@@ -1,6 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
-import { main } from "../../src/bin/main.js";
+import { describe, expect } from "vitest";
+
+import { test } from "../helpers/cli-test.js";
 
 const helpTree: readonly [path: readonly string[], usage: string][] = [
   [[], "mcp-use client <command>"],
@@ -39,102 +42,68 @@ const helpTree: readonly [path: readonly string[], usage: string][] = [
   [["demo", "auth", "logout"], "mcp-use client <name> auth logout [options]"],
 ];
 
-afterEach(() => vi.restoreAllMocks());
-
-function runClientHelp(argv: readonly string[]): Promise<number> {
-  return main(["client", ...argv]);
-}
-
 describe("client help tree", () => {
-  it.each(helpTree)(
-    "prints scoped long and short help for %s",
-    async (path, usage) => {
-      for (const flag of ["--help", "-h"]) {
-        const stdout = vi
-          .spyOn(process.stdout, "write")
-          .mockImplementation(() => true);
-        const stderr = vi
-          .spyOn(process.stderr, "write")
-          .mockImplementation(() => true);
+  test.for(
+    helpTree.flatMap(([path, usage]) =>
+      ["--help", "-h"].map((flag) => [[...path, flag], usage] as const)
+    )
+  )("mcp-use client %s prints scoped help", async ([args, usage], { cli }) => {
+    const result = await cli.run(["client", ...args]);
 
-        await expect(runClientHelp([...path, flag])).resolves.toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.startsWith(`Usage: ${usage}\n`)).toBe(true);
+    expect(result.stdout).toContain("-h, --help");
+  });
 
-        const output = stdout.mock.calls.flat().join("");
-        expect(output).toContain(`Usage: ${usage}`);
-        expect(output).toContain("-h, --help");
-        expect(stderr).not.toHaveBeenCalled();
-        vi.restoreAllMocks();
-      }
-    }
-  );
+  test("resolves leaf help without touching saved servers", async ({ cli }) => {
+    const result = await cli.run([
+      "client",
+      "--json",
+      "not-saved",
+      "tools",
+      "call",
+      "not-a-tool",
+      "--help",
+    ]);
 
-  it("resolves leaf help without saved-server or MCP side effects", async () => {
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runClientHelp([
-        "--json",
-        "not-saved",
-        "tools",
-        "call",
-        "not-a-tool",
-        "--help",
-      ])
-    ).resolves.toBe(0);
-
-    const output = stdout.mock.calls.flat().join("");
-    expect(output).toContain(
+    expect(result.stderr).toBe("");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(
       "Usage: mcp-use client <name> tools call <tool> [args...] [options]"
     );
-    expect(output).toContain("--timeout <ms>");
-    expect(output).toContain("--json");
-    expect(stderr).not.toHaveBeenCalled();
+    expect(result.stdout).toContain("--timeout <ms>");
+    expect(existsSync(join(cli.home, ".mcp-use"))).toBe(false);
   });
 
-  it("keeps invalid nested help paths as usage errors", async () => {
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
+  test("keeps invalid nested help paths as usage errors", async ({ cli }) => {
+    const result = await cli.run([
+      "client",
+      "demo",
+      "tools",
+      "frobnicate",
+      "--help",
+    ]);
 
-    await expect(
-      runClientHelp(["demo", "tools", "frobnicate", "--help"])
-    ).resolves.toBe(2);
-
-    expect(stdout).not.toHaveBeenCalled();
-    expect(stderr.mock.calls.flat().join("")).toContain(
-      "Unknown client tools command: frobnicate"
-    );
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Unknown client tools command: frobnicate");
   });
 
-  it("documents current connect and removal behavior", async () => {
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await runClientHelp(["connect", "--help"]);
-    const connect = stdout.mock.calls.flat().join("");
+  test("documents current connect and removal options", async ({ cli }) => {
+    const connect = (await cli.run(["client", "connect", "--help"])).stdout;
     expect(connect).toContain("--protocol <auto|legacy|modern>");
     expect(connect).toContain("--no-open");
     expect(connect).not.toMatch(/\d{4}-\d{2}-\d{2}/);
     expect(connect).not.toContain("  --open");
 
-    stdout.mockClear();
-    await runClientHelp(["remove", "--help"]);
-    const remove = stdout.mock.calls.flat().join("");
+    const remove = (await cli.run(["client", "remove", "--help"])).stdout;
     expect(remove).not.toContain("--yes");
     expect(remove).toContain("--json");
 
-    stdout.mockClear();
-    await runClientHelp(["demo", "auth", "logout", "--help"]);
-    const logout = stdout.mock.calls.flat().join("");
+    const logout = (
+      await cli.run(["client", "demo", "auth", "logout", "--help"])
+    ).stdout;
     expect(logout).toContain("--yes");
     expect(logout).toContain("--json");
   });

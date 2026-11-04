@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { discoverEntry, ENTRY_CANDIDATES } from "../../src/toolchain/index.js";
+import { discoverEntry } from "../../src/toolchain/index.js";
 import { removeDir, TMP_ROOT } from "./helpers.js";
 
 let counter = 0;
@@ -25,11 +25,18 @@ afterAll(() => {
 });
 
 describe("discoverEntry", () => {
-  it("finds each conventional candidate", () => {
-    for (const candidate of ENTRY_CANDIDATES) {
-      const dir = makeProject([candidate]);
-      expect(discoverEntry(dir)).toBe(join(dir, candidate));
-    }
+  it.each([
+    "src/index.ts",
+    "src/index.tsx",
+    "src/server.ts",
+    "src/server.tsx",
+    "index.ts",
+    "index.tsx",
+    "server.ts",
+    "server.tsx",
+  ])("finds %s as the entry", (candidate) => {
+    const dir = makeProject([candidate]);
+    expect(discoverEntry(dir)).toBe(join(dir, candidate));
   });
 
   it("prefers candidates in order (first hit wins)", () => {

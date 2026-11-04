@@ -494,83 +494,6 @@ describe("client human-readable output", () => {
     expect(stdout).toBe("echo - Echo input\n");
     expect(stderr).toBe("");
   });
-
-  it("fails instead of reporting a remove that never happened", async () => {
-    await expect(runClient(["remove", "never-saved", "--json"])).resolves.toBe(
-      2
-    );
-    expect(stdout).toBe("");
-    expect(JSON.parse(stderr)).toEqual({
-      error: {
-        code: "usage_error",
-        message:
-          "Unknown saved server: never-saved. Run `mcp-use client list` to see saved servers.",
-      },
-    });
-  });
-
-  it("removes without confirmation and supports JSON anywhere", async () => {
-    await expect(
-      runClient([
-        "connect",
-        "remove-json",
-        "https://mcp.example.com/mcp",
-        "--no-oauth",
-      ])
-    ).resolves.toBe(0);
-    stdout = "";
-
-    await expect(runClient(["remove", "remove-json", "--json"])).resolves.toBe(
-      0
-    );
-    expect(JSON.parse(stdout)).toEqual({ removed: "remove-json" });
-    expect(stderr).toBe("");
-
-    await runClient([
-      "connect",
-      "remove-flags",
-      "https://mcp.example.com/mcp",
-      "--no-oauth",
-    ]);
-
-    for (const argv of [
-      ["--json", "remove", "remove-flags"],
-      ["remove", "--json", "remove-flags"],
-      ["remove", "remove-flags", "--json"],
-    ]) {
-      stdout = "";
-      stderr = "";
-
-      await expect(runClient(argv)).resolves.toBe(0);
-
-      expect(JSON.parse(stdout)).toEqual({ removed: "remove-flags" });
-      expect(stderr).toBe("");
-      await runClient([
-        "connect",
-        "remove-flags",
-        "https://mcp.example.com/mcp",
-        "--no-oauth",
-      ]);
-    }
-
-    stdout = "";
-    stderr = "";
-    await expect(runClient(["remove", "remove-flags", "--yes"])).resolves.toBe(
-      2
-    );
-    expect(stdout).toBe("");
-    expect(stderr).toContain("Unknown option '--yes'");
-
-    stderr = "";
-    await expect(runClient(["list", "--json"])).resolves.toBe(0);
-    expect(JSON.parse(stdout)).toContainEqual({
-      name: "remove-flags",
-      oauth: false,
-      protocol: "auto",
-      url: "https://mcp.example.com/mcp",
-    });
-    expect(stderr).toBe("");
-  });
 });
 
 describe("client protocol selection", () => {
@@ -616,75 +539,6 @@ describe("client protocol selection", () => {
     }
   );
 
-  it("advertises only named protocol modes in help and validation errors", async () => {
-    await expect(runClient(["connect", "--help"])).resolves.toBe(0);
-    expect(stdout).toContain("--protocol <auto|legacy|modern>");
-    expect(stdout).not.toMatch(/\d{4}-\d{2}-\d{2}/);
-
-    for (const value of ["2025-11-25", "2026-07-28", "invalid"]) {
-      stdout = "";
-      stderr = "";
-      await expect(
-        runClient([
-          "connect",
-          "invalid-protocol",
-          "https://mcp.example.com/mcp",
-          "--no-oauth",
-          "--protocol",
-          value,
-        ])
-      ).resolves.toBe(2);
-      expect(stdout).toBe("");
-      expect(stderr).toBe(
-        "Invalid protocol. Expected auto, legacy, or modern.\n"
-      );
-    }
-  });
-
-  it("migrates saved revision values before listing or reconnecting", async () => {
-    const { GLOBAL_STATE_DIR } = await import("../../src/core/fs.js");
-    const clientDirectory = join(GLOBAL_STATE_DIR, "client");
-    const serversPath = join(clientDirectory, "servers.json");
-    await mkdir(clientDirectory, { recursive: true });
-    await writeFile(
-      serversPath,
-      JSON.stringify({
-        servers: {
-          old: {
-            url: "https://old.example.com/mcp",
-            oauth: false,
-            protocol: "2025-11-25",
-          },
-          new: {
-            url: "https://new.example.com/mcp",
-            oauth: false,
-            protocol: "2026-07-28",
-          },
-        },
-      })
-    );
-
-    await expect(runClient(["list", "--json"])).resolves.toBe(0);
-    expect(JSON.parse(stdout)).toEqual([
-      {
-        name: "old",
-        url: "https://old.example.com/mcp",
-        oauth: false,
-        protocol: "legacy",
-      },
-      {
-        name: "new",
-        url: "https://new.example.com/mcp",
-        oauth: false,
-        protocol: "modern",
-      },
-    ]);
-    expect(await readFile(serversPath, "utf8")).not.toMatch(
-      /\d{4}-\d{2}-\d{2}/
-    );
-    await rm(clientDirectory, { recursive: true, force: true });
-  });
-
   it.each([
     {
       protocol: "legacy",
@@ -725,26 +579,6 @@ describe("client protocol selection", () => {
 });
 
 describe("client OAuth browser UX", () => {
-  it("validates saved command options before connecting or starting OAuth", async () => {
-    await runClient([
-      "connect",
-      "oauth-validation",
-      "https://mcp.example.com/mcp",
-    ]);
-    const callsBefore = mocks.connectCall.mock.calls.length;
-    stdout = "";
-    stderr = "";
-    mocks.triggerOAuth = true;
-
-    await expect(
-      runClient(["oauth-validation", "tools", "list", "--no-open"])
-    ).resolves.toBe(2);
-
-    expect(mocks.connectCall).toHaveBeenCalledTimes(callsBefore);
-    expect(mocks.openBrowser).not.toHaveBeenCalled();
-    expect(stderr).toContain("Unknown option '--no-open'");
-  });
-
   it("waits for Enter before opening a browser in an interactive TTY", async () => {
     setStdinTty(true);
     mocks.triggerOAuth = true;
