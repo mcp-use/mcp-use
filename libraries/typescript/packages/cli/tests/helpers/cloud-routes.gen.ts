@@ -4,6 +4,94 @@ import type * as T from "../../src/cloud/api/generated/types.gen.js";
 type ResponseBody<R> = R extends { content: infer C } ? C[keyof C] : void;
 
 export interface CloudRoutes {
+  "DELETE /api/v1/deployments/{id}": {
+    data: T.operations["deleteApiV1DeploymentsById"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["deleteApiV1DeploymentsById"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["deleteApiV1DeploymentsById"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["deleteApiV1DeploymentsById"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["deleteApiV1DeploymentsById"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["deleteApiV1DeploymentsById"]["responses"][404]
+      >;
+    };
+  };
+  "DELETE /api/v1/servers/{id}": {
+    data: T.operations["deleteApiV1ServersById"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["deleteApiV1ServersById"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["deleteApiV1ServersById"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["deleteApiV1ServersById"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["deleteApiV1ServersById"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["deleteApiV1ServersById"]["responses"][404]
+      >;
+    };
+  };
+  "DELETE /api/v1/servers/{id}/env-variables/{varId}": {
+    data: T.operations["deleteApiV1ServersByIdEnvVariablesByVarId"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["deleteApiV1ServersByIdEnvVariablesByVarId"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["deleteApiV1ServersByIdEnvVariablesByVarId"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["deleteApiV1ServersByIdEnvVariablesByVarId"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["deleteApiV1ServersByIdEnvVariablesByVarId"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["deleteApiV1ServersByIdEnvVariablesByVarId"]["responses"][404]
+      >;
+    };
+  };
+  "DELETE /api/v1/servers/{id}/repository": {
+    data: T.operations["deleteApiV1ServersByIdRepository"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["deleteApiV1ServersByIdRepository"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["deleteApiV1ServersByIdRepository"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["deleteApiV1ServersByIdRepository"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["deleteApiV1ServersByIdRepository"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["deleteApiV1ServersByIdRepository"]["responses"][404]
+      >;
+    };
+  };
   "GET /api/auth/get-session": {
     data: T.operations["getSession"]["parameters"];
     responses: {
@@ -208,6 +296,28 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/servers/{id}/logs": {
+    data: T.operations["getApiV1ServersByIdLogs"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1ServersByIdLogs"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1ServersByIdLogs"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1ServersByIdLogs"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1ServersByIdLogs"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1ServersByIdLogs"]["responses"][404]
+      >;
+    };
+  };
   "GET /api/v1/user-preferences": {
     data: T.operations["getApiV1UserPreferences"]["parameters"];
     responses: {
@@ -274,6 +384,28 @@ export interface CloudRoutes {
       >;
     };
   };
+  "PATCH /api/v1/servers/{id}/gateway/ip-access": {
+    data: T.operations["patchApiV1ServersByIdGatewayIpAccess"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["patchApiV1ServersByIdGatewayIpAccess"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["patchApiV1ServersByIdGatewayIpAccess"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["patchApiV1ServersByIdGatewayIpAccess"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["patchApiV1ServersByIdGatewayIpAccess"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["patchApiV1ServersByIdGatewayIpAccess"]["responses"][404]
+      >;
+    };
+  };
   "POST /api/auth/api-key/create": {
     data: T.operations["postApiAuthApiKeyCreate"]["parameters"];
     responses: {
@@ -330,6 +462,62 @@ export interface CloudRoutes {
       >;
     };
   };
+  "POST /api/auth/organization/create": {
+    data: T.operations["postApiAuthOrganizationCreate"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiAuthOrganizationCreate"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiAuthOrganizationCreate"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiAuthOrganizationCreate"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiAuthOrganizationCreate"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiAuthOrganizationCreate"]["responses"][404]
+      >;
+      429: ResponseBody<
+        T.operations["postApiAuthOrganizationCreate"]["responses"][429]
+      >;
+      500: ResponseBody<
+        T.operations["postApiAuthOrganizationCreate"]["responses"][500]
+      >;
+    };
+  };
+  "POST /api/auth/organization/update": {
+    data: T.operations["postApiAuthOrganizationUpdate"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiAuthOrganizationUpdate"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiAuthOrganizationUpdate"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiAuthOrganizationUpdate"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiAuthOrganizationUpdate"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiAuthOrganizationUpdate"]["responses"][404]
+      >;
+      429: ResponseBody<
+        T.operations["postApiAuthOrganizationUpdate"]["responses"][429]
+      >;
+      500: ResponseBody<
+        T.operations["postApiAuthOrganizationUpdate"]["responses"][500]
+      >;
+    };
+  };
   "POST /api/v1/deployments": {
     data: T.operations["postApiV1Deployments"]["parameters"];
     responses: {
@@ -340,6 +528,50 @@ export interface CloudRoutes {
       401: ResponseBody<T.operations["postApiV1Deployments"]["responses"][401]>;
       403: ResponseBody<T.operations["postApiV1Deployments"]["responses"][403]>;
       404: ResponseBody<T.operations["postApiV1Deployments"]["responses"][404]>;
+    };
+  };
+  "POST /api/v1/deployments/{id}/activate": {
+    data: T.operations["postApiV1DeploymentsByIdActivate"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdActivate"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdActivate"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdActivate"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdActivate"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdActivate"]["responses"][404]
+      >;
+    };
+  };
+  "POST /api/v1/deployments/{id}/stop": {
+    data: T.operations["postApiV1DeploymentsByIdStop"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdStop"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdStop"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdStop"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdStop"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1DeploymentsByIdStop"]["responses"][404]
+      >;
     };
   };
   "POST /api/v1/github/installations/{installationId}/repos": {
@@ -361,6 +593,31 @@ export interface CloudRoutes {
       >;
       404: ResponseBody<
         T.operations["postApiV1GithubInstallationsByInstallationIdRepos"]["responses"][404]
+      >;
+    };
+  };
+  "POST /api/v1/organizations/{id}/logo": {
+    data: T.operations["postApiV1OrganizationsByIdLogo"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdLogo"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdLogo"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdLogo"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdLogo"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdLogo"]["responses"][404]
+      >;
+      500: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdLogo"]["responses"][500]
       >;
     };
   };
@@ -420,10 +677,36 @@ export interface CloudRoutes {
       >;
     };
   };
+  "PUT /api/v1/servers/{id}/repository": {
+    data: T.operations["putApiV1ServersByIdRepository"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["putApiV1ServersByIdRepository"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["putApiV1ServersByIdRepository"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["putApiV1ServersByIdRepository"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["putApiV1ServersByIdRepository"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["putApiV1ServersByIdRepository"]["responses"][404]
+      >;
+    };
+  };
 }
 
 /** Route templates used by the fake Cloud at runtime. */
 export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
+  "DELETE /api/v1/deployments/{id}",
+  "DELETE /api/v1/servers/{id}",
+  "DELETE /api/v1/servers/{id}/env-variables/{varId}",
+  "DELETE /api/v1/servers/{id}/repository",
   "GET /api/auth/get-session",
   "GET /api/v1/deployments",
   "GET /api/v1/deployments/{id}",
@@ -435,22 +718,34 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "GET /api/v1/servers",
   "GET /api/v1/servers/{id}",
   "GET /api/v1/servers/{id}/env-variables",
+  "GET /api/v1/servers/{id}/logs",
   "GET /api/v1/user-preferences",
   "PATCH /api/v1/servers/{id}",
   "PATCH /api/v1/servers/{id}/env-variables/{varId}",
+  "PATCH /api/v1/servers/{id}/gateway/ip-access",
   "POST /api/auth/api-key/create",
   "POST /api/auth/api-key/delete",
+  "POST /api/auth/organization/create",
+  "POST /api/auth/organization/update",
   "POST /api/v1/deployments",
+  "POST /api/v1/deployments/{id}/activate",
+  "POST /api/v1/deployments/{id}/stop",
   "POST /api/v1/github/installations/{installationId}/repos",
+  "POST /api/v1/organizations/{id}/logo",
   "POST /api/v1/servers",
   "POST /api/v1/servers/{id}/env-variables",
   "POST /api/v1/servers/{id}/source",
+  "PUT /api/v1/servers/{id}/repository",
 ];
 
 /** Documented default success status for each route. */
 export const cloudRouteSuccessStatus: Readonly<
   Record<keyof CloudRoutes, number>
 > = {
+  "DELETE /api/v1/deployments/{id}": 200,
+  "DELETE /api/v1/servers/{id}": 200,
+  "DELETE /api/v1/servers/{id}/env-variables/{varId}": 200,
+  "DELETE /api/v1/servers/{id}/repository": 200,
   "GET /api/auth/get-session": 200,
   "GET /api/v1/deployments": 200,
   "GET /api/v1/deployments/{id}": 200,
@@ -462,14 +757,22 @@ export const cloudRouteSuccessStatus: Readonly<
   "GET /api/v1/servers": 200,
   "GET /api/v1/servers/{id}": 200,
   "GET /api/v1/servers/{id}/env-variables": 200,
+  "GET /api/v1/servers/{id}/logs": 200,
   "GET /api/v1/user-preferences": 200,
   "PATCH /api/v1/servers/{id}": 200,
   "PATCH /api/v1/servers/{id}/env-variables/{varId}": 200,
+  "PATCH /api/v1/servers/{id}/gateway/ip-access": 200,
   "POST /api/auth/api-key/create": 200,
   "POST /api/auth/api-key/delete": 200,
+  "POST /api/auth/organization/create": 200,
+  "POST /api/auth/organization/update": 200,
   "POST /api/v1/deployments": 201,
+  "POST /api/v1/deployments/{id}/activate": 200,
+  "POST /api/v1/deployments/{id}/stop": 200,
   "POST /api/v1/github/installations/{installationId}/repos": 201,
+  "POST /api/v1/organizations/{id}/logo": 200,
   "POST /api/v1/servers": 201,
   "POST /api/v1/servers/{id}/env-variables": 201,
   "POST /api/v1/servers/{id}/source": 200,
+  "PUT /api/v1/servers/{id}/repository": 200,
 };

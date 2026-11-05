@@ -11,6 +11,24 @@ import { deployment, server } from "../helpers/cloud-fixtures.js";
 
 const exec = promisify(execFile);
 
+const CONNECTED_REPOSITORY = {
+  isManaged: false,
+  productionBranch: "main",
+  repoFullName: "example/weather",
+  githubInstallationId: "inst_record",
+  watchPaths: [],
+  deployBranchPatterns: [],
+  waitForCi: false,
+};
+
+const VARIABLE_METADATA = {
+  serverId: "srv_1",
+  phase: "both",
+  sensitive: false,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+};
+
 async function link(cwd: string): Promise<void> {
   await mkdir(join(cwd, ".manufact"), { recursive: true });
   await writeFile(
@@ -166,12 +184,18 @@ describe("deploy", () => {
       cloud.on("GET", "/api/v1/servers/srv_1", {
         body: server({
           id: "srv_1",
-          connectedRepository: { isManaged: false, productionBranch: "main" },
+          connectedRepository: { ...CONNECTED_REPOSITORY },
         }),
       });
       cloud.on("GET", "/api/v1/servers/srv_1/env-variables", { body: [] });
       cloud.on("POST", "/api/v1/servers/srv_1/env-variables", {
-        body: { id: "var_1" },
+        body: {
+          ...VARIABLE_METADATA,
+          id: "var_1",
+          key: "KEY",
+          branch: null,
+          environments: ["production"],
+        },
       });
       cloud.on("POST", "/api/v1/deployments", { body: { id: "dep_1" } });
       const result = await cli.run(
@@ -207,12 +231,14 @@ describe("deploy", () => {
     cloud.on("GET", "/api/v1/servers/srv_1", {
       body: server({
         id: "srv_1",
-        connectedRepository: { isManaged: false, productionBranch: "main" },
+        connectedRepository: { ...CONNECTED_REPOSITORY },
       }),
     });
     cloud.on("GET", "/api/v1/servers/srv_1/env-variables", {
       body: [
         {
+          ...VARIABLE_METADATA,
+          sensitive: true,
           id: "var_1",
           key: "KEY",
           branch: "feature",
@@ -221,7 +247,13 @@ describe("deploy", () => {
       ],
     });
     cloud.on("PATCH", "/api/v1/servers/srv_1/env-variables/var_1", {
-      body: { id: "var_1" },
+      body: {
+        ...VARIABLE_METADATA,
+        id: "var_1",
+        key: "KEY",
+        branch: null,
+        environments: ["production"],
+      },
     });
     cloud.on("POST", "/api/v1/deployments", { body: { id: "dep_1" } });
     const result = await cli.run(
@@ -267,6 +299,8 @@ describe("deploy", () => {
           {
             id: "inst_record",
             installationId: "123",
+            organizationId: "org_1",
+            isActive: true,
             account: { login: "example", type: "Organization" },
           },
         ],
@@ -444,7 +478,7 @@ describe("deploy", () => {
         body: server({ id: "srv_1", isExternal: true }),
       });
       cloud.on("PATCH", "/api/v1/servers/srv_1", {
-        body: { id: "srv_1", slug: "weather" },
+        body: server({ id: "srv_1", slug: "weather", name: "renamed" }),
       });
       const updated = await cli.run(
         ["deploy", "--external-url", url, "--name", "renamed", "--json"],

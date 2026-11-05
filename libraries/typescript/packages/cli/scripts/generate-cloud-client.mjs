@@ -49,6 +49,18 @@ const OPERATIONS = [
   "GET /api/v1/servers/{id}/env-variables",
   "POST /api/v1/servers/{id}/env-variables",
   "PATCH /api/v1/servers/{id}/env-variables/{varId}",
+  "GET /api/v1/servers/{id}/logs",
+  "POST /api/v1/deployments/{id}/activate",
+  "POST /api/v1/deployments/{id}/stop",
+  "DELETE /api/v1/deployments/{id}",
+  "DELETE /api/v1/servers/{id}",
+  "DELETE /api/v1/servers/{id}/env-variables/{varId}",
+  "PUT /api/v1/servers/{id}/repository",
+  "DELETE /api/v1/servers/{id}/repository",
+  "PATCH /api/v1/servers/{id}/gateway/ip-access",
+  "POST /api/auth/organization/create",
+  "POST /api/auth/organization/update",
+  "POST /api/v1/organizations/{id}/logo",
 ];
 
 /**
@@ -75,6 +87,9 @@ const RESPONSE_FIELDS = {
     "total",
     "limit",
     "skip",
+    "items[].status",
+    "items[].mcpUrl",
+    "items[].dashboardUrl",
   ],
   "GET /api/v1/servers/{id}": [
     "id",
@@ -84,24 +99,109 @@ const RESPONSE_FIELDS = {
     "isExternal",
     "connectedRepository.isManaged",
     "connectedRepository.productionBranch",
+    "description",
+    "status",
+    "mcpUrl",
+    "dashboardUrl",
+    "publicRoutingMode",
+    "region",
+    "activeDeploymentId",
+    "connectedRepository.repoFullName",
+    "connectedRepository.githubInstallationId",
+    "connectedRepository.watchPaths",
+    "connectedRepository.deployBranchPatterns",
+    "connectedRepository.waitForCi",
   ],
   "POST /api/v1/servers": ["server.id", "server.slug", "deploymentId"],
-  "PATCH /api/v1/servers/{id}": ["id", "slug"],
+  "PATCH /api/v1/servers/{id}": [
+    "id",
+    "slug",
+    "name",
+    "organizationId",
+    "description",
+    "status",
+    "mcpUrl",
+    "dashboardUrl",
+    "publicRoutingMode",
+    "region",
+    "activeDeploymentId",
+    "connectedRepository.repoFullName",
+    "connectedRepository.productionBranch",
+    "connectedRepository.githubInstallationId",
+    "connectedRepository.watchPaths",
+    "connectedRepository.deployBranchPatterns",
+    "connectedRepository.waitForCi",
+  ],
   "POST /api/v1/servers/{id}/source": ["commitSha"],
   "GET /api/v1/github/installations": [
     "installations[].id",
     "installations[].installationId",
     "installations[].account.login",
     "installations[].account.type",
+    "installations[].organizationId",
+    "installations[].isActive",
   ],
   "GET /api/v1/servers/{id}/env-variables": [
     "[].id",
     "[].key",
     "[].branch",
     "[].environments",
+    "[].serverId",
+    "[].phase",
+    "[].sensitive",
+    "[].createdAt",
+    "[].updatedAt",
   ],
-  "POST /api/v1/servers/{id}/env-variables": ["id"],
-  "PATCH /api/v1/servers/{id}/env-variables/{varId}": ["id"],
+  "POST /api/v1/servers/{id}/env-variables": [
+    "id",
+    "serverId",
+    "key",
+    "environments",
+    "phase",
+    "sensitive",
+    "branch",
+    "createdAt",
+    "updatedAt",
+  ],
+  "PATCH /api/v1/servers/{id}/env-variables/{varId}": [
+    "id",
+    "serverId",
+    "key",
+    "environments",
+    "phase",
+    "sensitive",
+    "branch",
+    "createdAt",
+    "updatedAt",
+  ],
+  "PUT /api/v1/servers/{id}/repository": [
+    "server.id",
+    "server.name",
+    "server.slug",
+  ],
+  "PATCH /api/v1/servers/{id}/gateway/ip-access": ["hasConfig"],
+  "POST /api/auth/organization/create": ["id", "name", "slug", "logo"],
+  "POST /api/auth/organization/update": ["id", "name", "slug", "logo"],
+};
+
+const REQUEST_FIELDS = {
+  "PATCH /api/v1/servers/{id}": [
+    "name",
+    "description",
+    "productionBranch",
+    "watchPaths",
+    "deployBranchPatterns",
+    "waitForCi",
+    "config.rootDir",
+    "config.buildCommand",
+    "config.startCommand",
+  ],
+  "POST /api/auth/organization/create": ["name", "slug"],
+  "POST /api/auth/organization/update": [
+    "organizationId",
+    "data.name",
+    "data.slug",
+  ],
 };
 
 const spec = JSON.parse(await readFile(resolve(process.cwd(), input), "utf8"));
@@ -119,6 +219,15 @@ for (const [key, fields] of Object.entries(RESPONSE_FIELDS)) {
       content.schema = keepFields(content.schema, fields, `${key} ${status}`);
     }
   }
+}
+
+for (const [key, fields] of Object.entries(REQUEST_FIELDS)) {
+  const space = key.indexOf(" ");
+  const operation =
+    spec.paths[key.slice(space + 1)]?.[key.slice(0, space).toLowerCase()];
+  const content = operation?.requestBody?.content?.["application/json"];
+  if (!content?.schema) throw new Error(`No request schema for ${key}.`);
+  content.schema = keepFields(content.schema, fields, `${key} request`);
 }
 
 const scoped = {

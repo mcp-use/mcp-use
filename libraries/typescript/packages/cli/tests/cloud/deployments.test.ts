@@ -88,83 +88,10 @@ describe("organization selection", () => {
     );
 
     expect(result.exitCode).toBe(1);
-    expect(result.errorJson).toMatchObject({
+    expect(result.json).toMatchObject({
       error: { code: "organization_not_found" },
     });
     expect(cloud.requestsTo("GET", "/api/v1/deployments")).toEqual([]);
-  });
-});
-
-describe("deployment JSON output", () => {
-  test("follows build logs until a terminal status and emits exactly one document", async ({
-    cloud,
-    cli,
-  }) => {
-    signIn(cloud);
-    // Two replies: a third poll after "running" would be unhandled and fail.
-    cloud.sequence("GET", "/api/v1/deployments/deployment_1/build-logs", [
-      {
-        body: {
-          logs: "building\n",
-          offset: 9,
-          totalLength: 9,
-          status: "building",
-        },
-      },
-      {
-        body: {
-          logs: "ready\n",
-          offset: 15,
-          totalLength: 15,
-          status: "running",
-        },
-      },
-    ]);
-
-    const result = await cli.run(
-      ["deployments", "logs", "deployment_1", "--build", "--follow", "--json"],
-      { env: SIGNED_IN }
-    );
-
-    expect(result.stderr).toBe("");
-    expect(result.exitCode).toBe(0);
-    // `json` is undefined unless stdout is a single JSON document.
-    expect(result.json).toEqual({
-      deploymentId: "deployment_1",
-      offset: 15,
-      logs: "building\nready\n",
-      status: "running",
-    });
-    expect(
-      cloud
-        .requestsTo("GET", "/api/v1/deployments/deployment_1/build-logs")
-        .map((request) => request.query)
-    ).toEqual([{ offset: "0" }, { offset: "9" }]);
-  });
-
-  test("emits one document when a build log page is empty", async ({
-    cloud,
-    cli,
-  }) => {
-    signIn(cloud);
-    // One reply: without --follow the CLI must not poll again.
-    cloud.sequence("GET", "/api/v1/deployments/deployment_1/build-logs", [
-      { body: { logs: "", offset: 0, totalLength: 0, status: "failed" } },
-    ]);
-
-    const result = await cli.run(
-      ["deployments", "logs", "deployment_1", "--build", "--json"],
-      { env: SIGNED_IN }
-    );
-
-    expect(result.stderr).toBe("");
-    expect(result.exitCode).toBe(0);
-    expect(result.json).toEqual({
-      deploymentId: "deployment_1",
-      offset: 0,
-      logs: "",
-      status: "failed",
-    });
   });
 });
 
@@ -225,7 +152,7 @@ describe("deployments get", () => {
         "Branch: main",
         "Created: 2026-07-24T00:00:00Z",
         "Error: Build failed",
-        "Build logs: mcp-use deployments logs dep_1 --build",
+        "Build logs: mcp-use logs dep_1 --build",
         "",
       ].join("\n")
     );
