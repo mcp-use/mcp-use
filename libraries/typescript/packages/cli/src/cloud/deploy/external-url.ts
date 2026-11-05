@@ -1,6 +1,7 @@
 import { CommandError, UsageError } from "../../core/errors.js";
 import { writeProjectLink } from "../project/link-file.js";
 import type { DeployInput, DeployValues } from "./types.js";
+import { serverCreationTimeout } from "./errors.js";
 
 /** Reject source/build flags and malformed external endpoints before auth. */
 export function validateExternalOptions(values: DeployValues): void {
@@ -94,7 +95,8 @@ export async function deployExternal(input: DeployInput): Promise<{
                 url: externalUrl,
                 ...(values.name !== undefined ? { name: values.name } : {}),
               },
-            })
+            }),
+            serverCreationTimeout()
           )
         ).server
       : await cloud.call(

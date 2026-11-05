@@ -141,7 +141,18 @@ type DocumentedErrorReply<K extends RouteKey> = {
 }[StatusUnion<CloudRoutes[K]["errors"]>];
 
 /** Failures any route can return, even when the spec does not list them. */
-type AnyRouteError = 401 | 403 | 404 | 409 | 429 | 500 | 502 | 503 | 504;
+type AnyRouteError =
+  | 401
+  | 403
+  | 404
+  | 408
+  | 409
+  | 429
+  | 500
+  | 502
+  | 503
+  | 504
+  | 524;
 
 type UndocumentedErrorReply<K extends RouteKey> = {
   status: Exclude<AnyRouteError, StatusUnion<CloudRoutes[K]["errors"]>>;

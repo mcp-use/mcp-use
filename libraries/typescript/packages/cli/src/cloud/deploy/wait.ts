@@ -13,7 +13,24 @@ export async function waitForDeployment(
   const deadline = Date.now() + 30 * 60 * 1000;
   while (Date.now() < deadline) {
     const deployment = await cloud.call(
-      cloud.client.GET("/api/v1/deployments/{id}", { params: { path: { id } } })
+      cloud.client.GET("/api/v1/deployments/{id}", {
+        params: { path: { id } },
+      }),
+      {
+        timeout: {
+          message: `Cloud timed out while checking deployment ${id}. The deployment may still be running.`,
+          nextSteps: [
+            {
+              description: "Check deployment status",
+              command: `mcp-use deployments get ${id} --json`,
+            },
+            {
+              description: "Inspect build logs",
+              command: `mcp-use logs ${id} --build --json`,
+            },
+          ],
+        },
+      }
     );
     if (deployment.status === "running")
       return { status: deployment.status, mcpUrl: deployment.mcpUrl };

@@ -16,6 +16,7 @@ import {
   syncEnvironment,
 } from "./env.js";
 import { syncServerConfiguration } from "./config.js";
+import { serverCreationTimeout, deploymentStartTimeout } from "./errors.js";
 import type { Cloud, DeployInput, StartedDeployment } from "./types.js";
 
 type CreatedServer =
@@ -27,7 +28,8 @@ type SourceUpdate =
 async function upload<T>(
   cloud: Cloud,
   path: string,
-  form: FormData
+  form: FormData,
+  context: Parameters<Cloud["call"]>[1]
 ): Promise<T> {
   return cloud.call(
     fetch(`${cloudApiUrl()}${path}`, {
@@ -50,7 +52,8 @@ async function upload<T>(
       return response.ok
         ? { data: body as T, response }
         : { error: body, response };
-    })
+    }),
+    context
   );
 }
 
@@ -93,12 +96,25 @@ export async function deployUpload(
     await upload<SourceUpdate>(
       cloud,
       `/servers/${encodeURIComponent(serverId)}/source`,
-      form
+      form,
+      {
+        timeout: {
+          message:
+            "Cloud timed out while uploading source. The upload may still be processing. Check the server before running deploy again.",
+          nextSteps: [
+            {
+              description: "Inspect the server",
+              command: `mcp-use servers get ${serverId} --json`,
+            },
+          ],
+        },
+      }
     );
     const deployment = await cloud.call(
       cloud.client.POST("/api/v1/deployments", {
         body: { serverId, branch, trigger: "redeploy" },
-      })
+      }),
+      deploymentStartTimeout(serverId)
     );
     deploymentId = deployment.id;
   } else {
@@ -126,7 +142,12 @@ export async function deployUpload(
       if (value !== undefined) form.set(field, value);
     }
     if (Object.keys(env).length) form.set("env", JSON.stringify(env));
-    const created = await upload<CreatedServer>(cloud, "/servers", form);
+    const created = await upload<CreatedServer>(
+      cloud,
+      "/servers",
+      form,
+      serverCreationTimeout()
+    );
     serverId = created.server.id;
     if (created.deploymentId === null)
       throw new CommandError(
