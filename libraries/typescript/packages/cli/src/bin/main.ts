@@ -84,6 +84,8 @@ Commands:
   servers  Manage cloud servers and environment variables
   deployments Manage cloud deployments and logs
   deploy   Deploy from GitHub or upload local source
+  link     Link this project to a cloud server
+  unlink   Remove this project's link to a cloud server
   client   Connect to and invoke MCP servers
   screenshot Capture an MCP Apps view
 
@@ -219,6 +221,14 @@ export async function main(
   if (command === "deployments") {
     const { runDeployments } = await import("../cloud/deployments.js");
     return runDeployments(commandArgs);
+  }
+  if (command === "link") {
+    const { runLink } = await import("../cloud/project/link.js");
+    return runLink(commandArgs);
+  }
+  if (command === "unlink") {
+    const { runUnlink } = await import("../cloud/project/unlink.js");
+    return runUnlink(commandArgs);
   }
   if (command === "deploy") {
     const { runDeploy } = await import("../cloud/deploy.js");
