@@ -6,16 +6,15 @@
  * builders fill those with neutral values; a test passes the fields its
  * assertions depend on, so every value it asserts is visible in the test.
  */
-import type {
-  GetApiV1DeploymentsByIdResponses,
-  GetApiV1DeploymentsResponses,
-} from "../../src/cloud/api/generated/types.gen.js";
+import type { operations } from "../../src/cloud/api/generated/types.gen.js";
 
 /** A deployment as `GET /api/v1/deployments/{id}` returns it. */
-type Deployment = GetApiV1DeploymentsByIdResponses[200];
+type Deployment =
+  operations["getApiV1DeploymentsById"]["responses"][200]["content"]["application/json"];
 
 /** A deployment as `GET /api/v1/deployments` lists it. */
-type DeploymentListItem = GetApiV1DeploymentsResponses[200]["items"][number];
+type DeploymentListItem =
+  operations["getApiV1Deployments"]["responses"][200]["content"]["application/json"]["items"][number];
 
 const TIMESTAMP = "2026-01-01T00:00:00Z";
 

@@ -1,6 +1,6 @@
 /**
- * The thin layer between cloud commands and the generated client in
- * `./generated` (see `scripts/generate-cloud-client.mjs`).
+ * Cloud transport, authentication and error mapping. API declarations in
+ * `./generated` come from `scripts/generate-cloud-client.mjs`.
  *
  * It owns the three things the generated code must not decide: the base URL
  * (`MCP_USE_CLOUD_API_URL`), the auth headers, and how a failed request maps
@@ -9,7 +9,7 @@
  * ```ts
  * const cloud = await connectCloud();
  * const deployment = await cloud.call(
- *   getApiV1DeploymentsById({ client: cloud.client, path: { id } }),
+ *   cloud.client.GET("/api/v1/deployments/{id}", { params: { path: { id } } }),
  *   { notFound: { code: "deployment_not_found" } }
  * );
  * ```
@@ -17,7 +17,11 @@
  * Only cloud commands import this module; `dev`, `build` and `start` never
  * load it.
  */
-import { createClient, type Client } from "./generated/client/index.js";
+// Bundled into the CLI artifact, like the tunnel transport.
+// eslint-disable-next-line import/no-extraneous-dependencies
+import createClient, { type Client } from "openapi-fetch";
+
+import type { paths } from "./generated/types.gen.js";
 import {
   cloudApiUrl,
   readCloudConfig,
@@ -36,16 +40,16 @@ interface CallContext {
   notFound?: { code: string; nextSteps?: readonly NextStep[] };
 }
 
-/** The shape every generated SDK function resolves to. */
-interface SdkResult<T> {
-  data?: T;
+/** The shape every typed fetch method resolves to. */
+interface CloudResult<T> {
+  data?: T | undefined;
   error?: unknown;
   response?: Response;
 }
 
-/** Awaits a generated SDK call; see {@link CloudConnection.call}. */
+/** Awaits a typed fetch call; see {@link CloudConnection.call}. */
 type Call = <T>(
-  pending: Promise<SdkResult<T>>,
+  pending: Promise<CloudResult<T>>,
   context?: CallContext
 ) => Promise<Exclude<T, undefined>>;
 
@@ -53,7 +57,13 @@ type Call = <T>(
 function callerFor(apiKey: string): Call {
   return async (pending, context = {}) => {
     try {
-      return await settle(await pending, context);
+      const result = await pending.catch((error: unknown) => {
+        throw new CommandError(
+          "cloud_unreachable",
+          `Could not reach Manufact Cloud at ${cloudBaseUrl()}: ${messageOf(error) ?? "network error"}.`
+        );
+      });
+      return settle(result, context);
     } catch (error) {
       if (!(error instanceof CommandError)) throw error;
       throw new CommandError(
@@ -67,7 +77,7 @@ function callerFor(apiKey: string): Call {
 }
 
 function settle<T>(
-  result: SdkResult<T>,
+  result: CloudResult<T>,
   context: CallContext
 ): Exclude<T, undefined> {
   const { response } = result;
@@ -105,12 +115,12 @@ function settle<T>(
 
 /** An authenticated client scoped to one organization. */
 interface CloudConnection {
-  /** Pass as `{ client }` to generated SDK functions. */
-  client: Client;
+  /** Pass as `{ client }` to typed fetch methods. */
+  client: Client<paths>;
   /** The organization requests act on. */
   organization: CloudOrganization;
   /**
-   * Await a generated SDK call and return its data, or throw a
+   * Await a typed fetch call and return its data, or throw a
    * `CommandError` with a stable code: `cloud_unreachable`,
    * `not_authenticated`, `forbidden`, `context.notFound.code` (default
    * `not_found`), `validation_error`, `rate_limited` or `cloud_api_error`.
@@ -150,8 +160,13 @@ export async function connectCloud(): Promise<CloudConnection> {
   // `/api/v1/test-auth` is not in the OpenAPI document; the auth PR in the
   // CLI rewrite replaces this identity lookup.
   const identity = await call(
-    createCloudClient(apiKey).get<{ 200: AuthWireResponse }, unknown, false>({
-      url: "/api/v1/test-auth",
+    fetch(`${cloudBaseUrl()}/api/v1/test-auth`, {
+      headers: { Accept: "application/json", "x-api-key": apiKey },
+    }).then(async (response) => {
+      const body: unknown = await response.json();
+      return response.ok
+        ? { data: body as AuthWireResponse, response }
+        : { error: body, response };
     })
   );
   const organizations = identity.profiles.map((profile) => ({
@@ -182,8 +197,11 @@ export async function connectCloud(): Promise<CloudConnection> {
   };
 }
 
-function createCloudClient(apiKey: string, organizationId?: string): Client {
-  return createClient({
+function createCloudClient(
+  apiKey: string,
+  organizationId?: string
+): Client<paths> {
+  return createClient<paths>({
     baseUrl: cloudBaseUrl(),
     headers: {
       Accept: "application/json",

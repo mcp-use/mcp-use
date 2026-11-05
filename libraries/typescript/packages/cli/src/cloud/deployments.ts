@@ -1,7 +1,6 @@
 import { parseArgs } from "node:util";
 
 import { connectCloud } from "./api/client.js";
-import { getApiV1DeploymentsById } from "./api/generated/sdk.gen.js";
 import { cloudApiForOrganization, type CloudApi } from "./cloud-api.js";
 import { parseCommandArgs, runCommand } from "../core/command.js";
 import { UsageError } from "../core/errors.js";
@@ -102,7 +101,7 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
   return 0;
 }
 
-/** `deployments get`, on the generated client and the command conventions. */
+/** `deployments get`, on the typed fetch client and the command conventions. */
 async function get(argv: readonly string[]): Promise<number> {
   return runCommand(argv, async (output) => {
     const { positionals } = parseCommandArgs(argv, {
@@ -114,7 +113,9 @@ async function get(argv: readonly string[]): Promise<number> {
     const id = positionals[0]!;
     const cloud = await connectCloud();
     const deployment = await cloud.call(
-      getApiV1DeploymentsById({ client: cloud.client, path: { id } }),
+      cloud.client.GET("/api/v1/deployments/{id}", {
+        params: { path: { id } },
+      }),
       {
         notFound: {
           code: "deployment_not_found",

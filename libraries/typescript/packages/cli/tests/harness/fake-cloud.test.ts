@@ -5,6 +5,9 @@
  * the routing behaviour is tested over HTTP, the way the CLI talks to it.
  */
 import { afterEach, describe, expect, test } from "vitest";
+import type { Client } from "openapi-fetch";
+
+import type { paths } from "../../src/cloud/api/generated/types.gen.js";
 
 import { deployment } from "../helpers/cloud-fixtures.js";
 import { startFakeCloud, type FakeCloud } from "../helpers/fake-cloud.js";
@@ -29,7 +32,19 @@ async function get(path: string): Promise<{ status: number; body: unknown }> {
  * being an error, which is what keeps fixtures in step with the generated
  * Cloud types.
  */
-function typeContract(fake: FakeCloud): void {
+function typeContract(fake: FakeCloud, client: Client<paths>): void {
+  // Requests infer both their input and result from the route.
+  void client.GET("/api/v1/deployments/{id}", {
+    params: { path: { id: "dep_1" } },
+  });
+  void client.POST("/api/v1/deployments", { body: { serverId: "srv_1" } });
+  // @ts-expect-error -- only generated routes can be requested.
+  void client.GET("/api/v1/deployment/dep_1");
+  // @ts-expect-error -- this route requires the id path parameter.
+  void client.GET("/api/v1/deployments/{id}");
+  // @ts-expect-error -- creating a deployment requires serverId.
+  void client.POST("/api/v1/deployments", { body: {} });
+
   const { mcpUrl: _dropped, ...withoutMcpUrl } = deployment({ id: "dep_1" });
   // @ts-expect-error -- Cloud's deployment response requires `mcpUrl`.
   fake.on("GET", "/api/v1/deployments/dep_1", { body: withoutMcpUrl });

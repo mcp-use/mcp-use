@@ -23,6 +23,14 @@ const packageRoots = new Map([
     resolvePackageRoot("@modelcontextprotocol/core"),
   ],
   ["zod", resolvePackageRoot("zod")],
+  [
+    "openapi-fetch",
+    dirname(
+      fileURLToPath(
+        new URL("../node_modules/openapi-fetch/package.json", import.meta.url)
+      )
+    ),
+  ],
 ]);
 
 mkdirSync(targetDirectory, { recursive: true });
