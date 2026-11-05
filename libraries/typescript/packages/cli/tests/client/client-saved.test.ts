@@ -186,7 +186,8 @@ describe("client option validation", () => {
     cli,
     cloud,
   }) => {
-    cloud.on("POST", "/mcp", { status: 500, body: {} });
+    // The fake stands in for a remote MCP server here, not for Cloud.
+    cloud.onUndocumented("POST", "/mcp", { status: 500, body: {} });
     await seedServers(cli, {
       remote: { url: `${cloud.origin}/mcp`, oauth: true, protocol: "auto" },
     });

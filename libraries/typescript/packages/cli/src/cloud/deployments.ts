@@ -1,6 +1,9 @@
 import { parseArgs } from "node:util";
 
+import { connectCloud } from "./api/client.js";
+import { getApiV1DeploymentsById } from "./api/generated/sdk.gen.js";
 import { cloudApiForOrganization, type CloudApi } from "./cloud-api.js";
+import { parseCommandArgs, runCommand } from "../core/command.js";
 import { UsageError } from "../core/errors.js";
 import { printResult, reportError, wantsJson } from "../core/output.js";
 import { confirm } from "../core/prompt.js";
@@ -57,7 +60,7 @@ export async function runDeployments(argv: readonly string[]): Promise<number> {
   try {
     const subcommand = argv[0];
     if (subcommand === "list") return await list(argv.slice(1), json);
-    if (subcommand === "get") return await get(argv.slice(1), json);
+    if (subcommand === "get") return await get(argv.slice(1));
     if (subcommand === "logs") return await logs(argv.slice(1), json);
     if (subcommand === "restart") return await restart(argv.slice(1), json);
     if (subcommand === "stop") return await stop(argv.slice(1), json);
@@ -99,18 +102,34 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
   return 0;
 }
 
-async function get(argv: readonly string[], json: boolean): Promise<number> {
-  const { positionals } = parseSimple(argv, {
-    json: { type: "boolean" as const },
+/** `deployments get`, on the generated client and the command conventions. */
+async function get(argv: readonly string[]): Promise<number> {
+  return runCommand(argv, async (output) => {
+    const { positionals } = parseCommandArgs(argv, {
+      options: { json: { type: "boolean" } },
+      positionals: 1,
+      usage: "mcp-use deployments get <deployment-id> [--json]",
+      nextSteps: [LIST_DEPLOYMENTS],
+    });
+    const id = positionals[0]!;
+    const cloud = await connectCloud();
+    const deployment = await cloud.call(
+      getApiV1DeploymentsById({ client: cloud.client, path: { id } }),
+      {
+        notFound: {
+          code: "deployment_not_found",
+          nextSteps: [LIST_DEPLOYMENTS],
+        },
+      }
+    );
+    output.result(deployment, formatDeployment(deployment));
   });
-  const id = one(positionals, "mcp-use deployments get <deployment-id>");
-  const { api } = await cloudApiForOrganization();
-  const deployment = await api.request<Deployment>(
-    `/deployments/${encodeURIComponent(id)}`
-  );
-  printResult(deployment, json, formatDeployment(deployment));
-  return 0;
 }
+
+const LIST_DEPLOYMENTS = {
+  description: "List deployments",
+  command: "mcp-use deployments list --json",
+};
 
 async function logs(argv: readonly string[], json: boolean): Promise<number> {
   const { values, positionals } = parseSimple(argv, {
