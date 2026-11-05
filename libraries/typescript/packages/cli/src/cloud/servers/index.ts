@@ -1,6 +1,5 @@
 import {
   cloudFor,
-  human,
   integer,
   parseCloudArgs,
   projectServer,
@@ -9,6 +8,9 @@ import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
+import { formatServer, formatServerList } from "./output.js";
+import { plain } from "../../core/format.js";
+import { cloudWebUrl } from "../cloud-api.js";
 import { updateServer } from "./update.js";
 
 const COMMANDS = ["list", "get", "update", "rm", "remove"];
@@ -47,15 +49,7 @@ export async function runServers(argv: readonly string[]): Promise<number> {
           },
         })
       );
-      output.result(
-        page,
-        page.items
-          .map(
-            (item) =>
-              `${item.id}\t${item.name ?? item.slug ?? "-"}\t${item.status}`
-          )
-          .join("\n") || "No servers."
-      );
+      output.result(page, formatServerList(page.items, page.total));
       return;
     }
     const { cloud, server, details } = await projectServer(
@@ -63,7 +57,18 @@ export async function runServers(argv: readonly string[]): Promise<number> {
       positionals[0]
     );
     if (operation === "get") {
-      output.result(details, human(details));
+      output.result(
+        details,
+        formatServer(
+          {
+            ...details,
+            dashboardUrl: `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(server)}/overview`,
+          },
+          cloud.organization.name ??
+            cloud.organization.slug ??
+            cloud.organization.id
+        )
+      );
       return;
     }
     if (
@@ -80,6 +85,9 @@ export async function runServers(argv: readonly string[]): Promise<number> {
         params: { path: { id: server } },
       })
     );
-    output.result(result, `Removed ${server}.`);
+    output.result(
+      result,
+      `✓ Removed server “${plain(details.name ?? details.slug ?? server)}”\nID  ${plain(server)}`
+    );
   });
 }

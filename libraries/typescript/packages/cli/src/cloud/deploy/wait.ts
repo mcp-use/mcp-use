@@ -6,7 +6,12 @@ import type { Cloud } from "./types.js";
 export async function waitForDeployment(
   cloud: Cloud,
   id: string
-): Promise<{ status: string; mcpUrl: string | null }> {
+): Promise<{
+  status: string;
+  mcpUrl: string | null;
+  gitBranch?: string | null;
+  gitCommitSha?: string | null;
+}> {
   const override = process.env["MCP_USE_POLL_INTERVAL_MS"];
   const interval =
     override !== undefined && /^\d+$/.test(override) ? Number(override) : 1000;
@@ -33,7 +38,12 @@ export async function waitForDeployment(
       }
     );
     if (deployment.status === "running")
-      return { status: deployment.status, mcpUrl: deployment.mcpUrl };
+      return {
+        status: deployment.status,
+        mcpUrl: deployment.mcpUrl,
+        gitBranch: deployment.gitBranch,
+        gitCommitSha: deployment.gitCommitSha,
+      };
     if (
       ["failed", "stopped", "cancelled", "canceled", "deleted"].includes(
         deployment.status

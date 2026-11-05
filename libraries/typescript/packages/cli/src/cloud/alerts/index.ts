@@ -5,6 +5,8 @@ import { confirm } from "../../core/prompt.js";
 import { cloudWebUrl } from "../cloud-api.js";
 import type { operations } from "../api/generated/types.gen.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
+import { plain, fields } from "../../core/format.js";
+import { formatAlert, formatAlertList } from "./output.js";
 import { readAlertFile } from "./config.js";
 
 const USAGE =
@@ -132,9 +134,11 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
       }));
       output.result(
         { total: result.total, rules, dashboardUrl },
-        rules
-          .map((rule) => `${rule.id}\t${rule.config.name}\t${rule.status}`)
-          .join("\n") || "No alert rules."
+        formatAlertList(
+          result.rules,
+          result.total,
+          found.name ?? found.slug ?? id
+        )
       );
     } else if (command === "create") {
       const result = await cloud.call(
@@ -153,7 +157,7 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
       );
       output.result(
         { rule: publicRule(result.rule), dashboardUrl },
-        `Created alert ${result.rule.id}.`
+        `✓ Created alert “${plain(result.rule.config.name)}”\n${fields([["ID", result.rule.id]])}`
       );
     } else {
       const current = await cloud.call(
@@ -164,7 +168,11 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
       if (command === "get")
         output.result(
           { rule: publicRule(current.rule), dashboardUrl },
-          JSON.stringify(publicRule(current.rule), null, 2)
+          formatAlert(
+            current.rule,
+            found.name ?? found.slug ?? id,
+            dashboardUrl
+          )
         );
       else if (command === "rm") {
         const result = await cloud.call(
@@ -173,7 +181,10 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
             body: { expectedRevision: current.rule.revision },
           })
         );
-        output.result({ ...result, dashboardUrl }, `Removed alert ${ruleId}.`);
+        output.result(
+          { ...result, dashboardUrl },
+          `✓ Removed alert “${plain(current.rule.config.name)}”\n${fields([["ID", ruleId]])}`
+        );
       } else {
         const result = await cloud.call(
           cloud.client.PUT("/api/v1/servers/{id}/alerts/rules/{ruleId}", {
@@ -193,7 +204,10 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
         );
         output.result(
           { rule: publicRule(result.rule), dashboardUrl },
-          `Updated alert ${ruleId}.`
+          `✓ Updated alert “${plain(result.rule.config.name)}”\n${fields([
+            ["Rule", result.rule.config.enabled ? "Enabled" : "Paused"],
+            ["ID", ruleId],
+          ])}`
         );
       }
     }

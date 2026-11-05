@@ -1,3 +1,5 @@
+import { plain } from "../../core/format.js";
+import { formatDomain } from "./output.js";
 import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
@@ -63,7 +65,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
       })
     );
     const id = found.id;
-    const dashboardUrl = `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(id)}/settings`;
+    const dashboardUrl = `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(id)}/domains`;
     const query =
       typeof values["domain-id"] !== "string"
         ? {}
@@ -77,7 +79,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
       );
       output.result(
         { serverId: id, subdomain: argument, dashboardUrl },
-        `Subdomain set to ${argument}.`
+        `✓ Subdomain set to ${plain(argument)}.`
       );
     } else if (command === "add") {
       const result = await cloud.call(
@@ -93,7 +95,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
       );
       output.result(
         { ...result, dashboardUrl },
-        `Add CNAME ${result.domain} → ${result.cnameTarget}\n${result.dnsInstructions}`
+        formatDomain(result, found.name ?? id, found.mcpUrl)
       );
     } else if (command === "verify") {
       const result = await cloud.call(
@@ -113,7 +115,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
           params: { path: { id }, query },
         })
       );
-      output.result({ ...result, dashboardUrl }, result.message);
+      output.result({ ...result, dashboardUrl }, `✓ ${plain(result.message)}`);
     } else {
       const result = await cloud.call(
         cloud.client.GET("/api/v1/servers/{id}/domain/status", {
@@ -122,9 +124,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
       );
       output.result(
         { ...result, dashboardUrl },
-        result.domain
-          ? `${result.domain}: ${result.verified ? "verified" : "pending"}\nCNAME target: ${result.cnameTarget ?? "pending"}`
-          : "No custom domain configured."
+        formatDomain(result, found.name ?? id, found.mcpUrl)
       );
     }
   });

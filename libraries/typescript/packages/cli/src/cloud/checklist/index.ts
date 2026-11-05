@@ -1,3 +1,4 @@
+import { age, elapsed, table } from "../../core/format.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
@@ -26,6 +27,9 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
       options: {
         ...PROJECT_OPTIONS,
         json: { type: "boolean" },
+        ...(command !== "list"
+          ? { verbose: { type: "boolean" as const } }
+          : {}),
         ...(command === "run" || command === "list"
           ? { branch: { type: "string" as const } }
           : {}),
@@ -71,7 +75,7 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
       );
       const serverId = found.id;
       const api = checklistClient(cloud.apiKey, cloud.organization.id);
-      const dashboardUrl = `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(serverId)}/publish`;
+      const dashboardUrl = `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(serverId)}/checklist`;
       const branch =
         typeof values.branch === "string" ? { branch: values.branch } : {};
       if (command === "list") {
@@ -80,7 +84,7 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
             params: { path: { serverId }, query: { limit, skip, ...branch } },
           })
         );
-        const items = page.items.map(checklistRun);
+        const items = page.items.map((item) => checklistRun(item));
         return {
           value: {
             items,
@@ -89,9 +93,18 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
             skip: page.skip,
             dashboardUrl,
           },
-          human:
-            items.map((run) => `${run.id}\t${run.status}`).join("\n") ||
-            "No checklist runs.",
+          human: items.length
+            ? `Checklist runs · ${found.name ?? found.slug ?? serverId}\n\n${table(
+                ["STATUS", "BRANCH", "DURATION", "CREATED", "ID"],
+                items.map((run) => [
+                  run.status,
+                  run.gitBranch,
+                  elapsed(run.startedAt, run.completedAt),
+                  age(run.createdAt),
+                  run.id,
+                ])
+              )}\n\n${items.length} shown · ${page.total} total`
+            : "No checklist runs on this page.\nStart one: mcp-use checklist run",
         };
       }
       const get = async (auditId: string) =>
@@ -100,7 +113,8 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
             api.GET("/api/v1/server-audits/{serverId}/audits/{auditId}", {
               params: { path: { serverId, auditId } },
             })
-          )
+          ),
+          true
         );
       let run;
       if (command === "cancel")
@@ -112,7 +126,8 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
                 params: { path: { serverId, auditId: positionals[0]! } },
               }
             )
-          )
+          ),
+          true
         );
       else if (command === "get") run = await get(positionals[0]!);
       else {
@@ -122,7 +137,8 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
               params: { path: { serverId } },
               body: branch,
             })
-          )
+          ),
+          true
         );
         if (values["no-wait"] !== true) {
           const started = Date.now();
@@ -150,8 +166,9 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
         }
       }
       return {
-        value: { ...run, dashboardUrl },
+        value: { ...checklistRun(run), dashboardUrl },
         human: formatChecklist(run, {
+          verbose: values.verbose === true,
           serverName: found.name ?? found.slug ?? serverId,
           dashboardUrl,
           color:

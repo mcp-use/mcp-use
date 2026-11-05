@@ -1,3 +1,4 @@
+import { plain, fields } from "../../core/format.js";
 import { readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
 
@@ -8,7 +9,7 @@ import {
   listOrganizations,
 } from "../auth/account.js";
 import { readAuth, requireCredential, updateAuth } from "../auth/store.js";
-import { cloudFor, human, parseCloudArgs } from "../options.js";
+import { cloudFor, parseCloudArgs } from "../options.js";
 import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
@@ -187,7 +188,13 @@ export async function runOrganizations(
       });
     output.result(
       { ...updated, ...(logoUrl ? { logo: logoUrl } : {}) },
-      human({ ...updated, ...(logoUrl ? { logo: logoUrl } : {}) })
+      `✓ Updated organization “${plain(updated.name ?? cloud.organization.name)}”\n${fields(
+        [
+          ["ID", updated.id],
+          ["Slug", updated.slug],
+          ["Logo", logoUrl],
+        ]
+      )}`
     );
   });
 }

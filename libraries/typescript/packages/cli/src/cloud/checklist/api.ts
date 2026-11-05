@@ -22,6 +22,11 @@ export interface ChecklistRun {
     checkName: string;
     status: string;
     message?: string | null;
+    category?: string;
+    severity?: string;
+    platforms?: string[];
+    hint?: { text: string };
+    details?: Array<{ label: string; value: string }>;
   }>;
 }
 
@@ -73,7 +78,10 @@ export function checklistClient(apiKey: string, organizationId: string) {
 }
 
 /** Keep the documented CLI result stable and limit it to public run fields. */
-export function checklistRun(value: unknown): ChecklistRun {
+export function checklistRun(
+  value: unknown,
+  presentation = false
+): ChecklistRun {
   if (
     value === null ||
     typeof value !== "object" ||
@@ -113,6 +121,41 @@ export function checklistRun(value: unknown): ChecklistRun {
         status: String(check.status ?? "unknown"),
         ...(typeof check.message === "string" || check.message === null
           ? { message: check.message }
+          : {}),
+        ...(presentation && typeof check.category === "string"
+          ? { category: check.category }
+          : {}),
+        ...(presentation && typeof check.severity === "string"
+          ? { severity: check.severity }
+          : {}),
+        ...(presentation && Array.isArray(check.platforms)
+          ? {
+              platforms: check.platforms.filter(
+                (p): p is string => typeof p === "string"
+              ),
+            }
+          : {}),
+        ...(presentation &&
+        check.hint &&
+        typeof check.hint === "object" &&
+        "text" in check.hint &&
+        typeof check.hint.text === "string"
+          ? { hint: { text: check.hint.text } }
+          : {}),
+        ...(presentation && Array.isArray(check.details)
+          ? {
+              details: check.details
+                .filter(
+                  (d: unknown): d is { label: string; value: string } =>
+                    d !== null &&
+                    typeof d === "object" &&
+                    "label" in d &&
+                    typeof d.label === "string" &&
+                    "value" in d &&
+                    typeof d.value === "string"
+                )
+                .map(({ label, value }) => ({ label, value })),
+            }
           : {}),
       }));
   }

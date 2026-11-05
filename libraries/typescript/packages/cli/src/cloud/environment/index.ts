@@ -1,3 +1,4 @@
+import { plain, table } from "../../core/format.js";
 import { readFile } from "node:fs/promises";
 
 import { parseCloudArgs, projectServer, stdinText } from "../options.js";
@@ -88,12 +89,17 @@ export async function runEnv(argv: readonly string[]): Promise<number> {
       const safe = scoped.map(metadata);
       output.result(
         safe,
-        safe
-          .map(
-            (item) =>
-              `${item.key}\t${item.environments.join(",")}\t${item.phase}\t${item.sensitive ? "sensitive" : "plain"}`
-          )
-          .join("\n") || "No environment variables."
+        safe.length
+          ? table(
+              ["NAME", "ENVIRONMENTS", "PHASE", "VALUE"],
+              safe.map((item) => [
+                item.key,
+                item.environments.join(", "),
+                item.phase,
+                item.sensitive ? "Sensitive" : "Plain",
+              ])
+            )
+          : "No environment variables in this scope.\nSet one: mcp-use env set NAME=value"
       );
       return;
     }
@@ -122,7 +128,7 @@ export async function runEnv(argv: readonly string[]): Promise<number> {
         );
       output.result(
         { removed: existing.key, environment, branch: values.branch ?? null },
-        `Removed ${existing.key}.`
+        `✓ Removed ${plain(existing.key)} from ${plain(environment)}.`
       );
       return;
     }
@@ -176,7 +182,7 @@ export async function runEnv(argv: readonly string[]): Promise<number> {
     }
     output.result(
       { serverId: server, variables: results },
-      results.map((item) => `Set ${item.key}.`).join("\n")
+      results.map((item) => `✓ Set ${plain(item.key)}.`).join("\n")
     );
   });
 }

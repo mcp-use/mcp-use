@@ -80,8 +80,9 @@ test("domains add sends the branch and prints the CNAME target", async ({
     { env: SIGNED_IN }
   );
   expect(result.exitCode).toBe(0);
-  expect(result.stdout).toContain(
-    "CNAME weather.example.com → domains.example.com"
+  expect(result.stdout).toContain("DNS records");
+  expect(result.stdout).toMatch(
+    /CNAME\s+weather.example.com\s+domains.example.com/
   );
   expect(
     cloud.requestsTo("POST", "/api/v1/servers/srv_1/domain/request")

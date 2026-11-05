@@ -133,8 +133,3 @@ export async function stdinText(): Promise<string> {
   }
   return Buffer.concat(chunks).toString("utf8");
 }
-
-/** A compact human summary; JSON output preserves the complete selected result. */
-export function human(value: unknown): string {
-  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
-}

@@ -331,6 +331,7 @@ const pages: Record<string, Page> = {
           ...project,
           branch,
           ["--no-wait", "Return the run ID immediately"],
+          ["--verbose", "Show every check and full finding details"],
         ],
         examples: ["mcp-use checklist run --no-wait"],
       },
@@ -342,13 +343,19 @@ const pages: Record<string, Page> = {
       get: {
         summary: "Show a checklist run.",
         args: "<run-id>",
-        options: project,
+        options: [
+          ...project,
+          ["--verbose", "Show every check and full finding details"],
+        ],
         examples: ["mcp-use checklist get run_123"],
       },
       cancel: {
         summary: "Cancel a checklist run.",
         args: "<run-id>",
-        options: project,
+        options: [
+          ...project,
+          ["--verbose", "Show every check and full finding details"],
+        ],
         examples: ["mcp-use checklist cancel run_123"],
       },
     },

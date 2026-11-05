@@ -1,3 +1,5 @@
+import { elapsed } from "../../core/format.js";
+import { formatDeployReceipt } from "../deployments/output.js";
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { connectCloud } from "../api/client.js";
@@ -219,7 +221,13 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         { code: "source_mode_conflict" }
       );
     let started: StartedDeployment;
-    let terminal: { status: string; mcpUrl?: string | null };
+    let terminal: {
+      status: string;
+      mcpUrl?: string | null;
+      gitBranch?: string | null;
+      gitCommitSha?: string | null;
+    };
+    const deploymentStartedAt = new Date().toISOString();
     try {
       started = managed ? await deployUpload(input) : await deployGitHub(input);
       terminal = values["no-wait"]
@@ -231,8 +239,16 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
     const dashboardUrl = dashboard(started.serverId);
     if (values.open && dashboardUrl) openBrowser(dashboardUrl);
     output.result(
-      { ...started, ...terminal, dashboardUrl },
-      `Deployment ${started.deploymentId} ${terminal.status}.${dashboardUrl ? `\n${dashboardUrl}` : ""}`
+      {
+        ...started,
+        status: terminal.status,
+        ...(terminal.mcpUrl !== undefined ? { mcpUrl: terminal.mcpUrl } : {}),
+        dashboardUrl,
+      },
+      formatDeployReceipt(
+        { ...started, ...terminal, dashboardUrl },
+        elapsed(deploymentStartedAt, new Date().toISOString())
+      )
     );
   });
 }

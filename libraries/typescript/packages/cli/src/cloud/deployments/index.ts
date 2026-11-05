@@ -1,8 +1,9 @@
-import { cloudFor, human, integer, parseCloudArgs } from "../options.js";
+import { cloudFor, integer, parseCloudArgs } from "../options.js";
 import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
+import { plain } from "../../core/format.js";
 import { formatDeployment, formatDeploymentList } from "./output.js";
 
 const COMMANDS = ["list", "get", "restart", "promote", "stop", "rm", "remove"];
@@ -99,7 +100,10 @@ export async function runDeployments(argv: readonly string[]): Promise<number> {
           },
         })
       );
-      output.result(result, `Created deployment ${result.id}.`);
+      output.result(
+        result,
+        `✓ Created deployment ${plain(result.id)}\nInspect: mcp-use deployments get ${plain(result.id)}`
+      );
       return;
     }
     const result =
@@ -119,6 +123,9 @@ export async function runDeployments(argv: readonly string[]): Promise<number> {
               cloud.client.DELETE("/api/v1/deployments/{id}", { params }),
               context
             );
-    output.result(result, human(result));
+    output.result(
+      result,
+      `✓ ${operation === "promote" ? "Promoted" : operation === "stop" ? "Stopped" : "Removed"} deployment ${plain(id)}`
+    );
   });
 }
