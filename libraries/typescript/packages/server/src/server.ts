@@ -2176,8 +2176,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     return new Proxy(requestContext as object, {
       get(target, prop) {
         if (Object.hasOwn(overlay, prop)) return overlay[prop];
-        const value = Reflect.get(target, prop, target);
-        return typeof value === "function" ? value.bind(target) : value;
+        const value: unknown = Reflect.get(target, prop, target);
+        return typeof value === "function"
+          ? (value as (...args: unknown[]) => unknown).bind(target)
+          : value;
       },
       set(_target, prop, value) {
         overlay[prop] = value;
