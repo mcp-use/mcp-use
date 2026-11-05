@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   CommandError,
   GLOBAL_STATE_DIR,
+  parseUrlArgument,
   readJson,
   removeFile,
   writePrivateJson,
@@ -63,6 +64,14 @@ export function cloudApiUrl(): string {
   const configured =
     process.env["MCP_USE_CLOUD_API_URL"] ?? process.env["MCP_API_URL"];
   const base = configured ?? "https://cloud.manufact.com/api/v1";
+  if (configured !== undefined) {
+    parseUrlArgument(
+      configured,
+      process.env["MCP_USE_CLOUD_API_URL"] !== undefined
+        ? "MCP_USE_CLOUD_API_URL"
+        : "MCP_API_URL"
+    );
+  }
   return base.replace(/\/+$/, "").replace(/\/api\/v1$/, "") + "/api/v1";
 }
 

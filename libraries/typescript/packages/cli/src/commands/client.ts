@@ -13,6 +13,7 @@ import {
   confirm,
   GLOBAL_STATE_DIR,
   openBrowser,
+  parseUrlArgument,
   pathExists,
   printResult,
   readJson,
@@ -67,10 +68,7 @@ export async function runClient(argv: readonly string[]): Promise<number> {
     }
     return await savedServerCommand(first, normalizedArgv.slice(1), json);
   } catch (error) {
-    return reportError(
-      error instanceof TypeError ? new UsageError(error.message) : error,
-      json
-    );
+    return reportError(error, json);
   }
 }
 
@@ -95,7 +93,7 @@ async function connect(
   }
   const [name, rawUrl] = positionals as [string, string];
   validateName(name);
-  const url = new URL(rawUrl);
+  const url = parseUrlArgument(rawUrl, "Server URL");
   if (!["http:", "https:"].includes(url.protocol)) {
     throw new UsageError("Client URLs must use http or https.");
   }
