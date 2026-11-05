@@ -15,7 +15,8 @@ import {
   validateExternalServer,
 } from "./external-url.js";
 import { waitForDeployment } from "./wait.js";
-import type { DeployValues, DeployInput } from "./types.js";
+import { createDeployProgress } from "./progress.js";
+import type { DeployValues, DeployInput, StartedDeployment } from "./types.js";
 
 const HELP = `Usage: mcp-use deploy [path] [options]
 
@@ -163,6 +164,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
             }),
             { notFound: { code: "server_not_found" } }
           );
+    const progress = createDeployProgress(output.json);
     const input: DeployInput = {
       cloud,
       cwd,
@@ -171,6 +173,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         : null,
       values,
       env,
+      onDeploying: progress.start,
       ...(linkedServer !== undefined ? { linkedServer } : {}),
     };
     const dashboard = (id: string) =>
@@ -211,12 +214,16 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         "--watch-paths and --wait-for-ci require GitHub deployments.",
         { code: "source_mode_conflict" }
       );
-    const started = managed
-      ? await deployUpload(input)
-      : await deployGitHub(input);
-    const terminal = values["no-wait"]
-      ? { status: "pending" }
-      : await waitForDeployment(cloud, started.deploymentId);
+    let started: StartedDeployment;
+    let terminal: { status: string; mcpUrl?: string | null };
+    try {
+      started = managed ? await deployUpload(input) : await deployGitHub(input);
+      terminal = values["no-wait"]
+        ? { status: "pending" }
+        : await waitForDeployment(cloud, started.deploymentId);
+    } finally {
+      progress.stop();
+    }
     const dashboardUrl = dashboard(started.serverId);
     if (values.open && dashboardUrl) openBrowser(dashboardUrl);
     output.result(

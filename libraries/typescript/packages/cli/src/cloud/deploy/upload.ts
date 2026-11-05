@@ -70,7 +70,7 @@ export async function deployUpload(
   if (!(await pathExists(sourceRoot)))
     throw new UsageError(`Project directory not found: ${sourceRoot}`);
   validateSourcePath(sourceRoot, values.dockerfile, "--dockerfile");
-  if (!values.json) process.stderr.write("Deploying...\n");
+  input.onDeploying();
   const archive = await packProject(cwd);
   assertManagedArchiveSize(archive.byteLength);
   const branch =
