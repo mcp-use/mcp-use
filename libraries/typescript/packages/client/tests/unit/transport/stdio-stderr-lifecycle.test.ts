@@ -151,6 +151,8 @@ describe("stdio stderr cleanup with a backpressured destination", () => {
     ["natural", "disabled"],
     ["natural", "destroy-before-callback-error"],
     ["natural", "destroy-before-callback-success"],
+    ["natural", "tail-error"],
+    ["explicit", "tail-error"],
     ["natural", "open-failure"],
   ])(
     "handles errlog errors with %s exit and %s ordering",

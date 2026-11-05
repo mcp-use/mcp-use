@@ -10,6 +10,13 @@ import { StdioConnector } from "../../../src/transport/stdio.js";
 import { deferred } from "../../helpers/deferred.js";
 
 class ObservableStdioConnector extends StdioConnector {
+  transportStarts = 0;
+
+  protected override async establishTransport(): Promise<void> {
+    this.transportStarts++;
+    await super.establishTransport();
+  }
+
   get sdkClient() {
     if (!this.client) throw new Error("No SDK client");
     return this.client;
@@ -31,7 +38,7 @@ function isAlive(pid: number): boolean {
   }
 }
 
-function fixture(mode?: string) {
+function fixture(mode?: string, autoConnect = true) {
   const directory = mkdtempSync(join(tmpdir(), "mcp-session-close-"));
   const spawnLog = join(directory, "children.txt");
   writeFileSync(spawnLog, "");
@@ -52,7 +59,7 @@ function fixture(mode?: string) {
     ],
     errlog,
   });
-  const session = new MCPSession(connector);
+  const session = new MCPSession(connector, autoConnect);
   onTestFinished(async () => {
     try {
       for (const pid of pids()) {
@@ -86,6 +93,32 @@ async function expectPing(session: MCPSession, pid: number) {
 }
 
 describe("stdio session after server exit", () => {
+  it("reuses an established client across repeated initialization", async () => {
+    const { session, connector, pids } = fixture();
+    await session.initialize();
+    const client = connector.sdkClient;
+    await Promise.all([session.initialize(), session.initialize()]);
+    expect(connector.transportStarts).toBe(1);
+    expect(connector.sdkClient).toBe(client);
+    await expectPing(session, pids()[0]);
+  });
+
+  it("keeps reconnection explicit when autoConnect is disabled", async () => {
+    const { session, connector, pids } = fixture(undefined, false);
+    await expect(session.initialize()).rejects.toThrow("not connected");
+    expect(connector.transportStarts).toBe(0);
+    await session.connect();
+    await session.initialize();
+    await expectPing(session, pids()[0]);
+    await session.disconnect();
+    await expect(session.initialize()).rejects.toThrow("not connected");
+    expect(connector.transportStarts).toBe(1);
+    await session.connect();
+    await session.initialize();
+    expect(connector.transportStarts).toBe(2);
+    await expectPing(session, pids()[1]);
+  });
+
   it("clears idle close state and reconnects with one fresh client and transport", async () => {
     const { session, connector, pids, errlog } = fixture();
     await session.initialize();
@@ -137,6 +170,49 @@ describe("stdio session after server exit", () => {
     await expectPing(session, pids()[1]);
   });
 
+  it("waits for client close before initializing a fresh session", async () => {
+    const { session, connector, pids } = fixture();
+    await session.initialize();
+    const oldClient = connector.sdkClient;
+    const close = oldClient.close.bind(oldClient);
+    const cleanup = deferred();
+    const cleanupStarted = deferred();
+    vi.spyOn(oldClient, "close").mockImplementation(async () => {
+      cleanupStarted.resolve();
+      await cleanup.promise;
+      await close();
+    });
+    onTestFinished(() => cleanup.resolve());
+    const listTools = vi.spyOn(oldClient, "listTools");
+    const closed = observeClose(connector);
+    process.kill(pids()[0], "SIGTERM");
+    await closed;
+    await cleanupStarted.promise;
+    expect(connector.sdkClient).toBe(oldClient);
+
+    const initializations = [session.initialize(), session.initialize()];
+    const settled = vi.fn();
+    for (const initialization of initializations) {
+      void initialization.then(settled, settled);
+    }
+    try {
+      await setImmediate();
+      expect(listTools).not.toHaveBeenCalled();
+      expect(settled).not.toHaveBeenCalled();
+      expect(connector.transportStarts).toBe(1);
+
+      cleanup.resolve();
+      await Promise.all(initializations);
+      expect(connector.transportStarts).toBe(2);
+      expect(connector.sdkClient).not.toBe(oldClient);
+      await expectPing(session, pids()[1]);
+      await vi.waitFor(() => expect(isAlive(pids()[0])).toBe(false));
+    } finally {
+      cleanup.resolve();
+      await Promise.allSettled(initializations);
+    }
+  });
+
   it("waits for close cleanup before satisfying concurrent reconnects", async () => {
     const { session, connector, pids, errlog } = fixture();
     await session.initialize();
@@ -168,9 +244,11 @@ describe("stdio session after server exit", () => {
       for (const reconnect of reconnects) void reconnect.then(settled, settled);
       await setImmediate();
       expect(settled).not.toHaveBeenCalled();
+      expect(connector.transportStarts).toBe(1);
       expect(pids()).toHaveLength(1);
       cleanup.resolve();
       await Promise.all(reconnects);
+      expect(connector.transportStarts).toBe(2);
       expect(pids()).toHaveLength(2);
       expect(errlog.listenerCount("error")).toBe(connectedListeners);
       await expectPing(session, pids()[1]);
@@ -188,7 +266,7 @@ describe("stdio session after server exit", () => {
     await Promise.all([disconnect, session.connect(), session.connect()]);
 
     expect(pids()).toHaveLength(2);
-    expect(isAlive(pids()[0])).toBe(false);
+    await vi.waitFor(() => expect(isAlive(pids()[0])).toBe(false));
     expect(connector.sdkClient).not.toBe(oldClient);
     expect(session.isConnected).toBe(true);
     expect(errlog.listenerCount("error")).toBe(connectedListeners);

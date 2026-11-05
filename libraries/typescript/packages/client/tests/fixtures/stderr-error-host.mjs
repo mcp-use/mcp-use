@@ -9,6 +9,9 @@ const { MCPSession, StdioConnector } = await import(entry);
 let release;
 let firstWritten;
 const firstWrite = new Promise((resolve) => (firstWritten = resolve));
+let tailWritten;
+const tailWrite = new Promise((resolve) => (tailWritten = resolve));
+let writes = 0;
 const failure = new Error("DELAYED_ERRLOG_WRITE");
 const errlog =
   destroyMode === "open-failure"
@@ -18,7 +21,8 @@ const errlog =
         autoDestroy: destroyMode !== "disabled",
         write(_chunk, _encoding, callback) {
           release = callback;
-          firstWritten();
+          if (++writes === 1) firstWritten();
+          else tailWritten();
         },
         ...(destroyMode === "delayed"
           ? {
@@ -67,6 +71,7 @@ try {
     );
     if (mode === "natural") await closed;
     await session.disconnect();
+    assert.equal(errlog.listenerCount("error"), 1);
     // No external error handler: a prematurely removed forwarding guard crashes
     // this host, which the parent test observes as a non-zero exit.
     const destinationClosed =
@@ -78,6 +83,12 @@ try {
       assert.equal(errlog.closed, true);
       release(destroyMode.endsWith("success") ? undefined : failure);
     } else {
+      if (destroyMode === "tail-error") {
+        release();
+        await tailWrite;
+        assert.equal(writes, 2);
+        assert.equal(errlog.listenerCount("error"), 1);
+      }
       release(failure);
     }
     await destinationClosed;

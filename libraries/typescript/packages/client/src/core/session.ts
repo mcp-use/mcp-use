@@ -227,7 +227,8 @@ export class MCPConnection {
    * @see {@link connect} for establishing the connection first
    */
   async initialize(): Promise<void> {
-    if (!this.isConnected && this.autoConnect) {
+    if (this.autoConnect) {
+      // connect() joins pending teardown and reuses an established connection.
       await this.connect();
     }
     await this.connector.initialize();
