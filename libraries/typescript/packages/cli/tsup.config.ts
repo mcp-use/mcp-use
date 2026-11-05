@@ -29,6 +29,8 @@ export default defineConfig({
     "commands/logs": "src/cloud/logs/index.ts",
     "commands/link": "src/cloud/project/link.ts",
     "commands/unlink": "src/cloud/project/unlink.ts",
+    "commands/domains": "src/cloud/domains/index.ts",
+    "commands/github": "src/cloud/github/index.ts",
     "commands/client": "src/client/client.ts",
     "commands/screenshot": "src/client/screenshot.ts",
   },

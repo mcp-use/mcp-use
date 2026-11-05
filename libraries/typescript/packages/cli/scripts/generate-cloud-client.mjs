@@ -61,6 +61,12 @@ const OPERATIONS = [
   "POST /api/auth/organization/create",
   "POST /api/auth/organization/update",
   "POST /api/v1/organizations/{id}/logo",
+  "GET /api/v1/servers/{id}/domain/status",
+  "POST /api/v1/servers/{id}/domain/request",
+  "POST /api/v1/servers/{id}/domain/verify",
+  "DELETE /api/v1/servers/{id}/domain",
+  "GET /api/v1/github/connect-url",
+  "GET /api/v1/github/installations/{installationId}/repos",
 ];
 
 /**
@@ -140,6 +146,7 @@ const RESPONSE_FIELDS = {
     "installations[].account.type",
     "installations[].organizationId",
     "installations[].isActive",
+    "installations[].account",
   ],
   "GET /api/v1/servers/{id}/env-variables": [
     "[].id",
@@ -195,6 +202,7 @@ const REQUEST_FIELDS = {
     "config.rootDir",
     "config.buildCommand",
     "config.startCommand",
+    "slug",
   ],
   "POST /api/auth/organization/create": ["name", "slug"],
   "POST /api/auth/organization/update": [
