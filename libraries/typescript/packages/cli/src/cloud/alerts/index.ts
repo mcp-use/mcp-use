@@ -141,7 +141,12 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
         cloud.client.POST("/api/v1/servers/{id}/alerts/rules", {
           params: { path: { id } },
           body: {
-            config: { ...config!, enabled: config!.enabled ?? true },
+            config: {
+              ...config!,
+              enabled: config!.enabled ?? true,
+              audience: "customer",
+              targets: { serverIds: [id] },
+            },
             reason,
           },
         })
@@ -178,6 +183,8 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
                 ...config!,
                 id: ruleId,
                 enabled: config!.enabled ?? current.rule.config.enabled,
+                audience: "customer",
+                targets: { serverIds: [id] },
               },
               expectedRevision: current.rule.revision,
               reason,
