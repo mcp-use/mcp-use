@@ -125,6 +125,7 @@ export async function deployGitHub(
   validateSourcePath(root, values.dockerfile, "--dockerfile");
   if (probe.dirty)
     await handleDirtyRepository(root, branch, values, values.json === true);
+  if (!values.json) process.stderr.write("Deploying...\n");
   let serverId: string;
   let deploymentId: string;
   if (existing !== null) {
