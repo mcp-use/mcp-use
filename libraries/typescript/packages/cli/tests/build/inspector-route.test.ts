@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isInspectorPath } from "../../src/build/inspector-route.js";
+import { isInspectorPath } from "../../src/toolchain/inspector-route.js";
 
 describe("isInspectorPath", () => {
   it("matches the mount under a nested basePath", () => {

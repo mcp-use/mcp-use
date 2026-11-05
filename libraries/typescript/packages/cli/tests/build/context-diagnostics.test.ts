@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runInNewContext } from "node:vm";
 afterEach(() => vi.restoreAllMocks());
-import { mcpUseViewsPlugin } from "../../src/build/views-plugin.js";
-import { sanitizeContextDiagnostic } from "../../src/build/context-diagnostics.js";
+import { mcpUseViewsPlugin } from "../../src/toolchain/views-plugin.js";
+import { sanitizeContextDiagnostic } from "../../src/toolchain/context-diagnostics.js";
 
 describe("development context diagnostics", () => {
   it("retains protocol structure and strips text, image bytes, metadata and unknown fields", () => {

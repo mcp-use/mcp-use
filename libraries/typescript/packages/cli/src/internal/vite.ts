@@ -1,11 +1,11 @@
 /** Shared Vite tooling used by framework adapters. @internal */
-export { mcpUseViewsPlugin } from "../build/views-plugin.js";
+export { mcpUseViewsPlugin } from "../toolchain/views-plugin.js";
 export {
   discoverViews,
   buildDevViewsManifest,
   virtualViewId,
   isViewEntryPath,
-} from "../build/views.js";
-export { syncMcpEnvDeclaration } from "../build/mcp-env-declaration.js";
+} from "../toolchain/views.js";
+export { syncMcpEnvDeclaration } from "../toolchain/mcp-env-declaration.js";
 
-export { readViewConfig } from "../build/view-config.js";
+export { readViewConfig } from "../toolchain/view-config.js";

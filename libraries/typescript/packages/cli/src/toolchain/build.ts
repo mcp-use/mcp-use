@@ -482,7 +482,7 @@ async function buildView(
  * @throws If no entry is found (see {@link discoverEntry}) or a server/view
  * build or binding validation step fails.
  *
- * @internal Reached only via the bin's `import("../build/commands/build.js")`
+ * @internal Reached only via the bin's `import("../toolchain/commands/build.js")`
  * dispatch (`bin/main.ts`) — not re-exported from the package's "." entry.
  */
 export async function runBuild(options: BuildOptions): Promise<void> {

@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { discoverEntry, ENTRY_CANDIDATES } from "../../src/build/index.js";
+import { discoverEntry, ENTRY_CANDIDATES } from "../../src/toolchain/index.js";
 import { removeDir, TMP_ROOT } from "./helpers.js";
 
 let counter = 0;

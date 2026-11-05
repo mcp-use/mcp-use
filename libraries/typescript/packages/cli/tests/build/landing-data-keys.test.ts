@@ -5,7 +5,7 @@ import { parseAst, transformWithOxc } from "vite";
 import {
   createLandingDataKeysCollector,
   type GraphNode,
-} from "../../src/build/landing-data-keys.js";
+} from "../../src/toolchain/landing-data-keys.js";
 
 type Collector = ReturnType<typeof createLandingDataKeysCollector>;
 

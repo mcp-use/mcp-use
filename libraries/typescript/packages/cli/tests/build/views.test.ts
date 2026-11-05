@@ -7,7 +7,7 @@ import {
   discoverViews,
   isViewEntryPath,
   isViewPath,
-} from "../../src/build/views.js";
+} from "../../src/toolchain/views.js";
 
 describe("discoverViews", () => {
   const dirs: string[] = [];

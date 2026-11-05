@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveDevClientEndpoint } from "../../src/build/dev-client-endpoint.js";
+import { resolveDevClientEndpoint } from "../../src/toolchain/dev-client-endpoint.js";
 
 describe("resolveDevClientEndpoint", () => {
   it("uses the public MCP origin for remote sandbox assets and HMR", () => {

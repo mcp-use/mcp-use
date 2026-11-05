@@ -16,9 +16,9 @@ import {
   runBuild,
   WORKSPACE_DIR_NAME,
   type BuildManifest,
-} from "../../src/build/index.js";
-import { mcpUseViewsPlugin } from "../../src/build/views-plugin.js";
-import { VIRTUAL_VIEW_RESOLVED_PREFIX } from "../../src/build/views.js";
+} from "../../src/toolchain/index.js";
+import { mcpUseViewsPlugin } from "../../src/toolchain/views-plugin.js";
+import { VIRTUAL_VIEW_RESOLVED_PREFIX } from "../../src/toolchain/views.js";
 import { bindBasicToolToView, copyFixture, removeDir } from "./helpers.js";
 
 const UI_META = {

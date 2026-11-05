@@ -42,14 +42,14 @@ vi.mock("@mcp-use/tunnel", () => ({
 }));
 vi.mock("@tailwindcss/vite", () => ({ default: vi.fn() }));
 vi.mock("@vitejs/plugin-react", () => ({ default: vi.fn() }));
-vi.mock("../../src/build/port.js", () => ({
+vi.mock("../../src/toolchain/port.js", () => ({
   resolvePort: async () => ({ port: 3000, requested: 3000 }),
 }));
-vi.mock("../../src/build/mcp-env-declaration.js", () => ({
+vi.mock("../../src/toolchain/mcp-env-declaration.js", () => ({
   syncMcpEnvDeclaration: vi.fn(),
 }));
 
-import { runDev } from "../../src/build/dev.js";
+import { runDev } from "../../src/toolchain/dev.js";
 
 function server() {
   return {

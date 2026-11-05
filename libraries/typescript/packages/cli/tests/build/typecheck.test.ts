@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { runTypecheck } from "../../src/build/typecheck.js";
+import { runTypecheck } from "../../src/toolchain/typecheck.js";
 import { copyFixture, removeDir } from "./helpers.js";
 
 const dirs: string[] = [];

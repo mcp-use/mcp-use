@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { runBuild, runDev } from "../../src/build/index.js";
+import { runBuild, runDev } from "../../src/toolchain/index.js";
 import { runStart } from "../../src/bin/start.js";
 import {
   copyFixture,

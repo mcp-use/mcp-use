@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { readViewConfig } from "../../src/build/view-config.js";
-import { buildDevViewsManifest } from "../../src/build/views.js";
+import { readViewConfig } from "../../src/toolchain/view-config.js";
+import { buildDevViewsManifest } from "../../src/toolchain/views.js";
 
 const paths: string[] = [];
 afterEach(() =>

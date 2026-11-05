@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   renderMcpEnvDeclaration,
   syncMcpEnvDeclaration,
-} from "../../src/build/mcp-env-declaration.js";
+} from "../../src/toolchain/mcp-env-declaration.js";
 
 const tempDirs: string[] = [];
 

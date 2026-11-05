@@ -2,7 +2,7 @@
  * The `mcp-use` dev/build toolchain, built on Vite.
  *
  * Shared source exports for CLI tests and internal tooling. The published bin
- * dispatches `dev` and `build` through separate `src/build/commands/*` entries so
+ * dispatches `dev` and `build` through separate `src/toolchain/commands/*` entries so
  * neither command, production startup, nor library imports evaluate unrelated
  * Vite code.
  *

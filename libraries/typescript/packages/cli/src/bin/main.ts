@@ -262,7 +262,7 @@ export async function main(
 /** `mcp-use typecheck`: refresh MCP types, then run project-local `tsc`. */
 async function typecheckCommand(args: ParsedArgs): Promise<number> {
   try {
-    const { runTypecheck } = await import("../build/commands/typecheck.js");
+    const { runTypecheck } = await import("../toolchain/commands/typecheck.js");
     return await runTypecheck({
       cwd: resolve(process.cwd(), args.path ?? "."),
       ...(args.entry !== undefined && { entry: args.entry }),
@@ -279,7 +279,7 @@ async function typecheckCommand(args: ParsedArgs): Promise<number> {
 async function startCommand(args: ParsedArgs): Promise<number> {
   let started;
   try {
-    const { runStart } = await import("../build/commands/start.js");
+    const { runStart } = await import("../toolchain/commands/start.js");
     started = await runStart({
       cwd: resolve(process.cwd(), args.path ?? "."),
       port: args.port,
@@ -341,10 +341,10 @@ async function cliCommand(
 
   try {
     if (command === "dev") {
-      const { runDev } = await import("../build/commands/dev.js");
+      const { runDev } = await import("../toolchain/commands/dev.js");
       await runDev(options);
     } else {
-      const { runBuild } = await import("../build/commands/build.js");
+      const { runBuild } = await import("../toolchain/commands/build.js");
       await runBuild(options);
     }
     return 0;

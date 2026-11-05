@@ -16,7 +16,7 @@ import {
 } from "@modelcontextprotocol/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { runDev } from "../../src/build/index.js";
+import { runDev } from "../../src/toolchain/index.js";
 import {
   bindBasicToolToView,
   copyFixture,

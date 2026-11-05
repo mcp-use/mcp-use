@@ -7,7 +7,7 @@ import {
   isNextProject,
   loadProjectEnv,
   nextStandaloneCompatPlugin,
-} from "../../src/build/next-compat.js";
+} from "../../src/toolchain/next-compat.js";
 
 const dirs: string[] = [];
 const keys = ["MCP_USE_ENV_PRIORITY", "MCP_USE_SHELL_PRIORITY"] as const;
