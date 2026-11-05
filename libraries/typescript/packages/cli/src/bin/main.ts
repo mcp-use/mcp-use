@@ -93,6 +93,7 @@ Commands:
   link     Link this project to a cloud server
   unlink   Remove this project's link to a cloud server
   client   Connect to and invoke MCP servers
+  skills   Install version-matched coding agent skills
   screenshot Capture an MCP Apps view
 
 Options:
@@ -263,6 +264,10 @@ export async function main(
   if (command === "deploy") {
     const { runDeploy } = await import("../cloud/deploy/index.js");
     return runDeploy(commandArgs);
+  }
+  if (command === "skills") {
+    const { runSkills } = await import("../skills/install.js");
+    return runSkills(commandArgs);
   }
   if (command === "client") {
     const { runClient } = await import("../client/client.js");
