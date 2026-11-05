@@ -100,11 +100,56 @@ describe("middleware ctx.auth shape", () => {
 
     const response = await server.fetch(toolCall());
     expect(response.status).toBe(200);
+    expect(JSON.stringify(await response.json())).toContain("user-1");
 
     for (const key of ["before", "after", "complete"]) {
       const auth = seen[key] as Record<string, unknown> | undefined;
       expect(auth, key).toMatchObject({ token: "tok", clientId: "client-1" });
       expect(auth, key).not.toHaveProperty("accessToken");
     }
+  });
+  function authServer() {
+    return new MCPServer({
+      name: "auth",
+      version: "1.0.0",
+      oauth: provider(),
+      logging: { enabled: false },
+    });
+  }
+
+  it("keeps the middleware fields visible to spread and Object.keys", async () => {
+    const server = authServer();
+    let keys: string[] = [];
+    server.use("mcp:tools/call", async (ctx, next) => {
+      keys = Object.keys({ ...ctx });
+      return next();
+    });
+    server.tool({ name: "whoami" }, async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+    }));
+
+    const response = await server.fetch(toolCall());
+    expect(response.status).toBe(200);
+    expect(keys).toEqual(
+      expect.arrayContaining(["method", "params", "auth", "state"])
+    );
+  });
+
+  it("forwards writes to existing Hono members instead of the overlay", async () => {
+    const server = authServer();
+    const replacement = new Response("replaced");
+    let seenInCallback: unknown;
+    server.use("mcp:tools/call", async (ctx, next) => {
+      (ctx as unknown as { res: Response }).res = replacement;
+      return next();
+    });
+    server.tool({ name: "whoami" }, async (_args, ctx) => {
+      seenInCallback = (ctx as unknown as { res: Response }).res;
+      return { content: [{ type: "text" as const, text: "ok" }] };
+    });
+
+    const response = await server.fetch(toolCall());
+    expect(response.status).toBe(200);
+    expect(seenInCallback).toBe(replacement);
   });
 });

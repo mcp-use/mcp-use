@@ -2181,11 +2181,31 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           ? (value as (...args: unknown[]) => unknown).bind(target)
           : value;
       },
-      set(_target, prop, value) {
-        overlay[prop] = value;
-        return true;
+      set(target, prop, value) {
+        // Middleware fields (and new keys) live on the overlay; writes to
+        // existing Hono members such as `res` still reach the shared Context.
+        if (Object.hasOwn(overlay, prop) || !(prop in target)) {
+          overlay[prop] = value;
+          return true;
+        }
+        return Reflect.set(target, prop, value, target);
       },
       has: (target, prop) => Object.hasOwn(overlay, prop) || prop in target,
+      ownKeys: (target) => [
+        ...new Set([...Reflect.ownKeys(target), ...Reflect.ownKeys(overlay)]),
+      ],
+      getOwnPropertyDescriptor(target, prop) {
+        const own = Reflect.getOwnPropertyDescriptor(target, prop);
+        if (Object.hasOwn(overlay, prop) && (!own || own.configurable)) {
+          return {
+            value: overlay[prop],
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          };
+        }
+        return own;
+      },
     }) as unknown as MiddlewareContext<M, TEnv>;
   }
 
