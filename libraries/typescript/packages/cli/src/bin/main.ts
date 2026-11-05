@@ -196,9 +196,17 @@ export async function main(
 
   const command = argv[0];
   const commandArgs = stripForwardingSeparator(argv.slice(1));
-  if (command === "login" || command === "logout" || command === "whoami") {
-    const { runIdentity } = await import("../cloud/identity.js");
-    return runIdentity(command, commandArgs);
+  if (command === "login") {
+    const { runLogin } = await import("../cloud/auth/login.js");
+    return runLogin(commandArgs);
+  }
+  if (command === "logout") {
+    const { runLogout } = await import("../cloud/auth/logout.js");
+    return runLogout(commandArgs);
+  }
+  if (command === "whoami") {
+    const { runWhoami } = await import("../cloud/auth/whoami.js");
+    return runWhoami(commandArgs);
   }
   if (command === "org") {
     const { runOrganizations } = await import("../cloud/organizations.js");

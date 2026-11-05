@@ -5,10 +5,18 @@ type ResponseBody<R> = R extends { content: infer C } ? C[keyof C] : void;
 
 export interface CloudRoutes {
   "GET /api/auth/get-session": {
-    operationId: "getSession";
-    data: T.GetSessionData;
-    responses: T.GetSessionResponses;
-    errors: T.GetSessionErrors;
+    data: T.operations["getSession"]["parameters"];
+    responses: {
+      200: ResponseBody<T.operations["getSession"]["responses"][200]>;
+    };
+    errors: {
+      400: ResponseBody<T.operations["getSession"]["responses"][400]>;
+      401: ResponseBody<T.operations["getSession"]["responses"][401]>;
+      403: ResponseBody<T.operations["getSession"]["responses"][403]>;
+      404: ResponseBody<T.operations["getSession"]["responses"][404]>;
+      429: ResponseBody<T.operations["getSession"]["responses"][429]>;
+      500: ResponseBody<T.operations["getSession"]["responses"][500]>;
+    };
   };
   "GET /api/v1/deployments": {
     data: T.operations["getApiV1Deployments"]["parameters"];
@@ -89,28 +97,104 @@ export interface CloudRoutes {
     };
   };
   "GET /api/v1/organizations": {
-    operationId: "getApiV1Organizations";
-    data: T.GetApiV1OrganizationsData;
-    responses: T.GetApiV1OrganizationsResponses;
-    errors: T.GetApiV1OrganizationsErrors;
+    data: T.operations["getApiV1Organizations"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][404]
+      >;
+    };
   };
   "GET /api/v1/user-preferences": {
-    operationId: "getApiV1UserPreferences";
-    data: T.GetApiV1UserPreferencesData;
-    responses: T.GetApiV1UserPreferencesResponses;
-    errors: T.GetApiV1UserPreferencesErrors;
+    data: T.operations["getApiV1UserPreferences"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][404]
+      >;
+    };
   };
   "POST /api/auth/api-key/create": {
-    operationId: "postApiAuthApiKeyCreate";
-    data: T.PostApiAuthApiKeyCreateData;
-    responses: T.PostApiAuthApiKeyCreateResponses;
-    errors: T.PostApiAuthApiKeyCreateErrors;
+    data: T.operations["postApiAuthApiKeyCreate"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][404]
+      >;
+      429: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][429]
+      >;
+      500: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][500]
+      >;
+    };
   };
   "POST /api/auth/api-key/delete": {
-    operationId: "postApiAuthApiKeyDelete";
-    data: T.PostApiAuthApiKeyDeleteData;
-    responses: T.PostApiAuthApiKeyDeleteResponses;
-    errors: T.PostApiAuthApiKeyDeleteErrors;
+    data: T.operations["postApiAuthApiKeyDelete"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][404]
+      >;
+      429: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][429]
+      >;
+      500: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][500]
+      >;
+    };
   };
   "POST /api/v1/deployments": {
     data: T.operations["postApiV1Deployments"]["parameters"];

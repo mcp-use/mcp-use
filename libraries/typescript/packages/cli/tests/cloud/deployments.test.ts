@@ -3,40 +3,15 @@ import { createServer } from "node:net";
 import { describe, expect } from "vitest";
 
 import { test } from "../helpers/cli-test.js";
-import { deployment } from "../helpers/cloud-fixtures.js";
-import type { FakeCloud } from "../helpers/fake-cloud.js";
-
-const SIGNED_IN = { MCP_USE_API_KEY: "test_key" };
-
-/**
- * Answer today's identity call with one organization, the account default.
- * `/api/v1/test-auth` is not in Cloud's OpenAPI document; the auth PR in the
- * CLI rewrite replaces it.
- */
-function signInToOrg1(cloud: FakeCloud): void {
-  cloud.onUndocumented("GET", "/api/v1/test-auth", {
-    body: {
-      user_id: "user_1",
-      email: "dev@example.com",
-      profiles: [
-        {
-          id: "org_1",
-          profile_name: "Org One",
-          slug: "org-one",
-          role: "admin",
-        },
-      ],
-      default_profile_id: "org_1",
-    },
-  });
-}
+import { deployment, organization } from "../helpers/cloud-fixtures.js";
+import { SIGNED_IN, signIn } from "../helpers/cloud-auth.js";
 
 describe("deployment human output", () => {
   test("lists one tab-separated row per deployment, keeping only the first line of an error", async ({
     cloud,
     cli,
   }) => {
-    signInToOrg1(cloud);
+    signIn(cloud);
     cloud.on("GET", "/api/v1/deployments", {
       body: {
         items: [
@@ -73,12 +48,59 @@ describe("deployment human output", () => {
   });
 });
 
+describe("organization selection", () => {
+  test("--org picks the organization by slug, and requests carry its id", async ({
+    cloud,
+    cli,
+  }) => {
+    cloud.on("GET", "/api/v1/organizations", {
+      body: {
+        organizations: [
+          organization({ id: "org_1", slug: "org-one" }),
+          organization({ id: "org_2", slug: "org-two" }),
+        ],
+      },
+    });
+    cloud.on("GET", "/api/v1/deployments", {
+      body: { items: [], total: 0, limit: 30, skip: 0 },
+    });
+
+    const result = await cli.run(
+      ["deployments", "list", "--org", "org-two", "--json"],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(cloud.requestsTo("GET", "/api/v1/deployments")).toMatchObject([
+      { headers: { "x-profile-id": "org_2" } },
+    ]);
+  });
+
+  test("an unknown --org is organization_not_found, and nothing is listed", async ({
+    cloud,
+    cli,
+  }) => {
+    signIn(cloud);
+
+    const result = await cli.run(
+      ["deployments", "list", "--org", "org-nine", "--json"],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.errorJson).toMatchObject({
+      error: { code: "organization_not_found" },
+    });
+    expect(cloud.requestsTo("GET", "/api/v1/deployments")).toEqual([]);
+  });
+});
+
 describe("deployment JSON output", () => {
   test("follows build logs until a terminal status and emits exactly one document", async ({
     cloud,
     cli,
   }) => {
-    signInToOrg1(cloud);
+    signIn(cloud);
     // Two replies: a third poll after "running" would be unhandled and fail.
     cloud.sequence("GET", "/api/v1/deployments/deployment_1/build-logs", [
       {
@@ -124,7 +146,7 @@ describe("deployment JSON output", () => {
     cloud,
     cli,
   }) => {
-    signInToOrg1(cloud);
+    signIn(cloud);
     // One reply: without --follow the CLI must not poll again.
     cloud.sequence("GET", "/api/v1/deployments/deployment_1/build-logs", [
       { body: { logs: "", offset: 0, totalLength: 0, status: "failed" } },
@@ -151,7 +173,7 @@ describe("deployments get", () => {
     cloud,
     cli,
   }) => {
-    signInToOrg1(cloud);
+    signIn(cloud);
     const failed = deployment({
       id: "dep_1",
       status: "failed",
@@ -175,7 +197,7 @@ describe("deployments get", () => {
     cloud,
     cli,
   }) => {
-    signInToOrg1(cloud);
+    signIn(cloud);
     cloud.on("GET", "/api/v1/deployments/dep_1", {
       body: deployment({
         id: "dep_1",
@@ -213,7 +235,7 @@ describe("deployments get", () => {
     cloud,
     cli,
   }) => {
-    signInToOrg1(cloud);
+    signIn(cloud);
     cloud.on("GET", "/api/v1/deployments/dep_missing", {
       status: 404,
       body: { error: "Deployment not found" },
@@ -264,7 +286,9 @@ describe("deployments get", () => {
       error: {
         code: "not_authenticated",
         message: expect.any(String),
-        nextSteps: [{ description: "Log in", command: "mcp-use login" }],
+        nextSteps: [
+          { description: "Log in to Manufact Cloud", command: "mcp-use login" },
+        ],
       },
     });
     expect(cloud.requests).toEqual([]);

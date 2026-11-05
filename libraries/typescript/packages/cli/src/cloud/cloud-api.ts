@@ -1,58 +1,25 @@
-import { rm } from "node:fs/promises";
-import { join } from "node:path";
-
 import { CommandError } from "../core/errors.js";
-import { GLOBAL_STATE_DIR, readJson, writePrivateJson } from "../core/fs.js";
+import {
+  findOrganization,
+  listOrganizations,
+  defaultOrganizationId,
+  type CloudOrganization,
+} from "./auth/account.js";
+import { callerFor, connectCloud, createCloudClient } from "./api/client.js";
+import {
+  readAuth,
+  requireCredential,
+  updateAuth,
+  type StoredAuth,
+} from "./auth/store.js";
 
-/** Organization returned by the cloud authentication endpoint. */
-export interface CloudOrganization {
-  /** Organization id. */
-  id: string;
-  /** Human-readable organization name. */
-  name: string;
-  /** URL-safe organization slug. */
-  slug: string | null;
-  /** Current member's role. */
-  role: string;
-}
-
-/** Persisted cloud CLI state. */
-interface CloudConfig {
-  /** Cloud API key. */
-  apiKey?: string;
-  /** Active organization id. */
-  orgId?: string;
-  /** Active organization name. */
-  orgName?: string;
-  /** Active organization slug. */
-  orgSlug?: string;
-}
-
-/** Authentication response normalized for CLI consumers. */
+/** Organizations and the dashboard default, for the `org` commands. */
 interface CloudIdentity {
-  /** User id. */
-  userId: string;
-  /** User email address. */
-  email: string;
   /** Organization memberships. */
   organizations: CloudOrganization[];
   /** Account-default organization id. */
   defaultOrganizationId: string | null;
 }
-
-interface AuthWireResponse {
-  user_id: string;
-  email: string;
-  profiles: Array<{
-    id: string;
-    profile_name: string;
-    slug: string | null;
-    role: string;
-  }>;
-  default_profile_id: string | null;
-}
-
-const CONFIG_PATH = join(GLOBAL_STATE_DIR, "config.json");
 
 /** Cloud API base URL. */
 export function cloudApiUrl(): string {
@@ -74,40 +41,18 @@ export function cloudAuthUrl(): string {
   return cloudApiUrl().replace(/\/api\/v1$/, "");
 }
 
-/** Read cloud CLI state. */
-export async function readCloudConfig(): Promise<CloudConfig> {
-  return readJson(CONFIG_PATH, {});
+/** Read cloud CLI state (`~/.manufact/auth.json`). */
+export async function readCloudConfig(): Promise<StoredAuth> {
+  return readAuth();
 }
 
-/** Persist cloud CLI state. */
-export async function writeCloudConfig(config: CloudConfig): Promise<void> {
-  await writePrivateJson(CONFIG_PATH, config);
-}
-
-/** Delete cloud CLI state. */
-export async function clearCloudConfig(): Promise<void> {
-  await rm(CONFIG_PATH, { force: true });
+/** Merge `config` into the stored cloud CLI state. */
+export async function writeCloudConfig(config: StoredAuth): Promise<void> {
+  await updateAuth(config);
 }
 
 /** Resolve an organization id or slug from memberships. */
-export function resolveOrganization(
-  organizations: readonly CloudOrganization[],
-  selector: string
-): CloudOrganization {
-  const matches = organizations.filter(
-    (organization) =>
-      organization.id === selector || organization.slug === selector
-  );
-  if (matches.length !== 1) {
-    throw new CommandError(
-      matches.length === 0
-        ? "organization_not_found"
-        : "organization_ambiguous",
-      `Organization not found: ${selector}`
-    );
-  }
-  return matches[0]!;
-}
+export const resolveOrganization = findOrganization;
 
 /** Minimal authenticated cloud API client. */
 export class CloudApi {
@@ -121,15 +66,11 @@ export class CloudApi {
 
   /** Create a client from persisted credentials. */
   static async create(organizationId?: string): Promise<CloudApi> {
-    const config = await readCloudConfig();
-    const apiKey = process.env["MCP_USE_API_KEY"] ?? config.apiKey;
-    if (apiKey === undefined || apiKey === "") {
-      throw new CommandError(
-        "not_authenticated",
-        "Not logged in. Run `mcp-use login`."
-      );
-    }
-    return new CloudApi(apiKey, organizationId ?? config.orgId);
+    const { apiKey } = await requireCredential();
+    return new CloudApi(
+      apiKey,
+      organizationId ?? (await readCloudConfig()).orgId
+    );
   }
 
   /** Create a client for validating a candidate API key. */
@@ -238,20 +179,17 @@ export class CloudApi {
     }
   }
 
-  /** Verify credentials and return the current identity. */
+  /** Verify credentials and return the user's organizations. */
   async identity(): Promise<CloudIdentity> {
-    const response = await this.request<AuthWireResponse>("/test-auth");
-    return {
-      userId: response.user_id,
-      email: response.email,
-      organizations: response.profiles.map((profile) => ({
-        id: profile.id,
-        name: profile.profile_name,
-        slug: profile.slug,
-        role: profile.role,
-      })),
-      defaultOrganizationId: response.default_profile_id,
+    const api = {
+      client: createCloudClient({ apiKey: this.#apiKey }),
+      call: callerFor(this.#apiKey),
     };
+    const [organizations, defaultId] = await Promise.all([
+      listOrganizations(api),
+      defaultOrganizationId(api),
+    ]);
+    return { organizations, defaultOrganizationId: defaultId };
   }
 
   /** Update the account-default organization. */
@@ -268,20 +206,7 @@ export async function cloudApiForOrganization(selector?: string): Promise<{
   organizationId: string;
   organizationSlug: string | null;
 }> {
-  const config = await readCloudConfig();
-  const identity = await (await CloudApi.create()).identity();
-  const organization =
-    selector !== undefined
-      ? resolveOrganization(identity.organizations, selector)
-      : identity.organizations.find(
-          (item) => item.id === (config.orgId ?? identity.defaultOrganizationId)
-        );
-  if (organization === undefined) {
-    throw new CommandError(
-      "organization_required",
-      "No active organization. Run `mcp-use org use <id-or-slug>`."
-    );
-  }
+  const { organization } = await connectCloud({ organization: selector });
   return {
     api: await CloudApi.create(organization.id),
     organizationId: organization.id,

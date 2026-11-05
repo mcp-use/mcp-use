@@ -31,10 +31,11 @@ builds before it tests.
 ```ts
 import { describe, expect } from "vitest";
 import { test } from "../helpers/cli-test.js";
+import { SIGNED_IN, signIn } from "../helpers/cloud-auth.js";
 import { deployment } from "../helpers/cloud-fixtures.js";
 
 test("restart redeploys the same server and branch", async ({ cloud, cli }) => {
-  signInToOrg1(cloud); // registers GET /api/v1/test-auth; see deployments.test.ts
+  signIn(cloud); // the organization lookup every signed-in command makes
   cloud.on("GET", "/api/v1/deployments/dep_1", {
     body: deployment({ id: "dep_1", serverId: "srv_1", gitBranch: "main" }),
   });
@@ -42,7 +43,7 @@ test("restart redeploys the same server and branch", async ({ cloud, cli }) => {
   cloud.on("POST", "/api/v1/deployments", { body: { id: "dep_2" } });
 
   const result = await cli.run(["deployments", "restart", "dep_1", "--json"], {
-    env: { MCP_USE_API_KEY: "test_key" },
+    env: SIGNED_IN,
   });
 
   expect(result.exitCode).toBe(0);
@@ -87,8 +88,10 @@ routes are typed from the generated Cloud client
   and pass every field your assertions depend on, so the values are visible
   in the test. Add a builder there when you need a new object.
 - `cloud.onUndocumented(method, path, reply)` registers a route the spec
-  leaves out, untyped and unchecked. It throws for a route the spec has. Today
-  only `GET /api/v1/test-auth` needs it; say why in a comment when you use it.
+  leaves out, untyped and unchecked, and `cloud.sequenceUndocumented(method,
+  path, replies)` is its `sequence`. Both throw for a route the spec has.
+  Today only the device-login routes (`POST /api/auth/device/code` and
+  `/token`) need them; say why in a comment when you use them.
 - `cloud.requests` lists every request in arrival order;
   `cloud.requestsTo(method, path)` filters it. Each one has `method`, `path`,
   `query`, `headers` (lower-case), `body` (parsed JSON, a string, or
@@ -120,7 +123,8 @@ A sandbox wired to the test's fake Cloud.
   - `NO_COLOR=1`,
   - and whatever you pass in `env`.
 
-  Your own `MCP_USE_API_KEY` or `~/.mcp-use` never reaches the test.
+  Your own `MANUFACT_TOKEN`, `MCP_USE_API_KEY`, `~/.manufact` or `~/.mcp-use`
+  never reaches the test.
 
 - The working directory is `cli.cwd`, an empty temp directory. Write project
   files there, or pass `cwd`.
@@ -131,9 +135,11 @@ A sandbox wired to the test's fake Cloud.
 
 ## Recipes
 
-**Signed in.** Pass `env: { MCP_USE_API_KEY: "test_key" }` and register the
-identity route the command calls (today `GET /api/v1/test-auth`). The auth
-PR in the CLI rewrite stack replaces this with a shared helper.
+**Signed in.** Pass `env: SIGNED_IN` (an API key in `MANUFACT_TOKEN`) and
+call `signIn(cloud)` from `tests/helpers/cloud-auth.ts`, which answers the
+organization lookup with one organization, `org_1`. To test the stored
+credential instead, write `~/.manufact/auth.json` under `cli.home`;
+`tests/cloud/auth.test.ts` shows how.
 
 **JSON errors.** Commands on the conventions in `src/core/command.ts` print
 the error document on **stdout** (`result.json`); commands not yet ported print
@@ -159,7 +165,9 @@ few human-mode tests for formats people or scripts read, such as tables.
 
 **Polling commands.** The CLI sleeps for real between polls (one second for
 build logs). Give the fake two replies, not ten, so the test stays fast and
-still proves the loop advances and stops.
+still proves the loop advances and stops. Polls that honour
+`MCP_USE_POLL_INTERVAL_MS` (the device login does) don't sleep at all when
+you pass `env: { MCP_USE_POLL_INTERVAL_MS: "0" }`.
 
 **Projects that import `mcp-use`, React or zod.** `cli.cwd` lives in the OS
 temp directory, where those packages don't resolve. For `build`, `dev` or

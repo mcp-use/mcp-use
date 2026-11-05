@@ -216,6 +216,15 @@ export interface FakeCloud {
    * path is a Cloud route; use `on` for those.
    */
   onUndocumented(method: string, path: string, reply: RouteReply): void;
+  /**
+   * `sequence` for a route Cloud does not document: one reply per call, and
+   * a call after the last reply is unhandled.
+   */
+  sequenceUndocumented(
+    method: string,
+    path: string,
+    replies: readonly RouteReply[]
+  ): void;
   /** Requests received for one method and path, in arrival order. */
   requestsTo(method: string, path: string): RecordedRequest[];
   /** Stop the server and drop open connections. */
@@ -327,6 +336,18 @@ export async function startFakeCloud(): Promise<FakeCloud> {
         );
       }
       routes.set(key(method, path), { spec: undefined, next: () => reply });
+    },
+    sequenceUndocumented(method, path, replies) {
+      if (routesMatching(method, path).length > 0) {
+        throw new Error(
+          `${method} ${path} is in the Cloud spec; register it with cloud.sequence().`
+        );
+      }
+      let next = 0;
+      routes.set(key(method, path), {
+        spec: undefined,
+        next: () => replies[next++],
+      });
     },
     requestsTo(method, path) {
       return requests.filter(
