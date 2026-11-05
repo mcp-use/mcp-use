@@ -24,7 +24,7 @@ export default defineConfig({
     "commands/organizations": "src/cloud/organizations.ts",
     "commands/servers": "src/cloud/servers.ts",
     "commands/deployments": "src/cloud/deployments.ts",
-    "commands/deploy": "src/cloud/deploy.ts",
+    "commands/deploy": "src/cloud/deploy/index.ts",
     "commands/link": "src/cloud/project/link.ts",
     "commands/unlink": "src/cloud/project/unlink.ts",
     "commands/client": "src/client/client.ts",
@@ -49,7 +49,11 @@ export default defineConfig({
   ],
   // Ship tunnel support inside the CLI artifact without adding a runtime
   // dependency to either @mcp-use/cli or mcp-use.
-  noExternal: ["@mcp-use/tunnel", "openapi-fetch"],
+  noExternal: [
+    "@mcp-use/tunnel",
+    "openapi-fetch",
+    "@modelcontextprotocol/client",
+  ],
   define: {
     __MCP_USE_CLI_VERSION__: JSON.stringify(cliPackage.version),
   },

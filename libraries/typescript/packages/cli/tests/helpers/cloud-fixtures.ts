@@ -78,5 +78,11 @@ type Server =
 
 /** A server with neutral values for fields outside the assertion. */
 export function server(fields: Pick<Server, "id"> & Partial<Server>): Server {
-  return { name: "Server", slug: "server", organizationId: "org_1", ...fields };
+  return {
+    name: "Server",
+    slug: "server",
+    organizationId: "org_1",
+    isExternal: false,
+    ...fields,
+  };
 }
