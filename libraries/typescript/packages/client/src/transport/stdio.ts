@@ -4,7 +4,7 @@ import type {
 } from "@modelcontextprotocol/client";
 import { Client } from "@modelcontextprotocol/client";
 import type { StdioServerParameters } from "@modelcontextprotocol/client/stdio";
-import type { Writable } from "node:stream";
+import { pipeline, Readable, Writable } from "node:stream";
 
 import process from "node:process";
 import type { ConnectorInitOptions } from "./base.js";
@@ -173,7 +173,15 @@ export class StdioConnector extends BaseConnector {
             : {}),
         },
       };
-      this.client = new Client(this.clientInfo, clientOptions);
+      const client = new Client(this.clientInfo, clientOptions);
+      this.client = client;
+      client.onclose = () => {
+        if (this.client !== client) return;
+        // Reuse the lifecycle coordinator so reconnects wait for cleanup.
+        void this.disconnect().catch((error) => {
+          logger.warn(`Error cleaning up closed stdio connection: ${error}`);
+        });
+      };
 
       // Register inbound handlers BEFORE connect() so they are available for the
       // entire connection lifetime (including reverse RPC during/after initialize).
@@ -184,7 +192,7 @@ export class StdioConnector extends BaseConnector {
         "Roots/sampling/elicitation handlers registered before connect (stdio)"
       );
 
-      await this.client.connect(transport);
+      await client.connect(transport);
 
       this.setupNotificationHandler();
       // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
@@ -202,6 +210,13 @@ export class StdioConnector extends BaseConnector {
       logger.error(`Failed to connect to MCP implementation: ${err}`);
       throw err;
     }
+  }
+
+  protected override async cleanupResources(): Promise<void> {
+    // Explicit cleanup must not turn its close event into another disconnect
+    // that would cancel reconnects already queued behind this teardown.
+    if (this.client) this.client.onclose = undefined;
+    await super.cleanupResources();
   }
 
   /**
@@ -224,7 +239,6 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   private readonly serverParams: StdioServerParameters;
   private readonly errlog: Writable;
   private _transport: StdioClientTransport | null = null;
-  private _stderrSource: NodeJS.ReadableStream | null = null;
   private readonly _onErrlogError = (error: Error): void => {
     logger.warn(`Error writing child stderr to errlog: ${error}`);
   };
@@ -258,16 +272,53 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
 
     // Only "pipe" leaves a readable stream; "inherit" and "ignore" do not.
     const childStderr = this._transport.stderr;
-    if (stderr === "pipe" && childStderr && "pipe" in childStderr) {
-      this._stderrSource = childStderr as unknown as NodeJS.ReadableStream;
-      // `errlog` is caller-owned and may be reused across reconnects, so the
-      // child exiting must not end it. Without a handler, a destroyed errlog
-      // would surface as an unhandled 'error' event.
-      this._stderrSource.on("error", (error) => {
-        logger.warn(`Error forwarding child stderr: ${error}`);
+    if (stderr === "pipe" && childStderr instanceof Readable) {
+      const errlog = this.errlog;
+      errlog.on("error", this._onErrlogError);
+      // Own the pipeline's destination so finishing or failing this child never
+      // ends/destroys the caller's errlog. Its write callbacks retain backpressure.
+      const forwarder = new Writable({
+        write(chunk, encoding, callback) {
+          if (errlog.destroyed || errlog.writableEnded || errlog.errored) {
+            callback(errlog.errored ?? new Error("errlog is not writable"));
+            return;
+          }
+          let settled = false;
+          const done = (error?: Error | null) => {
+            if (settled) return;
+            settled = true;
+            callback(error);
+          };
+          const cleanup = () => {
+            errlog.off("error", onError);
+            errlog.off("close", onClose);
+          };
+          const onError = (error: Error) => {
+            cleanup();
+            done(error);
+          };
+          const onClose = () => {
+            cleanup();
+            done(new Error("errlog closed while forwarding child stderr"));
+          };
+          errlog.once("error", onError);
+          errlog.once("close", onClose);
+          try {
+            errlog.write(chunk, encoding, (error) => {
+              // Destruction may complete before its queued error/close events,
+              // even when this write callback succeeds. Keep guards until then.
+              if (!error && !errlog.destroyed) cleanup();
+              done(error ?? errlog.errored);
+            });
+          } catch (error) {
+            if (!errlog.destroyed) cleanup();
+            done(error instanceof Error ? error : new Error(String(error)));
+          }
+        },
       });
-      this.errlog.on("error", this._onErrlogError);
-      this._stderrSource.pipe(this.errlog, { end: false });
+      pipeline(childStderr, forwarder, (error) => {
+        if (error) logger.warn(`Error forwarding child stderr: ${error}`);
+      });
     }
 
     logger.debug(`${this.constructor.name} connected successfully`);
@@ -277,17 +328,15 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   protected async closeConnection(
     _connection: StdioClientTransport
   ): Promise<void> {
-    if (this._stderrSource) {
-      this._stderrSource.unpipe(this.errlog);
-      this.errlog.off("error", this._onErrlogError);
-      this._stderrSource = null;
-    }
+    // Stderr drains independently: a caller-owned Writable may still be
+    // backpressured after the child exits, and must not hold up reconnects.
     if (this._transport) {
       try {
         await this._transport.close();
       } catch (e) {
         logger.warn(`Error closing stdio transport: ${e}`);
       } finally {
+        this.errlog.off("error", this._onErrlogError);
         this._transport = null;
       }
     }
