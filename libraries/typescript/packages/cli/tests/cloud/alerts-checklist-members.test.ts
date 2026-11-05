@@ -3,17 +3,13 @@ import { join } from "node:path";
 import { expect } from "vitest";
 import { test } from "../helpers/cli-test.js";
 import { signIn, SIGNED_IN } from "../helpers/cloud-auth.js";
+import { server as serverFixture } from "../helpers/cloud-fixtures.js";
 import type { FakeCloud } from "../helpers/fake-cloud.js";
 
 function server(cloud: FakeCloud): void {
   signIn(cloud);
   cloud.on("GET", "/api/v1/servers/weather", {
-    body: {
-      id: "srv_1",
-      slug: "weather",
-      name: "Weather",
-      organizationId: "org_1",
-    },
+    body: serverFixture({ id: "srv_1", slug: "weather", name: "Weather", organizationId: "org_1" }),
   });
 }
 const SCOPE = ["--server", "weather", "--json"];
