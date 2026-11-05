@@ -2159,7 +2159,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     ctx: ServerContext
   ): MiddlewareContext<M, TEnv> {
     const requestContext = toRequestContext<TEnv>(ctx);
-    return Object.assign(requestContext, {
+    // `requestContext` is the Hono Context shared with the tool callback, whose
+    // own `ctx.auth` has a different shape. Keep the middleware fields on a
+    // per-operation overlay instead of writing them onto the shared object.
+    const overlay: Record<PropertyKey, unknown> = {
       method,
       params,
       ...(ctx.sessionId !== undefined && {
@@ -2167,6 +2170,20 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }),
       ...(ctx.http?.authInfo !== undefined && { auth: ctx.http.authInfo }),
       state: new Map(),
+    };
+    // Hono's Context keeps true #private fields, so the view must forward
+    // reads to the original instance rather than inherit from it.
+    return new Proxy(requestContext as object, {
+      get(target, prop) {
+        if (Object.hasOwn(overlay, prop)) return overlay[prop];
+        const value = Reflect.get(target, prop, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+      set(_target, prop, value) {
+        overlay[prop] = value;
+        return true;
+      },
+      has: (target, prop) => Object.hasOwn(overlay, prop) || prop in target,
     }) as unknown as MiddlewareContext<M, TEnv>;
   }
 
