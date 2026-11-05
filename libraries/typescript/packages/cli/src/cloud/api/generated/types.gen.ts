@@ -630,4 +630,665 @@ export interface operations {
             };
         };
     };
+<<<<<<< HEAD
 }
+=======
+    /**
+     * Unauthorized
+     */
+    401: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Plan limit exceeded
+     */
+    403: {
+        error: string;
+        code: string;
+        feature: 'usageCredits' | 'external_mcp' | 'public_chat' | 'submission_pack' | 'submission_checklist' | 'evals' | 'publishing_checks' | 'projects' | 'teamMembers' | 'region' | 'previewDeploys' | 'coldStart' | 'requestsPerMonth' | 'logRetention' | 'githubOrg' | 'customDomain';
+        currentTier: 'free' | 'pay_as_you_go' | 'pro' | 'hobby' | 'startup' | 'enterprise' | 'custom';
+        requiredTier: 'free' | 'pay_as_you_go' | 'pro' | 'hobby' | 'startup' | 'enterprise' | 'custom';
+        current?: number;
+        limit?: number | 'unlimited';
+    };
+    /**
+     * Not found
+     */
+    404: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+};
+
+export type PostApiV1DeploymentsError = PostApiV1DeploymentsErrors[keyof PostApiV1DeploymentsErrors];
+
+export type PostApiV1DeploymentsResponses = {
+    /**
+     * Created
+     */
+    201: {
+        id: string;
+    };
+};
+
+export type PostApiV1DeploymentsResponse = PostApiV1DeploymentsResponses[keyof PostApiV1DeploymentsResponses];
+
+export type GetApiV1DeploymentsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/deployments/{id}';
+};
+
+export type GetApiV1DeploymentsByIdErrors = {
+    /**
+     * Validation error
+     */
+    400: {
+        error: string;
+        code: 'VALIDATION_ERROR';
+        details: unknown;
+    };
+    /**
+     * Unauthorized
+     */
+    401: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Forbidden
+     */
+    403: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Not found
+     */
+    404: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+};
+
+export type GetApiV1DeploymentsByIdError = GetApiV1DeploymentsByIdErrors[keyof GetApiV1DeploymentsByIdErrors];
+
+export type GetApiV1DeploymentsByIdResponses = {
+    /**
+     * OK
+     */
+    200: {
+        id: string;
+        name: string;
+        source: unknown;
+        status: string;
+        port: number | null;
+        healthCheckPath: string | null;
+        pipelineMeta: string | number | boolean | null | {
+            [key: string]: unknown;
+        } | Array<unknown> | null;
+        error: string | null;
+        buildLogs: string | null;
+        gitCommitSha: string | null;
+        gitBranch: string | null;
+        gitCommitMessage: string | null;
+        isProductionDeployment: boolean | null;
+        previousDeploymentId: string | null;
+        deploymentVersion: number | null;
+        deploymentTrigger: string | null;
+        pipelinePhase: string | null;
+        userId: string;
+        serverId: string;
+        organizationId: string;
+        createdAt: string;
+        updatedAt: string;
+        buildStartedAt: string;
+        buildCompletedAt: string;
+        archivedAt: string;
+        failureMeta?: {
+            error: string;
+            code: string;
+            feature: 'usageCredits' | 'external_mcp' | 'public_chat' | 'submission_pack' | 'submission_checklist' | 'evals' | 'publishing_checks' | 'projects' | 'teamMembers' | 'region' | 'previewDeploys' | 'coldStart' | 'requestsPerMonth' | 'logRetention' | 'githubOrg' | 'customDomain';
+            currentTier: 'free' | 'pay_as_you_go' | 'pro' | 'hobby' | 'startup' | 'enterprise' | 'custom';
+            requiredTier: 'free' | 'pay_as_you_go' | 'pro' | 'hobby' | 'startup' | 'enterprise' | 'custom';
+            current?: number;
+            limit?: number | 'unlimited';
+        } | null;
+        mcpUrl: string;
+        latestChecklistAuditStatus?: 'pending' | 'running' | 'completed' | 'failed' | null;
+        latestChecklistAudit?: {
+            id: string;
+            createdAt: string;
+            checks: Array<{
+                status: 'pass' | 'fail' | 'skip' | 'pending';
+                severity: string;
+                category: string;
+            }>;
+        } | null;
+    };
+};
+
+export type GetApiV1DeploymentsByIdResponse = GetApiV1DeploymentsByIdResponses[keyof GetApiV1DeploymentsByIdResponses];
+
+export type GetApiV1DeploymentsByIdBuildLogsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        offset?: number;
+    };
+    url: '/api/v1/deployments/{id}/build-logs';
+};
+
+export type GetApiV1DeploymentsByIdBuildLogsErrors = {
+    /**
+     * Validation error
+     */
+    400: {
+        error: string;
+        code: 'VALIDATION_ERROR';
+        details: unknown;
+    };
+    /**
+     * Unauthorized
+     */
+    401: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Forbidden
+     */
+    403: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Not found
+     */
+    404: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+};
+
+export type GetApiV1DeploymentsByIdBuildLogsError = GetApiV1DeploymentsByIdBuildLogsErrors[keyof GetApiV1DeploymentsByIdBuildLogsErrors];
+
+export type GetApiV1DeploymentsByIdBuildLogsResponses = {
+    /**
+     * OK
+     */
+    200: {
+        logs: string;
+        offset: number;
+        totalLength: number;
+        status: string;
+    };
+};
+
+export type GetApiV1DeploymentsByIdBuildLogsResponse = GetApiV1DeploymentsByIdBuildLogsResponses[keyof GetApiV1DeploymentsByIdBuildLogsResponses];
+
+export type GetApiV1DeploymentsByIdLogsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        lines?: number;
+    };
+    url: '/api/v1/deployments/{id}/logs';
+};
+
+export type GetApiV1DeploymentsByIdLogsErrors = {
+    /**
+     * Validation error
+     */
+    400: {
+        error: string;
+        code: 'VALIDATION_ERROR';
+        details: unknown;
+    };
+    /**
+     * Unauthorized
+     */
+    401: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Forbidden
+     */
+    403: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Not found
+     */
+    404: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+};
+
+export type GetApiV1DeploymentsByIdLogsError = GetApiV1DeploymentsByIdLogsErrors[keyof GetApiV1DeploymentsByIdLogsErrors];
+
+export type GetApiV1DeploymentsByIdLogsResponses = {
+    /**
+     * OK
+     */
+    200: {
+        logs: string;
+    };
+};
+
+export type GetApiV1DeploymentsByIdLogsResponse = GetApiV1DeploymentsByIdLogsResponses[keyof GetApiV1DeploymentsByIdLogsResponses];
+
+export type GetApiV1UserPreferencesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/user-preferences';
+};
+
+export type GetApiV1UserPreferencesErrors = {
+    /**
+     * Validation error
+     */
+    400: {
+        error: string;
+        code: 'VALIDATION_ERROR';
+        details: unknown;
+    };
+    /**
+     * Unauthorized
+     */
+    401: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Forbidden
+     */
+    403: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Not found
+     */
+    404: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+};
+
+export type GetApiV1UserPreferencesError = GetApiV1UserPreferencesErrors[keyof GetApiV1UserPreferencesErrors];
+
+export type GetApiV1UserPreferencesResponses = {
+    /**
+     * OK
+     */
+    200: {
+        defaultOrganizationId: string | null;
+    };
+};
+
+export type GetApiV1UserPreferencesResponse = GetApiV1UserPreferencesResponses[keyof GetApiV1UserPreferencesResponses];
+
+export type GetApiV1OrganizationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/organizations';
+};
+
+export type GetApiV1OrganizationsErrors = {
+    /**
+     * Validation error
+     */
+    400: {
+        error: string;
+        code: 'VALIDATION_ERROR';
+        details: unknown;
+    };
+    /**
+     * Unauthorized
+     */
+    401: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Forbidden
+     */
+    403: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+    /**
+     * Not found
+     */
+    404: {
+        error: string;
+        /**
+         * Stable application error code, when available.
+         */
+        code?: string;
+        details?: unknown;
+    };
+};
+
+export type GetApiV1OrganizationsError = GetApiV1OrganizationsErrors[keyof GetApiV1OrganizationsErrors];
+
+export type GetApiV1OrganizationsResponses = {
+    /**
+     * OK
+     */
+    200: {
+        organizations: Array<{
+            id: string;
+            name: string;
+            /**
+             * URL slug used by the dashboard (`/cloud/{slug}`).
+             */
+            slug: string;
+            /**
+             * The caller's role: `owner`, `admin`, `member` or a custom role (comma-separated when several).
+             */
+            role: string;
+        }>;
+    };
+};
+
+export type GetApiV1OrganizationsResponse = GetApiV1OrganizationsResponses[keyof GetApiV1OrganizationsResponses];
+
+export type GetSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/get-session';
+};
+
+export type GetSessionErrors = {
+    /**
+     * Bad Request. Usually due to missing parameters, or invalid parameters.
+     */
+    400: {
+        message: string;
+    };
+    /**
+     * Unauthorized. Due to missing or invalid authentication.
+     */
+    401: {
+        message: string;
+    };
+    /**
+     * Forbidden. You do not have permission to access this resource or to perform this action.
+     */
+    403: {
+        message?: string;
+    };
+    /**
+     * Not Found. The requested resource was not found.
+     */
+    404: {
+        message?: string;
+    };
+    /**
+     * Too Many Requests. You have exceeded the rate limit. Try again later.
+     */
+    429: {
+        message?: string;
+    };
+    /**
+     * Internal Server Error. This is a problem with the server that you cannot fix.
+     */
+    500: {
+        message?: string;
+    };
+};
+
+export type GetSessionError = GetSessionErrors[keyof GetSessionErrors];
+
+export type GetSessionResponses = {
+    /**
+     * Success
+     */
+    200: {
+        user: {
+            email: string;
+        };
+    } | null;
+};
+
+export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
+
+export type PostApiAuthApiKeyCreateData = {
+    body: {
+        /**
+         * The configuration ID to use for the API key. If not provided, the default configuration will be used.
+         */
+        configId?: string;
+        /**
+         * Name of the Api Key
+         */
+        name?: string;
+        /**
+         * Expiration time of the Api Key in seconds
+         */
+        expiresIn?: number | null;
+        /**
+         * Prefix of the Api Key
+         */
+        prefix?: string;
+        metadata?: unknown;
+        /**
+         * Organization Id of the organization that the Api Key belongs to. Eg: 'org-id'
+         */
+        organizationId?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/api-key/create';
+};
+
+export type PostApiAuthApiKeyCreateErrors = {
+    /**
+     * Bad Request. Usually due to missing parameters, or invalid parameters.
+     */
+    400: {
+        message: string;
+    };
+    /**
+     * Unauthorized. Due to missing or invalid authentication.
+     */
+    401: {
+        message: string;
+    };
+    /**
+     * Forbidden. You do not have permission to access this resource or to perform this action.
+     */
+    403: {
+        message?: string;
+    };
+    /**
+     * Not Found. The requested resource was not found.
+     */
+    404: {
+        message?: string;
+    };
+    /**
+     * Too Many Requests. You have exceeded the rate limit. Try again later.
+     */
+    429: {
+        message?: string;
+    };
+    /**
+     * Internal Server Error. This is a problem with the server that you cannot fix.
+     */
+    500: {
+        message?: string;
+    };
+};
+
+export type PostApiAuthApiKeyCreateError = PostApiAuthApiKeyCreateErrors[keyof PostApiAuthApiKeyCreateErrors];
+
+export type PostApiAuthApiKeyCreateResponses = {
+    /**
+     * API key created successfully
+     */
+    200: {
+        /**
+         * Unique identifier of the API key
+         */
+        id: string;
+        /**
+         * The full API key (only returned on creation)
+         */
+        key: string;
+        /**
+         * Name of the API key
+         */
+        name?: string;
+    };
+};
+
+export type PostApiAuthApiKeyCreateResponse = PostApiAuthApiKeyCreateResponses[keyof PostApiAuthApiKeyCreateResponses];
+
+export type PostApiAuthApiKeyDeleteData = {
+    body?: {
+        /**
+         * The id of the API key to delete
+         */
+        keyId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/api-key/delete';
+};
+
+export type PostApiAuthApiKeyDeleteErrors = {
+    /**
+     * Bad Request. Usually due to missing parameters, or invalid parameters.
+     */
+    400: {
+        message: string;
+    };
+    /**
+     * Unauthorized. Due to missing or invalid authentication.
+     */
+    401: {
+        message: string;
+    };
+    /**
+     * Forbidden. You do not have permission to access this resource or to perform this action.
+     */
+    403: {
+        message?: string;
+    };
+    /**
+     * Not Found. The requested resource was not found.
+     */
+    404: {
+        message?: string;
+    };
+    /**
+     * Too Many Requests. You have exceeded the rate limit. Try again later.
+     */
+    429: {
+        message?: string;
+    };
+    /**
+     * Internal Server Error. This is a problem with the server that you cannot fix.
+     */
+    500: {
+        message?: string;
+    };
+};
+
+export type PostApiAuthApiKeyDeleteError = PostApiAuthApiKeyDeleteErrors[keyof PostApiAuthApiKeyDeleteErrors];
+
+export type PostApiAuthApiKeyDeleteResponses = {
+    /**
+     * API key deleted successfully
+     */
+    200: {
+        /**
+         * Indicates if the API key was successfully deleted
+         */
+        success: boolean;
+    };
+};
+
+export type PostApiAuthApiKeyDeleteResponse = PostApiAuthApiKeyDeleteResponses[keyof PostApiAuthApiKeyDeleteResponses];
+>>>>>>> 2e222b3bb (feat(cli): generate the session, API key, organization and preference operations)

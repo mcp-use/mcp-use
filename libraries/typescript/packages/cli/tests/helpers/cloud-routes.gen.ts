@@ -4,6 +4,12 @@ import type * as T from "../../src/cloud/api/generated/types.gen.js";
 type ResponseBody<R> = R extends { content: infer C } ? C[keyof C] : void;
 
 export interface CloudRoutes {
+  "GET /api/auth/get-session": {
+    operationId: "getSession";
+    data: T.GetSessionData;
+    responses: T.GetSessionResponses;
+    errors: T.GetSessionErrors;
+  };
   "GET /api/v1/deployments": {
     data: T.operations["getApiV1Deployments"]["parameters"];
     responses: {
@@ -82,6 +88,30 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/organizations": {
+    operationId: "getApiV1Organizations";
+    data: T.GetApiV1OrganizationsData;
+    responses: T.GetApiV1OrganizationsResponses;
+    errors: T.GetApiV1OrganizationsErrors;
+  };
+  "GET /api/v1/user-preferences": {
+    operationId: "getApiV1UserPreferences";
+    data: T.GetApiV1UserPreferencesData;
+    responses: T.GetApiV1UserPreferencesResponses;
+    errors: T.GetApiV1UserPreferencesErrors;
+  };
+  "POST /api/auth/api-key/create": {
+    operationId: "postApiAuthApiKeyCreate";
+    data: T.PostApiAuthApiKeyCreateData;
+    responses: T.PostApiAuthApiKeyCreateResponses;
+    errors: T.PostApiAuthApiKeyCreateErrors;
+  };
+  "POST /api/auth/api-key/delete": {
+    operationId: "postApiAuthApiKeyDelete";
+    data: T.PostApiAuthApiKeyDeleteData;
+    responses: T.PostApiAuthApiKeyDeleteResponses;
+    errors: T.PostApiAuthApiKeyDeleteErrors;
+  };
   "POST /api/v1/deployments": {
     data: T.operations["postApiV1Deployments"]["parameters"];
     responses: {
@@ -98,10 +128,15 @@ export interface CloudRoutes {
 
 /** Route templates used by the fake Cloud at runtime. */
 export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
+  "GET /api/auth/get-session",
   "GET /api/v1/deployments",
   "GET /api/v1/deployments/{id}",
   "GET /api/v1/deployments/{id}/build-logs",
   "GET /api/v1/deployments/{id}/logs",
+  "GET /api/v1/organizations",
+  "GET /api/v1/user-preferences",
+  "POST /api/auth/api-key/create",
+  "POST /api/auth/api-key/delete",
   "POST /api/v1/deployments",
 ];
 
@@ -109,9 +144,14 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
 export const cloudRouteSuccessStatus: Readonly<
   Record<keyof CloudRoutes, number>
 > = {
+  "GET /api/auth/get-session": 200,
   "GET /api/v1/deployments": 200,
   "GET /api/v1/deployments/{id}": 200,
   "GET /api/v1/deployments/{id}/build-logs": 200,
   "GET /api/v1/deployments/{id}/logs": 200,
+  "GET /api/v1/organizations": 200,
+  "GET /api/v1/user-preferences": 200,
+  "POST /api/auth/api-key/create": 200,
+  "POST /api/auth/api-key/delete": 200,
   "POST /api/v1/deployments": 201,
 };
