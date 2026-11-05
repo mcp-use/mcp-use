@@ -9,7 +9,12 @@ import type { FakeCloud } from "../helpers/fake-cloud.js";
 function server(cloud: FakeCloud): void {
   signIn(cloud);
   cloud.on("GET", "/api/v1/servers/weather", {
-    body: serverFixture({ id: "srv_1", slug: "weather", name: "Weather", organizationId: "org_1" }),
+    body: serverFixture({
+      id: "srv_1",
+      slug: "weather",
+      name: "Weather",
+      organizationId: "org_1",
+    }),
   });
 }
 const SCOPE = ["--server", "weather", "--json"];
