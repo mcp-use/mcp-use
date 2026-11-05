@@ -34,7 +34,8 @@ directory. Supply commands appropriate to the project's framework.
 mcp-use deploy --external-url https://example.com/mcp --name weather --json
 ```
 
-This registers an existing MCP endpoint. It does not upload source or build
+The endpoint must use HTTPS. External registration rejects source/build/env
+options. This registers an existing MCP endpoint. It does not upload source or build
 an application.
 
 ## Environment and progress
@@ -57,3 +58,12 @@ mcp-use logs DEPLOYMENT_ID --follow
 `stop` stops it, and `rm` removes it. Read each command's help for required
 arguments and confirmation flags. Retain IDs returned by mutations rather
 than guessing resource names.
+
+When Git setup or synchronization is needed, `deploy --yes` authorizes the
+necessary Git initialization, commits, and pushes. Use it only when the user
+has requested those repository changes.
+
+Runtime `logs --follow` continues until interrupted. Build following ends at a
+terminal deployment status. With `--json`, the command emits its result when
+following ends. Deployment promotion/stopping/removal requires `--yes` in a
+non-interactive command.

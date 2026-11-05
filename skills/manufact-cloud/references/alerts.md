@@ -47,6 +47,11 @@ example alone. Pair percentage thresholds with a minimum count to avoid a
 single failure triggering an alert. Use a lower recovery threshold than the
 trigger threshold to avoid repeated open/resolve notifications near a boundary.
 
+`enabled` is optional YAML: `false` pauses a rule. Creation defaults it to
+`true`; updating without it preserves the rule's current enabled/paused state.
+Updates and removals read the current revision first. A concurrent edit causes
+a conflict instead of overwriting another user's change.
+
 ## Rule shape
 
 - `name` is required, one line, up to 120 characters. Optional `description`

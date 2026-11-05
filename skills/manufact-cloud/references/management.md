@@ -12,7 +12,7 @@ need to run inside an mcp-use application.
 
 `servers update` changes user-visible settings: name, description, production
 branch, repository root, build/start commands, watch paths, deployment branch
-patterns, CI waiting, repository connection, access, and allowed IP ranges.
+patterns, CI waiting, repository connection, and allowed IP ranges.
 Use `--disconnect-repo` to detach the repository. `--wait-for-ci` and
 `--no-wait-for-ci` explicitly set a saved setting in either direction.
 
@@ -23,7 +23,7 @@ Listing shows keys and metadata; stored values are write-only.
 ```bash
 mcp-use env set LOG_LEVEL=info --environment production --json
 mcp-use env push .env.production --environment production --json
-mcp-use env rm OLD_KEY --environment production --json
+mcp-use env rm OLD_KEY --environment production --yes --json
 ```
 
 For secrets, use `env set` with `--sensitive` and pipe the value through stdin

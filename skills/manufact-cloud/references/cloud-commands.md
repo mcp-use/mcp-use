@@ -22,3 +22,10 @@ Publishing checks assess a server for app directories. Start with
 Use `--no-wait` to retain the run ID and inspect it later through `checklist get`.
 A successful checklist run is evidence about those checks; publication itself
 remains a separate action.
+
+For `github repos`, a single active installation is selected automatically.
+If there are several, pass `--installation` with the provider `installationId`
+from `github installations --json`.
+
+`checklist run` waits by default. Both run and list accept `--branch`;
+list also accepts `--limit` and `--skip`.

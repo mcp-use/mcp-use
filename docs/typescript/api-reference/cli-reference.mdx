@@ -555,7 +555,7 @@ Read runtime or build logs.
 mcp-use logs [deployment-id] [--build] [--since <duration>] [--limit <n>] [--follow] [options]
 ```
 
-`--build` selects build output; `--follow` follows updates. Runtime logs support a time window and line limit.
+`--build` selects build output; `--follow` follows updates. Runtime logs support a time window and line limit. Runtime following continues until interrupted; build following ends at a terminal status. With `--json`, output is emitted when following ends.
 
 Use the deployment ID returned by deploy to inspect a failed build. When omitting it, select the server through its project link or `--server`.
 
@@ -638,7 +638,7 @@ mcp-use github repos [--installation <id>] [--page <n>] [--limit <n>] [options]
 Run the publishing checklist for a server.
 
 ```bash
-mcp-use checklist run [--no-wait] [options]
+mcp-use checklist run [--branch <branch>] [--no-wait] [options]
 ```
 
 Retain the run ID when using `--no-wait`, then inspect it with `checklist get`. A completed check does not publish the server.
@@ -648,7 +648,7 @@ Retain the run ID when using `--no-wait`, then inspect it with `checklist get`. 
 List publishing checklist runs.
 
 ```bash
-mcp-use checklist list [options]
+mcp-use checklist list [--branch <branch>] [--limit <n>] [--skip <n>] [options]
 ```
 
 ### `checklist get`
@@ -734,6 +734,8 @@ mcp-use skills install [--path <directory>] [--json]
 ```
 
 Installs into `.cursor/skills`, `.claude/skills`, and `.agents/skills`. The skills are bundled with the CLI and work offline. `skills add` remains an alias. Other project skills are preserved.
+
+Destructive removals and deployment promotion/stopping require `--yes` without a terminal.
 
 ## `client`
 
