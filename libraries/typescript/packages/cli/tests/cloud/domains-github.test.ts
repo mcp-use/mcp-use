@@ -1,17 +1,18 @@
 import { expect } from "vitest";
 import { test } from "../helpers/cli-test.js";
 import { signIn, SIGNED_IN } from "../helpers/cloud-auth.js";
+import { server as serverFixture } from "../helpers/cloud-fixtures.js";
 import type { FakeCloud } from "../helpers/fake-cloud.js";
 
 function server(cloud: FakeCloud): void {
   signIn(cloud);
   cloud.on("GET", "/api/v1/servers/weather", {
-    body: {
+    body: serverFixture({
       id: "srv_1",
       slug: "weather",
       name: "Weather",
       organizationId: "org_1",
-    },
+    }),
   });
 }
 
@@ -95,7 +96,7 @@ test("domains set-subdomain updates only the server slug", async ({
 }) => {
   server(cloud);
   cloud.on("PATCH", "/api/v1/servers/srv_1", {
-    body: { id: "srv_1", slug: "new-weather" },
+    body: serverFixture({ id: "srv_1", slug: "new-weather" }),
   });
   const result = await cli.run(
     [
@@ -209,7 +210,7 @@ test("github repos auto-selects a unique active installation and preserves pagin
           installationId: "123",
           organizationId: "org_1",
           isActive: true,
-          account: { login: "example", avatar_url: null, type: "Organization" },
+          account: { login: "example", type: "Organization" },
         },
       ],
     },
