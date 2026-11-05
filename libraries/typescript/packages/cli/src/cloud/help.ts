@@ -40,7 +40,7 @@ const pages: Record<string, Page> = {
     summary: "Manage organizations and choose the active organization.",
     examples: [
       "mcp-use org list",
-      "mcp-use org use blossom-hill",
+      "mcp-use org use acme",
       "mcp-use org update --help",
     ],
     commands: {
@@ -56,7 +56,7 @@ const pages: Record<string, Page> = {
       use: {
         summary: "Select the active organization by ID or URL slug.",
         args: "<id-or-slug>",
-        examples: ["mcp-use org use blossom-hill"],
+        examples: ["mcp-use org use acme"],
       },
       create: {
         summary: "Create an organization.",
@@ -64,7 +64,7 @@ const pages: Record<string, Page> = {
         options: [
           ["--slug <slug>", "URL slug (default: derived from the name)"],
         ],
-        examples: ['mcp-use org create "Blossom Hill" --slug blossom-hill'],
+        examples: ['mcp-use org create "Acme Corp" --slug acme'],
       },
       update: {
         summary: "Update the selected organization's name, URL slug, or logo.",
@@ -76,14 +76,14 @@ const pages: Record<string, Page> = {
           ["--logo <file>", "Upload a PNG, JPEG, SVG, or WebP logo"],
         ],
         examples: [
-          'mcp-use org update --name "Blossom Hill"',
-          "mcp-use org update --org blossom-hill --logo ./logo.png",
+          'mcp-use org update --name "Acme Corp"',
+          "mcp-use org update --org acme --logo ./logo.png",
         ],
       },
       members: {
         summary: "List organization members.",
         options: [org, limit(100, 30), skip],
-        examples: ["mcp-use org members --org blossom-hill"],
+        examples: ["mcp-use org members --org acme"],
       },
       invites: {
         summary: "Manage organization invitations.",
@@ -125,7 +125,7 @@ const pages: Record<string, Page> = {
       list: {
         summary: "List servers in an organization.",
         options: [org, path, limit(100, 30), skip],
-        examples: ["mcp-use servers list --org blossom-hill"],
+        examples: ["mcp-use servers list --org acme"],
       },
       get: {
         summary: "Show server details.",
@@ -155,7 +155,7 @@ const pages: Record<string, Page> = {
           ["--clear-allow-ip", "Clear custom IP ranges"],
         ],
         examples: [
-          'mcp-use servers update --name "Blossom API"',
+          'mcp-use servers update --name "Acme API"',
           "mcp-use servers update my-server --branch main",
         ],
       },
@@ -268,7 +268,7 @@ const pages: Record<string, Page> = {
         summary: "Change the server's managed subdomain.",
         args: "<name>",
         options: project,
-        examples: ["mcp-use domains set-subdomain blossom"],
+        examples: ["mcp-use domains set-subdomain my-server"],
       },
       add: {
         summary: "Configure a custom domain and show its CNAME target.",
@@ -299,7 +299,7 @@ const pages: Record<string, Page> = {
       connect: {
         summary: "Print the GitHub App installation URL.",
         options: [org],
-        examples: ["mcp-use github connect --org blossom-hill"],
+        examples: ["mcp-use github connect --org acme"],
       },
       installations: {
         summary: "List connected GitHub installations.",

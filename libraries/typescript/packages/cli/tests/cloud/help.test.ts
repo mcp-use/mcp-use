@@ -63,7 +63,7 @@ test("missing and malformed arguments show the respective help on stderr", async
 }) => {
   for (const args of [
     ["org", "use"],
-    ["org", "use", "Blossom", "Hill"],
+    ["org", "use", "Acme", "Corp"],
     ["org", "update", "--unknown"],
     ["org", "invites", "send"],
     ["servers", "update", "--unknown"],
@@ -88,7 +88,7 @@ test("missing and malformed arguments show the respective help on stderr", async
 });
 
 test("unknown organization operations show the group help", async ({ cli }) => {
-  const result = await cli.run(["org", "switch", "blossom-hill"]);
+  const result = await cli.run(["org", "switch", "acme"]);
   expect(result.exitCode).toBe(2);
   expect(result.stderr).toContain("Commands:\n");
   expect(result.stderr).toContain("use <id-or-slug>");
@@ -106,7 +106,7 @@ test("JSON usage errors stay a single structured document without a help dump", 
 });
 
 test("authentication errors do not print command help", async ({ cli }) => {
-  const result = await cli.run(["org", "use", "blossom-hill"]);
+  const result = await cli.run(["org", "use", "acme"]);
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toBe("");
   expect(result.stderr).toContain("Not logged in");
