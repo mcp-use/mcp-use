@@ -167,8 +167,7 @@ mcp-use project (no `mcp-use` dependency, or not Node at all).
 
 - **Never use `spawnSync` or `execFileSync` for the CLI.** The fake runs on
   the test's event loop. A synchronous spawn blocks it and the CLI hangs.
-- **Rebuild after editing `src/`**, including during the reviewing-tests
-  break edits. The stale-build guard catches a forgotten rebuild.
+- **Rebuild after editing `src/`**. The stale-build guard catches a forgotten rebuild.
 - **Don't mock our own modules** in harness tests. If a behaviour can't be
   reached from argv, env, files and the fake, ask whether it is behaviour.
 - Tests in one file run one after another, and each has its own server and

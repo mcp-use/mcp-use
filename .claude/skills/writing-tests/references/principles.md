@@ -115,34 +115,3 @@ function) can be tested directly through its exported API, as long as:
 
 If a test needs `vi.mock` of our own modules to reach the function, test
 through the command instead.
-
-## The two-edit check
-
-For each test, imagine (or, with the `reviewing-tests` skill, actually make)
-two edits:
-
-1. **Break the behaviour:** return a wrong value, skip an effect, or do it
-   twice. If the test still passes, it proves nothing. Usual causes: an
-   assertion looser than the contract, an expected value computed by the code,
-   a restated constant, an assertion on the test's own data.
-2. **Restructure the internals** with every observable result unchanged:
-   inline a helper, rename a private function, split a module, reorder
-   independent calls. If the test fails, it is pinned to the implementation
-   and will break on every refactor without catching bugs.
-
-Keep tests that fail edit 1 and pass edit 2. Rewrite or delete the rest.
-
-## Workflow details
-
-- **Failing first.** Run the new test before the change and read the
-  failure. "Expected exit code 0, got 2 (`usage_error`)" is the right failure
-  for a missing flag; "ENOENT dist/bin.js" is a setup failure, so fix the
-  setup first.
-- **Bug fixes.** Commit the failing test, then the fix, so `git log` shows
-  the test failing without the fix.
-- **Run the real thing.** After the tests pass, run the built CLI once by
-  hand the way an agent would (`node dist/bin.js deployments list --json`
-  against a fake or staging Cloud) and read the output.
-- **No test is fine.** If the only possible test needs heavy mocking, timing
-  luck or a large fixture that tests nothing, skip it and say in the PR how
-  you verified the change instead.

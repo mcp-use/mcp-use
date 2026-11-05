@@ -29,25 +29,12 @@ only the internals change. If you can't write a test like that, write no test:
 5. **Avoid** snapshots of human prose, exact error _messages_ (assert the
    `code`), sleeps and timing races, and assertions on data the test built
    itself.
-6. **Apply the two-edit check** to every test you keep:
-   - _Break the behaviour_ (wrong value, skipped effect, effect done twice).
-     The test must fail.
-   - _Restructure the internals_ without changing behaviour. The test must
-     pass.
-
-   Rewrite or delete any test that fails either edit. The `reviewing-tests`
-   skill runs this check for real.
-
 ## Workflow
 
-1. Name the behaviour in one sentence a user would agree with. That sentence
-   is the test name.
-2. Write the test first and run it. Confirm it fails, and that it fails on
-   the assertion you meant, not on setup.
-3. For a bug fix, commit the failing test before the fix so the history shows
-   it failing.
-4. Make it pass. Then run the real thing too (the built CLI against the fake
-   or a real Cloud): green tests are not proof on their own.
+1. Name the observable behaviour the test covers.
+2. Drive the built CLI through the real-process runner and fake Cloud.
+3. Assert on output, exit status, files, and requests received by the fake.
+4. Rebuild after source edits, then run the relevant tests and typecheck.
 
 ## References
 
