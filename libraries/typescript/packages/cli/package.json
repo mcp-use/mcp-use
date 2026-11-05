@@ -48,6 +48,7 @@
     "node": ">=22.22.2"
   },
   "scripts": {
+    "generate:cloud-client": "node scripts/generate-cloud-client.mjs",
     "build": "rimraf dist && tsup --config tsup.config.ts && node scripts/copy-third-party-licenses.mjs && node scripts/verify-package.mjs",
     "test": "node --test tests/proxy.test.mjs && vitest run",
     "test:run": "npm run typecheck && npm test",
@@ -73,6 +74,7 @@
     }
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
     "@mcp-use/client": "workspace:*",
     "@mcp-use/tunnel": "workspace:*",
     "@modelcontextprotocol/client": "2.3.1",
