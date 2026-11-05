@@ -214,6 +214,65 @@ test("checklist run waits for completion and emits one public result", async ({
   ).toHaveLength(2);
 });
 
+for (const operation of ["run", "get"] as const) {
+  test(`checklist ${operation} prints the human summary without changing JSON conventions`, async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    const completed = {
+      id: "run_1",
+      status: "completed",
+      gitBranch: "main",
+      startedAt: "2026-11-05T10:00:00Z",
+      completedAt: "2026-11-05T10:00:42Z",
+      isReadyForChatgpt: true,
+      isReadyForClaudeai: false,
+      checks: [
+        { checkId: "connection", checkName: "MCP connection", status: "pass" },
+        {
+          checkId: "schema",
+          checkName: "Tool schemas",
+          status: "fail",
+          message: "Missing schema",
+        },
+      ],
+      hidden: "must not appear",
+    };
+    if (operation === "run")
+      cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+        status: 201,
+        body: { id: "run_1", status: "pending" },
+      });
+    cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+      body: completed,
+    });
+    const result = await cli.run(
+      [
+        "checklist",
+        operation,
+        ...(operation === "get" ? ["run_1"] : []),
+        "--server",
+        "weather",
+      ],
+      { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe(
+      operation === "run" ? "Running checklist\n" : "Loading checklist\n"
+    );
+    expect(result.stdout).toContain(
+      "Checklist completed in 42s\nWeather · main"
+    );
+    expect(result.stdout).toContain("1 passed · 1 failed");
+    expect(result.stdout).toContain("      Missing schema");
+    expect(result.stdout).toContain("ChatGPT   Ready");
+    expect(result.stdout).toContain("Claude    Not ready");
+    expect(result.stdout).not.toContain("must not appear");
+    expect(result.stdout).not.toContain("\u001b");
+  });
+}
+
 test("checklist --no-wait returns immediately and cancel sends the selected run", async ({
   cloud,
   cli,

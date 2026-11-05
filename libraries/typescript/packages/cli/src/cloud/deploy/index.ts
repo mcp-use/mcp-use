@@ -15,7 +15,7 @@ import {
   validateExternalServer,
 } from "./external-url.js";
 import { waitForDeployment } from "./wait.js";
-import { createDeployProgress } from "./progress.js";
+import { createProgress, withProgress } from "../../core/progress.js";
 import type { DeployValues, DeployInput, StartedDeployment } from "./types.js";
 
 const HELP = `Usage: mcp-use deploy [path] [options]
@@ -134,7 +134,9 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       values.env ?? []
     );
     if (values["external-url"] !== undefined)
-      await validateExternalServer(values["external-url"]);
+      await withProgress("Checking MCP endpoint", output.json, () =>
+        validateExternalServer(values["external-url"]!)
+      );
     const link = values.new ? null : await readProjectLink(cwd);
     const cloud = await connectCloud({
       organization: values.org ?? process.env["MANUFACT_ORG"] ?? link?.orgId,
@@ -164,7 +166,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
             }),
             { notFound: { code: "server_not_found" } }
           );
-    const progress = createDeployProgress(output.json);
+    const progress = createProgress("Deploying", output.json);
     const input: DeployInput = {
       cloud,
       cwd,
@@ -181,7 +183,9 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         ? `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug)}/servers/${encodeURIComponent(id)}/overview`
         : null;
     if (values["external-url"] !== undefined) {
-      const result = await deployExternal(input);
+      const result = await withProgress("Registering server", output.json, () =>
+        deployExternal(input)
+      );
       const dashboardUrl = dashboard(result.serverId);
       if (values.open && dashboardUrl) openBrowser(dashboardUrl);
       output.result(
