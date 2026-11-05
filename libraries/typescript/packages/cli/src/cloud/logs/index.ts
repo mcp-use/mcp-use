@@ -6,18 +6,18 @@ import {
   parseCloudArgs,
   projectServer,
 } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 
 /** Read build or runtime logs, optionally following until interrupted or complete. */
 export async function runLogs(argv: readonly string[]): Promise<number> {
+  const help = cloudHelp("logs", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(
-      "Usage: mcp-use logs [deployment-id] [--server <id-or-slug>] [--build] [--since <duration>] [--limit <n>] [--follow] [--json]\n\n--since accepts durations such as 30s, 5m, 2h or 1d.\n--follow polls until interrupted; build logs stop when the deployment completes.\n"
-    );
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const { values, positionals } = parseCloudArgs(
       argv,
       {

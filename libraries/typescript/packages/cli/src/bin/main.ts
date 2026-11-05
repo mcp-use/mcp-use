@@ -68,50 +68,51 @@ export interface CliMainOptions {
   frameworkVersion: string;
 }
 
-const HELP = `mcp-use — run MCP servers built with mcp-use
+const HELP = `mcp-use — develop MCP servers and manage Manufact Cloud
 
 Usage: mcp-use <command> [options]
 
-Commands:
-  alerts            Manage alert rules
-  checklist         Run publishing checks
-  domains           Manage server domains
-  github            Manage GitHub App access
-  dev      Start the dev server
-  build    Build the server into .mcp-use/build
-  typecheck Refresh MCP types and run the project's TypeScript compiler
-  start    Serve the production build from .mcp-use/build
-  login    Authenticate the cloud CLI
-  logout   Log out of the cloud CLI
-  whoami   Show the authenticated cloud identity
-  org      Manage the active organization
-  env               Manage Cloud environment variables
-  logs              Read Cloud build and runtime logs
-  servers  Manage cloud servers and environment variables
-  deployments Manage cloud deployments and logs
-  deploy   Deploy from GitHub or upload local source
-  link     Link this project to a cloud server
-  unlink   Remove this project's link to a cloud server
-  client   Connect to and invoke MCP servers
-  skills   Install version-matched coding agent skills
-  screenshot Capture an MCP Apps view
+Local development:
+  dev          Start the dev server
+  build        Build the server into .mcp-use/build
+  start        Serve the production build
+  typecheck    Refresh MCP types and run the project's TypeScript compiler
+
+Cloud projects:
+  deploy       Deploy from GitHub, upload source, or register an MCP endpoint
+  link         Link this project to a Cloud server
+  unlink       Remove this project's Cloud link
+  servers      Manage servers and deployment settings
+  deployments  Inspect and manage deployments
+  env          Manage environment variables
+  logs         Read build and runtime logs
+  domains      Manage server domains
+  github       Manage GitHub App access
+  alerts       Manage alert rules
+  checklist    Run publishing checks
+
+Account:
+  login        Sign in to Manufact Cloud
+  logout       Sign out
+  whoami       Show the authenticated identity
+  org          Manage organizations and choose the active organization
+
+Tools:
+  client       Connect to and invoke MCP servers
+  screenshot   Capture an MCP Apps view
+  skills       Install version-matched coding agent skills
+  help         Show help for a command
 
 Options:
-  -p, --port <n>     Port to serve on (dev/start; default: $PORT or 3000)
-  --host <host>      Host to bind (dev/start; default: $HOST or 127.0.0.1)
-  --entry <path>     Server entry module (dev/build/typecheck only)
-  --path <directory> Project root (default: current directory)
-  --mcp-dir <dir>    Directory containing the MCP entry and views/
-  --views-dir <dir>  Views directory (default: views/ or <mcp-dir>/views/)
-  --source-maps      Emit source maps in build output (build only)
-  --inline           Embed view JS and CSS in MCP resources (build only)
-  -- <tsc options>   Forward remaining options to TypeScript (typecheck only)
-  --with-inspector   Mount Inspector on the production listener (start only)
-  --tunnel           Expose the server through a public tunnel (dev/start only)
-  --no-open          Do not auto-open the inspector in a browser (dev only)
-  --no-inspector     Start dev without loading the optional Inspector
-  -h, --help         Show this help
-  -v, --version      Print the version`;
+  -h, --help     Show help
+  -v, --version  Print the version
+
+Examples:
+  mcp-use org --help
+  mcp-use org use --help
+  mcp-use help deploy
+
+Run 'mcp-use <command> --help' for command-specific options.`;
 
 const LOCAL_HELP: Record<string, string> = {
   dev: `Usage: mcp-use dev [options]
@@ -186,6 +187,9 @@ export async function main(
   argv: readonly string[],
   options: CliMainOptions = { frameworkVersion: "unknown" }
 ): Promise<number> {
+  if (argv[0] === "help") {
+    return main([...argv.slice(1), "--help"], options);
+  }
   if (argv.length === 1 && ["--version", "-v"].includes(argv[0] ?? "")) {
     console.log(options.frameworkVersion);
     return 0;

@@ -1,3 +1,4 @@
+import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
@@ -5,32 +6,15 @@ import { cloudWebUrl } from "../cloud-api.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
 
 const USAGE = "mcp-use domains <get|set-subdomain|add|verify|rm> [options]";
-const HELP = `Usage: ${USAGE}
-
-Commands:
-  get                     Show custom domain status
-  set-subdomain <name>     Change the server's managed subdomain
-  add <hostname>          Configure a custom domain and show its CNAME target
-  verify                  Verify custom domain DNS and certificate
-  rm                      Remove the custom domain (alias: remove)
-
-Options:
-  --server <id-or-slug>    Server, or the linked project
-  --org <id-or-slug>       Organization override
-  --path <dir>            Linked project directory
-  --branch <name>         Branch for a custom domain
-  --domain-id <id>        Select a custom domain for get, verify, or rm
-  --yes                   Confirm removal without prompting
-  --json                  Emit one JSON result or error
-  -h, --help              Show this help`;
 
 /** Manage a server's managed subdomain and custom domain. */
 export async function runDomains(argv: readonly string[]): Promise<number> {
+  const help = cloudHelp("domains", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`${HELP}\n`);
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const command = argv[0] === "remove" ? "rm" : argv[0];
     if (
       !["get", "set-subdomain", "add", "verify", "rm"].includes(command ?? "")

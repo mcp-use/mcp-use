@@ -1,4 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { CommandError, UsageError } from "../../core/errors.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
@@ -7,26 +8,15 @@ import { checklistClient, checklistRun } from "./api.js";
 
 const USAGE =
   "mcp-use checklist <run|list|get <run-id>|cancel <run-id>> [options]";
-const HELP = `Usage: ${USAGE}
-
-Options:
-  --server <id-or-slug>  Server, or the linked project
-  --org <id-or-slug>     Organization override
-  --path <dir>          Linked project directory
-  --branch <name>       Branch for run or list
-  --no-wait             Return a new run immediately
-  --limit <n>           List page size, 1-100 (default: 30)
-  --skip <n>            List offset (default: 0)
-  --json                Emit one JSON result or error
-  -h, --help            Show this help`;
 
 /** Run and inspect the server publishing checklist. */
 export async function runChecklist(argv: readonly string[]): Promise<number> {
+  const help = cloudHelp("checklist", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`${HELP}\n`);
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const command = argv[0];
     if (!["run", "list", "get", "cancel"].includes(command ?? ""))
       throw new UsageError(`Usage: ${USAGE}`);

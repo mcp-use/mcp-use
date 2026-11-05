@@ -1,12 +1,14 @@
 import { isIP } from "node:net";
 
 import { human, parseCloudArgs, projectServer } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 
 /** Update only explicitly supplied server settings. */
 export async function updateServer(argv: readonly string[]): Promise<number> {
-  return runCommand(argv, async (output) => {
+  const help = cloudHelp("servers", ["update", ...argv]);
+  return runCommand(argv, help, async (output) => {
     const { values, positionals } = parseCloudArgs(
       argv,
       {

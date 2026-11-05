@@ -1,3 +1,4 @@
+import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { connectCloud } from "../api/client.js";
@@ -6,11 +7,12 @@ import { connectCloud } from "../api/client.js";
 export async function runOrgMembers(argv: readonly string[]): Promise<number> {
   const usage =
     "mcp-use org members [--org <id-or-slug>] [--limit <n>] [--skip <n>] [--json]";
+  const help = cloudHelp("org", ["members", ...argv]);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`Usage: ${usage}\n`);
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const { values } = parseCommandArgs(argv, {
       options: {
         org: { type: "string" },
@@ -38,7 +40,10 @@ export async function runOrgMembers(argv: readonly string[]): Promise<number> {
     });
     const result = await cloud.call(
       cloud.client.GET("/api/v1/organizations/{id}/members", {
-        params: { path: { id: cloud.organization.id }, query: { limit, skip } },
+        params: {
+          path: { id: cloud.organization.id },
+          query: { limit, skip },
+        },
       })
     );
     output.result(

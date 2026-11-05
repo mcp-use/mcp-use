@@ -27,7 +27,7 @@ export async function runUnlink(argv: readonly string[]): Promise<number> {
     process.stdout.write(`${HELP}\n`);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, HELP, async (output) => {
     const { values } = parseCommandArgs(argv, {
       options: { path: { type: "string" }, json: { type: "boolean" } },
       positionals: 0,

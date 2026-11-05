@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import { parseCloudArgs, projectServer, stdinText } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { CommandError, UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
@@ -12,13 +13,12 @@ type Phase = "runtime" | "build" | "both";
 /** Manage write-only Cloud environment values and their scopes. */
 export async function runEnv(argv: readonly string[]): Promise<number> {
   const operation = argv[0];
+  const help = cloudHelp("env", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(
-      `Usage: mcp-use env${COMMANDS.includes(operation ?? "") ? ` ${operation}` : ""} [options]\n\nCommands:\n  list                 List keys and metadata\n  set <KEY=VALUE...>    Create or update values\n  set <KEY> --sensitive Read one secret from stdin\n  rm <KEY>             Remove a variable (alias: remove)\n  push <file>          Set variables from a dotenv file\n\nOptions:\n  --server <id-or-slug>\n  --org <id-or-slug>\n  --environment <production|preview|development>\n  --branch <name>      Preview branch override\n  --phase <runtime|build|both>\n  --sensitive          Read a value from stdin\n  --yes                Confirm removal\n  --json               Emit one result or error; values are never printed\n`
-    );
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     if (!COMMANDS.includes(operation ?? ""))
       throw new UsageError("Usage: mcp-use env <list|set|rm|push>");
     const { values, positionals } = parseCloudArgs(

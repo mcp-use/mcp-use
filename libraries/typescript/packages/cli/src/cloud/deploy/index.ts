@@ -125,7 +125,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
     process.stdout.write(`${HELP}\n`);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, HELP, async (output) => {
     const { values, cwd } = parse(argv);
     const env = await loadEnvironment(
       cwd,

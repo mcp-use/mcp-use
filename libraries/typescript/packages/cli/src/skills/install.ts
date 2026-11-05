@@ -28,7 +28,7 @@ export async function runSkills(argv: readonly string[]): Promise<number> {
     process.stdout.write(`${HELP}\n`);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, HELP, async (output) => {
     const { positionals, values } = parseCommandArgs(argv, {
       options: {
         path: { type: "string", short: "p" },

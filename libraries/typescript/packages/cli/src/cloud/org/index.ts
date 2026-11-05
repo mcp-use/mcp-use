@@ -9,6 +9,7 @@ import {
 } from "../auth/account.js";
 import { readAuth, requireCredential, updateAuth } from "../auth/store.js";
 import { cloudFor, human, parseCloudArgs } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 
@@ -27,13 +28,12 @@ export async function runOrganizations(
     const { runOrgInvites } = await import("./invites.js");
     return runOrgInvites(argv.slice(1));
   }
+  const help = cloudHelp("org", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(
-      `Usage: mcp-use org${COMMANDS.includes(operation ?? "") ? ` ${operation}` : ""} [options]\n\nCommands: list, current, use <id-or-slug>, create <name>, update, members, invites\n\nOptions:\n  --org <id-or-slug>  Organization override\n  --name <name>      Updated display name\n  --slug <slug>      Organization URL slug\n  --logo <path>      Upload an organization logo\n  --json             Emit one result or error\n`
-    );
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     if (!COMMANDS.includes(operation ?? ""))
       throw new UsageError(
         "Usage: mcp-use org <list|current|use|create|update>"

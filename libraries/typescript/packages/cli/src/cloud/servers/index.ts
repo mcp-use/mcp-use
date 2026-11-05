@@ -5,6 +5,7 @@ import {
   parseCloudArgs,
   projectServer,
 } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
@@ -15,14 +16,13 @@ const COMMANDS = ["list", "get", "update", "rm", "remove"];
 /** Manage servers and their deployment settings. */
 export async function runServers(argv: readonly string[]): Promise<number> {
   const operation = argv[0];
+  const help = cloudHelp("servers", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(
-      `Usage: mcp-use servers${COMMANDS.includes(operation ?? "") ? ` ${operation}` : ""} [server] [options]\n\nCommands: list, get, update, rm (alias: remove)\n\nOptions:\n  --server <id-or-slug>     Default: MANUFACT_SERVER or the project link\n  --org <id-or-slug>        Organization override\n  --limit <n> --skip <n>    List pagination\n  --name <name> --description <text>\n  --branch <name> --root-dir <path>\n  --build-command <cmd> --start-command <cmd>\n  --watch-paths <glob> --deploy-branches <glob> (repeatable)\n  --wait-for-ci | --no-wait-for-ci\n  --repo <owner/name> | --disconnect-repo\n  --allow-ip <cidr>         Replace custom IP ranges (repeatable)\n  --clear-allow-ip          Clear custom IP ranges\n  --yes                    Confirm removal\n  --json                   Emit one result or error\n`
-    );
+    process.stdout.write(help);
     return 0;
   }
   if (operation === "update") return updateServer(argv.slice(1));
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     if (!COMMANDS.includes(operation ?? ""))
       throw new UsageError("Usage: mcp-use servers <list|get|update|rm>");
     const { values, positionals } = parseCloudArgs(

@@ -1,3 +1,4 @@
+import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
@@ -8,22 +9,6 @@ import { readAlertFile } from "./config.js";
 
 const USAGE =
   "mcp-use alerts <list|get <id>|create|update <id>|rm <id>|options> [options]";
-const HELP = `Usage: ${USAGE}
-
-Create and update use the dashboard alert YAML format:
-https://docs.manufact.com/dashboard/alerts
-
-Options:
-  --server <id-or-slug>  Server, or the linked project
-  --org <id-or-slug>     Organization override
-  --path <dir>          Linked project directory
-  --file <rule.yaml>    Required for create and update
-  --reason <text>       Change description for create and update
-  --limit <n>           List page size, 1-100 (default: 25)
-  --skip <n>            List offset (default: 0)
-  --yes                 Confirm rm (alias: remove) without prompting
-  --json                Emit one JSON result or error
-  -h, --help            Show this help`;
 
 type Rule =
   operations["getApiV1ServersByIdAlertsRulesByRuleId"]["responses"][200]["content"]["application/json"]["rule"];
@@ -48,11 +33,12 @@ function publicRule(rule: Rule) {
 
 /** Manage alert rules using dashboard-compatible YAML. */
 export async function runAlerts(argv: readonly string[]): Promise<number> {
+  const help = cloudHelp("alerts", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`${HELP}\n`);
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const command = argv[0] === "remove" ? "rm" : argv[0];
     if (
       !["list", "get", "create", "update", "rm", "options"].includes(

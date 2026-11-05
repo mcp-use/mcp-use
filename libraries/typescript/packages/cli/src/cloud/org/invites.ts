@@ -1,3 +1,4 @@
+import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { connectCloud } from "../api/client.js";
@@ -6,11 +7,12 @@ import { connectCloud } from "../api/client.js";
 export async function runOrgInvites(argv: readonly string[]): Promise<number> {
   const usage =
     "mcp-use org invites <list|send <email>|cancel <invite-id>> [--org <id-or-slug>] [--role member|admin] [--json]";
+  const help = cloudHelp("org", ["invites", ...argv]);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`Usage: ${usage}\n`);
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const command = argv[0];
     if (!["list", "send", "cancel"].includes(command ?? ""))
       throw new UsageError(`Usage: ${usage}`);

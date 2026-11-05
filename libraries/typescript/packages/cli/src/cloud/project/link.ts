@@ -53,7 +53,7 @@ export async function runLink(argv: readonly string[]): Promise<number> {
     process.stdout.write(`${HELP}\n`);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, HELP, async (output) => {
     const { values } = parseCommandArgs(argv, {
       options: { ...PROJECT_OPTIONS, json: { type: "boolean" } },
       positionals: 0,
