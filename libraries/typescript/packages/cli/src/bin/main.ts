@@ -73,6 +73,8 @@ const HELP = `mcp-use — run MCP servers built with mcp-use
 Usage: mcp-use <command> [options]
 
 Commands:
+  alerts            Manage alert rules
+  checklist         Run publishing checks
   domains           Manage server domains
   github            Manage GitHub App access
   dev      Start the dev server
@@ -213,6 +215,14 @@ export async function main(
   if (command === "whoami") {
     const { runWhoami } = await import("../cloud/auth/whoami.js");
     return runWhoami(commandArgs);
+  }
+  if (command === "alerts") {
+    const { runAlerts } = await import("../cloud/alerts/index.js");
+    return runAlerts(commandArgs);
+  }
+  if (command === "checklist") {
+    const { runChecklist } = await import("../cloud/checklist/index.js");
+    return runChecklist(commandArgs);
   }
   if (command === "domains") {
     const { runDomains } = await import("../cloud/domains/index.js");

@@ -433,6 +433,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/servers/{id}/alerts/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getApiV1ServersByIdAlertsOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/servers/{id}/alerts/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getApiV1ServersByIdAlertsRules"];
+        put?: never;
+        post: operations["postApiV1ServersByIdAlertsRules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/servers/{id}/alerts/rules/{ruleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getApiV1ServersByIdAlertsRulesByRuleId"];
+        put: operations["putApiV1ServersByIdAlertsRulesByRuleId"];
+        post?: never;
+        delete: operations["deleteApiV1ServersByIdAlertsRulesByRuleId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the members of an organization with their user profile, oldest first by default. Any member may list. */
+        get: operations["getApiV1OrganizationsByIdMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{id}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List every invitation of an organization (all statuses), newest first. Any member may list. */
+        get: operations["getApiV1OrganizationsByIdInvitations"];
+        put?: never;
+        /** @description Invite someone to an organization by email and send the invitation email. Requires the `invitation:create` permission. Callers cannot invite above their own role (only owners invite owners), and custom roles need the Enterprise plan. With `resend`, an existing pending invitation is extended and its email sent again. */
+        post: operations["postApiV1OrganizationsByIdInvitations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{id}/invitations/{invitationId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Cancel an invitation of the organization. Requires the `invitation:cancel` permission. Returns the canceled invitation. */
+        post: operations["postApiV1OrganizationsByIdInvitationsByInvitationIdCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/servers/{id}/domain/status": {
         parameters: {
             query?: never;
@@ -521,7 +621,30 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        AlertRuleCondition0: components["schemas"]["AlertRuleComparison"] | {
+            all: components["schemas"]["AlertRuleCondition1"][];
+        } | {
+            any: components["schemas"]["AlertRuleCondition1"][];
+        };
+        AlertRuleComparison: {
+            /** @enum {string} */
+            metric: "cpu.busyPercent" | "cpu.stealPercent" | "memory.usagePercent" | "request.requests" | "request.errors" | "request.errorPercent" | "request.reachabilityRequests" | "request.reachableRequests" | "request.unreachablePercent" | "deployment.failedCount" | "deployment.latestOpenFailureAtMs" | "runtime.serving" | "tool.calls" | "tool.errors" | "tool.errorPercent" | "authentication.requests" | "authentication.rejections" | "authentication.rejectionPercent" | "token.requests" | "token.errorPercent" | "token.latencyP95Ms";
+            /** @enum {string} */
+            op: "gt" | "gte" | "lt" | "lte" | "eq" | "ne";
+            value: number;
+        };
+        AlertRuleCondition1: components["schemas"]["AlertRuleComparison"] | {
+            all: components["schemas"]["AlertRuleCondition2"][];
+        } | {
+            any: components["schemas"]["AlertRuleCondition2"][];
+        };
+        AlertRuleCondition2: components["schemas"]["AlertRuleComparison"] | {
+            all: components["schemas"]["AlertRuleComparison"][];
+        } | {
+            any: components["schemas"]["AlertRuleComparison"][];
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -3914,6 +4037,1084 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServersByIdAlertsOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        metrics: {
+                            name: string;
+                            description: string;
+                        }[];
+                        evaluationIntervalMs: number;
+                        maxDurationMs: number;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServersByIdAlertsRules: {
+        parameters: {
+            query?: {
+                search?: string;
+                status?: "active" | "recovering" | "unknown" | "resolved" | "paused";
+                templateId?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        rules: {
+                            id: string;
+                            revision: number;
+                            config: {
+                                name: string;
+                                description?: string;
+                                enabled: boolean;
+                                trigger: {
+                                    when: components["schemas"]["AlertRuleCondition0"];
+                                    for: string;
+                                };
+                                recover: {
+                                    description?: string;
+                                    name?: string;
+                                    when: components["schemas"]["AlertRuleCondition0"];
+                                    for: string;
+                                };
+                                notify: ({
+                                    /** @constant */
+                                    type: "email";
+                                    recipients?: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "slack";
+                                    channel?: string;
+                                })[];
+                            };
+                            /** @enum {string} */
+                            status: "active" | "recovering" | "unknown" | "resolved" | "paused";
+                        }[];
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ServersByIdAlertsRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    config: {
+                        name: string;
+                        description?: string;
+                        enabled: boolean;
+                        trigger: {
+                            when: components["schemas"]["AlertRuleCondition0"];
+                            for: string;
+                        };
+                        recover: {
+                            description?: string;
+                            name?: string;
+                            when: components["schemas"]["AlertRuleCondition0"];
+                            for: string;
+                        };
+                        notify: ({
+                            /** @constant */
+                            type: "email";
+                            recipients?: string[];
+                        } | {
+                            /** @constant */
+                            type: "slack";
+                            channel?: string;
+                        })[];
+                    };
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rule: {
+                            id: string;
+                            revision: number;
+                            config: {
+                                name: string;
+                                description?: string;
+                                enabled: boolean;
+                                trigger: {
+                                    when: components["schemas"]["AlertRuleCondition0"];
+                                    for: string;
+                                };
+                                recover: {
+                                    description?: string;
+                                    name?: string;
+                                    when: components["schemas"]["AlertRuleCondition0"];
+                                    for: string;
+                                };
+                                notify: ({
+                                    /** @constant */
+                                    type: "email";
+                                    recipients?: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "slack";
+                                    channel?: string;
+                                })[];
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServersByIdAlertsRulesByRuleId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rule: {
+                            id: string;
+                            revision: number;
+                            config: {
+                                name: string;
+                                description?: string;
+                                enabled: boolean;
+                                trigger: {
+                                    when: components["schemas"]["AlertRuleCondition0"];
+                                    for: string;
+                                };
+                                recover: {
+                                    description?: string;
+                                    name?: string;
+                                    when: components["schemas"]["AlertRuleCondition0"];
+                                    for: string;
+                                };
+                                notify: ({
+                                    /** @constant */
+                                    type: "email";
+                                    recipients?: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "slack";
+                                    channel?: string;
+                                })[];
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    putApiV1ServersByIdAlertsRulesByRuleId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    config: {
+                        id?: string;
+                        name: string;
+                        description?: string;
+                        enabled: boolean;
+                        trigger: {
+                            when: components["schemas"]["AlertRuleCondition0"];
+                            for: string;
+                        };
+                        recover: {
+                            description?: string;
+                            name?: string;
+                            when: components["schemas"]["AlertRuleCondition0"];
+                            for: string;
+                        };
+                        notify: ({
+                            /** @constant */
+                            type: "email";
+                            recipients?: string[];
+                        } | {
+                            /** @constant */
+                            type: "slack";
+                            channel?: string;
+                        })[];
+                    };
+                    reason: string;
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rule: {
+                            id: string;
+                            revision: number;
+                            config: {
+                                name: string;
+                                description?: string;
+                                enabled: boolean;
+                                trigger: {
+                                    when: components["schemas"]["AlertRuleCondition0"];
+                                    for: string;
+                                };
+                                recover: {
+                                    description?: string;
+                                    name?: string;
+                                    when: components["schemas"]["AlertRuleCondition0"];
+                                    for: string;
+                                };
+                                notify: ({
+                                    /** @constant */
+                                    type: "email";
+                                    recipients?: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "slack";
+                                    channel?: string;
+                                })[];
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ServersByIdAlertsRulesByRuleId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                ruleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted: boolean;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1OrganizationsByIdMembers: {
+        parameters: {
+            query?: {
+                limit?: number;
+                take?: number;
+                skip?: number;
+                sort?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: string;
+                            organizationId: string;
+                            userId: string;
+                            role: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            user: {
+                                id: string;
+                                name: string;
+                                email: string;
+                                image: string | null;
+                            };
+                        }[];
+                        total: number;
+                        limit: number;
+                        skip: number;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1OrganizationsByIdInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        invitations: {
+                            id: string;
+                            organizationId: string;
+                            email: string;
+                            role: string | null;
+                            /** @description `pending`, `accepted`, `rejected` or `canceled`. A pending invitation past `expiresAt` can no longer be accepted. */
+                            status: string;
+                            inviterId: string;
+                            /** Format: date-time */
+                            expiresAt: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1OrganizationsByIdInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                    /**
+                     * @description One role: `member`, `admin`, `owner` or a custom role of the organization.
+                     * @default member
+                     */
+                    role?: string;
+                    /**
+                     * @description When the email already has a pending invitation, extend it and send the email again instead of failing.
+                     * @default false
+                     */
+                    resend?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        organizationId: string;
+                        email: string;
+                        role: string | null;
+                        /** @description `pending`, `accepted`, `rejected` or `canceled`. A pending invitation past `expiresAt` can no longer be accepted. */
+                        status: string;
+                        inviterId: string;
+                        /** Format: date-time */
+                        expiresAt: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                    };
+                };
+            };
+            /** @description Validation error, or a Better Auth rejection such as `USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION`, `USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION` (retry with `resend: true`), `ROLE_NOT_FOUND` or `INVALID_EMAIL`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not a member, missing `invitation:create`, role not assignable by the caller, `INVITATION_LIMIT_REACHED`, or `PLAN_LIMIT_TEAM_MEMBERS` (body carries the paywall fields of `PlanLimitErrorResponse`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1OrganizationsByIdInvitationsByInvitationIdCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                invitationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        organizationId: string;
+                        email: string;
+                        role: string | null;
+                        /** @description `pending`, `accepted`, `rejected` or `canceled`. A pending invitation past `expiresAt` can no longer be accepted. */
+                        status: string;
+                        inviterId: string;
+                        /** Format: date-time */
+                        expiresAt: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

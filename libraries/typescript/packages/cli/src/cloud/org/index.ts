@@ -19,10 +19,17 @@ export async function runOrganizations(
   argv: readonly string[]
 ): Promise<number> {
   const operation = argv[0];
-  // Additional organization command groups are dispatched here.
+  if (operation === "members") {
+    const { runOrgMembers } = await import("./members.js");
+    return runOrgMembers(argv.slice(1));
+  }
+  if (operation === "invites") {
+    const { runOrgInvites } = await import("./invites.js");
+    return runOrgInvites(argv.slice(1));
+  }
   if (argv.includes("--help") || argv.includes("-h")) {
     process.stdout.write(
-      `Usage: mcp-use org${COMMANDS.includes(operation ?? "") ? ` ${operation}` : ""} [options]\n\nCommands: list, current, use <id-or-slug>, create <name>, update\n\nOptions:\n  --org <id-or-slug>  Organization override\n  --name <name>      Updated display name\n  --slug <slug>      Organization URL slug\n  --logo <path>      Upload an organization logo\n  --json             Emit one result or error\n`
+      `Usage: mcp-use org${COMMANDS.includes(operation ?? "") ? ` ${operation}` : ""} [options]\n\nCommands: list, current, use <id-or-slug>, create <name>, update, members, invites\n\nOptions:\n  --org <id-or-slug>  Organization override\n  --name <name>      Updated display name\n  --slug <slug>      Organization URL slug\n  --logo <path>      Upload an organization logo\n  --json             Emit one result or error\n`
     );
     return 0;
   }
