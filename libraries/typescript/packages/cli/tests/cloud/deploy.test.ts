@@ -515,16 +515,9 @@ describe("deploy agent contract", () => {
     });
     expect(
       JSON.parse(
-        await readFile(
-          join(directory, ".mcp-use", "cloud", "link.json"),
-          "utf8"
-        )
+        await readFile(join(directory, ".manufact", "project.json"), "utf8")
       )
-    ).toMatchObject({
-      organizationId: "org_1",
-      serverId: "srv_1",
-      sourceType: "managed",
-    });
+    ).toEqual({ orgId: "org_1", serverId: "srv_1" });
   });
 
   it("applies .gitignore patterns and negation when packaging managed servers", async () => {
@@ -1290,19 +1283,17 @@ describe("deploy agent contract", () => {
 
   it("synchronizes configuration before a linked managed redeploy", async () => {
     const directory = await project("managed-config-redeploy");
-    const linkDirectory = join(directory, ".mcp-use", "cloud");
-    await mkdir(linkDirectory, { recursive: true });
+    await mkdir(join(directory, ".manufact"), { recursive: true });
     await writeFile(
-      join(linkDirectory, "link.json"),
-      `${JSON.stringify({
-        organizationId: "org_1",
-        serverId: "srv_managed_config",
-        sourceType: "managed",
-      })}\n`
+      join(directory, ".manufact", "project.json"),
+      `${JSON.stringify({ orgId: "org_1", serverId: "srv_managed_config" })}\n`
     );
     api.request.mockImplementation(async (path: string) => {
       if (path === "/servers/srv_managed_config")
-        return { id: "srv_managed_config" };
+        return {
+          id: "srv_managed_config",
+          connectedRepository: { isManaged: true },
+        };
       if (path === "/deployments") return { id: "dep_managed_config" };
       throw new Error(`Unexpected request: ${path}`);
     });
