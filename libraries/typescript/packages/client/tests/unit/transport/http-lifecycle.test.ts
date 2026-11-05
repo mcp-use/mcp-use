@@ -4,6 +4,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import { describe, expect, it, onTestFinished } from "vitest";
+import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 import { HttpConnector } from "../../../src/transport/http.js";
 import { deferred } from "../../helpers/deferred.js";
 
@@ -22,10 +23,12 @@ async function fixture(
   const terminated: Array<string | string[] | undefined> = [];
   const streams = new Set<ServerResponse>();
   const receivedHeaders: IncomingMessage["headers"][] = [];
+  const rawHeaders: string[][] = [];
 
   /** Handles the real SDK handshake, event stream, and session termination requests. */
   async function handle(request: IncomingMessage, response: ServerResponse) {
     receivedHeaders.push(request.headers);
+    rawHeaders.push(request.rawHeaders);
     if (
       expectedAuthorization !== undefined &&
       request.headers.authorization !== expectedAuthorization
@@ -120,10 +123,71 @@ async function fixture(
     terminated,
     streams,
     receivedHeaders,
+    rawHeaders,
   };
 }
 
 describe("HTTP lifecycle with a real legacy MCP session", () => {
+  it.each(["oauth-token", undefined])(
+    "sends one authorization header with an OAuth token of %s",
+    async (initialToken) => {
+      let accessToken = initialToken;
+      let verifier = "";
+      const provider = {
+        redirectUrl: "http://127.0.0.1/callback",
+        clientMetadata: { redirect_uris: ["http://127.0.0.1/callback"] },
+        clientInformation: () => undefined,
+        tokens: () =>
+          accessToken
+            ? { access_token: accessToken, token_type: "Bearer" }
+            : undefined,
+        saveTokens: (tokens) => {
+          accessToken = tokens.access_token;
+        },
+        redirectToAuthorization: () => {
+          throw new Error("Unexpected authorization redirect");
+        },
+        saveCodeVerifier: (value) => {
+          verifier = value;
+        },
+        codeVerifier: () => verifier,
+      } satisfies OAuthClientProvider;
+      const server = await fixture({
+        headers: {
+          authorization: "Bearer old-token",
+          "X-Request-Id": "keep-me",
+        },
+        authToken: "static-token",
+        authProvider: provider,
+        detectMixedAuth: false,
+      });
+      server.initializeGate.resolve();
+      server.terminateGate.resolve();
+      await server.connector.connect();
+      await server.streamOpened.promise;
+
+      const initialCount = server.receivedHeaders.length;
+      const expectedInitial = `Bearer ${initialToken ?? "static-token"}`;
+      expect(initialCount).toBeGreaterThanOrEqual(3);
+      for (const headers of server.receivedHeaders.slice(0, initialCount)) {
+        expect(headers.authorization).toBe(expectedInitial);
+        expect(headers["x-request-id"]).toBe("keep-me");
+      }
+
+      accessToken = "refreshed-oauth-token";
+      await server.connector.disconnect();
+      await server.streamClosed.promise;
+      expect(server.receivedHeaders.at(-1)?.authorization).toBe(
+        "Bearer refreshed-oauth-token"
+      );
+      for (const raw of server.rawHeaders) {
+        const names = raw.filter((_, index) => index % 2 === 0);
+        expect(
+          names.filter((name) => name.toLowerCase() === "authorization")
+        ).toHaveLength(1);
+      }
+    }
+  );
   it.each(["authorization", "AUTHORIZATION", "aUtHoRiZaTiOn", "Authorization"])(
     "replaces a custom %s header with authToken throughout the session",
     async (headerName) => {
