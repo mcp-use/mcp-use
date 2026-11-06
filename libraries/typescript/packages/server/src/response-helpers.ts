@@ -206,6 +206,9 @@ export function binary(
  * Create an embedded-resource content block for a tool result.
  *
  * Supports `resource(uri, mimeType, text?)` or `resource(uri, callToolResult)`.
+ * The result overload embeds the first content block. Image and audio blocks
+ * retain their base64 data as a blob and their MIME type; text blocks retain
+ * their text.
  *
  * @deprecated Prefer
  * `{ content: [{ type: "resource", resource: { uri, mimeType, text } }] }`.
@@ -237,6 +240,20 @@ export function resource(
     }
 
     const first = contentResult.content?.[0];
+    if (first?.type === "image" || first?.type === "audio") {
+      return {
+        content: [
+          {
+            type: "resource",
+            resource: {
+              uri,
+              mimeType: first.mimeType,
+              blob: first.data,
+            },
+          },
+        ],
+      };
+    }
     if (first?.type === "text" && "text" in first) {
       extractedText = first.text;
     }
