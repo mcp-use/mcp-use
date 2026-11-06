@@ -30,6 +30,7 @@ const COMMANDS: Record<string, readonly string[]> = {
   whoami: [],
   screenshot: [],
   feedback: ["send"],
+  analytics: ["catalog", "query"],
   skills: ["install"],
   logs: [],
   org: ["list", "current", "use", "create", "update", "members", "invites"],
@@ -50,9 +51,10 @@ const CLIENT_OPERATIONS: Record<string, readonly string[]> = {
 };
 
 function commandProperties(argv: readonly string[]) {
-  // Feedback text after -- can itself be --help; it is still a submission.
-  const messageSeparator =
-    argv[0] === "feedback" ? argv.indexOf("--", argv[1] === "--" ? 2 : 1) : -1;
+  // Literal feedback or SQL after -- can itself be --help.
+  const messageSeparator = ["feedback", "analytics"].includes(argv[0] ?? "")
+    ? argv.indexOf("--", argv[1] === "--" ? 2 : 1)
+    : -1;
   const optionArgs =
     messageSeparator < 0 ? argv : argv.slice(0, messageSeparator);
   const help =

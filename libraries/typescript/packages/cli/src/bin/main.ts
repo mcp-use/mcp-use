@@ -86,6 +86,7 @@ Cloud projects:
   deployments  Inspect and manage deployments
   env          Manage environment variables
   logs         Read build and runtime logs
+  analytics    Discover and query server analytics
   domains      Manage server domains
   github       Manage GitHub App access
   alerts       Manage alert rules
@@ -190,9 +191,10 @@ export async function main(
 ): Promise<number> {
   if (argv[0] === "help") {
     const args = argv.slice(1);
-    // Feedback preserves -- for literal messages. Keep the help flag before
-    // that delimiter so a help request can never become a submission.
-    const separator = args[0] === "feedback" ? args.indexOf("--", 2) : -1;
+    // Keep help before the delimiter for commands accepting literal text.
+    const separator = ["feedback", "analytics"].includes(args[0] ?? "")
+      ? args.indexOf("--", 2)
+      : -1;
     return main(
       separator < 0
         ? [...args, "--help"]
@@ -219,6 +221,11 @@ export async function main(
 
   const command = argv[0];
   const commandArgs = stripForwardingSeparator(argv.slice(1));
+  if (command === "analytics") {
+    const { runAnalytics } = await import("../cloud/analytics/index.js");
+    // SQL may start with a -- comment; preserve its literal delimiter.
+    return runAnalytics(argv.slice(argv[1] === "--" ? 2 : 1));
+  }
   if (command === "feedback") {
     const { runFeedback } = await import("../feedback.js");
     // Preserve the message's -- delimiter; only remove a forwarding separator
