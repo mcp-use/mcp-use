@@ -9,42 +9,74 @@ Code mode exposes `execute_code` and `search_tools` so agents run JavaScript wit
 ## Enable
 
 ```typescript
+import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import { MCPClient } from "@mcp-use/client";
+
+const directory = resolve("./data");
+await mkdir(directory, { recursive: true });
 
 const client = new MCPClient(
   {
     mcpServers: {
       fs: {
         command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-filesystem", "./data"],
+        args: ["-y", "@modelcontextprotocol/server-filesystem", directory],
       },
     },
   },
   { codeMode: true },
 );
 
-const result = await client.executeCode(`
-  const files = await fs.list_directory({ path: "." });
-  return files.length;
-`);
+try {
+  const result = await client.executeCode(`
+    return await fs.list_directory({ path: ${JSON.stringify(directory)} });
+  `);
 
-console.log(result.result, result.logs, result.error);
-await client.close();
+  console.log(result.result, result.logs, result.error);
+} finally {
+  await client.close();
+}
 ```
+
+The filesystem server's `list_directory` tool returns a formatted string, so
+`result.result` contains the directory listing. A string's `.length` counts
+characters, not directory entries. The example creates `./data` if needed and
+uses its absolute path for both the server's allowed directory and the tool call.
 
 ## Executors
 
-| Executor | Use case |
-| -------- | -------- |
-| `"vm"` (default) | Local Node.js VM — fast, trusted environments |
-| `"e2b"` | Cloud sandbox — untrusted code (`@e2b/code-interpreter` + API key) |
-| Custom function / `BaseCodeExecutor` | Your own runtime |
+| Executor                             | Use case                                                           |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| `"vm"` (default)                     | Local Node.js VM — fast, trusted environments                      |
+| `"e2b"`                              | Cloud sandbox — untrusted code (`@e2b/code-interpreter` + API key) |
+| Custom function / `BaseCodeExecutor` | Your own runtime                                                   |
 
 ```typescript
 { codeMode: {
     enabled: true,
     executor: "e2b",
     executorOptions: { apiKey: process.env.E2B_API_KEY!, timeoutMs: 300_000 },
+}}
+```
+
+A custom function receives `(code, timeout?)` and returns an `ExecutionResult`.
+It owns cleanup for whatever runtime it wraps — `client.close()` does not
+release anything on its behalf. A non-arrow function is invoked with the
+`MCPClient` as its `this`, so it can reach the client without closing over it:
+
+```typescript
+{ codeMode: {
+    enabled: true,
+    executor: async function (this: MCPClient, code, timeout) {
+      const servers = this.getServerNames();
+      return {
+        result: await myRuntime.run(code, timeout, servers),
+        logs: [],
+        error: null,
+        execution_time: 0,
+      };
+    },
 }}
 ```
 
@@ -61,6 +93,6 @@ await agent.run("List all files and count them");
 
 ## Reference
 
-[Code mode API reference](/typescript/api-reference/client/code-mode) — config types, `searchTools`, `ExecutionResult`.
+[Client API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/_mcp-use_client.index.html) — config types, `searchTools`, and `ExecutionResult`.
 
 [Anthropic: Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)

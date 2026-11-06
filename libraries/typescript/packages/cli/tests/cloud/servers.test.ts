@@ -1,0 +1,431 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { api, cloudApiForOrganization } = vi.hoisted(() => {
+  const api = { request: vi.fn() };
+  return {
+    api,
+    cloudApiForOrganization: vi.fn(async () => ({
+      api,
+      organizationId: "org_1",
+    })),
+  };
+});
+
+vi.mock("../../src/cloud/cloud-api.js", () => ({
+  cloudApiForOrganization,
+}));
+
+import { runServers } from "../../src/cloud/servers.js";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  api.request.mockReset();
+  cloudApiForOrganization.mockClear();
+});
+
+describe("server environment output safety", () => {
+  it("never returns a newly created environment value", async () => {
+    api.request.mockResolvedValueOnce([]).mockResolvedValueOnce({
+      id: "env_1",
+      key: "TOKEN",
+      value: "must-not-appear",
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "TOKEN=must-not-appear", "--json"])
+    ).resolves.toBe(0);
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(output).not.toContain("must-not-appear");
+    expect(JSON.parse(output)).toEqual({
+      serverId: "server_1",
+      key: "TOKEN",
+      scope: "production",
+      branch: null,
+      secret: false,
+      updated: false,
+    });
+  });
+
+  it("never returns an updated preview environment value", async () => {
+    api.request
+      .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN", branch: "feature" }])
+      .mockResolvedValueOnce({
+        id: "env_1",
+        key: "TOKEN",
+        value: "new-secret",
+      });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers([
+        "env",
+        "set",
+        "server_1",
+        "TOKEN=new-secret",
+        "--branch",
+        "feature",
+        "--secret",
+        "--json",
+      ])
+    ).resolves.toBe(0);
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(output).not.toContain("new-secret");
+    expect(JSON.parse(output)).toMatchObject({
+      scope: "preview",
+      branch: "feature",
+      secret: true,
+      updated: true,
+    });
+  });
+
+  it("clears an existing sensitive flag when --secret is not repeated on update", async () => {
+    api.request
+      .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN", sensitive: true }])
+      .mockResolvedValueOnce({
+        id: "env_1",
+        key: "TOKEN",
+        value: "rotated",
+      });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "TOKEN=rotated", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenLastCalledWith(
+      "/servers/server_1/env-variables/env_1",
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          key: "TOKEN",
+          value: "rotated",
+          branch: null,
+          environments: ["production"],
+          sensitive: false,
+        }),
+      }
+    );
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(JSON.parse(output)).toMatchObject({
+      secret: false,
+    });
+  });
+
+  it("does not mark a brand-new variable sensitive by default", async () => {
+    api.request.mockResolvedValueOnce([]).mockResolvedValueOnce({
+      id: "env_2",
+      key: "NEW_VAR",
+      value: "value",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "NEW_VAR=value", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenLastCalledWith(
+      "/servers/server_1/env-variables",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          key: "NEW_VAR",
+          value: "value",
+          branch: null,
+          environments: ["production"],
+          sensitive: false,
+        }),
+      }
+    );
+  });
+});
+
+describe("server environment deletion", () => {
+  it("fails instead of reporting a delete that never happened", async () => {
+    // The key exists in production, but the caller scoped the unset to a branch.
+    api.request.mockResolvedValueOnce([
+      { id: "env_1", key: "TOKEN", branch: null },
+    ]);
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers([
+        "env",
+        "unset",
+        "server_1",
+        "TOKEN",
+        "--branch",
+        "feature",
+        "--yes",
+        "--json",
+      ])
+    ).resolves.toBe(1);
+
+    // Only the lookup ran; nothing was deleted.
+    expect(api.request).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toEqual({
+      error: {
+        code: "env_variable_not_found",
+        message:
+          "Environment variable not found on server_1 (branch feature): TOKEN",
+      },
+    });
+  });
+});
+
+describe("server list argument validation", () => {
+  it("rejects a bad page size before authenticating", async () => {
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["list", "--limit", "0", "--json"])).resolves.toBe(
+      2
+    );
+
+    // Nothing should reach the cloud for a command line that cannot run.
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+    expect(api.request).not.toHaveBeenCalled();
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toEqual({
+      error: {
+        code: "usage_error",
+        message: "--limit must be an integer from 1 to 100.",
+      },
+    });
+  });
+
+  it("rejects a bad skip before authenticating", async () => {
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["list", "--skip", "abc", "--json"])).resolves.toBe(
+      2
+    );
+
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+    expect(api.request).not.toHaveBeenCalled();
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toEqual({
+      error: {
+        code: "usage_error",
+        message: "--skip must be a non-negative integer.",
+      },
+    });
+  });
+});
+
+describe("server human output", () => {
+  it("renders a compact list instead of raw API JSON", async () => {
+    api.request.mockResolvedValue({
+      items: [
+        {
+          id: "server_1",
+          name: "Demo",
+          status: "running",
+          region: "US",
+          updatedAt: "2026-07-24T00:00:00Z",
+          connectedRepository: { isManaged: true },
+          config: { noisy: { deeply: "nested" } },
+        },
+      ],
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["list"])).resolves.toBe(0);
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(output).toContain("NAME\tSTATUS\tSOURCE\tREGION\tUPDATED");
+    expect(output).toContain("Demo\trunning\tmanaged\tUS");
+    expect(output).not.toContain('"config"');
+  });
+
+  it("shows effective GitHub trigger configuration in server detail", async () => {
+    api.request.mockResolvedValue({
+      id: "server_1",
+      name: "Demo",
+      connectedRepository: {
+        isManaged: false,
+        watchPaths: ["apps/api/**"],
+        deployBranchPatterns: ["main", "release/*"],
+        waitForCi: true,
+      },
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["get", "server_1"])).resolves.toBe(0);
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(output).toContain("Watch paths: apps/api/**");
+    expect(output).toContain("Deploy branches: main, release/*");
+    expect(output).toContain("Wait for CI: yes");
+  });
+});
+
+describe("server trigger configuration", () => {
+  it("updates and clears documented GitHub trigger fields", async () => {
+    api.request.mockResolvedValue({ id: "server_1" });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runServers([
+        "update",
+        "server_1",
+        "--watch-paths",
+        "apps/api/**",
+        "--watch-paths",
+        "packages/shared/**",
+        "--deploy-branches",
+        "release/*",
+        "--wait-for-ci",
+        "--json",
+      ])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenCalledWith("/servers/server_1", {
+      method: "PATCH",
+      body: JSON.stringify({
+        watchPaths: ["apps/api/**", "packages/shared/**"],
+        deployBranchPatterns: ["release/*"],
+        waitForCi: true,
+      }),
+    });
+
+    api.request.mockClear();
+    await expect(
+      runServers([
+        "update",
+        "server_1",
+        "--watch-paths",
+        "",
+        "--deploy-branches",
+        "",
+        "--no-wait-for-ci",
+        "--json",
+      ])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenCalledWith("/servers/server_1", {
+      method: "PATCH",
+      body: JSON.stringify({
+        watchPaths: [],
+        deployBranchPatterns: [],
+        waitForCi: false,
+      }),
+    });
+  });
+
+  it("rejects conflicting wait-for-CI switches", async () => {
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers([
+        "update",
+        "server_1",
+        "--wait-for-ci",
+        "--no-wait-for-ci",
+        "--json",
+      ])
+    ).resolves.toBe(2);
+
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
+      error: { code: "usage_error" },
+    });
+    expect(api.request).not.toHaveBeenCalled();
+  });
+});
+
+describe("server command help routing", () => {
+  const cases: Array<{
+    name: string;
+    argv: string[];
+    contains: string;
+    notContains?: string;
+  }> = [
+    {
+      name: "servers --help",
+      argv: ["--help"],
+      contains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers -h",
+      argv: ["-h"],
+      contains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers list --help",
+      argv: ["list", "--help"],
+      contains: "Usage: mcp-use servers list [options]",
+    },
+    {
+      name: "servers env --help",
+      argv: ["env", "--help"],
+      contains: "Usage: mcp-use servers env <list|set|unset> [options]",
+      notContains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers env -h",
+      argv: ["env", "-h"],
+      contains: "Usage: mcp-use servers env <list|set|unset> [options]",
+      notContains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers --help env",
+      argv: ["--help", "env"],
+      contains: "Usage: mcp-use servers env <list|set|unset> [options]",
+      notContains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers env --json --help",
+      argv: ["env", "--json", "--help"],
+      contains: "Usage: mcp-use servers env <list|set|unset> [options]",
+      notContains: "Usage: mcp-use servers <command> [options]",
+    },
+    {
+      name: "servers env list --help",
+      argv: ["env", "list", "--help"],
+      contains: "Usage: mcp-use servers env list <server> [options]",
+    },
+    {
+      name: "servers env set --help",
+      argv: ["env", "set", "--help"],
+      contains: "Usage: mcp-use servers env set <server> <KEY=VALUE> [options]",
+    },
+    {
+      name: "servers env unset --help",
+      argv: ["env", "unset", "--help"],
+      contains: "Usage: mcp-use servers env unset <server> <key> [options]",
+    },
+  ];
+
+  for (const { name, argv, contains, notContains } of cases) {
+    it(`routes ${name} correctly`, async () => {
+      const stdout = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation(() => true);
+
+      await expect(runServers(argv)).resolves.toBe(0);
+      const output = stdout.mock.calls.flat().join("");
+      expect(output).toContain(contains);
+      if (notContains) {
+        expect(output).not.toContain(notContains);
+      }
+    });
+  }
+});

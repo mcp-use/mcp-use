@@ -197,31 +197,31 @@ export async function main(
   const command = argv[0];
   const commandArgs = stripForwardingSeparator(argv.slice(1));
   if (command === "login" || command === "logout" || command === "whoami") {
-    const { runIdentity } = await import("../commands/identity.js");
+    const { runIdentity } = await import("../cloud/identity.js");
     return runIdentity(command, commandArgs);
   }
   if (command === "org") {
-    const { runOrganizations } = await import("../commands/organizations.js");
+    const { runOrganizations } = await import("../cloud/organizations.js");
     return runOrganizations(commandArgs);
   }
   if (command === "servers") {
-    const { runServers } = await import("../commands/servers.js");
+    const { runServers } = await import("../cloud/servers.js");
     return runServers(commandArgs);
   }
   if (command === "deployments") {
-    const { runDeployments } = await import("../commands/deployments.js");
+    const { runDeployments } = await import("../cloud/deployments.js");
     return runDeployments(commandArgs);
   }
   if (command === "deploy") {
-    const { runDeploy } = await import("../commands/deploy.js");
+    const { runDeploy } = await import("../cloud/deploy.js");
     return runDeploy(commandArgs);
   }
   if (command === "client") {
-    const { runClient } = await import("../commands/client.js");
+    const { runClient } = await import("../client/client.js");
     return runClient(commandArgs);
   }
   if (command === "screenshot") {
-    const { runScreenshot } = await import("../commands/screenshot.js");
+    const { runScreenshot } = await import("../client/screenshot.js");
     return runScreenshot(commandArgs);
   }
 
@@ -262,7 +262,7 @@ export async function main(
 /** `mcp-use typecheck`: refresh MCP types, then run project-local `tsc`. */
 async function typecheckCommand(args: ParsedArgs): Promise<number> {
   try {
-    const { runTypecheck } = await import("../commands/typecheck.js");
+    const { runTypecheck } = await import("../toolchain/commands/typecheck.js");
     return await runTypecheck({
       cwd: resolve(process.cwd(), args.path ?? "."),
       ...(args.entry !== undefined && { entry: args.entry }),
@@ -279,7 +279,7 @@ async function typecheckCommand(args: ParsedArgs): Promise<number> {
 async function startCommand(args: ParsedArgs): Promise<number> {
   let started;
   try {
-    const { runStart } = await import("../commands/start.js");
+    const { runStart } = await import("../toolchain/commands/start.js");
     started = await runStart({
       cwd: resolve(process.cwd(), args.path ?? "."),
       port: args.port,
@@ -341,10 +341,10 @@ async function cliCommand(
 
   try {
     if (command === "dev") {
-      const { runDev } = await import("../commands/dev.js");
+      const { runDev } = await import("../toolchain/commands/dev.js");
       await runDev(options);
     } else {
-      const { runBuild } = await import("../commands/build.js");
+      const { runBuild } = await import("../toolchain/commands/build.js");
       await runBuild(options);
     }
     return 0;

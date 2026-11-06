@@ -271,7 +271,7 @@ https://github.com/user-attachments/assets/2f9b56c1-f149-430e-b5b6-a258c08491e6
 
 https://github.com/user-attachments/assets/e488c66e-8f65-4930-8e08-711bdf12ec6e
 
-[Explore ChatGPT Plugin Extensions →](https://mcp-use.com/docs/typescript/mcp-apps/chatgpt-extensions)
+[Explore ChatGPT Plugin Extensions →](https://mcp-use.com/docs/v2/typescript/mcp-apps/chatgpt-extensions)
 
 ## Build
 
