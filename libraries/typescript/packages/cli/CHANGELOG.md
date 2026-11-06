@@ -1,5 +1,35 @@
 # @mcp-use/cli
 
+## 5.0.0-canary.1
+
+### Major Changes
+
+- d57fa5e: Rewrite the Manufact Cloud CLI for agents with typed requests, consistent JSON results and errors, framework-independent deployment, project links in .manufact, scoped environment variables, and Cloud management commands. Install the version-matched Manufact Cloud skill with skills install. Update the framework's bundled CLI without changing its server APIs.
+
+### Patch Changes
+
+- b97451e: Add organization members and invitations, publishing checklist commands, and alert rules using dashboard-compatible YAML with optimistic concurrency for updates and deletion.
+- a9b6557: `login`, `logout` and `whoami` are rewritten for agents and the current Manufact Cloud API.
+  - Without a TTY, or with `--json`, `login` prints the device code as JSON and exits. `login --device-code <code>` finishes the login once the code is approved.
+  - A device login creates an API key named `CLI · <hostname>` and stores it in `~/.manufact/auth.json` (mode 0600). A credential in `~/.mcp-use/config.json` moves there automatically.
+  - `MANUFACT_TOKEN` overrides the stored key. `MCP_USE_API_KEY` is still read.
+  - `logout` revokes the key `login` created and always deletes the local credential. A failed revoke is a warning, not an error.
+  - `whoami` shows the email, the active organization, the key's name and where the key comes from.
+  - Identity and organization lookups use documented Cloud endpoints.
+
+- 715874b: Add a generated, typed Manufact Cloud client and move `mcp-use deployments get` onto it. With `--json`, `deployments get` now prints errors on stdout as `{ "error": { code, message, nextSteps } }` instead of on stderr, and a network failure exits 1 with `cloud_unreachable` instead of exiting 2. Its successful output is unchanged.
+- 9be9d1f: Rewrite Cloud deployment around typed API calls and framework-independent sources. Deployments wait for a running state by default, with `--no-wait` for immediate results. Add external MCP endpoint registration and validation, scope deployment environment variables to the selected production or preview branch, and use the shared `.manufact/` project link and command output conventions.
+- 4c747f7: Rewrite Cloud deployment, server, organization, log, and environment commands on the shared typed transport. Add deployment promotion, scoped write-only environment commands, repository settings, IP allow ranges, and organization branding. Move log and environment operations into top-level commands and use rm/remove consistently.
+- b085554: Add scriptable domain management and GitHub App connection, installation, and repository commands.
+- 680943b: Reorganize the CLI source by concern (`bin`, `core`, `build`, `client`, `cloud`) with no change to commands or published entry points, and stop ignoring the retired Vibe `.dev-server-logs.txt` file in the dev server's file watcher.
+- ae8c4b8: Add `mcp-use link` and `mcp-use unlink`. `link --server <id-or-slug>` checks that the server exists and that you can access it, then saves `{ orgId, serverId }` in `.manufact/project.json` and adds `.manufact/` to the project's `.gitignore`. Without a terminal, `link` needs `--server` (or `MANUFACT_SERVER`) and otherwise exits 2 with `project_not_linked`. `link` resolves the server from `--server`, then `MANUFACT_SERVER`, then the existing link, and the organization from `--org`, then `MANUFACT_ORG`, then the link, then the active organization. `deploy` now reads and writes the link in `.manufact/project.json`; a link in `.mcp-use/cloud/link.json` from an older CLI is moved there automatically.
+
+## 4.5.6-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 4.5.5
 
 ### Patch Changes

@@ -1,231 +1,97 @@
 ---
 title: "Deploy to Manufact"
-description: "Deploy an MCP server from GitHub with Manufact"
+description: "Deploy MCP servers from GitHub, local source, or an existing URL with Manufact Cloud."
 icon: "/images/logo-mcp-use.svg"
 ---
 
-Manufact deploys a GitHub-backed `mcp-use` server and provides its hosted MCP
-URL, deployments, logs, environment variables, and client connection settings.
-See the [Manufact dashboard documentation](https://docs.manufact.com/dashboard)
-for service setup and dashboard workflows.
-
-## Prerequisites
-
-Before deploying:
-
-- Build the server with `mcp-use`.
-- Commit it to an existing Git repository.
-- Configure `origin` as a supported GitHub repository.
-- Push the branch you intend to deploy.
-- Install the Manufact GitHub App with access to that repository.
-- Sign in to a Manufact organization.
-
-Projects created with `create-mcp-use-app@latest` already contain the `mcp-use`
-executable and a `deploy` script. In another project, install the package:
-
-```bash
-npm install mcp-use
-```
-
-Confirm the repository and branch before deploying:
-
-```bash
-git remote get-url origin
-git branch --show-current
-git status --short
-```
-
-The CLI does not install the GitHub App. If you skip the Git steps above, it
-can perform them after asking you:
-
-- If the project has no `origin` remote, an interactive deploy offers to create
-  a private repository through the GitHub App, run `git init` when needed,
-  commit the project, and push it to `main`.
-- If the working tree has uncommitted changes, it offers to run `git add .`,
-  commit them, and push the branch before deploying.
-
-`--yes` authorizes both without prompting. In JSON or non-interactive runs
-without `--yes`, the command stops and reports the required choice. To deploy
-without GitHub, see [Deploy without GitHub](#deploy-without-github).
+Manufact Cloud hosts MCP servers and provides deployment logs, environments,
+domains, alerting, and publishing checks. Its Cloud commands work with any MCP
+framework. For the full command surface, see the [CLI reference](/typescript/api-reference/cli-reference).
 
 ## Sign in
 
 ```bash
 npx mcp-use login
-npx mcp-use whoami
+npx mcp-use whoami --json
 ```
 
-For a non-interactive environment, use one supported credential flow:
+In a terminal, login opens a verification URL and waits. An agent can run
+`npx mcp-use login --json`, present the returned URL and code, then run the
+returned `login --device-code` command after approval. CI can provide
+`MANUFACT_TOKEN` through a secret store.
+
+## Deploy from GitHub
+
+Push the branch and give the Manufact GitHub App access to the repository.
+Inspect access or get an installation URL with:
 
 ```bash
-npx mcp-use login --api-key "${MCP_USE_API_KEY}" --org YOUR_ORG
+npx mcp-use github installations --json
+npx mcp-use github repos --json
+npx mcp-use github connect --json
 ```
 
-or:
+Run from the project directory:
 
 ```bash
-npx mcp-use login --device-code YOUR_PREAPPROVED_CODE --org YOUR_ORG
+npx mcp-use deploy --name weather
 ```
 
-`--api-key` and `--device-code` are mutually exclusive.
+The command creates a Cloud server or reuses the linked one, waits for deployment,
+and returns its MCP URL, deployment ID, and dashboard URL. `--branch` selects the
+deployment branch. `--root-dir` selects an app within a monorepo. Configure
+`--build-command`, `--start-command`, `--dockerfile`, and `--region` when needed.
 
-## Start the first deployment
-
-Run from the server project directory:
+The project link lives in `.manufact/project.json`. Later deploys reuse it;
+`--new` creates another server. To link an existing server explicitly:
 
 ```bash
-npx mcp-use deploy --name my-server
+npx mcp-use link --server weather --org my-team --json
 ```
 
-The first deploy:
-
-1. Resolves the GitHub repository from `origin`.
-2. Confirms that the Manufact GitHub App can access it.
-3. Creates a Git-backed cloud server and starts a deployment.
-4. Writes the non-secret project link to `.mcp-use/cloud/link.json`.
-5. Prints the server ID, deployment ID, pending status, and dashboard URL.
-
-The command starts the deployment; it does not wait for the build to finish.
-
-<Note>
-  `.mcp-use/cloud/link.json` is the only project-local cloud linkage. Later
-  deploys reuse its organization and server IDs.
-</Note>
-
-## Follow the build
-
-Use the deployment ID printed by `deploy`:
+## Deploy local source
 
 ```bash
-npx mcp-use deployments get DEPLOYMENT_ID
-npx mcp-use deployments logs DEPLOYMENT_ID --build --follow
+npx mcp-use deploy . --no-github --name weather
 ```
 
-Build-log following is a separate command. Once the deployment is running,
-read its recent runtime logs with:
+Cloud builds and runs the uploaded source. A prebuilt `.mcp-use/` directory is
+not required. Use build and start commands appropriate to your framework.
+
+## Register an existing MCP endpoint
 
 ```bash
-npx mcp-use deployments logs DEPLOYMENT_ID
+npx mcp-use deploy --external-url https://example.com/mcp --name weather
 ```
 
-List deployments when you need to recover an ID:
+This connects an already-hosted server without uploading or building an app.
+
+## Environment variables
 
 ```bash
-npx mcp-use deployments list --server SERVER_ID
+npx mcp-use env set LOG_LEVEL=info --environment production --json
+npx mcp-use env push .env.production --environment production --json
+npx mcp-use env list --json
 ```
 
-## Redeploy and create another server
+Listing returns keys and metadata; values are write-only. For a secret, use
+`env set --sensitive` with stdin as documented by `env set --help`.
 
-With a link file present, this starts another deployment on the linked server:
+Deploy also accepts repeatable `--env KEY=VALUE` and `--env-file` options. It
+writes production values when the deployment branch matches the saved production
+branch; other branches receive a branch-specific preview override.
+
+## Progress and logs
+
+Deploy waits by default. Use `--no-wait` to return the deployment ID immediately,
+then inspect progress:
 
 ```bash
-npx mcp-use deploy
+npx mcp-use deployments get DEPLOYMENT_ID --json
+npx mcp-use logs DEPLOYMENT_ID --build --json
+npx mcp-use logs DEPLOYMENT_ID --follow
 ```
 
-Pass `--new` to ignore the existing link and create a separate cloud server:
-
-```bash
-npx mcp-use deploy --new
-```
-
-Use `--yes` only when you intend to accept every confirmation. It also
-authorizes creating a GitHub repository and committing and pushing uncommitted
-changes with `git add .`:
-
-```bash
-npx mcp-use deploy --new --yes
-```
-
-## Implemented deploy flags
-
-The command accepts:
-
-| Flag                        | Purpose                                                                    |
-| --------------------------- | -------------------------------------------------------------------------- |
-| `[path]`                    | Project directory; defaults to the current directory                       |
-| `--org <id-or-slug>`        | Select the Manufact organization                                           |
-| `--name <name>`             | Server name, and repository name when the CLI creates one                  |
-| `--branch <name>`           | Deploy a branch instead of the current branch                              |
-| `--root-dir <path>`         | Repository-relative app root                                               |
-| `--region <region>`         | Select an API-supported region                                             |
-| `--env <KEY=VALUE>`         | Add an environment value; repeatable                                       |
-| `--env-file <path>`         | Load environment values from a file                                        |
-| `--build-command <command>` | Override the detected build command                                        |
-| `--start-command <command>` | Override the detected start command                                        |
-| `--dockerfile <path>`       | Use a repository-relative Dockerfile                                       |
-| `--watch-paths <glob>`      | Auto-deploy only when matching files change; repeatable; GitHub only       |
-| `--wait-for-ci`             | Hold GitHub auto-deploys until other check runs pass; GitHub only          |
-| `--no-github`               | Upload local source to a managed private repository instead of GitHub      |
-| `--new`                     | Create a new server instead of reusing the link                            |
-| `--open`                    | Open the dashboard after deployment starts                                 |
-| `-y, --yes`                 | Accept confirmations and authorize Git and repository changes              |
-| `--json`                    | Emit machine-readable output; never prompts                                |
-
-`--root-dir` and `--dockerfile` must stay inside the repository. Repeated
-`--env` entries override duplicate keys loaded from `--env-file`, and the CLI
-does not echo uploaded values.
-
-Flags also apply when redeploying a linked server. Before the deployment
-starts, `--name`, `--branch` (which becomes the production branch), `--region`,
-`--root-dir`, `--build-command`, `--start-command`, `--dockerfile`,
-`--watch-paths`, and `--wait-for-ci` update the server's configuration. `--env`
-and `--env-file` values are written to the server's production variables, or to
-the branch's preview variables when `--branch` is set. To change settings
-without deploying, use `mcp-use servers update` and `mcp-use servers env set`
-or `unset`.
-
-## Deploy without GitHub
-
-Pass `--no-github` on the first deploy to upload the local project to a
-platform-managed private repository instead of GitHub:
-
-```bash
-npx mcp-use deploy --no-github
-```
-
-Later deploys of that linked server use the upload path automatically. The
-archive excludes `.git`, dependencies, build output, `.mcp-use`, `.env*` files,
-caches, coverage, OS metadata, symbolic links, and paths matched by the project
-root's `.gitignore`. The compressed archive limit is 80 MB.
-
-`--watch-paths` and `--wait-for-ci` are GitHub-only. `--no-github` cannot
-replace the source of a linked GitHub server; add `--new --yes` to create a
-separate server.
-
-## Monorepo example
-
-Deploy one app from an existing GitHub monorepo:
-
-```bash
-npx mcp-use deploy \
-  --name inventory-mcp \
-  --root-dir apps/inventory \
-  --build-command "npm run build" \
-  --start-command "npm start"
-```
-
-Repository-relative paths are resolved from the Git root even when the command
-is run inside the app directory.
-
-## Connect a client
-
-After the deployment is running, copy the exact generated MCP URL from the
-Manufact dashboard. Do not infer a hostname from the server slug; the
-dashboard is authoritative for generated and custom domains.
-
-```bash
-export MCP_URL="PASTE_THE_GENERATED_MCP_URL"
-npx mcp-use client connect production "${MCP_URL}"
-npx mcp-use client production tools list
-```
-
-Use that same exact URL in any other MCP client configuration.
-
-## More Manufact operations
-
-- [Creating servers](https://docs.manufact.com/dashboard/servers)
-- [Deployments](https://docs.manufact.com/dashboard/deployments)
-- [Build and runtimes](https://docs.manufact.com/dashboard/build-runtimes)
-- [Environment variables](https://docs.manufact.com/dashboard/environment-variables)
-- [Runtime logs](https://docs.manufact.com/dashboard/logs)
-- [Connecting clients](https://docs.manufact.com/dashboard/connect-clients)
+For publishing checks, run `npx mcp-use checklist run --json`. For an agent
+working on Cloud configuration, install the version-matched skill with
+`npx mcp-use skills install`.

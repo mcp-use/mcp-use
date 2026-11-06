@@ -27,7 +27,11 @@ import {
 } from "vitest";
 import { z } from "zod";
 
-import { MCPServer, registerViews } from "../src/index.js";
+import {
+  isInputRequiredResult,
+  MCPServer,
+  registerViews,
+} from "../src/index.js";
 import type { MetaObject } from "../src/index.js";
 import { synthesizeViewDocument } from "../src/views/document.js";
 import { createViewAssetsHandler } from "../src/views/routes.js";
@@ -1070,6 +1074,158 @@ describe("views server core (e2e over HTTP)", () => {
         mkdirSync(assetsDir, { recursive: true });
       }
     }
+  });
+});
+
+describe("view resource reads through resources/read middleware", () => {
+  const server = new MCPServer({
+    name: "views-middleware-test",
+    version: "1.0.0",
+  });
+  const seenUris: string[] = [];
+  const seenTexts: string[] = [];
+  const seenDomains: unknown[] = [];
+  const seenViews: unknown[] = [];
+  const observed: string[] = [];
+  let url: string;
+  let client: Client;
+  let claudeClient: Client;
+
+  primeViews(server);
+  server.tool(
+    {
+      name: "search-fruits",
+      inputSchema: z.object({}),
+      outputSchema: resultsSchema,
+      view: {
+        name: "product-search-result",
+        description: "Results",
+        domain: "https://views.example.com",
+      },
+    },
+    async () => ({
+      structuredContent: { query: "", items: [] },
+      content: [{ type: "text", text: "Found 0 fruits" }],
+    })
+  );
+  server.resource({ name: "notes", uri: "notes://plain" }, async (uri) => ({
+    contents: [{ uri: uri.href, text: "plain" }],
+  }));
+  server.use("mcp:resources/read", async (ctx, next) => {
+    seenUris.push(ctx.params.uri);
+    seenViews.push(ctx.view);
+    if (ctx.params.uri === "ui://views/orphan-view.html") {
+      throw new Error("Blocked by middleware");
+    }
+    const result = await next();
+    if (isInputRequiredResult(result)) {
+      return result;
+    }
+    return {
+      ...result,
+      contents: result.contents.map((content) => {
+        if ("text" in content) {
+          seenTexts.push(content.text);
+        }
+        const ui = content._meta?.["ui"] as Record<string, unknown> | undefined;
+        seenDomains.push(ui?.["domain"]);
+        return {
+          ...content,
+          _meta: { ...content._meta, "example.com/injected": true },
+        };
+      }),
+    };
+  });
+
+  server.on("mcp:resources/read", (ctx) => {
+    observed.push(`before:${ctx.params.uri}:${ctx.view?.name}`);
+  });
+  server.on("mcp:resources/read:complete", (ctx) => {
+    observed.push(`complete:${ctx.params.uri}:${ctx.view?.name}`);
+  });
+
+  beforeAll(async () => {
+    ({ url } = await server.listen(0));
+    client = new Client(
+      { name: "plain-client", version: "1.0.0" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } }
+    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(url)));
+    claudeClient = new Client(
+      { name: "claude-desktop", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        capabilities: UI_CAPABILITIES,
+      }
+    );
+    await claudeClient.connect(new StreamableHTTPClientTransport(new URL(url)));
+  });
+
+  afterAll(async () => {
+    await client.close();
+    await claudeClient.close();
+    await server.close();
+  });
+
+  it("runs middleware on view reads and returns its modified result", async () => {
+    const read = await client.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(seenUris).toContain("ui://views/product-search-result.html");
+    expect(seenTexts.some((text) => text.includes("<!doctype html>"))).toBe(
+      true
+    );
+    expect(read.contents).toHaveLength(1);
+    expect(read.contents[0]?._meta?.["example.com/injected"]).toBe(true);
+    expect(read.contents[0]?._meta?.["openai/widgetDescription"]).toBe(
+      "Results"
+    );
+  });
+
+  it("passes the Claude-hashed ui.domain to middleware", async () => {
+    seenDomains.length = 0;
+    const read = await claudeClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    const hashed = `${createHash("sha256").update(url).digest("hex").slice(0, 32)}.claudemcpcontent.com`;
+    expect(seenDomains).toEqual([hashed]);
+    const ui = read.contents[0]?._meta?.["ui"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(ui?.["domain"]).toBe(hashed);
+    expect(read.contents[0]?._meta?.["example.com/injected"]).toBe(true);
+  });
+
+  it("passes the authored ui.domain to middleware for other clients", async () => {
+    seenDomains.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    expect(seenDomains).toEqual(["https://views.example.com"]);
+  });
+
+  it("sets ctx.view on view reads only", async () => {
+    seenViews.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    await client.readResource({ uri: "notes://plain" });
+    expect(seenViews).toEqual([{ name: "product-search-result" }, undefined]);
+  });
+
+  it("fires resources/read observers for view reads", async () => {
+    observed.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    expect(observed).toEqual([
+      "before:ui://views/product-search-result.html:product-search-result",
+      "complete:ui://views/product-search-result.html:product-search-result",
+    ]);
+  });
+
+  it("lets middleware reject a view read", async () => {
+    seenViews.length = 0;
+    await expect(
+      client.readResource({ uri: "ui://views/orphan-view.html" })
+    ).rejects.toThrow("Blocked by middleware");
+    expect(seenUris).toContain("ui://views/orphan-view.html");
+    // No tool binds orphan-view, so it is not marked as a tool view.
+    expect(seenViews).toEqual([undefined]);
   });
 });
 

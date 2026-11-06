@@ -68,41 +68,51 @@ export interface CliMainOptions {
   frameworkVersion: string;
 }
 
-const HELP = `mcp-use — run MCP servers built with mcp-use
+const HELP = `mcp-use — develop MCP servers and manage Manufact Cloud
 
 Usage: mcp-use <command> [options]
 
-Commands:
-  dev      Start the dev server
-  build    Build the server into .mcp-use/build
-  typecheck Refresh MCP types and run the project's TypeScript compiler
-  start    Serve the production build from .mcp-use/build
-  login    Authenticate the cloud CLI
-  logout   Log out of the cloud CLI
-  whoami   Show the authenticated cloud identity
-  org      Manage the active organization
-  servers  Manage cloud servers and environment variables
-  deployments Manage cloud deployments and logs
-  deploy   Deploy from GitHub or upload local source
-  client   Connect to and invoke MCP servers
-  screenshot Capture an MCP Apps view
+Local development:
+  dev          Start the dev server
+  build        Build the server into .mcp-use/build
+  start        Serve the production build
+  typecheck    Refresh MCP types and run the project's TypeScript compiler
+
+Cloud projects:
+  deploy       Deploy from GitHub, upload source, or register an MCP endpoint
+  link         Link this project to a Cloud server
+  unlink       Remove this project's Cloud link
+  servers      Manage servers and deployment settings
+  deployments  Inspect and manage deployments
+  env          Manage environment variables
+  logs         Read build and runtime logs
+  domains      Manage server domains
+  github       Manage GitHub App access
+  alerts       Manage alert rules
+  checklist    Run publishing checks
+
+Account:
+  login        Sign in to Manufact Cloud
+  logout       Sign out
+  whoami       Show the authenticated identity
+  org          Manage organizations and choose the active organization
+
+Tools:
+  client       Connect to and invoke MCP servers
+  screenshot   Capture an MCP Apps view
+  skills       Install version-matched coding agent skills
+  help         Show help for a command
 
 Options:
-  -p, --port <n>     Port to serve on (dev/start; default: $PORT or 3000)
-  --host <host>      Host to bind (dev/start; default: $HOST or 127.0.0.1)
-  --entry <path>     Server entry module (dev/build/typecheck only)
-  --path <directory> Project root (default: current directory)
-  --mcp-dir <dir>    Directory containing the MCP entry and views/
-  --views-dir <dir>  Views directory (default: views/ or <mcp-dir>/views/)
-  --source-maps      Emit source maps in build output (build only)
-  --inline           Embed view JS and CSS in MCP resources (build only)
-  -- <tsc options>   Forward remaining options to TypeScript (typecheck only)
-  --with-inspector   Mount Inspector on the production listener (start only)
-  --tunnel           Expose the server through a public tunnel (dev/start only)
-  --no-open          Do not auto-open the inspector in a browser (dev only)
-  --no-inspector     Start dev without loading the optional Inspector
-  -h, --help         Show this help
-  -v, --version      Print the version`;
+  -h, --help     Show help
+  -v, --version  Print the version
+
+Examples:
+  mcp-use org --help
+  mcp-use org use --help
+  mcp-use help deploy
+
+Run 'mcp-use <command> --help' for command-specific options.`;
 
 const LOCAL_HELP: Record<string, string> = {
   dev: `Usage: mcp-use dev [options]
@@ -177,6 +187,9 @@ export async function main(
   argv: readonly string[],
   options: CliMainOptions = { frameworkVersion: "unknown" }
 ): Promise<number> {
+  if (argv[0] === "help") {
+    return main([...argv.slice(1), "--help"], options);
+  }
   if (argv.length === 1 && ["--version", "-v"].includes(argv[0] ?? "")) {
     console.log(options.frameworkVersion);
     return 0;
@@ -196,32 +209,76 @@ export async function main(
 
   const command = argv[0];
   const commandArgs = stripForwardingSeparator(argv.slice(1));
-  if (command === "login" || command === "logout" || command === "whoami") {
-    const { runIdentity } = await import("../commands/identity.js");
-    return runIdentity(command, commandArgs);
+  if (command === "login") {
+    const { runLogin } = await import("../cloud/auth/login.js");
+    return runLogin(commandArgs);
+  }
+  if (command === "logout") {
+    const { runLogout } = await import("../cloud/auth/logout.js");
+    return runLogout(commandArgs);
+  }
+  if (command === "whoami") {
+    const { runWhoami } = await import("../cloud/auth/whoami.js");
+    return runWhoami(commandArgs);
+  }
+  if (command === "alerts") {
+    const { runAlerts } = await import("../cloud/alerts/index.js");
+    return runAlerts(commandArgs);
+  }
+  if (command === "checklist") {
+    const { runChecklist } = await import("../cloud/checklist/index.js");
+    return runChecklist(commandArgs);
+  }
+  if (command === "domains") {
+    const { runDomains } = await import("../cloud/domains/index.js");
+    return runDomains(commandArgs);
+  }
+  if (command === "github") {
+    const { runGithub } = await import("../cloud/github/index.js");
+    return runGithub(commandArgs);
   }
   if (command === "org") {
-    const { runOrganizations } = await import("../commands/organizations.js");
+    const { runOrganizations } = await import("../cloud/org/index.js");
     return runOrganizations(commandArgs);
   }
   if (command === "servers") {
-    const { runServers } = await import("../commands/servers.js");
+    const { runServers } = await import("../cloud/servers/index.js");
     return runServers(commandArgs);
   }
   if (command === "deployments") {
-    const { runDeployments } = await import("../commands/deployments.js");
+    const { runDeployments } = await import("../cloud/deployments/index.js");
     return runDeployments(commandArgs);
   }
+  if (command === "env") {
+    const { runEnv } = await import("../cloud/environment/index.js");
+    return runEnv(commandArgs);
+  }
+  if (command === "logs") {
+    const { runLogs } = await import("../cloud/logs/index.js");
+    return runLogs(commandArgs);
+  }
+  if (command === "link") {
+    const { runLink } = await import("../cloud/project/link.js");
+    return runLink(commandArgs);
+  }
+  if (command === "unlink") {
+    const { runUnlink } = await import("../cloud/project/unlink.js");
+    return runUnlink(commandArgs);
+  }
   if (command === "deploy") {
-    const { runDeploy } = await import("../commands/deploy.js");
+    const { runDeploy } = await import("../cloud/deploy/index.js");
     return runDeploy(commandArgs);
   }
+  if (command === "skills") {
+    const { runSkills } = await import("../skills/install.js");
+    return runSkills(commandArgs);
+  }
   if (command === "client") {
-    const { runClient } = await import("../commands/client.js");
+    const { runClient } = await import("../client/client.js");
     return runClient(commandArgs);
   }
   if (command === "screenshot") {
-    const { runScreenshot } = await import("../commands/screenshot.js");
+    const { runScreenshot } = await import("../client/screenshot.js");
     return runScreenshot(commandArgs);
   }
 
@@ -262,7 +319,7 @@ export async function main(
 /** `mcp-use typecheck`: refresh MCP types, then run project-local `tsc`. */
 async function typecheckCommand(args: ParsedArgs): Promise<number> {
   try {
-    const { runTypecheck } = await import("../commands/typecheck.js");
+    const { runTypecheck } = await import("../toolchain/commands/typecheck.js");
     return await runTypecheck({
       cwd: resolve(process.cwd(), args.path ?? "."),
       ...(args.entry !== undefined && { entry: args.entry }),
@@ -279,7 +336,7 @@ async function typecheckCommand(args: ParsedArgs): Promise<number> {
 async function startCommand(args: ParsedArgs): Promise<number> {
   let started;
   try {
-    const { runStart } = await import("../commands/start.js");
+    const { runStart } = await import("../toolchain/commands/start.js");
     started = await runStart({
       cwd: resolve(process.cwd(), args.path ?? "."),
       port: args.port,
@@ -341,10 +398,10 @@ async function cliCommand(
 
   try {
     if (command === "dev") {
-      const { runDev } = await import("../commands/dev.js");
+      const { runDev } = await import("../toolchain/commands/dev.js");
       await runDev(options);
     } else {
-      const { runBuild } = await import("../commands/build.js");
+      const { runBuild } = await import("../toolchain/commands/build.js");
       await runBuild(options);
     }
     return 0;

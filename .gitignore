@@ -104,7 +104,9 @@ dmypy.json
 
 # AI
 .cursor
-.claude
+# Contributor skills in .claude/skills are tracked; the rest of .claude is local.
+.claude/*
+!.claude/skills/
 .agents
 .codex
 
@@ -181,7 +183,6 @@ conf.yaml
 # Agents
 .cursor
 .cursorrules
-.claude
 
 # Local pnpm store
 .pnpm-store/
