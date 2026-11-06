@@ -4,6 +4,7 @@ import {
   readFile,
   readdir,
   rm,
+  utimes,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -170,6 +171,23 @@ describe("anonymous CLI analytics", () => {
     }
   );
 
+  it("leaves an active repair alone and recovers an abandoned lock", async () => {
+    const directory = join(home, ".mcp-use");
+    const file = join(directory, "cli-telemetry.json");
+    const lock = `${file}.lock`;
+    await mkdir(directory);
+    await writeFile(file, "{");
+    await mkdir(lock);
+    await captureCliUsage(["dev"]);
+    expect(capture).not.toHaveBeenCalled();
+    expect(await readFile(file, "utf8")).toBe("{");
+    const stale = new Date(Date.now() - 120_000);
+    await utimes(lock, stale, stale);
+    await captureCliUsage(["dev"]);
+    expect(events()).toHaveLength(1);
+    expect(await readdir(directory)).toEqual(["cli-telemetry.json"]);
+  });
+
   it("silently tolerates offline capture", async () => {
     capture.mockRejectedValue(new Error("offline"));
     await expect(captureCliUsage(["dev"])).resolves.toBeUndefined();
@@ -248,5 +266,24 @@ cliTest(
         (event) => typeof event.api_key === "string" && event.api_key.length > 0
       )
     ).toBe(true);
+
+    // Several real processes repairing the same damaged state must converge
+    // on one ID. A contender can skip capture while another owns the lock.
+    const identityFile = join(cli.home, ".mcp-use", "cli-telemetry.json");
+    await writeFile(identityFile, "{");
+    await writeFile(output, "");
+    const concurrent = await Promise.all(
+      Array.from({ length: 4 }, () => cli.run(["--version"], { env }))
+    );
+    expect(concurrent.every((result) => result.exitCode === 0)).toBe(true);
+    const recovered = (await readFile(output, "utf8"))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    expect(recovered.length).toBeGreaterThan(0);
+    expect(new Set(recovered.map((event) => event.distinct_id)).size).toBe(1);
+    const saved = JSON.parse(await readFile(identityFile, "utf8"));
+    expect(recovered[0].distinct_id).toBe(`cli:${saved.installationId}`);
   }
 );

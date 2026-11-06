@@ -4,7 +4,9 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -163,9 +165,27 @@ function installationId(): string | undefined {
         !(error instanceof Error && "code" in error && error.code === "EEXIST")
       )
         return undefined;
-      // The existing file is malformed. Replace it with a complete document,
-      // so an interrupted write cannot leave the next run with partial JSON.
-      renameSync(temporary, file);
+      const lock = `${file}.lock`;
+      let locked = false;
+      try {
+        try {
+          mkdirSync(lock, { mode: 0o700 });
+          locked = true;
+        } catch {
+          // Repair is synchronous and takes milliseconds. Recover an abandoned
+          // lock after a minute, rather than disabling capture after a crash.
+          if (Date.now() - statSync(lock).mtimeMs <= 60_000) return read();
+          rmdirSync(lock);
+          mkdirSync(lock, { mode: 0o700 });
+          locked = true;
+        }
+        // A previous lock holder may already have repaired the file.
+        const repaired = read();
+        if (repaired !== undefined) return repaired;
+        renameSync(temporary, file);
+      } finally {
+        if (locked) rmdirSync(lock);
+      }
     }
     return read();
   } catch {
