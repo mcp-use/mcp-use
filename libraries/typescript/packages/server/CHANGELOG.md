@@ -1,5 +1,21 @@
 # mcp-use
 
+## 2.12.3-canary.2
+
+### Patch Changes
+
+- d57fa5e: Rewrite the Manufact Cloud CLI for agents with typed requests, consistent JSON results and errors, framework-independent deployment, project links in .manufact, scoped environment variables, and Cloud management commands. Install the version-matched Manufact Cloud skill with skills install. Update the framework's bundled CLI without changing its server APIs.
+- Updated dependencies [b97451e]
+- Updated dependencies [a9b6557]
+- Updated dependencies [715874b]
+- Updated dependencies [9be9d1f]
+- Updated dependencies [4c747f7]
+- Updated dependencies [d57fa5e]
+- Updated dependencies [b085554]
+- Updated dependencies [680943b]
+- Updated dependencies [ae8c4b8]
+  - @mcp-use/cli@5.0.0-canary.1
+
 ## 2.12.3-canary.1
 
 ### Patch Changes
