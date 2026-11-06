@@ -312,6 +312,91 @@ describe("CodeModeConnector protocol contract", () => {
   });
 
   describe("MCPClient codeMode integration", () => {
+    it("preserves successful execute_code results without an error flag", async () => {
+      const client = new MCPClient({}, { codeMode: true });
+
+      try {
+        const session = client.getSession("code_mode");
+        const response = await session!.callTool("execute_code", {
+          code: 'console.log("success"); return 7;',
+        });
+
+        expect(response.isError).toBeUndefined();
+        expect(response.content).toHaveLength(1);
+        expect(response.content[0]?.type).toBe("text");
+        expect(
+          JSON.parse((response.content[0] as { text: string }).text)
+        ).toEqual({
+          result: 7,
+          logs: ["success"],
+          error: null,
+          execution_time: expect.any(Number),
+        });
+      } finally {
+        await client.closeAllSessions();
+      }
+    });
+
+    it.each([
+      {
+        name: "runtime exceptions",
+        code: 'console.log("before failure"); throw new Error("sentinel");',
+        error: "sentinel",
+        logs: ["before failure"],
+      },
+      {
+        name: "empty error strings",
+        code: 'throw "";',
+        error: "",
+        logs: [],
+      },
+      {
+        name: "empty Error messages",
+        code: 'throw new Error("");',
+        error: "Error",
+        logs: [],
+      },
+      {
+        name: "syntax errors",
+        code: "const = ;",
+        error: expect.stringMatching(/SyntaxError|Unexpected token/),
+        logs: [],
+      },
+      {
+        name: "synchronous timeouts",
+        code: "while (true) {}",
+        error: "Script execution timed out",
+        logs: [],
+      },
+    ])(
+      "marks $name as failed execute_code tool results",
+      async ({ code, error, logs, name }) => {
+        const client = new MCPClient({}, { codeMode: true });
+
+        try {
+          const session = client.getSession("code_mode");
+          const response = await session!.callTool("execute_code", {
+            code,
+            timeout: name === "synchronous timeouts" ? 50 : 5000,
+          });
+
+          expect(response.content).toHaveLength(1);
+          expect(response.content[0]?.type).toBe("text");
+          expect(
+            JSON.parse((response.content[0] as { text: string }).text)
+          ).toEqual({
+            result: null,
+            logs,
+            error,
+            execution_time: expect.any(Number),
+          });
+          expect(response.isError).toBe(true);
+        } finally {
+          await client.closeAllSessions();
+        }
+      }
+    );
+
     it("registers an active code_mode session that can be inspected and listed", async () => {
       const client = new MCPClient({}, { codeMode: true });
       expect(client.activeSessions).toContain("code_mode");

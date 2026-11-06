@@ -374,6 +374,7 @@ export class CodeModeConnector extends BaseConnector {
       );
 
       return {
+        ...(result.error !== null ? { isError: true } : {}),
         content: [
           {
             type: "text",
