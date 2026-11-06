@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { parseCommandArgs, runCommand } from "./core/command.js";
 import { CommandError, UsageError } from "./core/errors.js";
 import { posthogEndpoint, posthogEvent } from "./posthog.js";
-import { commandProperties, installationId } from "./telemetry.js";
+import { knownCommandName, installationId } from "./telemetry.js";
 
 const USAGE = "mcp-use feedback send --message <text> [options]";
 const HELP = `Usage: mcp-use feedback <send> [options]
@@ -50,26 +50,18 @@ export async function runFeedback(argv: readonly string[]): Promise<number> {
       usage: USAGE,
     });
     const message = values.message?.trim();
-    if (!message || message.length > 10_000)
+    if (!message || [...message].length > 10_000)
       throw new UsageError("Pass --message with 1–10,000 characters.");
     const source = values.source ?? "user";
     if (source !== "user" && source !== "agent")
       throw new UsageError("Pass --source user or --source agent.");
     let relatedCommand: string | undefined;
     if (values.command !== undefined) {
-      const parts = values.command.trim().split(/\s+/);
-      const known = commandProperties(parts);
-      const normalized = [known.command, known.subcommand]
-        .filter(Boolean)
-        .join(" ");
-      if (
-        ["unknown", "version", "help"].includes(known.command) ||
-        normalized !== parts.join(" ")
-      )
+      relatedCommand = knownCommandName(values.command);
+      if (relatedCommand === undefined)
         throw new UsageError(
           "Pass a known command name, e.g. --command deploy or --command 'env push'."
         );
-      relatedCommand = normalized;
     }
 
     const reportId = randomUUID();

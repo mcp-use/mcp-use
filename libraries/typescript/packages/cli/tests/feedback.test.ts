@@ -144,17 +144,17 @@ describe("explicit CLI feedback", () => {
     expect(await capture.events()).toHaveLength(1);
   });
 
-  test("accepts a message at the documented size limit", async ({
-    cli,
-    capture,
-  }) => {
-    const result = await cli.run(
-      ["feedback", "send", "--message", "x".repeat(10_000), "--json"],
-      { env: capture.env }
-    );
-    expect(result.exitCode).toBe(0);
-    expect(await capture.events()).toHaveLength(1);
-  });
+  test.for(["x", "😀"])(
+    "accepts a message at the documented size limit: %s",
+    async (character, { cli, capture }) => {
+      const result = await cli.run(
+        ["feedback", "send", "--message", character.repeat(10_000), "--json"],
+        { env: capture.env }
+      );
+      expect(result.exitCode).toBe(0);
+      expect(await capture.events()).toHaveLength(1);
+    }
+  );
 
   test("prints human delivery failures only on stderr", async ({
     cli,
@@ -172,11 +172,61 @@ describe("explicit CLI feedback", () => {
   });
 
   test.for([
+    ["servers remove", "servers rm"],
+    ["deployments remove", "deployments rm"],
+    ["skills add", "skills install"],
+    ["client remove", "client remove"],
+    ["client tools call", "client tools call"],
+    ["org invites send", "org invites send"],
+  ])(
+    "accepts known command paths and normalizes aliases: %s",
+    async ([command, expected], { cli, capture }) => {
+      const result = await cli.run(
+        [
+          "feedback",
+          "send",
+          "--message",
+          "A clearer error would help.",
+          "--command",
+          command!,
+          "--json",
+        ],
+        { env: capture.env }
+      );
+      expect(result.exitCode).toBe(0);
+      expect(await capture.events()).toMatchObject([
+        { properties: { related_command: expected } },
+      ]);
+    }
+  );
+
+  test.for([
     ["send"],
     ["send", "--message", "   "],
     ["send", "--message", "x".repeat(10_001)],
     ["send", "--message", "Report", "--source", "bot"],
     ["send", "--message", "Report", "--command", "private-server"],
+    [
+      "send",
+      "--message",
+      "Report",
+      "--command",
+      "servers remove private-server",
+    ],
+    [
+      "send",
+      "--message",
+      "Report",
+      "--command",
+      "client secret-server tools call",
+    ],
+    [
+      "send",
+      "--message",
+      "Report",
+      "--command",
+      "org invites send private@example.com",
+    ],
     ["send", "--message", "Report", "--command", "env push SECRET=value"],
     ["send", "--message", "Report", "--unknown"],
     ["send", "--message", "Report", "extra"],
