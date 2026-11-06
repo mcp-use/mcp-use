@@ -284,14 +284,27 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
             return;
           }
           let settled = false;
+          let destroyCheck: NodeJS.Timeout | undefined;
           const done = (error?: Error | null) => {
             if (settled) return;
             settled = true;
             callback(error);
           };
           const cleanup = () => {
+            clearTimeout(destroyCheck);
             errlog.off("error", onError);
             errlog.off("close", onClose);
+          };
+          const cleanupAfterWrite = () => {
+            if (errlog.errored) return;
+            if (!errlog.destroyed || errlog.closed) {
+              cleanup();
+              return;
+            }
+            // emitClose:false can suppress the only clean-destroy notification.
+            // Keep the error guard until asynchronous _destroy has completed.
+            destroyCheck = setTimeout(cleanupAfterWrite, 10);
+            destroyCheck.unref();
           };
           const onError = (error: Error) => {
             cleanup();
@@ -307,7 +320,7 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
             errlog.write(chunk, encoding, (error) => {
               // Destruction may complete before its queued error/close events,
               // even when this write callback succeeds. Keep guards until then.
-              if (!error && !errlog.destroyed) cleanup();
+              if (!error) cleanupAfterWrite();
               done(error ?? errlog.errored);
             });
           } catch (error) {

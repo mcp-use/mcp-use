@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 import { createWriteStream } from "node:fs";
 import { join } from "node:path";
 import { Writable } from "node:stream";
-import { setImmediate as nextTurn } from "node:timers/promises";
+import {
+  setImmediate as nextTurn,
+  setTimeout as delay,
+} from "node:timers/promises";
 
 const [entry, fixture, spawnLog, mode, destroyMode] = process.argv.slice(2);
 const { MCPSession, StdioConnector } = await import(entry);
+const silentDestroy = destroyMode.startsWith("silent-destroy");
+const pendingDestroy = destroyMode === "silent-destroy-pending";
 let release;
+let releaseDestroy;
 let firstWritten;
 const firstWrite = new Promise((resolve) => (firstWritten = resolve));
 let tailWritten;
@@ -19,18 +25,25 @@ const errlog =
     : new Writable({
         highWaterMark: 1,
         autoDestroy: destroyMode !== "disabled",
+        emitClose: !silentDestroy,
         write(_chunk, _encoding, callback) {
           release = callback;
           if (++writes === 1) firstWritten();
           else tailWritten();
         },
-        ...(destroyMode === "delayed"
+        ...(silentDestroy
           ? {
-              destroy(error, callback) {
-                setImmediate(() => callback(error));
+              destroy(_error, callback) {
+                releaseDestroy = callback;
               },
             }
-          : {}),
+          : destroyMode === "delayed"
+            ? {
+                destroy(error, callback) {
+                  setImmediate(() => callback(error));
+                },
+              }
+            : {}),
       });
 const openFailed =
   destroyMode === "open-failure"
@@ -66,7 +79,11 @@ try {
     await session.callTool("first", {});
     await firstWrite;
     await session.callTool(
-      destroyMode.startsWith("destroy-before-callback") ? "exit" : "second",
+      destroyMode.startsWith("destroy-before-callback") || silentDestroy
+        ? mode === "natural"
+          ? "exit"
+          : "ping"
+        : "second",
       {}
     );
     if (mode === "natural") await closed;
@@ -75,10 +92,25 @@ try {
     // No external error handler: a prematurely removed forwarding guard crashes
     // this host, which the parent test observes as a non-zero exit.
     const destinationClosed =
-      destroyMode === "disabled"
+      destroyMode === "disabled" || silentDestroy
         ? nextTurn()
         : new Promise((resolve) => errlog.once("close", resolve));
-    if (destroyMode.startsWith("destroy-before-callback")) {
+    if (silentDestroy) {
+      errlog.destroy();
+      release();
+      await delay(30);
+      assert.equal(errlog.closed, false);
+      assert.equal(errlog.errored, null);
+      assert.equal(errlog.listenerCount("error"), 1);
+      assert.equal(errlog.listenerCount("close"), 1);
+      if (!pendingDestroy) {
+        releaseDestroy(failure);
+        await nextTurn();
+        assert.equal(errlog.closed, true);
+        assert.equal(errlog.errored, failure);
+        console.log("STDERR_DESTROY_ERROR_HANDLED");
+      }
+    } else if (destroyMode.startsWith("destroy-before-callback")) {
       errlog.destroy(failure);
       assert.equal(errlog.closed, true);
       release(destroyMode.endsWith("success") ? undefined : failure);
@@ -102,8 +134,11 @@ try {
       await session.disconnect();
       assert.equal(errlog.destroyed, false);
     }
-    assert.equal(errlog.listenerCount("error"), 0);
-    console.log("STDERR_ERROR_HANDLED");
+    assert.equal(errlog.listenerCount("error"), pendingDestroy ? 1 : 0);
+    assert.equal(errlog.listenerCount("close"), pendingDestroy ? 1 : 0);
+    console.log(
+      pendingDestroy ? "STDERR_DESTROY_PENDING" : "STDERR_ERROR_HANDLED"
+    );
   }
 } finally {
   await session.disconnect();

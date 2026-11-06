@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Writable } from "node:stream";
+import { setImmediate as nextTurn } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
@@ -145,6 +146,72 @@ describe("stdio stderr cleanup with a backpressured destination", () => {
   }, 5000);
 
   it.each([
+    ["natural", false],
+    ["natural", true],
+    ["explicit", false],
+    ["explicit", true],
+  ] as const)(
+    "cleans silent errlog destruction after %s exit (delayed: %s)",
+    async (mode, delayed) => {
+      const { spawnLog } = processJournal();
+      const firstWrite = deferred();
+      let releaseWrite: (() => void) | undefined;
+      let releaseDestroy: (() => void) | undefined;
+      const errlog = new Writable({
+        emitClose: false,
+        write(_chunk, _encoding, callback) {
+          releaseWrite = callback;
+          firstWrite.resolve();
+        },
+        destroy(_error, callback) {
+          if (delayed) releaseDestroy = () => callback(null);
+          else callback(null);
+        },
+      });
+      const connector = new ObservableStdioConnector({
+        command: process.execPath,
+        args: [server, spawnLog, mode],
+        errlog,
+      });
+      const session = new MCPSession(connector);
+      onTestFinished(async () => {
+        releaseWrite?.();
+        releaseWrite = undefined;
+        await session.disconnect();
+        errlog.destroy();
+        releaseDestroy?.();
+        releaseDestroy = undefined;
+      });
+      await session.initialize();
+      const closed = connector.observeClose();
+      await session.callTool("first", {});
+      await firstWrite.promise;
+      if (mode === "natural") {
+        await session.callTool("exit", {});
+        await closed;
+      }
+      await session.disconnect();
+      expect(errlog.listenerCount("error")).toBe(1);
+      expect(errlog.listenerCount("close")).toBe(1);
+      errlog.destroy();
+      releaseWrite!();
+      releaseWrite = undefined;
+      if (delayed) {
+        await nextTurn();
+        expect(errlog.closed).toBe(false);
+        expect(errlog.listenerCount("error")).toBe(1);
+        releaseDestroy!();
+        releaseDestroy = undefined;
+      }
+      await vi.waitFor(() => {
+        expect(errlog.closed).toBe(true);
+        expect(errlog.listenerCount("error")).toBe(0);
+        expect(errlog.listenerCount("close")).toBe(0);
+      });
+    }
+  );
+
+  it.each([
     ["natural", "default"],
     ["natural", "delayed"],
     ["explicit", "default"],
@@ -154,8 +221,12 @@ describe("stdio stderr cleanup with a backpressured destination", () => {
     ["natural", "tail-error"],
     ["explicit", "tail-error"],
     ["natural", "open-failure"],
+    ["natural", "silent-destroy-error"],
+    ["explicit", "silent-destroy-error"],
+    ["natural", "silent-destroy-pending"],
+    ["explicit", "silent-destroy-pending"],
   ])(
-    "handles errlog errors with %s exit and %s ordering",
+    "handles errlog completion with %s exit and %s ordering",
     async (mode, destroyMode) => {
       const { spawnLog } = processJournal();
       const host = fileURLToPath(
@@ -178,12 +249,18 @@ describe("stdio stderr cleanup with a backpressured destination", () => {
           env: { ...process.env, MCP_USE_ANONYMIZED_TELEMETRY: "false" },
         }
       );
-      expect(stdout).toContain("STDERR_ERROR_HANDLED");
-      expect(stdout + stderr).toContain(
-        destroyMode === "open-failure"
-          ? "Error writing child stderr to errlog"
-          : "DELAYED_ERRLOG_WRITE"
-      );
+      if (destroyMode === "silent-destroy-pending") {
+        expect(stdout).toContain("STDERR_DESTROY_PENDING");
+      } else if (destroyMode === "silent-destroy-error") {
+        expect(stdout).toContain("STDERR_DESTROY_ERROR_HANDLED");
+      } else {
+        expect(stdout).toContain("STDERR_ERROR_HANDLED");
+        expect(stdout + stderr).toContain(
+          destroyMode === "open-failure"
+            ? "Error writing child stderr to errlog"
+            : "DELAYED_ERRLOG_WRITE"
+        );
+      }
     }
   );
 });
