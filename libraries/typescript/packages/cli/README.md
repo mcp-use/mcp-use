@@ -19,6 +19,7 @@ mcp-use <command> [options]
   typecheck    Refresh MCP types and run the project's TypeScript compiler
   start        Serve the production build from .mcp-use/build
   client       Connect to and invoke MCP servers
+  feedback     Send CLI feedback to Manufact
   screenshot   Capture an MCP Apps view
   deploy       Deploy from GitHub or upload local source
   login/logout/whoami/org/servers/deployments
@@ -30,6 +31,31 @@ Inspector. `--tunnel` exposes either `dev` or `start` through the managed
 relay in [`@mcp-use/tunnel`](https://www.npmjs.com/package/@mcp-use/tunnel).
 
 Run `mcp-use --help` for the full option list.
+
+## Send CLI feedback
+
+```bash
+mcp-use feedback send --message "Deploy output should include the server URL." --command deploy
+mcp-use feedback send --message "The env push error needs a recovery command." --command "env push" --source agent --json
+```
+
+`--message` is required (1–10,000 characters). `--command` accepts a known
+command or subcommand name; omit server names, flags, and argument values.
+`--source` defaults to `user` and also accepts `agent`. No login is required.
+
+Reports are explicit submissions to the SDK's PostHog project, even with
+passive analytics disabled. Only the supplied message, source, related command,
+report ID, anonymous installation ID, and the basic CLI metadata described below
+are sent. No logs, project files, credentials, or conversations are collected.
+Review report text before sending and omit secrets or personal data. If identity
+storage is unavailable, the report uses a temporary random ID.
+
+The request has a 10-second timeout and no automatic retries. Exit 0 means the
+capture endpoint accepted the request, not that someone has reviewed it or that
+downstream ingestion has completed. `--json` returns `{ "accepted": true,
+"reportId": "<uuid>" }`. Exit 1 returns `feedback_rejected`,
+`feedback_network_error`, or `feedback_timeout`; timeout/network errors leave
+acceptance unknown. Invalid input exits 2 with `usage_error`.
 
 ## Anonymous usage analytics
 
@@ -44,7 +70,8 @@ reused across projects and CLI upgrades. Unique IDs measure installations,
 not people; disposable CI homes create new IDs, so filter `is_ci: false`
 when measuring developer adoption. No argument values, paths, server/tool
 names, environment variable contents, credentials, or account details are
-sent. Capture is best effort, with a 500 ms network timeout and no retries.
+sent in usage events. Explicit feedback is separate and includes the report
+text you supply. Capture is best effort, with a 500 ms network timeout and no retries.
 If the ID cannot be persisted, capture is skipped.
 
 Set `MCP_USE_ANONYMIZED_TELEMETRY=false` or `DO_NOT_TRACK=1` in your shell
