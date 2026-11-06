@@ -224,6 +224,13 @@ export class HttpConnector extends BaseConnector {
   private authorizationDiscovery: Promise<
     MCPAuthorizationInfo | undefined
   > | null = null;
+  /**
+   * Bumped whenever `authenticate()` stores tokens successfully. A discovery
+   * reads the token store asynchronously, so it compares this before and after
+   * that read to tell "no tokens" apart from "the read started before the
+   * tokens were saved".
+   */
+  private authenticationEpoch = 0;
 
   /**
    * Creates an HTTP connector.
@@ -294,6 +301,14 @@ export class HttpConnector extends BaseConnector {
             ...(this.authorizationCache ?? { mode: "mixed" }),
             authenticated: true,
           };
+          this.authenticationEpoch += 1;
+          // Discovery memoizes its first classification, which no longer
+          // describes this connection: the client now holds tokens, so any
+          // earlier result would keep reporting the pre-authentication answer.
+          // Drop the memoized promise so the next discoverAuthorization()
+          // classifies the server again and reads the tokens finishAuth()
+          // stored; the cache above carries the new state until then.
+          this.authorizationDiscovery = null;
         })
         .finally(() => {
           this.pendingOAuthCompletion = null;
@@ -370,6 +385,7 @@ export class HttpConnector extends BaseConnector {
       }, MIXED_AUTH_DISCOVERY_TIMEOUT_MS);
     });
     const baseFetch = this.customFetch ?? globalThis.fetch.bind(globalThis);
+    const authenticationEpochAtStart = this.authenticationEpoch;
 
     try {
       const metadata = await Promise.race([
@@ -381,9 +397,36 @@ export class HttpConnector extends BaseConnector {
         discoveryTimeout,
       ]);
       await selectResourceURL(this.baseUrl, provider, metadata);
+      // `authenticated` is documented as "this client currently has OAuth
+      // access tokens", so read it from the provider instead of hardcoding
+      // false. Same predicate as the connect-time `hadAccessTokenAtConnect`
+      // check. A failed token read must not discard the metadata we just
+      // fetched, so it falls back to the last known state.
+      let authenticated = this.authorizationCache?.authenticated === true;
+      try {
+        // Bound the token read by the same discovery deadline: a stalled token
+        // store must not keep discoverAuthorization() pending forever.
+        const tokens = await Promise.race([
+          provider.tokens(),
+          discoveryTimeout,
+        ]);
+        authenticated = Boolean(tokens?.access_token);
+      } catch (error) {
+        logger.debug(
+          "Mixed-auth discovery could not read OAuth tokens:",
+          error
+        );
+      }
+      // That read is asynchronous: one issued before finishAuth() saved the
+      // token resolves with a pre-save snapshot after authenticate() has
+      // already reported success. Authentication that completed while this
+      // discovery was running wins over the stale snapshot.
+      if (this.authenticationEpoch !== authenticationEpochAtStart) {
+        authenticated = true;
+      }
       this.authorizationCache = {
         mode: "mixed",
-        authenticated: false,
+        authenticated,
         ...(metadata.resource ? { resource: metadata.resource } : {}),
         ...(metadata.scopes_supported
           ? { scopesSupported: [...metadata.scopes_supported] }
