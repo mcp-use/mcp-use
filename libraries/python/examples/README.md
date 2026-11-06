@@ -52,6 +52,7 @@
 | Example | Description |
 |---------|-------------|
 | [airbnb_use.py](airbnb_use.py) | Airbnb MCP server |
+| [battle_training_use.py](battle_training_use.py) | battle.training MCP server (AI agent arena) |
 | [blender_use.py](blender_use.py) | Blender MCP server |
 | [browser_use.py](browser_use.py) | Browser automation MCP server |
 | [filesystem_use.py](filesystem_use.py) | Filesystem operations MCP server |
