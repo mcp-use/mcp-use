@@ -4,6 +4,20 @@ import type * as T from "../../src/cloud/api/generated/types.gen.js";
 type ResponseBody<R> = R extends { content: infer C } ? C[keyof C] : void;
 
 export interface CloudRoutes {
+  "GET /api/auth/get-session": {
+    data: T.operations["getSession"]["parameters"];
+    responses: {
+      200: ResponseBody<T.operations["getSession"]["responses"][200]>;
+    };
+    errors: {
+      400: ResponseBody<T.operations["getSession"]["responses"][400]>;
+      401: ResponseBody<T.operations["getSession"]["responses"][401]>;
+      403: ResponseBody<T.operations["getSession"]["responses"][403]>;
+      404: ResponseBody<T.operations["getSession"]["responses"][404]>;
+      429: ResponseBody<T.operations["getSession"]["responses"][429]>;
+      500: ResponseBody<T.operations["getSession"]["responses"][500]>;
+    };
+  };
   "GET /api/v1/deployments": {
     data: T.operations["getApiV1Deployments"]["parameters"];
     responses: {
@@ -82,6 +96,106 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/organizations": {
+    data: T.operations["getApiV1Organizations"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1Organizations"]["responses"][404]
+      >;
+    };
+  };
+  "GET /api/v1/user-preferences": {
+    data: T.operations["getApiV1UserPreferences"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1UserPreferences"]["responses"][404]
+      >;
+    };
+  };
+  "POST /api/auth/api-key/create": {
+    data: T.operations["postApiAuthApiKeyCreate"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][404]
+      >;
+      429: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][429]
+      >;
+      500: ResponseBody<
+        T.operations["postApiAuthApiKeyCreate"]["responses"][500]
+      >;
+    };
+  };
+  "POST /api/auth/api-key/delete": {
+    data: T.operations["postApiAuthApiKeyDelete"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][404]
+      >;
+      429: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][429]
+      >;
+      500: ResponseBody<
+        T.operations["postApiAuthApiKeyDelete"]["responses"][500]
+      >;
+    };
+  };
   "POST /api/v1/deployments": {
     data: T.operations["postApiV1Deployments"]["parameters"];
     responses: {
@@ -98,10 +212,15 @@ export interface CloudRoutes {
 
 /** Route templates used by the fake Cloud at runtime. */
 export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
+  "GET /api/auth/get-session",
   "GET /api/v1/deployments",
   "GET /api/v1/deployments/{id}",
   "GET /api/v1/deployments/{id}/build-logs",
   "GET /api/v1/deployments/{id}/logs",
+  "GET /api/v1/organizations",
+  "GET /api/v1/user-preferences",
+  "POST /api/auth/api-key/create",
+  "POST /api/auth/api-key/delete",
   "POST /api/v1/deployments",
 ];
 
@@ -109,9 +228,14 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
 export const cloudRouteSuccessStatus: Readonly<
   Record<keyof CloudRoutes, number>
 > = {
+  "GET /api/auth/get-session": 200,
   "GET /api/v1/deployments": 200,
   "GET /api/v1/deployments/{id}": 200,
   "GET /api/v1/deployments/{id}/build-logs": 200,
   "GET /api/v1/deployments/{id}/logs": 200,
+  "GET /api/v1/organizations": 200,
+  "GET /api/v1/user-preferences": 200,
+  "POST /api/auth/api-key/create": 200,
+  "POST /api/auth/api-key/delete": 200,
   "POST /api/v1/deployments": 201,
 };

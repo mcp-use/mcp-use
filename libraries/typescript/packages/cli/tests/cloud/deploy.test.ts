@@ -685,13 +685,11 @@ describe("deploy agent contract", () => {
     const server = createServer((_req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
+        // The organization lookup; with one organization the CLI uses it.
         JSON.stringify({
-          user_id: "u1",
-          email: "test@example.com",
-          profiles: [
-            { id: "org_1", profile_name: "Org", slug: "org", role: "admin" },
+          organizations: [
+            { id: "org_1", name: "Org", slug: "org", role: "owner" },
           ],
-          default_profile_id: "org_1",
         })
       );
     });

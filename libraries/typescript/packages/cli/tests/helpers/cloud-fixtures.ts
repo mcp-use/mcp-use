@@ -53,3 +53,21 @@ export function deployment(
     ...fields,
   };
 }
+
+/** An organization as Cloud lists it. */
+type Organization =
+  operations["getApiV1Organizations"]["responses"][200]["content"]["application/json"]["organizations"][number];
+
+/** An organization with neutral values for every field not in fields. */
+export function organization(
+  fields: Pick<Organization, "id" | "slug"> & Partial<Organization>
+): Organization {
+  return { name: "Organization", role: "owner", ...fields };
+}
+
+/** A session for an API key whose user has email. */
+export function session(
+  email: string
+): operations["getSession"]["responses"][200]["content"]["application/json"] {
+  return { user: { email } };
+}

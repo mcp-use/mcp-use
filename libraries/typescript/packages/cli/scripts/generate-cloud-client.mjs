@@ -28,6 +28,11 @@ const ROUTES = `${PACKAGE_DIR}tests/helpers/cloud-routes.gen.ts`;
 
 /** Add an operation in the same change as the command that calls it. */
 const OPERATIONS = [
+  "GET /api/auth/get-session",
+  "POST /api/auth/api-key/create",
+  "POST /api/auth/api-key/delete",
+  "GET /api/v1/organizations",
+  "GET /api/v1/user-preferences",
   "GET /api/v1/deployments",
   "POST /api/v1/deployments",
   "GET /api/v1/deployments/{id}",
@@ -40,7 +45,18 @@ const OPERATIONS = [
  * into an array). Unlisted operations retain their full success response.
  * This limits generated declarations; it does not filter HTTP responses.
  */
-const RESPONSE_FIELDS = {};
+const RESPONSE_FIELDS = {
+  "GET /api/auth/get-session": ["user.email"],
+  "POST /api/auth/api-key/create": ["id", "key", "name"],
+  "POST /api/auth/api-key/delete": ["success"],
+  "GET /api/v1/organizations": [
+    "organizations[].id",
+    "organizations[].name",
+    "organizations[].slug",
+    "organizations[].role",
+  ],
+  "GET /api/v1/user-preferences": ["defaultOrganizationId"],
+};
 
 const spec = JSON.parse(await readFile(resolve(process.cwd(), input), "utf8"));
 for (const [key, fields] of Object.entries(RESPONSE_FIELDS)) {

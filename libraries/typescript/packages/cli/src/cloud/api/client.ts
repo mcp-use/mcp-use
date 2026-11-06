@@ -22,11 +22,14 @@
 import createClient, { type Client } from "openapi-fetch";
 
 import type { paths } from "./generated/types.gen.js";
+import { cloudApiUrl } from "../cloud-api.js";
 import {
-  cloudApiUrl,
-  readCloudConfig,
+  chooseOrganization,
+  listOrganizations,
+  organizationRequired,
   type CloudOrganization,
-} from "../cloud-api.js";
+} from "../auth/account.js";
+import { readAuth, requireCredential, LOG_IN } from "../auth/store.js";
 import { CommandError, type NextStep } from "../../core/errors.js";
 
 /** Cloud origin. Generated paths already start with `/api/...`. */
@@ -38,9 +41,11 @@ function cloudBaseUrl(): string {
 interface CallContext {
   /** Error code and next steps for a 404, e.g. `deployment_not_found`. */
   notFound?: { code: string; nextSteps?: readonly NextStep[] };
+  /** Error code and next steps for a 403. Defaults to `forbidden`. */
+  forbidden?: { code: string; nextSteps?: readonly NextStep[] };
 }
 
-/** The shape every typed fetch method resolves to. */
+/** The shape every typed fetch function resolves to. */
 interface CloudResult<T> {
   data?: T | undefined;
   error?: unknown;
@@ -48,13 +53,13 @@ interface CloudResult<T> {
 }
 
 /** Awaits a typed fetch call; see {@link CloudConnection.call}. */
-type Call = <T>(
+export type Call = <T>(
   pending: Promise<CloudResult<T>>,
   context?: CallContext
 ) => Promise<Exclude<T, undefined>>;
 
-/** A `call` that keeps `apiKey` out of error messages. */
-function callerFor(apiKey: string): Call {
+/** A `call` that keeps `secret` (an API key or token) out of error messages. */
+export function callerFor(secret: string): Call {
   return async (pending, context = {}) => {
     try {
       const result = await pending.catch((error: unknown) => {
@@ -68,7 +73,7 @@ function callerFor(apiKey: string): Call {
       if (!(error instanceof CommandError)) throw error;
       throw new CommandError(
         error.code,
-        error.message.replaceAll(apiKey, "[REDACTED]"),
+        error.message.replaceAll(secret, "[REDACTED]"),
         undefined,
         error.nextSteps
       );
@@ -93,11 +98,16 @@ function settle<T>(
   const message =
     messageOf(result.error) ?? `Manufact Cloud request failed (${status}).`;
   if (status === 401) {
-    throw new CommandError("not_authenticated", message, undefined, [
-      { description: "Log in to Manufact Cloud", command: "mcp-use login" },
-    ]);
+    throw new CommandError("not_authenticated", message, undefined, [LOG_IN]);
   }
-  if (status === 403) throw new CommandError("forbidden", message);
+  if (status === 403) {
+    throw new CommandError(
+      context.forbidden?.code ?? "forbidden",
+      message,
+      undefined,
+      context.forbidden?.nextSteps
+    );
+  }
   if (status === 404) {
     throw new CommandError(
       context.notFound?.code ?? "not_found",
@@ -115,99 +125,68 @@ function settle<T>(
 
 /** An authenticated client scoped to one organization. */
 interface CloudConnection {
-  /** Pass as `{ client }` to typed fetch methods. */
+  /** Calls infer parameters and responses from the route. */
   client: Client<paths>;
   /** The organization requests act on. */
   organization: CloudOrganization;
+  /** The API key requests are signed with. */
+  apiKey: string;
   /**
    * Await a typed fetch call and return its data, or throw a
    * `CommandError` with a stable code: `cloud_unreachable`,
-   * `not_authenticated`, `forbidden`, `context.notFound.code` (default
-   * `not_found`), `validation_error`, `rate_limited` or `cloud_api_error`.
+   * `not_authenticated`, `forbidden` (or `context.forbidden.code`),
+   * `context.notFound.code` (default `not_found`), `validation_error`,
+   * `rate_limited` or `cloud_api_error`.
    */
   call: Call;
 }
 
-interface AuthWireResponse {
-  user_id: string;
-  email: string;
-  profiles: Array<{
-    id: string;
-    profile_name: string;
-    slug: string | null;
-    role: string;
-  }>;
-  default_profile_id: string | null;
-}
-
 /**
- * Connect with the saved or `MCP_USE_API_KEY` credentials, scoped to the
- * active organization, else the account default.
+ * Connect with the current credential (see `auth/store.ts`), scoped to
+ * `options.organization` (an id or slug) when given, else the active
+ * organization.
  */
-export async function connectCloud(): Promise<CloudConnection> {
-  const config = await readCloudConfig();
-  const apiKey = process.env["MCP_USE_API_KEY"] ?? config.apiKey;
-  if (apiKey === undefined || apiKey === "") {
-    throw new CommandError(
-      "not_authenticated",
-      "Not logged in to Manufact Cloud.",
-      undefined,
-      [{ description: "Log in", command: "mcp-use login" }]
-    );
-  }
-  const call = callerFor(apiKey);
-
-  // `/api/v1/test-auth` is not in the OpenAPI document; the auth PR in the
-  // CLI rewrite replaces this identity lookup.
-  const identity = await call(
-    fetch(`${cloudBaseUrl()}/api/v1/test-auth`, {
-      headers: { Accept: "application/json", "x-api-key": apiKey },
-    }).then(async (response) => {
-      const body: unknown = await response.json();
-      return response.ok
-        ? { data: body as AuthWireResponse, response }
-        : { error: body, response };
-    })
-  );
-  const organizations = identity.profiles.map((profile) => ({
-    id: profile.id,
-    name: profile.profile_name,
-    slug: profile.slug,
-    role: profile.role,
-  }));
-  const activeId = config.orgId ?? identity.default_profile_id;
-  const organization = organizations.find((item) => item.id === activeId);
-  if (organization === undefined) {
-    throw new CommandError(
-      "organization_required",
-      "No active organization.",
-      undefined,
-      [
-        {
-          description: "List your organizations",
-          command: "mcp-use org list --json",
-        },
-      ]
-    );
-  }
+export async function connectCloud(
+  options: { organization?: string | undefined } = {}
+): Promise<CloudConnection> {
+  const { apiKey } = await requireCredential();
+  const api = {
+    client: createCloudClient({ apiKey }),
+    call: callerFor(apiKey),
+  };
+  const organizations = await listOrganizations(api);
+  const organization = await chooseOrganization(api, organizations, {
+    selector: options.organization,
+    storedId: (await readAuth()).orgId,
+  });
+  if (organization === undefined) throw organizationRequired();
   return {
-    client: createCloudClient(apiKey, organization.id),
+    client: createCloudClient({ apiKey, organizationId: organization.id }),
     organization,
-    call,
+    apiKey,
+    call: api.call,
   };
 }
 
-function createCloudClient(
-  apiKey: string,
-  organizationId?: string
-): Client<paths> {
+/**
+ * A typed fetch client for Cloud. `apiKey` signs requests as the key's
+ * user; `bearer` signs them with a short-lived login token instead.
+ */
+export function createCloudClient(auth: {
+  apiKey?: string;
+  bearer?: string;
+  organizationId?: string;
+}): Client<paths> {
   return createClient<paths>({
     baseUrl: cloudBaseUrl(),
     headers: {
       Accept: "application/json",
-      "x-api-key": apiKey,
-      ...(organizationId !== undefined
-        ? { "x-profile-id": organizationId }
+      ...(auth.apiKey !== undefined ? { "x-api-key": auth.apiKey } : {}),
+      ...(auth.bearer !== undefined
+        ? { Authorization: `Bearer ${auth.bearer}` }
+        : {}),
+      ...(auth.organizationId !== undefined
+        ? { "x-profile-id": auth.organizationId }
         : {}),
     },
   });
