@@ -212,7 +212,9 @@ export async function main(
   const commandArgs = stripForwardingSeparator(argv.slice(1));
   if (command === "feedback") {
     const { runFeedback } = await import("../feedback.js");
-    return runFeedback(commandArgs);
+    // Preserve the message's -- delimiter; only remove a forwarding separator
+    // immediately after the command name (e.g. feedback -- send ...).
+    return runFeedback(argv.slice(argv[1] === "--" ? 2 : 1));
   }
   if (command === "login") {
     const { runLogin } = await import("../cloud/auth/login.js");

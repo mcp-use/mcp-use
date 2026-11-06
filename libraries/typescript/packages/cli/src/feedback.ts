@@ -15,6 +15,7 @@ Commands:
 
 Arguments for send:
   <message>          Required report text (1–10,000 characters); quote spaces
+                     Use send -- <message> for text starting with a dash
 
 Options:
   --json             Print one JSON result, including failures
@@ -33,11 +34,13 @@ const SEND_HELP = HELP.replace(
 /** Submit explicit CLI feedback independently of passive usage analytics. */
 export async function runFeedback(argv: readonly string[]): Promise<number> {
   const help = argv[0] === "send" ? SEND_HELP : HELP;
-  if (argv.includes("--help") || argv.includes("-h")) {
+  const separator = argv.indexOf("--");
+  const optionArgs = separator < 0 ? argv : argv.slice(0, separator);
+  if (optionArgs.includes("--help") || optionArgs.includes("-h")) {
     process.stdout.write(`${help}\n`);
     return 0;
   }
-  return runCommand(argv, help, async (output) => {
+  return runCommand(optionArgs, help, async (output) => {
     if (argv[0] !== "send") throw new UsageError(`Usage: ${USAGE}`);
     const { positionals } = parseCommandArgs(argv.slice(1), {
       options: {
