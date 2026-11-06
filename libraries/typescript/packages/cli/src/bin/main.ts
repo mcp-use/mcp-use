@@ -73,6 +73,8 @@ const HELP = `mcp-use — run MCP servers built with mcp-use
 Usage: mcp-use <command> [options]
 
 Commands:
+  domains           Manage server domains
+  github            Manage GitHub App access
   dev      Start the dev server
   build    Build the server into .mcp-use/build
   typecheck Refresh MCP types and run the project's TypeScript compiler
@@ -211,6 +213,14 @@ export async function main(
   if (command === "whoami") {
     const { runWhoami } = await import("../cloud/auth/whoami.js");
     return runWhoami(commandArgs);
+  }
+  if (command === "domains") {
+    const { runDomains } = await import("../cloud/domains/index.js");
+    return runDomains(commandArgs);
+  }
+  if (command === "github") {
+    const { runGithub } = await import("../cloud/github/index.js");
+    return runGithub(commandArgs);
   }
   if (command === "org") {
     const { runOrganizations } = await import("../cloud/org/index.js");

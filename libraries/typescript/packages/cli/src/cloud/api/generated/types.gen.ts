@@ -232,7 +232,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** @description List repositories accessible to a GitHub App installation. */
+        get: operations["getApiV1GithubInstallationsByInstallationIdRepos"];
         put?: never;
         /** @description Create a new GitHub repository via the installation's Octokit client. Repos created by the app are automatically accessible to the installation. */
         post: operations["postApiV1GithubInstallationsByInstallationIdRepos"];
@@ -426,6 +427,91 @@ export interface paths {
         put?: never;
         /** @description Upload or replace the organization logo. Accepts multipart/form-data with a single `file` field (PNG, JPEG, WebP, GIF; max 2 MB). Returns the public URL of the uploaded image. */
         post: operations["postApiV1OrganizationsByIdLogo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/servers/{id}/domain/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get custom domain status for a server */
+        get: operations["getApiV1ServersByIdDomainStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/servers/{id}/domain/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Request a custom domain. HTTP validation returns CNAME instructions. TXT validation returns ownership and certificate records to prepare HTTPS before DNS cutover; call verify with activate=true when ready to activate. */
+        post: operations["postApiV1ServersByIdDomainRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/servers/{id}/domain/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Check hostname and certificate validation, or explicitly switch a pending domain to TXT with validationMethod=txt and domainId. TXT preparation stays staged until activate=true is explicitly supplied. Pending checks return current DNS validation records. */
+        post: operations["postApiV1ServersByIdDomainVerify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/servers/{id}/domain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove custom domain from a server */
+        delete: operations["deleteApiV1ServersByIdDomain"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/github/connect-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Mint a GitHub App install URL carrying a short-lived signed `state` that binds the install to the current user + organization. Used by the in-chat connect_github flow so the install can complete in a fresh browser tab (no session) and link back via /installations/callback-by-state. */
+        get: operations["getApiV1GithubConnectUrl"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2027,6 +2113,7 @@ export interface operations {
                     } & {
                         [key: string]: unknown;
                     };
+                    slug?: string | null;
                 };
             };
         };
@@ -2243,6 +2330,105 @@ export interface operations {
                         /** @description Stable application error code, when available. */
                         code?: string;
                         details?: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1GithubInstallationsByInstallationIdRepos: {
+        parameters: {
+            query?: {
+                page?: number;
+                perPage?: number;
+                q?: string;
+            };
+            header?: never;
+            path: {
+                installationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        repos: {
+                            id: number;
+                            name: string;
+                            fullName: string;
+                            private: boolean;
+                            htmlUrl: string;
+                            defaultBranch: string | null;
+                            pushedAt: string | null;
+                            ownerAvatarUrl: string | null;
+                        }[];
+                        page: number;
+                        perPage: number;
+                        totalCount: number;
+                        hasMore: boolean;
+                        /** @enum {string} */
+                        mode: "browse" | "search";
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
                     };
                 };
             };
@@ -3728,6 +3914,507 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServersByIdDomainStatus: {
+        parameters: {
+            query?: {
+                domainId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        validationMethod?: ("http" | "txt" | "email") | null;
+                        validationRecords?: {
+                            /** @enum {string} */
+                            purpose: "hostname" | "certificate";
+                            /** @constant */
+                            type: "TXT";
+                            name: string;
+                            value: string;
+                        }[];
+                        hostnameReady?: boolean;
+                        certificateReady?: boolean;
+                        readyToConnect?: boolean;
+                        dnsConnected?: boolean | null;
+                        domain: string | null;
+                        verified: boolean;
+                        hostnameId: string | null;
+                        status: string | null;
+                        sslStatus: string | null;
+                        cnameTarget: string | null;
+                        configuredAt: string | null;
+                        verificationErrors: string[] | null;
+                        pendingRemovalAt?: string | null;
+                        setupMode?: "new_hostname" | null;
+                        gatewayReady?: boolean;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ServersByIdDomainRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    domain: string;
+                    /**
+                     * @default http
+                     * @enum {string}
+                     */
+                    validationMethod?: "http" | "txt";
+                    /**
+                     * @default new_hostname
+                     * @constant
+                     */
+                    setupMode?: "new_hostname";
+                    branch?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        validationMethod?: ("http" | "txt" | "email") | null;
+                        validationRecords?: {
+                            /** @enum {string} */
+                            purpose: "hostname" | "certificate";
+                            /** @constant */
+                            type: "TXT";
+                            name: string;
+                            value: string;
+                        }[];
+                        hostnameReady?: boolean;
+                        certificateReady?: boolean;
+                        readyToConnect?: boolean;
+                        dnsConnected?: boolean | null;
+                        success: boolean;
+                        domain: string;
+                        hostnameId: string;
+                        status: string;
+                        sslStatus: string;
+                        cnameTarget: string;
+                        dnsInstructions: string;
+                        /** @constant */
+                        setupMode?: "new_hostname";
+                        gatewayReady?: boolean;
+                    };
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        domain?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Server not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        domain?: string;
+                    };
+                };
+            };
+            /** @description Domain already in use (same hostname on another server you can access, or globally) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        domain?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ServersByIdDomainVerify: {
+        parameters: {
+            query?: {
+                domainId?: string;
+                activate?: "true" | "false";
+                validationMethod?: "txt";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        validationMethod?: ("http" | "txt" | "email") | null;
+                        validationRecords?: {
+                            /** @enum {string} */
+                            purpose: "hostname" | "certificate";
+                            /** @constant */
+                            type: "TXT";
+                            name: string;
+                            value: string;
+                        }[];
+                        hostnameReady?: boolean;
+                        certificateReady?: boolean;
+                        readyToConnect?: boolean;
+                        dnsConnected?: boolean | null;
+                        success: boolean;
+                        verified: boolean;
+                        status?: string | null;
+                        sslStatus?: string | null;
+                        message?: string | null;
+                        configuredAt?: string | null;
+                        verificationErrors?: string[] | null;
+                        gatewayReady?: boolean;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description No domain configured */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        domain?: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ServersByIdDomain: {
+        parameters: {
+            query?: {
+                domainId?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                        message: string;
+                        pending?: boolean;
+                        pendingRemovalAt?: string;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1GithubConnectUrl: {
+        parameters: {
+            query: {
+                organizationId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        url: string;
+                        expiresInSeconds: number;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
