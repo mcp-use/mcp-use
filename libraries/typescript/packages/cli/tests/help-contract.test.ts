@@ -31,6 +31,8 @@ describe("offline help contract", () => {
     ["deployments restart", ["deployments", "restart", "--help"]],
     ["deployments stop", ["deployments", "stop", "--help"]],
     ["deployments delete", ["deployments", "delete", "--help"]],
+    ["link", ["link", "--help"]],
+    ["unlink", ["unlink", "-h"]],
     ["screenshot", ["screenshot", "--help"]],
     ["client", ["client", "--help"]],
     ["client", ["client", "--", "--help"]],
@@ -79,6 +81,8 @@ describe("offline help contract", () => {
       "login",
       "deploy",
       "deployments",
+      "link",
+      "unlink",
       "servers",
     ]) {
       expect(result.stdout).toMatch(new RegExp(`^ {2}${command} `, "m"));

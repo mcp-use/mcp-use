@@ -20,11 +20,16 @@ import {
   type CloudApi,
 } from "./cloud-api.js";
 import { CommandError, UsageError } from "../core/errors.js";
-import { pathExists, readJson, writePrivateJson } from "../core/fs.js";
+import { pathExists } from "../core/fs.js";
 import { openBrowser } from "../core/open-browser.js";
 import { printResult, reportError, wantsJson } from "../core/output.js";
 import { confirm } from "../core/prompt.js";
 import { CommandUsageError } from "./errors.js";
+import {
+  readProjectLink,
+  writeProjectLink,
+  type ProjectLink,
+} from "./project/link-file.js";
 
 const exec = promisify(execFile);
 const MAX_ARCHIVE_BYTES = 80 * 1024 * 1024;
@@ -114,14 +119,6 @@ Exit codes:
   1  Git, API, upload, or deployment failure
   2  Invalid arguments or an explicit headless choice is required`;
 
-interface ProjectLink {
-  organizationId: string;
-  serverId: string;
-  serverSlug?: string | null;
-  repository?: string;
-  sourceType?: "github" | "managed";
-}
-
 interface Installation {
   id?: string;
   installationId: string;
@@ -195,7 +192,6 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
     }
 
     const cwd = resolve(positionals[0] ?? process.cwd());
-    const linkPath = join(cwd, ".mcp-use", "cloud", "link.json");
 
     if (values.new === true) {
       const accepted = await confirm(
@@ -207,13 +203,9 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
 
     const { api, organizationId, organizationSlug } =
       await cloudApiForOrganization(values.org);
-    const existing = await readJson<ProjectLink | null>(linkPath, null);
+    const existing = await readProjectLink(cwd);
     const createNew = values.new === true || existing === null;
-    if (
-      !createNew &&
-      existing !== null &&
-      existing.organizationId !== organizationId
-    ) {
+    if (!createNew && existing !== null && existing.orgId !== organizationId) {
       throw new CommandError(
         "organization_mismatch",
         "The linked server belongs to another organization. Pass --new --yes to create one.",
@@ -286,7 +278,6 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         organizationId,
         organizationSlug,
         cwd,
-        linkPath,
         existing: createNew ? null : existing,
         values,
         json,
@@ -298,7 +289,6 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       organizationId,
       organizationSlug,
       cwd,
-      linkPath,
       existing: createNew ? null : existing,
       values,
       json,
@@ -372,21 +362,12 @@ async function deployManaged(input: {
   organizationId: string;
   organizationSlug: string | null;
   cwd: string;
-  linkPath: string;
   existing: ProjectLink | null;
   values: DeployValues;
   json: boolean;
 }): Promise<number> {
-  const {
-    api,
-    organizationId,
-    organizationSlug,
-    cwd,
-    linkPath,
-    existing,
-    values,
-    json,
-  } = input;
+  const { api, organizationId, organizationSlug, cwd, existing, values, json } =
+    input;
   const projectRoot = cwd;
   const sourceRoot = resolveContainedPath(
     cwd,
@@ -410,12 +391,10 @@ async function deployManaged(input: {
   const branch = values.branch ?? "main";
   const name = values.name ?? (await projectName(sourceRoot));
   let serverId: string;
-  let serverSlug: string | null | undefined;
   let deploymentId: string;
 
   if (existing !== null) {
     serverId = existing.serverId;
-    serverSlug = existing.serverSlug;
     await syncServerConfiguration(api, serverId, values);
     await syncEnvironment(api, serverId, env, values.branch);
     const sourceForm = new FormData();
@@ -461,16 +440,10 @@ async function deployManaged(input: {
       throw deploymentNotCreated(created.server.id);
     }
     serverId = created.server.id;
-    serverSlug = created.server.slug;
     deploymentId = created.deploymentId;
   }
 
-  await writePrivateJson(linkPath, {
-    organizationId,
-    serverId,
-    ...(serverSlug !== undefined ? { serverSlug } : {}),
-    sourceType: "managed",
-  } satisfies ProjectLink);
+  await writeProjectLink(projectRoot, { orgId: organizationId, serverId });
   await ensureLocalMcpUseIgnored(projectRoot);
   return finishDeployment({
     sourceType: "managed",
@@ -507,21 +480,12 @@ async function deployGitHub(input: {
   organizationId: string;
   organizationSlug: string | null;
   cwd: string;
-  linkPath: string;
   existing: ProjectLink | null;
   values: DeployValues;
   json: boolean;
 }): Promise<number> {
-  const {
-    api,
-    organizationId,
-    organizationSlug,
-    cwd,
-    linkPath,
-    existing,
-    values,
-    json,
-  } = input;
+  const { api, organizationId, organizationSlug, cwd, existing, values, json } =
+    input;
   let probe = await probeGit(cwd);
   let repository: string;
   let installation: Installation | undefined;
@@ -645,11 +609,9 @@ async function deployGitHub(input: {
   }
 
   let serverId: string;
-  let serverSlug: string | null | undefined;
   let deploymentId: string;
   if (existing !== null) {
     serverId = existing.serverId;
-    serverSlug = existing.serverSlug;
     await syncServerConfiguration(api, serverId, values);
     await syncEnvironment(api, serverId, env, values.branch);
     const deployment = await api.request<{ id: string }>("/deployments", {
@@ -723,17 +685,10 @@ async function deployGitHub(input: {
       throw deploymentNotCreated(created.server.id);
     }
     serverId = created.server.id;
-    serverSlug = created.server.slug;
     deploymentId = created.deploymentId;
   }
 
-  await writePrivateJson(linkPath, {
-    organizationId,
-    serverId,
-    ...(serverSlug !== undefined ? { serverSlug } : {}),
-    repository,
-    sourceType: "github",
-  } satisfies ProjectLink);
+  await writeProjectLink(cwd, { orgId: organizationId, serverId });
   await ensureLocalMcpUseIgnored(repositoryRoot);
   return finishDeployment({
     sourceType: "github",
@@ -825,8 +780,6 @@ async function linkedServerIsManaged(
   api: CloudApi,
   link: ProjectLink
 ): Promise<boolean> {
-  if (link.sourceType !== undefined) return link.sourceType === "managed";
-  if (link.repository === undefined) return true;
   try {
     const server = await api.request<{
       connectedRepository?: { isManaged?: boolean } | null;

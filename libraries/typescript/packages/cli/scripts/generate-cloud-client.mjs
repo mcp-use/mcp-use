@@ -38,6 +38,8 @@ const OPERATIONS = [
   "GET /api/v1/deployments/{id}",
   "GET /api/v1/deployments/{id}/build-logs",
   "GET /api/v1/deployments/{id}/logs",
+  "GET /api/v1/servers",
+  "GET /api/v1/servers/{id}",
 ];
 
 /**
@@ -56,6 +58,16 @@ const RESPONSE_FIELDS = {
     "organizations[].role",
   ],
   "GET /api/v1/user-preferences": ["defaultOrganizationId"],
+  "GET /api/v1/servers": [
+    "items[].id",
+    "items[].slug",
+    "items[].name",
+    "items[].organizationId",
+    "total",
+    "limit",
+    "skip",
+  ],
+  "GET /api/v1/servers/{id}": ["id", "slug", "name", "organizationId"],
 };
 
 const spec = JSON.parse(await readFile(resolve(process.cwd(), input), "utf8"));

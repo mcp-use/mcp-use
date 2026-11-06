@@ -25,6 +25,8 @@ export default defineConfig({
     "commands/servers": "src/cloud/servers.ts",
     "commands/deployments": "src/cloud/deployments.ts",
     "commands/deploy": "src/cloud/deploy.ts",
+    "commands/link": "src/cloud/project/link.ts",
+    "commands/unlink": "src/cloud/project/unlink.ts",
     "commands/client": "src/client/client.ts",
     "commands/screenshot": "src/client/screenshot.ts",
   },

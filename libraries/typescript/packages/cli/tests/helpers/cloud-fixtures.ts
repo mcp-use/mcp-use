@@ -71,3 +71,12 @@ export function session(
 ): operations["getSession"]["responses"][200]["content"]["application/json"] {
   return { user: { email } };
 }
+
+/** A server as the project lookup returns it. */
+type Server =
+  operations["getApiV1ServersById"]["responses"][200]["content"]["application/json"];
+
+/** A server with neutral values for fields outside the assertion. */
+export function server(fields: Pick<Server, "id"> & Partial<Server>): Server {
+  return { name: "Server", slug: "server", organizationId: "org_1", ...fields };
+}

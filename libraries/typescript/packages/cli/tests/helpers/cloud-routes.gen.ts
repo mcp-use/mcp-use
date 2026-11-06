@@ -118,6 +118,30 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/servers": {
+    data: T.operations["getApiV1Servers"]["parameters"];
+    responses: {
+      200: ResponseBody<T.operations["getApiV1Servers"]["responses"][200]>;
+    };
+    errors: {
+      400: ResponseBody<T.operations["getApiV1Servers"]["responses"][400]>;
+      401: ResponseBody<T.operations["getApiV1Servers"]["responses"][401]>;
+      403: ResponseBody<T.operations["getApiV1Servers"]["responses"][403]>;
+      404: ResponseBody<T.operations["getApiV1Servers"]["responses"][404]>;
+    };
+  };
+  "GET /api/v1/servers/{id}": {
+    data: T.operations["getApiV1ServersById"]["parameters"];
+    responses: {
+      200: ResponseBody<T.operations["getApiV1ServersById"]["responses"][200]>;
+    };
+    errors: {
+      400: ResponseBody<T.operations["getApiV1ServersById"]["responses"][400]>;
+      401: ResponseBody<T.operations["getApiV1ServersById"]["responses"][401]>;
+      403: ResponseBody<T.operations["getApiV1ServersById"]["responses"][403]>;
+      404: ResponseBody<T.operations["getApiV1ServersById"]["responses"][404]>;
+    };
+  };
   "GET /api/v1/user-preferences": {
     data: T.operations["getApiV1UserPreferences"]["parameters"];
     responses: {
@@ -218,6 +242,8 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "GET /api/v1/deployments/{id}/build-logs",
   "GET /api/v1/deployments/{id}/logs",
   "GET /api/v1/organizations",
+  "GET /api/v1/servers",
+  "GET /api/v1/servers/{id}",
   "GET /api/v1/user-preferences",
   "POST /api/auth/api-key/create",
   "POST /api/auth/api-key/delete",
@@ -234,6 +260,8 @@ export const cloudRouteSuccessStatus: Readonly<
   "GET /api/v1/deployments/{id}/build-logs": 200,
   "GET /api/v1/deployments/{id}/logs": 200,
   "GET /api/v1/organizations": 200,
+  "GET /api/v1/servers": 200,
+  "GET /api/v1/servers/{id}": 200,
   "GET /api/v1/user-preferences": 200,
   "POST /api/auth/api-key/create": 200,
   "POST /api/auth/api-key/delete": 200,
