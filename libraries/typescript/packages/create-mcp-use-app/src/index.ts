@@ -401,9 +401,10 @@ function parseGitHubRepoUrl(url: string): GitHubRepoInfo | null {
 
 function validateGitHubRepoInfo(info: GitHubRepoInfo): boolean {
   const validIdentifier = /^[a-zA-Z0-9_-]+$/;
+  const validRepository = /^[a-zA-Z0-9_.-]+$/;
   const validBranch = /^[a-zA-Z0-9_./-]+$/;
 
-  if (!validIdentifier.test(info.owner) || !validIdentifier.test(info.repo)) {
+  if (!validIdentifier.test(info.owner) || !validRepository.test(info.repo)) {
     return false;
   }
 
