@@ -180,6 +180,83 @@ describe("explicit CLI feedback", () => {
     ]);
   });
 
+  test.for(["--help", "-h", "--json", "--", "--json output is missing"])(
+    "treats dash-leading messages after -- as literal feedback: %s",
+    async (message, { cli, capture }) => {
+      const result = await cli.run(
+        ["feedback", "send", "--json", "--", message],
+        {
+          env: { ...capture.env, MCP_USE_ANONYMIZED_TELEMETRY: "true" },
+        }
+      );
+      expect(result.exitCode).toBe(0);
+      expect(result.json).toMatchObject({ accepted: true });
+      expect(result.stderr).toBe("");
+      expect(await capture.events()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            event: "mcp_use_cli_feedback",
+            properties: expect.objectContaining({ message }),
+          }),
+          expect.objectContaining({
+            event: "mcp_use_cli_command",
+            properties: expect.objectContaining({
+              command: "feedback",
+              subcommand: "send",
+              is_help: false,
+            }),
+          }),
+        ])
+      );
+    }
+  );
+
+  test("a literal --json message does not enable JSON output", async ({
+    cli,
+    capture,
+  }) => {
+    const result = await cli.run(["feedback", "send", "--", "--json"], {
+      env: capture.env,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(
+      /^Feedback accepted\. Report ID: [0-9a-f-]{36}\n$/
+    );
+    expect(await capture.events()).toMatchObject([
+      { properties: { message: "--json" } },
+    ]);
+  });
+
+  test("preserves the message delimiter after a forwarding separator", async ({
+    cli,
+    capture,
+  }) => {
+    const result = await cli.run(
+      ["feedback", "--", "send", "--json", "--", "--help"],
+      {
+        env: { ...capture.env, MCP_USE_ANONYMIZED_TELEMETRY: "true" },
+      }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toMatchObject({ accepted: true });
+    expect(await capture.events()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "mcp_use_cli_feedback",
+          properties: expect.objectContaining({ message: "--help" }),
+        }),
+        expect.objectContaining({
+          event: "mcp_use_cli_command",
+          properties: expect.objectContaining({
+            command: "feedback",
+            subcommand: "send",
+            is_help: false,
+          }),
+        }),
+      ])
+    );
+  });
+
   test.for([
     ["send"],
     ["send", "   "],

@@ -40,7 +40,8 @@ mcp-use feedback send "The env push error needs a recovery command." --json
 ```
 
 Pass one quoted message (1–10,000 characters). No login is required. Use
-`--json` for a machine-readable receipt.
+`--json` for a machine-readable receipt. For dash-leading text, use
+`mcp-use feedback send -- '--json output is missing'`.
 
 Reports are explicit submissions to the SDK's PostHog project, even with
 passive analytics disabled. Only the supplied message, report ID, anonymous

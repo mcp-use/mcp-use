@@ -53,8 +53,11 @@ the installed version's skills into `.agents/skills`, `.claude/skills`, and
 ## Report CLI feedback
 
 When the user asks you to report a CLI problem or suggestion, submit a concise
-report with `mcp-use feedback send "..." --json`. Pass the report as one quoted
-message. Include expected and observed behavior and the affected command;
+report with `mcp-use feedback send '...' --json`. Pass the message as one literal
+argument, using an argument array or proper shell escaping so backticks and `$`
+in report text are not evaluated. For text beginning with a dash, use
+`mcp-use feedback send --json -- '...'`.
+Include expected and observed behavior and the affected command;
 omit secrets, personal data, raw logs, and conversation contents. Ask before
 sending when the user has not authorized a report.
 

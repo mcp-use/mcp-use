@@ -50,10 +50,15 @@ const CLIENT_OPERATIONS: Record<string, readonly string[]> = {
 };
 
 function commandProperties(argv: readonly string[]) {
+  // Feedback text after -- can itself be --help; it is still a submission.
+  const messageSeparator =
+    argv[0] === "feedback" ? argv.indexOf("--", argv[1] === "--" ? 2 : 1) : -1;
+  const optionArgs =
+    messageSeparator < 0 ? argv : argv.slice(0, messageSeparator);
   const help =
     argv.length === 0 ||
     argv[0] === "help" ||
-    argv.some((arg) => arg === "--help" || arg === "-h");
+    optionArgs.some((arg) => arg === "--help" || arg === "-h");
   let args = argv[0] === "help" ? argv.slice(1) : argv;
   if (args[1] === "--") args = [args[0]!, ...args.slice(2)];
   // The client accepts --json anywhere, including before the saved name.
