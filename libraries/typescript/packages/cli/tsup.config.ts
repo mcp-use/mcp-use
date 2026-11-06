@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
+import {
+  POSTHOG_API_KEY,
+  POSTHOG_HOST,
+} from "../client/src/telemetry/tel-fetch.js";
 
 const cliPackage = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8")
@@ -59,5 +63,13 @@ export default defineConfig({
   noExternal: ["@mcp-use/tunnel", "openapi-fetch"],
   define: {
     __MCP_USE_CLI_VERSION__: JSON.stringify(cliPackage.version),
+    // Reuse the SDK's public ingestion project at build time. The CLI stays
+    // independent of the optional client package at runtime.
+    __MCP_USE_POSTHOG_HOST__: JSON.stringify(
+      process.env.MCP_USE_POSTHOG_HOST ?? POSTHOG_HOST
+    ),
+    __MCP_USE_POSTHOG_KEY__: JSON.stringify(
+      process.env.MCP_USE_POSTHOG_API_KEY ?? POSTHOG_API_KEY
+    ),
   },
 });
