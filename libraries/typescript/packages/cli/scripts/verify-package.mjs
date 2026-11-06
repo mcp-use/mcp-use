@@ -50,7 +50,11 @@ if (!existsSync(join(root, "types", "internal", "skills-loader.d.ts"))) {
 if (!existsSync(join(root, "THIRD_PARTY_NOTICES.md"))) {
   throw new Error("Missing THIRD_PARTY_NOTICES.md");
 }
-for (const skill of ["mcp-apps-builder", "manufact-cloud"]) {
+for (const skill of [
+  "mcp-apps-builder",
+  "manufact-cloud",
+  "manufact-analytics",
+]) {
   if (!files.includes(join("dist", "agent-skills", skill, "SKILL.md"))) {
     throw new Error(`Missing bundled agent skill: ${skill}`);
   }

@@ -36,6 +36,52 @@ const phase: Row = [
 const envScope = [...project, environment, branch, phase];
 
 const pages: Record<string, Page> = {
+  analytics: {
+    summary:
+      "Discover server analytics and run scoped read-only ClickHouse SQL.",
+    examples: [
+      "mcp-use analytics catalog --json",
+      "mcp-use analytics query --help",
+    ],
+    commands: {
+      catalog: {
+        summary:
+          "Get live relations, columns, SQL examples, retention, freshness, and query limits.",
+        options: [
+          ...project,
+          ["--branch <name>", "Preview branch; omit for all environments"],
+        ],
+        examples: ["mcp-use analytics catalog --server my-server --json"],
+      },
+      query: {
+        summary:
+          "Run one read-only SELECT or UNION over catalog relations. Read the catalog first; include time predicates using {from:DateTime64(3)} and {to:DateTime64(3)}. Authorization, retention, and query budgets are enforced by Cloud.",
+        args: '"<sql>"',
+        options: [
+          ...project,
+          ["--time-range <preset>", "1h, 24h, 7d, 30d, or 90d (default: 7d)"],
+          [
+            "--from <timestamp>",
+            "Inclusive ISO start with UTC offset; requires --to",
+          ],
+          [
+            "--to <timestamp>",
+            "Exclusive ISO end with UTC offset; replaces --time-range with --from",
+          ],
+          ["--branch <name>", "Preview branch; omit for all environments"],
+          ["--max-rows <n>", "Maximum result rows, 1–500 (default: 100)"],
+          [
+            "--include-internal",
+            "Include Manufact internal traffic (default: excluded)",
+          ],
+        ],
+        examples: [
+          "mcp-use analytics query \"SELECT sum(events) AS requests FROM clients_daily WHERE bucket >= {from:DateTime64(3)} AND bucket < {to:DateTime64(3)} AND traffic_class != 'non_mcp'\" --json",
+          'mcp-use analytics query --json -- "-- comment\nSELECT …"',
+        ],
+      },
+    },
+  },
   org: {
     summary: "Manage organizations and choose the active organization.",
     examples: [

@@ -22,6 +22,7 @@ mcp-use <command> [options]
   feedback     Send CLI feedback to Manufact
   screenshot   Capture an MCP Apps view
   deploy       Deploy from GitHub or upload local source
+  analytics    Discover and query deployed-server analytics
   login/logout/whoami/org/servers/deployments
                Manage Manufact Cloud sessions, servers, and deployments
 ```
@@ -56,6 +57,30 @@ downstream ingestion has completed. `--json` returns `{ "accepted": true,
 "reportId": "<uuid>" }`. Exit 1 returns `feedback_rejected`,
 `feedback_network_error`, or `feedback_timeout`; timeout/network errors leave
 acceptance unknown. Invalid input exits 2 with `usage_error`.
+
+## Query server analytics
+
+Discover the live analytics schema, then run read-only ClickHouse SQL using
+your Cloud login and linked server (or pass `--server <id-or-slug>`):
+
+```bash
+mcp-use analytics catalog --json
+mcp-use analytics query "SELECT client_name, sum(events) AS requests FROM clients_daily WHERE bucket >= {from:DateTime64(3)} AND bucket < {to:DateTime64(3)} AND traffic_class != 'non_mcp' GROUP BY client_name ORDER BY requests DESC LIMIT 20" --time-range 7d --json
+```
+
+The catalog returns relations, columns, metric expressions, examples, retention,
+and query limits. Query defaults are the last seven days and at most 100 rows.
+Use `--time-range 1h|24h|7d|30d|90d`, or `--from <ISO timestamp> --to <ISO timestamp>`
+for an inclusive start and exclusive end. Include time predicates in SQL;
+the window binds the `{from}` and `{to}` parameters. Use `--branch <name>` for
+a preview branch; omitting it includes all environments. Internal traffic is
+excluded unless `--include-internal` is passed. `--max-rows` allows 1–500 rows.
+
+Cloud enforces server access, retention, read-only queries, and execution budgets.
+`--json` preserves columns, positional rows, integer strings, truncation,
+statistics, and freshness metadata. Query text is excluded from passive CLI
+telemetry. Install the bundled `manufact-analytics` skill and SQL guidance with
+`mcp-use skills install`. Run `mcp-use analytics query --help` for all options.
 
 ## Anonymous usage analytics
 

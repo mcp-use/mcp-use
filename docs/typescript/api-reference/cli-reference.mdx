@@ -723,6 +723,80 @@ mcp-use alerts options [options]
 
 Use the [dashboard YAML format](https://docs.manufact.com/dashboard/alerts). Choose a minimum traffic count alongside rate thresholds and separate trigger/recovery thresholds. `alerts options` lists current metrics.
 
+## Analytics commands
+
+Query a deployed MCP server's analytics through Manufact Cloud using the
+existing CLI login. Both commands accept `--server <id-or-slug>`, `--org`,
+`--path`, and `--json`. Server selection uses `--server`, then `MANUFACT_SERVER`,
+then the project link. No PostHog credentials are needed.
+
+### `analytics catalog`
+
+Read the live ClickHouse schema before constructing a query:
+
+```bash
+mcp-use analytics catalog [--server <id-or-slug>] [--branch <name>] [--json]
+```
+
+Returns relations and columns, metric SQL expressions and units, worked
+examples, branch mappings, retention, freshness, and current query limits.
+Human output is the complete formatted catalog; `--json` emits one compact
+JSON document.
+
+### `analytics query`
+
+Run one read-only ClickHouse SELECT or UNION over catalog relations:
+
+```bash
+mcp-use analytics query "SELECT client_name, sum(events) AS requests FROM clients_daily WHERE bucket >= {from:DateTime64(3)} AND bucket < {to:DateTime64(3)} AND traffic_class != 'non_mcp' GROUP BY client_name ORDER BY requests DESC LIMIT 20" --time-range 7d --json
+```
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `--time-range <preset>` | `1h`, `24h`, `7d`, `30d`, or `90d` | `7d` |
+| `--from <timestamp>` | Inclusive ISO start with `Z` or a UTC offset; requires `--to` | — |
+| `--to <timestamp>` | Exclusive ISO end with `Z` or a UTC offset; cannot be in the future | — |
+| `--branch <name>` | Scope to a preview branch; omission includes all environments | All environments |
+| `--max-rows <n>` | Maximum returned rows, 1–500 | `100` |
+| `--include-internal` | Include Manufact internal traffic | Excluded |
+
+Pass exactly one quoted SQL argument, up to 16384 UTF-8 bytes. For SQL starting
+with a dash, place flags before a literal delimiter:
+
+```bash
+mcp-use analytics query --server my-server --json -- '-- comment
+SELECT 1'
+```
+
+Custom dates replace `--time-range`; both dates are required and the start must
+precede the end. They bind `{from:DateTime64(3)}` and `{to:DateTime64(3)}`.
+Include predicates in SQL using the catalog relation's time column (`time` for
+raw events, `bucket` for rollups). For example, query one complete UTC day:
+
+```bash
+mcp-use analytics query "SELECT sum(events) AS requests FROM clients_daily WHERE bucket >= {from:DateTime64(3)} AND bucket < {to:DateTime64(3)}" --from 2026-01-01T00:00:00Z --to 2026-01-02T00:00:00Z --json
+```
+
+Cloud enforces server authorization, retention, and execution budgets, and
+rejects SETTINGS, FORMAT, INTO, table functions, and non-catalog relations.
+Query requests have a 30-second client timeout and no automatic retries.
+
+JSON output preserves `queryId`, `columns`, positional `rows`, `truncated`,
+`statistics`, and `meta`, including retention and freshness. Pair row values
+with columns in order and preserve 64-bit integer strings. Human output shows
+a table plus query metadata and a truncation notice when applicable. Empty
+results describe matching retained data, not all historical activity.
+
+Exit codes are 0 for success/help, 1 for operational failures, and 2 for invalid
+arguments. JSON errors use the standard `error.code`, `error.message`, and
+`error.nextSteps` shape. Analytics-specific API codes are retained, including
+`ANALYTICS_SQL_REJECTED`, `ANALYTICS_QUERY_BUDGET`, and `ANALYTICS_UNAVAILABLE`;
+authentication and network errors use the existing Cloud CLI codes. Query SQL
+and scope values are excluded from passive command telemetry.
+
+Install the version-matched `manufact-analytics` skill with `mcp-use skills
+install` for catalog discovery, SQL aggregation, and result interpretation.
+
 ## Feedback commands
 
 ### `feedback send`
@@ -762,7 +836,8 @@ unknown; check connectivity before retrying. Invalid input exits 2 with
 
 ### `skills install`
 
-Install version-matched coding-agent guidance, including the full Cloud CLI skill.
+Install version-matched coding-agent guidance, including the Cloud CLI and
+`manufact-analytics` skills.
 
 ```bash
 mcp-use skills install [--path <directory>] [--json]

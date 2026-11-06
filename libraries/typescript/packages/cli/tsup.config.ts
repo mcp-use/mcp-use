@@ -38,6 +38,7 @@ export default defineConfig({
     "commands/github": "src/cloud/github/index.ts",
     "commands/checklist": "src/cloud/checklist/index.ts",
     "commands/alerts": "src/cloud/alerts/index.ts",
+    "commands/analytics": "src/cloud/analytics/index.ts",
     "commands/skills": "src/skills/install.ts",
     "commands/client": "src/client/client.ts",
     "commands/screenshot": "src/client/screenshot.ts",
