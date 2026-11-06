@@ -1077,12 +1077,33 @@ describe("runDev (views)", () => {
         viewsDir: "src/mcp/views",
         directories: { mcpDir: "src/mcp" },
       },
+      {
+        label: "encoded viewsDir",
+        viewsDir: "src/my views café %",
+        directories: { viewsDir: "src/my views café %" },
+      },
+      {
+        label: "encoded shared import",
+        viewsDir: "src/views",
+        directories: { viewsDir: "src/views" },
+        sharedFileName: "shared greeting café %.ts",
+      },
+      {
+        label: "root viewsDir",
+        viewsDir: ".",
+        directories: { viewsDir: "." },
+      },
     ].flatMap((configuration) =>
       [false, true].map((landing) => ({ ...configuration, landing }))
     )
   )(
     "serves shared imports with $label and landing=$landing",
-    async ({ viewsDir, directories, landing }) => {
+    async ({
+      viewsDir,
+      directories,
+      landing,
+      sharedFileName = "shared.ts",
+    }) => {
       const cwd = copyFixture("dev-shared-import", "views");
       cleanups.push(() => removeDir(cwd));
       const sourceRoot = join(cwd, directories.mcpDir ?? ".");
@@ -1090,11 +1111,20 @@ describe("runDev (views)", () => {
         mkdirSync(sourceRoot, { recursive: true });
         renameSync(join(cwd, "src/index.ts"), join(sourceRoot, "index.ts"));
       }
-      if (viewsDir !== "views") {
+      if (viewsDir === ".") {
+        for (const name of ["product-search-result", "orphan-preview"]) {
+          renameSync(join(cwd, "views", name), join(cwd, name));
+        }
+        rmSync(join(cwd, "views"), { recursive: true });
+      } else if (viewsDir !== "views") {
         renameSync(join(cwd, "views"), join(cwd, viewsDir));
       }
-      const sharedPath = join(cwd, "src/shared.ts");
+      const sharedPath = join(cwd, "src", sharedFileName);
       writeFileSync(sharedPath, 'export const greeting = "shared greeting";');
+      writeFileSync(
+        join(cwd, "unreferenced.ts"),
+        'export const value = "private";'
+      );
       const viewDir = join(cwd, viewsDir, "product-search-result");
       const sharedImport = relative(viewDir, sharedPath).split("\\").join("/");
       writeFileSync(
@@ -1108,6 +1138,20 @@ describe("runDev (views)", () => {
           "export default function Landing() { return <main>Landing</main>; }"
         );
       }
+      if (viewsDir === ".") {
+        writeFileSync(
+          join(cwd, "vite.config.ts"),
+          `export default { plugins: [{
+            name: "observe-vite-routing",
+            configureServer(server) {
+              server.middlewares.use((_req, res, next) => {
+                res.setHeader("x-vite-module", "true");
+                next();
+              });
+            },
+          }] };`
+        );
+      }
 
       const dev = await startDev(
         cwd,
@@ -1118,6 +1162,14 @@ describe("runDev (views)", () => {
       );
       cleanups.push(dev.stop);
       const base = new URL(dev.url).origin;
+      // A root views directory must not send unrelated requests through Vite.
+      const unreferenced = await fetch(`${base}/unreferenced.ts`);
+      expect(unreferenced.status).toBe(404);
+      expect(unreferenced.headers.get("x-vite-module")).toBeNull();
+      await unreferenced.text();
+      const malformed = await fetch(`${base}/src/bad%ZZ.ts`);
+      expect(malformed.status).toBe(404);
+      await malformed.text();
       // Match browser dependency discovery: virtual entry -> view -> shared.
       const virtual = await fetch(
         `${base}/@id/__x00__virtual:mcp-use/views/product-search-result`
@@ -1125,11 +1177,16 @@ describe("runDev (views)", () => {
       expect(virtual.status).toBe(200);
       await virtual.text();
       const view = await fetch(
-        `${base}/${viewsDir}/product-search-result/view.tsx`
+        `${base}${encodeURI(`/${viewsDir}/product-search-result/view.tsx`)}`
       );
       expect(view.status).toBe(200);
-      expect(await view.text()).toContain('from "/src/shared.ts"');
-      const shared = await fetch(`${base}/src/shared.ts`);
+      if (viewsDir === ".") {
+        expect(view.headers.get("x-vite-module")).toBe("true");
+      }
+      expect(await view.text()).toMatch(/from ["']\/src\/shared/);
+      const shared = await fetch(
+        `${base}${encodeURI(`/src/${sharedFileName}`)}`
+      );
       expect(shared.status).toBe(200);
       expect(await shared.text()).toContain("shared greeting");
 

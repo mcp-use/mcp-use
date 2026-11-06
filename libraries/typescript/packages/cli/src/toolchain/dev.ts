@@ -486,13 +486,16 @@ export async function runDev(options: DevOptions): Promise<void> {
   const viewsRelativePath = normalizePath(
     relative(options.cwd, resolveViewsDir(options.cwd, viewsDirectory))
   );
+  // Root-level views use the module graph rather than a catch-all prefix.
   // Views outside the Vite root use /@fs/ URLs, handled separately below.
   const viewsUrlPrefix =
+    viewsRelativePath === "" ||
+    viewsRelativePath === "." ||
     isAbsolute(viewsRelativePath) ||
     viewsRelativePath === ".." ||
     viewsRelativePath.startsWith("../")
       ? undefined
-      : `/${viewsRelativePath === "" ? "" : `${viewsRelativePath}/`}`;
+      : `/${viewsRelativePath}/`;
   const conventionalSkillsDirectory =
     options.mcpDir === undefined ? "skills" : join(options.mcpDir, "skills");
   if (!existsSync(resolveViewsDir(options.cwd, viewsDirectory))) {
@@ -1274,19 +1277,31 @@ export async function runDev(options: DevOptions): Promise<void> {
     const landingUrlPath = landingRelativePath.startsWith("../")
       ? undefined
       : `/${landingRelativePath}`;
+    // Match Vite's URL decoding before comparing filesystem-derived paths.
+    // decodeURI preserves encoded URL delimiters, including encoded slashes.
+    let modulePathname: string | undefined;
+    try {
+      modulePathname = decodeURI(pathname);
+    } catch {
+      // Malformed escapes must not throw from the HTTP request listener.
+      modulePathname = undefined;
+    }
     const knownClientModule =
       (viewsEnabled || landingEnabled) &&
       !pathname.startsWith(`${basePath}/_mcp-use/`) &&
       !isInspectorPath(pathname, basePath) &&
       pathname !== basePath &&
+      modulePathname !== undefined &&
       ((viewsEnabled &&
         viewsUrlPrefix !== undefined &&
-        pathname.startsWith(viewsUrlPrefix)) ||
+        modulePathname.startsWith(viewsUrlPrefix)) ||
         (landingEnabled &&
-          (pathname === landingUrlPath || linkedLandingCss.has(pathname))) ||
-        (pathname.startsWith("/") &&
+          (modulePathname === landingUrlPath ||
+            linkedLandingCss.has(pathname) ||
+            linkedLandingCss.has(modulePathname))) ||
+        (modulePathname.startsWith("/") &&
           (vite.environments.client.moduleGraph.getModulesByFile(
-            normalizePath(resolve(options.cwd, pathname.slice(1)))
+            normalizePath(resolve(options.cwd, modulePathname.slice(1)))
           )?.size ?? 0) > 0));
     // Vite sees module-graph URLs (/@vite/client, /@id/virtual:…,
     // /.mcp-use/cache/deps/…, configured view sources…) plus standard
