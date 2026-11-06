@@ -236,14 +236,15 @@ export class HttpConnector extends BaseConnector {
 
     const originalUrl = baseUrl.replace(/\/$/, "");
     this.baseUrl = originalUrl;
-    this.headers = { ...(opts.headers ?? {}) };
+    const headers = new Headers(opts.headers);
     this.gatewayUrl = opts.gatewayUrl;
     this.serverId = opts.serverId;
 
-    // Add auth token if provided
+    // Header names are case-insensitive; replace any existing credential instead of combining it.
     if (opts.authToken) {
-      this.headers.Authorization = `Bearer ${opts.authToken}`;
+      headers.set("Authorization", `Bearer ${opts.authToken}`);
     }
+    this.headers = Object.fromEntries(headers);
 
     this.timeout = opts.timeout ?? 10000; // Default 10 seconds
     const baseFetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
