@@ -35,17 +35,16 @@ Run `mcp-use --help` for the full option list.
 ## Send CLI feedback
 
 ```bash
-mcp-use feedback send --message "Deploy output should include the server URL." --command deploy
-mcp-use feedback send --message "The env push error needs a recovery command." --command "env push" --source agent --json
+mcp-use feedback send "Deploy output should include the server URL."
+mcp-use feedback send "The env push error needs a recovery command." --json
 ```
 
-`--message` is required (1–10,000 characters). `--command` accepts a known
-command or subcommand name; omit server names, flags, and argument values.
-`--source` defaults to `user` and also accepts `agent`. No login is required.
+Pass one quoted message (1–10,000 characters). No login is required. Use
+`--json` for a machine-readable receipt.
 
 Reports are explicit submissions to the SDK's PostHog project, even with
-passive analytics disabled. Only the supplied message, source, related command,
-report ID, anonymous installation ID, and the basic CLI metadata described below
+passive analytics disabled. Only the supplied message, report ID, anonymous
+installation ID, and the basic CLI metadata described below
 are sent. No logs, project files, credentials, or conversations are collected.
 Review report text before sending and omit secrets or personal data. If identity
 storage is unavailable, the report uses a temporary random ID.

@@ -54,12 +54,7 @@ describe("explicit CLI feedback", () => {
       [
         "feedback",
         "send",
-        "--message",
         "Deploy output should show the server URL.",
-        "--command",
-        "deploy",
-        "--source",
-        "agent",
         "--json",
       ],
       { env: { ...capture.env, DO_NOT_TRACK: "1", NODE_ENV: "test" } }
@@ -79,8 +74,6 @@ describe("explicit CLI feedback", () => {
       distinct_id: expect.stringMatching(/^cli:[0-9a-f-]{36}$/),
       properties: {
         message: "Deploy output should show the server URL.",
-        source: "agent",
-        related_command: "deploy",
         report_id: (result.json as { reportId: string }).reportId,
         cli_version: expect.any(String),
         $process_person_profile: false,
@@ -96,19 +89,11 @@ describe("explicit CLI feedback", () => {
     capture,
   }) => {
     const first = await cli.run(
-      ["feedback", "send", "--message", "  A clearer error would help.  "],
+      ["feedback", "send", "  A clearer error would help.  "],
       { env: capture.env }
     );
     const second = await cli.run(
-      [
-        "feedback",
-        "send",
-        "--message",
-        "The env push help is useful.",
-        "--command",
-        "env push",
-        "--json",
-      ],
+      ["feedback", "send", "The env push help is useful.", "--json"],
       { env: capture.env }
     );
     expect(first.exitCode).toBe(0);
@@ -124,10 +109,11 @@ describe("explicit CLI feedback", () => {
     expect(events).toHaveLength(2);
     expect(events[0]!.properties).toMatchObject({
       message: "A clearer error would help.",
-      source: "user",
     });
     expect(events[0]!.properties).not.toHaveProperty("related_command");
-    expect(events[1]!.properties.related_command).toBe("env push");
+    expect(events[1]!.properties).not.toHaveProperty("related_command");
+    expect(events[0]!.properties).not.toHaveProperty("source");
+    expect(events[1]!.properties).not.toHaveProperty("source");
     expect(events[1]!.distinct_id).toBe(events[0]!.distinct_id);
   });
 
@@ -137,7 +123,7 @@ describe("explicit CLI feedback", () => {
   }) => {
     await writeFile(join(cli.home, ".mcp-use"), "not a directory");
     const result = await cli.run(
-      ["feedback", "send", "--message", "Readonly home report", "--json"],
+      ["feedback", "send", "Readonly home report", "--json"],
       { env: capture.env }
     );
     expect(result.exitCode).toBe(0);
@@ -148,7 +134,7 @@ describe("explicit CLI feedback", () => {
     "accepts a message at the documented size limit: %s",
     async (character, { cli, capture }) => {
       const result = await cli.run(
-        ["feedback", "send", "--message", character.repeat(10_000), "--json"],
+        ["feedback", "send", character.repeat(10_000), "--json"],
         { env: capture.env }
       );
       expect(result.exitCode).toBe(0);
@@ -160,10 +146,9 @@ describe("explicit CLI feedback", () => {
     cli,
     capture,
   }) => {
-    const result = await cli.run(
-      ["feedback", "send", "--message", "Report text"],
-      { env: { ...capture.env, FEEDBACK_REPLY: "500" } }
-    );
+    const result = await cli.run(["feedback", "send", "Report text"], {
+      env: { ...capture.env, FEEDBACK_REPLY: "500" },
+    });
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("HTTP 500");
@@ -171,65 +156,39 @@ describe("explicit CLI feedback", () => {
     expect(await capture.events()).toHaveLength(1);
   });
 
-  test.for([
-    ["servers remove", "servers rm"],
-    ["deployments remove", "deployments rm"],
-    ["skills add", "skills install"],
-    ["client remove", "client remove"],
-    ["client tools call", "client tools call"],
-    ["org invites send", "org invites send"],
-  ])(
-    "accepts known command paths and normalizes aliases: %s",
-    async ([command, expected], { cli, capture }) => {
-      const result = await cli.run(
-        [
-          "feedback",
-          "send",
-          "--message",
-          "A clearer error would help.",
-          "--command",
-          command!,
-          "--json",
-        ],
-        { env: capture.env }
-      );
-      expect(result.exitCode).toBe(0);
-      expect(await capture.events()).toMatchObject([
-        { properties: { related_command: expected } },
-      ]);
-    }
-  );
+  test("sends a quoted multiline message as one report", async ({
+    cli,
+    capture,
+  }) => {
+    const result = await cli.run(
+      [
+        "feedback",
+        "send",
+        "Deploy should show the URL.\nThe --json output should include it too.",
+        "--json",
+      ],
+      { env: capture.env }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(await capture.events()).toMatchObject([
+      {
+        properties: {
+          message:
+            "Deploy should show the URL.\nThe --json output should include it too.",
+        },
+      },
+    ]);
+  });
 
   test.for([
     ["send"],
-    ["send", "--message", "   "],
-    ["send", "--message", "x".repeat(10_001)],
-    ["send", "--message", "Report", "--source", "bot"],
-    ["send", "--message", "Report", "--command", "private-server"],
-    [
-      "send",
-      "--message",
-      "Report",
-      "--command",
-      "servers remove private-server",
-    ],
-    [
-      "send",
-      "--message",
-      "Report",
-      "--command",
-      "client secret-server tools call",
-    ],
-    [
-      "send",
-      "--message",
-      "Report",
-      "--command",
-      "org invites send private@example.com",
-    ],
-    ["send", "--message", "Report", "--command", "env push SECRET=value"],
-    ["send", "--message", "Report", "--unknown"],
-    ["send", "--message", "Report", "extra"],
+    ["send", "   "],
+    ["send", "x".repeat(10_001)],
+    ["send", "Report", "extra"],
+    ["send", "Report", "--unknown"],
+    ["send", "--message", "Report"],
+    ["send", "Report", "--command", "deploy"],
+    ["send", "Report", "--source", "agent"],
     ["list"],
     [],
   ])(
@@ -249,7 +208,7 @@ describe("explicit CLI feedback", () => {
     "reports delivery failure without echoing report or network details: %s",
     async (reply, { cli, capture }) => {
       const result = await cli.run(
-        ["feedback", "send", "--message", "private report", "--json"],
+        ["feedback", "send", "private report", "--json"],
         {
           env: { ...capture.env, FEEDBACK_REPLY: reply },
         }
@@ -274,7 +233,7 @@ describe("explicit CLI feedback", () => {
     capture,
   }) => {
     const result = await cli.run(
-      ["feedback", "send", "--message", "Timeout report", "--json"],
+      ["feedback", "send", "Timeout report", "--json"],
       {
         env: { ...capture.env, FEEDBACK_REPLY: "timeout" },
         timeoutMs: 20_000,
@@ -292,7 +251,7 @@ describe("explicit CLI feedback", () => {
   }) => {
     await mkdir(join(cli.home, ".mcp-use"), { recursive: true });
     const result = await cli.run(
-      ["feedback", "send", "--message", "Explicit report text", "--json"],
+      ["feedback", "send", "Explicit report text", "--json"],
       {
         env: { ...capture.env, MCP_USE_ANONYMIZED_TELEMETRY: "true" },
       }
