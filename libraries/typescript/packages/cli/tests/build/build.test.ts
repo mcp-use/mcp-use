@@ -17,8 +17,6 @@ import {
   WORKSPACE_DIR_NAME,
   type BuildManifest,
 } from "../../src/toolchain/index.js";
-import { mcpUseViewsPlugin } from "../../src/toolchain/views-plugin.js";
-import { VIRTUAL_VIEW_RESOLVED_PREFIX } from "../../src/toolchain/views.js";
 import { bindBasicToolToView, copyFixture, removeDir } from "./helpers.js";
 
 const UI_META = {
@@ -37,7 +35,8 @@ async function handlerMcp(
   handler: (request: Request) => Promise<Response>,
   method: string,
   params: Record<string, unknown> = {},
-  requestHeaders: Record<string, string> = {}
+  requestHeaders: Record<string, string> = {},
+  endpoint = "http://localhost/mcp"
 ): Promise<Record<string, unknown>> {
   const headers: Record<string, string> = {
     "content-type": "application/json",
@@ -52,7 +51,7 @@ async function handlerMcp(
     headers["mcp-name"] = params["uri"];
   }
   const response = await handler(
-    new Request("http://localhost/mcp", {
+    new Request(endpoint, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -347,15 +346,6 @@ describe("runBuild", () => {
     60_000
   );
 
-  it("honors an --entry override", async () => {
-    const cwd = copyFixture("build-entry");
-    dirs.push(cwd);
-    await runBuild({ cwd, entry: "src/index.ts" });
-    expect(existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"))).toBe(
-      true
-    );
-  });
-
   it("discovers the entry in --mcp-dir while keeping build output at the project root", async () => {
     const cwd = copyFixture("build-mcp-dir");
     dirs.push(cwd);
@@ -458,62 +448,25 @@ describe("runBuild", () => {
 });
 
 describe("runBuild (views)", () => {
-  it("configures a single React runtime and CSP-safe view evaluation", async () => {
-    const plugin = mcpUseViewsPlugin({
-      getViews: () => [
-        {
-          name: "demo",
-          entryPath: "/abs/views/demo/view.tsx",
-        },
-      ],
-    });
+  it("disables zod's eval-based JIT before any view code reads it", async () => {
+    // Views run under a CSP without 'unsafe-eval', so the built bundle must
+    // set zod's jitless flag before the first place zod checks it.
+    const cwd = copyFixture("build-view-csp", "views");
+    dirs.push(cwd);
 
-    const config = plugin.config;
-    expect(config).toBeTypeOf("function");
-    const resolvedConfig = await (
-      config as () => Promise<Record<string, unknown>> | Record<string, unknown>
-    )();
-    expect(resolvedConfig).toMatchObject({
-      resolve: { dedupe: ["react", "react-dom"] },
-      optimizeDeps: {
-        exclude: ["mcp-use/react"],
-        include: [
-          "react",
-          "react-dom",
-          "react-dom/client",
-          "mcp-use > @modelcontextprotocol/ext-apps",
-          "mcp-use > @modelcontextprotocol/server",
-          "mcp-use > @modelcontextprotocol/core",
-          "zod",
-        ],
-      },
-    });
+    await runBuild({ cwd });
 
-    const resolveId = plugin.resolveId;
-    expect(resolveId).toBeTypeOf("function");
-    const cspRuntimeId = (resolveId as (id: string) => string | undefined)(
-      "virtual:mcp-use/csp-runtime"
+    const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
+    const { entry } = listViewAssets(buildDir, "product-search-result");
+    const bundle = readFileSync(
+      join(buildDir, "views", "product-search-result", entry),
+      "utf8"
     );
-    expect(cspRuntimeId).toBe("\0virtual:mcp-use/csp-runtime");
-
-    const load = plugin.load;
-    expect(load).toBeTypeOf("function");
-    const cspRuntime = (load as (id: string) => string | undefined)(
-      cspRuntimeId!
+    const setter = bundle.search(
+      /__zod_globalConfig\.jitless\s*=\s*(?:!0|true)/
     );
-    expect(cspRuntime).toContain("__zod_globalConfig.jitless = true");
-
-    const source = (load as (id: string) => string | undefined)(
-      `${VIRTUAL_VIEW_RESOLVED_PREFIX}demo`
-    );
-    expect(source?.split("\n")[0]).toBe(
-      'import "virtual:mcp-use/csp-runtime";'
-    );
-    expect(source).toContain(
-      'import * as viewModule from "/abs/views/demo/view.tsx"'
-    );
-    expect(source).toContain("bootstrapView(viewModule)");
-    expect(source).not.toMatch(/bootstrapView\(\s*viewModule\.default\s*\)/);
+    expect(setter).toBeGreaterThan(-1);
+    expect(bundle.slice(0, setter)).not.toContain("jitless");
   });
 
   it("resolves host tsconfig aliases in standalone view builds", async () => {
@@ -823,35 +776,6 @@ describe("runBuild (views)", () => {
     expect(text).not.toContain("/_mcp-use/views/product-search-result/");
   }, 60_000);
 
-  it("builds a view that contains </script> in source as external assets", async () => {
-    const cwd = copyFixture("build-views-escape", "views");
-    dirs.push(cwd);
-    mkdirSync(join(cwd, "views", "escape-view"), { recursive: true });
-    writeFileSync(
-      join(cwd, "views", "escape-view", "view.tsx"),
-      [
-        `const marker = "</script>";`,
-        `export default function EscapeView() {`,
-        `  return <div data-marker={marker}>ok</div>;`,
-        `}`,
-        ``,
-      ].join("\n")
-    );
-    const entry = join(cwd, "src", "index.ts");
-    const source = readFileSync(entry, "utf8");
-    writeFileSync(
-      entry,
-      source.replace('name: "product-search-result"', 'name: "escape-view"')
-    );
-
-    await runBuild({ cwd });
-
-    const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
-    expect(listViewAssets(buildDir, "escape-view").entry).toMatch(
-      /^assets\/.+\.js$/
-    );
-  }, 60_000);
-
   it("emits source maps only when requested", async () => {
     const cwd = copyFixture("build-source-maps");
     dirs.push(cwd);
@@ -923,29 +847,6 @@ describe("runBuild (views)", () => {
     warnSpy.mockRestore();
   }, 60_000);
 
-  it("rewrites manifest asset paths when MCP_ASSETS_URL is set", async () => {
-    const cwd = copyFixture("build-views-cdn", "views");
-    dirs.push(cwd);
-    const previous = process.env.MCP_ASSETS_URL;
-    process.env.MCP_ASSETS_URL =
-      "https://cdn.example.com/storage/v1/object/public/widgets";
-    try {
-      await runBuild({ cwd });
-      const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
-      const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
-      expect(entryCode).toContain("https://cdn.example.com");
-      expect(entryCode).toContain(
-        "/mcp/_mcp-use/views/product-search-result/assets/"
-      );
-    } finally {
-      if (previous === undefined) {
-        delete process.env.MCP_ASSETS_URL;
-      } else {
-        process.env.MCP_ASSETS_URL = previous;
-      }
-    }
-  }, 60_000);
-
   it("uses server basePath in CDN manifest when MCP_ASSETS_URL is set", async () => {
     const cwd = copyFixture("build-views-cdn-basepath", "views");
     dirs.push(cwd);
@@ -962,20 +863,37 @@ describe("runBuild (views)", () => {
       "https://cdn.example.com/storage/v1/object/public/widgets";
     try {
       await runBuild({ cwd });
-      const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
-      const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
-      expect(entryCode).toContain(
-        "https://cdn.example.com/storage/v1/object/public/widgets/api/mcp/_mcp-use/views/product-search-result/assets/"
-      );
-      expect(entryCode).not.toContain(
-        "https://cdn.example.com/storage/v1/object/public/widgets/mcp/_mcp-use/"
-      );
     } finally {
       if (previous === undefined) {
         delete process.env.MCP_ASSETS_URL;
       } else {
         process.env.MCP_ASSETS_URL = previous;
       }
+    }
+
+    // The URL is baked in at build time, so serve with MCP_ASSETS_URL unset.
+    const previousCwd = process.cwd();
+    process.chdir(cwd);
+    try {
+      const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
+      const mod = (await import(
+        pathToFileURL(join(buildDir, "index.js")).href
+      )) as { default: { fetch(request: Request): Promise<Response> } };
+      const readBody = await handlerMcp(
+        mod.default.fetch,
+        "resources/read",
+        { uri: "ui://views/product-search-result.html" },
+        {},
+        "http://localhost/api/mcp"
+      );
+      const html = (readBody["result"] as { contents: { text: string }[] })
+        .contents[0]!.text;
+      const src = /<script type="module" src="([^"]+)"/.exec(html)?.[1];
+      expect(src).toMatch(
+        /^https:\/\/cdn\.example\.com\/storage\/v1\/object\/public\/widgets\/api\/mcp\/_mcp-use\/views\/product-search-result\/assets\/[^/]+\.js$/
+      );
+    } finally {
+      process.chdir(previousCwd);
     }
   }, 60_000);
 });

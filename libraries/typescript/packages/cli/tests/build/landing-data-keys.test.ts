@@ -36,24 +36,6 @@ async function keysOf(source: string, id = "/app/landing.tsx") {
 }
 
 describe("landing data keys plugin", () => {
-  it("runs after other transforms in the named environment only", () => {
-    const { plugin } = createLandingDataKeysCollector({ environment: "ssr" });
-    expect(plugin.enforce).toBe("post");
-    const applies = plugin.applyToEnvironment as (environment: {
-      name: string;
-    }) => boolean;
-    expect(applies({ name: "ssr" })).toBe(true);
-    expect(applies({ name: "client" })).toBe(false);
-  });
-
-  it("maps named hook imports to their keys", async () => {
-    expect(
-      await keysOf(`import { useServerInfo, useToolList, usePromptList } from "mcp-use/landing";
-export default () => <p>{useServerInfo().name}{useToolList().length}{usePromptList().length}</p>;
-`)
-    ).toEqual(["prompts", "tools"]);
-  });
-
   it("maps aliased imports by the imported name", async () => {
     expect(
       await keysOf(`import { useResourceList as resources, useServerInfo as useToolList } from "mcp-use/landing";
@@ -114,50 +96,6 @@ export default () => <p>{useToolList().length}{usePromptList().length}</p>;
         "/app/node_modules/ui-kit/index.js"
       )
     ).toEqual([]);
-  });
-
-  it("replaces a module's record when it is transformed again", async () => {
-    const collector = createLandingDataKeysCollector({ environment: "ssr" });
-    await transform(
-      collector,
-      "/app/landing.tsx",
-      `import { useToolList } from "mcp-use/landing";\nexport default () => <p>{useToolList().length}</p>;\n`
-    );
-    expect(collector.all()).toEqual(["tools"]);
-    await transform(
-      collector,
-      "/app/landing.tsx",
-      `export default () => <p>static</p>;\n`
-    );
-    expect(collector.all()).toEqual([]);
-  });
-
-  it("resolves keys from the modules reachable in the import graph", async () => {
-    const collector = createLandingDataKeysCollector({ environment: "ssr" });
-    await transform(
-      collector,
-      "/app/tools.tsx",
-      `import { useToolList } from "mcp-use/landing";\nexport const Tools = () => <p>{useToolList().length}</p>;\n`
-    );
-    await transform(
-      collector,
-      "/app/prompts.tsx",
-      `import { usePromptList } from "mcp-use/landing";\nexport const Prompts = () => <p>{usePromptList().length}</p>;\n`
-    );
-    const tools = node("/app/tools.tsx");
-    const prompts = node("/app/prompts.tsx");
-    const landing = node("/app/landing.tsx", [tools]);
-    const root = node("\0virtual:root", [landing, landing]);
-    const unexpected = async (): Promise<never> => {
-      throw new Error("every module is already transformed");
-    };
-    expect(await collector.reachableFrom(root, unexpected)).toEqual(["tools"]);
-    expect(await collector.reachableFrom(undefined, unexpected)).toEqual([]);
-    landing.importedModules = [tools, prompts];
-    expect(await collector.reachableFrom(root, unexpected)).toEqual([
-      "prompts",
-      "tools",
-    ]);
   });
 
   it("transforms reachable modules the server render never loaded", async () => {

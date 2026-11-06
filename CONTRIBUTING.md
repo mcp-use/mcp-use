@@ -289,6 +289,15 @@ pnpm --filter mcp-use test:run
 pnpm --filter @mcp-use/agent test:integration:agent
 ```
 
+#### Writing and reviewing tests
+
+Tests should check behaviour callers can observe, not implementation details. Two contributor skills in [`.claude/skills/`](.claude/skills/) spell out how; coding agents load them automatically, and people can read them as guides:
+
+- [`writing-tests`](.claude/skills/writing-tests/SKILL.md): the rules, the workflow, and how to test `@mcp-use/cli` commands against a local fake of Manufact Cloud ([`tests/helpers/`](libraries/typescript/packages/cli/tests/helpers/)).
+- [`reviewing-tests`](.claude/skills/reviewing-tests/SKILL.md): a step-by-step check that breaks the code under test, confirms each test fails, and reports each test as keep, rewrite or delete.
+
+The root [`skills/`](skills/) folder is different: it holds the skills we ship to mcp-use users.
+
 ### Changesets
 
 **All TypeScript changes require a changeset** describing what changed. This is enforced in CI for PRs to `main`.

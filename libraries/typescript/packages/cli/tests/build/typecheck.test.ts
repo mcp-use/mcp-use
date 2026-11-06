@@ -1,8 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect } from "vitest";
 
 import { runTypecheck } from "../../src/toolchain/typecheck.js";
+import { test as it } from "../helpers/cli-test.js";
 import { copyFixture, removeDir } from "./helpers.js";
 
 const dirs: string[] = [];
@@ -59,44 +60,33 @@ describe("runTypecheck", () => {
     );
   });
 
-  it("reports success on stdout when the project is clean", async () => {
+  it("reports success on stdout when the project is clean", async ({ cli }) => {
     const cwd = copyFixture("typecheck-clean");
     dirs.push(cwd);
     writeTsconfig(cwd, ["src/**/*", "mcp-env.d.ts"]);
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    try {
-      await expect(
-        runTypecheck({ cwd, tscArgs: ["--pretty", "false"] })
-      ).resolves.toBe(0);
-      const lines = log.mock.calls.map((call) => String(call[0]));
-      expect(lines).toContainEqual(
-        expect.stringMatching(/^\[mcp-use] no type errors \(\d+ms\)$/)
-      );
-    } finally {
-      log.mockRestore();
-    }
+    const result = await cli.run(["typecheck", "--", "--pretty", "false"], {
+      cwd,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(/^\[mcp-use\] no type errors \(\d+ms\)$/m);
   });
 
-  it("stays silent about success when tsc reports errors", async () => {
+  it("prints tsc errors and no success line when the project has type errors", async ({
+    cli,
+  }) => {
     const cwd = copyFixture("typecheck-errors");
     dirs.push(cwd);
     writeFileSync(join(cwd, "bad.ts"), "export const port: number = 'nope';\n");
     writeTsconfig(cwd, ["src/**/*", "bad.ts", "mcp-env.d.ts"]);
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    try {
-      const exitCode = await runTypecheck({
-        cwd,
-        tscArgs: ["--pretty", "false"],
-      });
-      expect(exitCode).not.toBe(0);
-      const lines = log.mock.calls.map((call) => String(call[0]));
-      expect(lines).not.toContainEqual(
-        expect.stringContaining("no type errors")
-      );
-    } finally {
-      log.mockRestore();
-    }
+    const result = await cli.run(["typecheck", "--", "--pretty", "false"], {
+      cwd,
+    });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain("bad.ts(1,14): error TS2322");
+    expect(result.stdout).not.toContain("no type errors");
   });
 });

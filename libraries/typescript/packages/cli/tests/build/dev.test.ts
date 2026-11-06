@@ -509,6 +509,20 @@ describe("runDev", () => {
     );
   });
 
+  it("refuses to start when the project's Inspector has no mountInspector export", async () => {
+    const cwd = copyFixture("dev-inspector-incompatible");
+    cleanups.push(() => removeDir(cwd));
+    installFakeInspector(cwd);
+    writeFileSync(
+      join(cwd, "node_modules", "@mcp-use", "inspector", "index.js"),
+      "export const other = true;\n"
+    );
+
+    await expect(runDev({ cwd, port: await getFreePort() })).rejects.toThrow(
+      "does not export mountInspector"
+    );
+  });
+
   it("supports an intentional headless dev run", async () => {
     const cwd = copyFixture("dev-inspector-disabled");
     cleanups.push(() => removeDir(cwd));

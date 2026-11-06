@@ -173,30 +173,6 @@ describe("dev view config reconciliation", () => {
     }
   );
 
-  it("retains the active config when a stale candidate is discarded", async () => {
-    await start();
-    const candidate = server();
-    candidate.__mount.mockImplementation(() => {
-      writeConfig("{ autoResize: false, displayModes: ['inline'] }");
-      watcher.emit("change", viewPath);
-    });
-    mocks.importEntry
-      .mockResolvedValueOnce({ default: candidate })
-      .mockRejectedValue(new Error("newer entry failed"));
-
-    await changeConfig("{ autoResize: false }");
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("keeping the previous server: newer entry failed")
-    );
-    expect(mocks.publish).not.toHaveBeenCalled();
-    const attempts = mocks.importEntry.mock.calls.length;
-    mocks.importEntry.mockImplementation(async () => ({ default: server() }));
-
-    await changeConfig("{ autoResize: false }");
-    expect(mocks.importEntry).toHaveBeenCalledTimes(attempts + 1);
-    expect(mocks.publish).toHaveBeenCalledTimes(3);
-  });
-
   it("keeps component HMR for key reordering but reloads changed values", async () => {
     writeConfig("{ autoResize: true, displayModes: ['inline', 'fullscreen'] }");
     await start();

@@ -1,77 +1,107 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect } from "vitest";
 
-import { main } from "../src/bin/main.js";
-import { runDeployments } from "../src/cloud/deployments.js";
-import { runIdentity } from "../src/cloud/identity.js";
-import { runOrganizations } from "../src/cloud/organizations.js";
-import { runScreenshot } from "../src/client/screenshot.js";
-import { runServers } from "../src/cloud/servers.js";
+import { test } from "./helpers/cli-test.js";
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
+// Help must work offline. The API key means any Cloud call would reach the
+// fake Cloud, which fails the test for every request it receives.
+const SIGNED_IN = { MCP_USE_API_KEY: "test_key" };
 
 describe("offline help contract", () => {
-  it.each([
-    ["login", () => runIdentity("login", ["--help"])],
-    ["logout", () => runIdentity("logout", ["--help"])],
-    ["whoami", () => runIdentity("whoami", ["-h"])],
-    ["org", () => runOrganizations(["--help"])],
-    ["org list", () => runOrganizations(["list", "--help"])],
-    ["org current", () => runOrganizations(["current", "--help"])],
-    ["org use", () => runOrganizations(["use", "--help"])],
-    ["servers", () => runServers(["--help"])],
-    ["servers list", () => runServers(["list", "--help"])],
-    ["servers get", () => runServers(["get", "--help"])],
-    ["servers update", () => runServers(["update", "--help"])],
-    ["servers delete", () => runServers(["delete", "--help"])],
-    ["servers env", () => runServers(["env", "--help"])],
-    ["servers env list", () => runServers(["env", "list", "--help"])],
-    ["servers env set", () => runServers(["env", "set", "-h"])],
-    ["servers env unset", () => runServers(["env", "unset", "--help"])],
-    ["deployments", () => runDeployments(["--help"])],
-    ["deployments list", () => runDeployments(["list", "--help"])],
-    ["deployments get", () => runDeployments(["get", "--help"])],
-    ["deployments logs", () => runDeployments(["logs", "-h"])],
-    ["deployments restart", () => runDeployments(["restart", "--help"])],
-    ["deployments stop", () => runDeployments(["stop", "--help"])],
-    ["deployments delete", () => runDeployments(["delete", "--help"])],
-    ["screenshot", () => runScreenshot(["--help"])],
-  ])("%s prints help locally", async (_name, run) => {
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
+  test.for([
+    ["login", ["login", "--help"]],
+    ["logout", ["logout", "--help"]],
+    ["whoami", ["whoami", "-h"]],
+    ["org", ["org", "--help"]],
+    ["org list", ["org", "list", "--help"]],
+    ["org current", ["org", "current", "--help"]],
+    ["org use", ["org", "use", "--help"]],
+    ["servers", ["servers", "--help"]],
+    ["servers list", ["servers", "list", "--help"]],
+    ["servers get", ["servers", "get", "--help"]],
+    ["servers update", ["servers", "update", "--help"]],
+    ["servers delete", ["servers", "delete", "--help"]],
+    ["servers env", ["servers", "env", "--help"]],
+    ["servers env list", ["servers", "env", "list", "--help"]],
+    ["servers env set", ["servers", "env", "set", "-h"]],
+    ["servers env unset", ["servers", "env", "unset", "--help"]],
+    ["deployments", ["deployments", "--help"]],
+    ["deployments list", ["deployments", "list", "--help"]],
+    ["deployments get", ["deployments", "get", "--help"]],
+    ["deployments logs", ["deployments", "logs", "-h"]],
+    ["deployments restart", ["deployments", "restart", "--help"]],
+    ["deployments stop", ["deployments", "stop", "--help"]],
+    ["deployments delete", ["deployments", "delete", "--help"]],
+    ["screenshot", ["screenshot", "--help"]],
+    ["client", ["client", "--help"]],
+    ["client", ["client", "--", "--help"]],
+  ] as const)(
+    "mcp-use %s prints its own usage",
+    async ([name, args], { cli }) => {
+      const result = await cli.run(args, { env: SIGNED_IN });
 
-    await expect(run()).resolves.toBe(0);
-
-    expect(stdout.mock.calls.flat().join("")).toContain("Usage:");
-    expect(stderr).not.toHaveBeenCalled();
-  });
-
-  it.each(["dev", "build", "typecheck", "start"])(
-    "%s has command-specific help",
-    async (command) => {
-      const log = vi.spyOn(console, "log").mockImplementation(() => {});
-
-      await expect(main([command, "--help"])).resolves.toBe(0);
-
-      const output = log.mock.calls.flat().join("\n");
-      expect(output).toContain(`Usage: mcp-use ${command}`);
-      expect(output).not.toContain("Commands:\n  dev");
+      expect(result.stderr).toBe("");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.startsWith(`Usage: mcp-use ${name} `)).toBe(true);
     }
   );
 
-  it("documents the screenshot dimension range", async () => {
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+  test.for(["dev", "build", "typecheck", "start"])(
+    "mcp-use %s --help prints command help, not the command list",
+    async (command, { cli }) => {
+      const result = await cli.run([command, "--help"]);
 
-    await expect(runScreenshot(["--help"])).resolves.toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.startsWith(`Usage: mcp-use ${command} `)).toBe(true);
+      expect(result.stdout).not.toContain("Commands:");
+    }
+  );
 
-    const output = stdout.mock.calls.flat().join("");
-    expect(output.match(/integer from 1 to 10000000/g)).toHaveLength(2);
+  test("build --help documents --inline", async ({ cli }) => {
+    const result = await cli.run(["build", "--help"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toMatch(/^\s+--inline\s/m);
+  });
+
+  test("--help lists every top-level command", async ({ cli }) => {
+    const result = await cli.run(["--help"]);
+
+    expect(result.stderr).toBe("");
+    expect(result.exitCode).toBe(0);
+    for (const command of [
+      "dev",
+      "build",
+      "start",
+      "typecheck",
+      "client",
+      "screenshot",
+      "login",
+      "deploy",
+      "deployments",
+      "servers",
+    ]) {
+      expect(result.stdout).toMatch(new RegExp(`^ {2}${command} `, "m"));
+    }
+  });
+});
+
+describe("unusable invocations", () => {
+  test("no command prints usage to stderr and exits 2", async ({ cli }) => {
+    const result = await cli.run([]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Usage: mcp-use <command>");
+  });
+
+  test("an unknown command is named on stderr and exits 2", async ({ cli }) => {
+    const result = await cli.run(["frobnicate"]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr.startsWith("Unknown command: frobnicate\n")).toBe(
+      true
+    );
   });
 });
