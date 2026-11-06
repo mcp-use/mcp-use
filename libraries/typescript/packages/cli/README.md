@@ -31,6 +31,29 @@ relay in [`@mcp-use/tunnel`](https://www.npmjs.com/package/@mcp-use/tunnel).
 
 Run `mcp-use --help` for the full option list.
 
+## Anonymous usage analytics
+
+The CLI sends a `mcp_use_cli_command` event to the same PostHog project used
+by the SDK. It records the command and known subcommand, CLI version, OS,
+architecture, Node version, and whether it runs in CI or an interactive
+terminal. Help requests have `is_help: true` so they can be excluded from
+command rankings. Events count invocations, including failed attempts.
+
+A random installation ID is saved in `~/.mcp-use/cli-telemetry.json` and
+reused across projects and CLI upgrades. Unique IDs measure installations,
+not people; disposable CI homes create new IDs, so filter `is_ci: false`
+when measuring developer adoption. No argument values, paths, server/tool
+names, environment variable contents, credentials, or account details are
+sent. Capture is best effort, with a 500 ms network timeout and no retries.
+If the ID cannot be persisted, capture is skipped.
+
+Set `MCP_USE_ANONYMIZED_TELEMETRY=false` or `DO_NOT_TRACK=1` in your shell
+to disable CLI analytics. Tests (`NODE_ENV=test`) also disable capture.
+
+In PostHog, use unique users of `mcp_use_cli_command` for daily/weekly active
+installations. Use total events broken down by `command` and `subcommand`
+for command rankings, excluding `is_help: true`.
+
 ## Documentation
 
 The exhaustive command reference, including every flag and the CLI environment
