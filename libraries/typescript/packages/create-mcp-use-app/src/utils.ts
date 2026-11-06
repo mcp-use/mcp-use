@@ -114,9 +114,12 @@ export function updatePackageJson(projectPath: string, projectName: string) {
 }
 
 export function updateIndexTs(projectPath: string, projectName: string) {
-  const indexPath = join(projectPath, "index.ts");
+  const indexPath = [
+    join(projectPath, "index.ts"),
+    join(projectPath, "src", "index.ts"),
+  ].find(existsSync);
 
-  if (!existsSync(indexPath)) {
+  if (indexPath === undefined) {
     return;
   }
 

@@ -1068,6 +1068,15 @@ async function main(): Promise<void> {
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
+  } else if (validatedTemplate === "neon") {
+    console.log("   ├── src/index.ts (Neon Function entry point)");
+    console.log("   ├── src/db/ (event schema and database client)");
+    console.log("   ├── neon.ts");
+    console.log("   ├── drizzle.config.ts");
+    console.log("   ├── .env.example");
+    console.log("   ├── package.json");
+    console.log("   ├── tsconfig.json");
+    console.log("   └── README.md");
   } else if (validatedTemplate === "mcp-server") {
     console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
@@ -1089,10 +1098,19 @@ async function main(): Promise<void> {
   if (!shouldInstall) {
     console.log(ansi.cyan(`   ${getInstallCommand(usedPackageManager)}`));
   }
+  if (validatedTemplate === "neon") {
+    console.log(ansi.cyan("   npm install -g neon@latest"));
+    console.log(ansi.cyan("   neon login"));
+    console.log(ansi.cyan("   neon link"));
+    console.log(ansi.cyan(`   ${usedPackageManager} run db:push`));
+  }
   console.log(ansi.cyan(`   ${getDevCommand(usedPackageManager)}`));
   console.log("");
   console.log(ansi.bold("📤 To deploy:"));
   console.log(ansi.cyan(`   ${getDeployCommand(usedPackageManager)}`));
+  if (validatedTemplate === "neon") {
+    console.log(ansi.cyan("   neon functions get events"));
+  }
   console.log("");
   if (options.dev) {
     console.log(

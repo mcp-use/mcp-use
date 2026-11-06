@@ -1,0 +1,30 @@
+{
+  "name": "mcp-use-neon",
+  "description": "Model Context Protocol server that gives an AI agent CRUD access to an event database, built with mcp-use, Neon Postgres, and Drizzle ORM.",
+  "private": true,
+  "scripts": {
+    "dev": "neon dev",
+    "deploy": "neon deploy",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neon/config": "^1.6.0",
+    "@neon/env": "^1.4.0",
+    "@neon/functions": "^0.8.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.21.0",
+    "zod": "^4.4.3",
+    "mcp-use": "workspace:*",
+    "@mcp-use/client": "^2.4.5"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^5.6.3"
+  },
+  "type": "module"
+}

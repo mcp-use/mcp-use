@@ -169,6 +169,18 @@ The `blank` template includes:
 
 Ideal for starting from an empty server and adding your own tools.
 
+### Neon event database
+
+Create an event database MCP server hosted on Neon Functions:
+
+```bash
+npx create-mcp-use-app my-events --template neon
+```
+
+The template includes event CRUD tools, a Drizzle schema, and Neon configuration.
+Follow the generated README to install the Neon CLI, link your project, apply
+the schema, and deploy.
+
 ### GitHub Repository Templates
 
 You can use any GitHub repository as a template by providing the repository URL:
