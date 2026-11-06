@@ -6,7 +6,14 @@ import { Writable } from "node:stream";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { describe, expect, it, onTestFinished, vi } from "vitest";
+import {
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+  type MockInstance,
+} from "vitest";
 import { MCPSession } from "../../../src/core/session.js";
 import { StdioConnector } from "../../../src/transport/stdio.js";
 import { deferred } from "../../helpers/deferred.js";
@@ -157,6 +164,7 @@ describe("stdio stderr cleanup with a backpressured destination", () => {
       const firstWrite = deferred();
       let releaseWrite: (() => void) | undefined;
       let releaseDestroy: (() => void) | undefined;
+      let timerSpy: MockInstance<typeof setTimeout> | undefined;
       const errlog = new Writable({
         emitClose: false,
         write(_chunk, _encoding, callback) {
@@ -175,6 +183,8 @@ describe("stdio stderr cleanup with a backpressured destination", () => {
       });
       const session = new MCPSession(connector);
       onTestFinished(async () => {
+        timerSpy?.mockRestore();
+        vi.useRealTimers();
         releaseWrite?.();
         releaseWrite = undefined;
         await session.disconnect();
@@ -193,6 +203,10 @@ describe("stdio stderr cleanup with a backpressured destination", () => {
       await session.disconnect();
       expect(errlog.listenerCount("error")).toBe(1);
       expect(errlog.listenerCount("close")).toBe(1);
+      if (delayed) {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        timerSpy = vi.spyOn(globalThis, "setTimeout");
+      }
       errlog.destroy();
       releaseWrite!();
       releaseWrite = undefined;
@@ -200,8 +214,19 @@ describe("stdio stderr cleanup with a backpressured destination", () => {
         await nextTurn();
         expect(errlog.closed).toBe(false);
         expect(errlog.listenerCount("error")).toBe(1);
+        for (const delay of [10, 20, 40, 80, 160, 320, 640, 1000, 1000]) {
+          expect(timerSpy).toHaveBeenLastCalledWith(
+            expect.any(Function),
+            delay
+          );
+          await vi.advanceTimersByTimeAsync(delay);
+          expect(errlog.listenerCount("error")).toBe(1);
+          expect(vi.getTimerCount()).toBe(1);
+        }
         releaseDestroy!();
         releaseDestroy = undefined;
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(vi.getTimerCount()).toBe(0);
       }
       await vi.waitFor(() => {
         expect(errlog.closed).toBe(true);

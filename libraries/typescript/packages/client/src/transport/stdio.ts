@@ -285,6 +285,7 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
           }
           let settled = false;
           let destroyCheck: NodeJS.Timeout | undefined;
+          let destroyDelay = 10;
           const done = (error?: Error | null) => {
             if (settled) return;
             settled = true;
@@ -303,7 +304,8 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
             }
             // emitClose:false can suppress the only clean-destroy notification.
             // Keep the error guard until asynchronous _destroy has completed.
-            destroyCheck = setTimeout(cleanupAfterWrite, 10);
+            destroyCheck = setTimeout(cleanupAfterWrite, destroyDelay);
+            destroyDelay = Math.min(destroyDelay * 2, 1000);
             destroyCheck.unref();
           };
           const onError = (error: Error) => {
