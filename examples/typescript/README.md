@@ -1,6 +1,7 @@
 # TypeScript Examples
 
 - **[basic](basic/)** — the smallest useful `mcp-use` server: a tool, a static resource, and a prompt
+- **[neon](../../libraries/typescript/packages/server/examples/neon/)** — a Postgres-backed event database on Neon Functions, connected to Manufact by URL
 - **[excalidraw](excalidraw/)** — Excalidraw ported to MCP Apps views: hand-drawn diagrams streamed into a live view
 - **[property-search](property-search/)** — Zillow-style MCP Apps split view: San Francisco listings plus an interactive map, no external APIs
 - **[schema-validators](schema-validators/)** — the same server written with [arktype](schema-validators/arktype/), [typebox](schema-validators/typebox/), and [zod](schema-validators/zod/) schemas
