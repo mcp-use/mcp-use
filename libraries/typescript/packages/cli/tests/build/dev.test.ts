@@ -1064,6 +1064,41 @@ async function rawGetBody(
 }
 
 describe("runDev (views)", () => {
+  it.each([
+    ["inspector", "%69nspector"],
+    ["_mcp-use", "%5fmcp-use"],
+  ])(
+    "keeps raw and encoded %s URLs out of Vite",
+    async (reserved, encodedReserved) => {
+      const cwd = copyFixture("dev-encoded-reserved", "views");
+      cleanups.push(() => removeDir(cwd));
+      renameSync(join(cwd, "views"), join(cwd, "mcp"));
+      mkdirSync(join(cwd, "mcp", reserved), { recursive: true });
+      writeFileSync(
+        join(cwd, "mcp", reserved, "routing-probe.ts"),
+        'export const value = "reserved source";'
+      );
+      const dev = await startDev(cwd, await getFreePort(), undefined, false, {
+        viewsDir: "mcp",
+      });
+      cleanups.push(dev.stop);
+      const base = new URL(dev.url).origin;
+      const view = await fetch(`${base}/mcp/product-search-result/view.tsx`);
+      expect(view.status).toBe(200);
+      await view.text();
+
+      for (const prefix of [
+        `/mcp/${reserved}`,
+        `/mcp/${encodedReserved}`,
+        `/%6dcp/${reserved}`,
+      ]) {
+        const response = await fetch(`${base}${prefix}/routing-probe.ts`);
+        expect(response.status, prefix).toBe(404);
+        await response.text();
+      }
+    }
+  );
+
   it.each(
     [
       { label: "default views", viewsDir: "views", directories: {} },

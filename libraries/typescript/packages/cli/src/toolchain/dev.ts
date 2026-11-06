@@ -1292,6 +1292,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       !isInspectorPath(pathname, basePath) &&
       pathname !== basePath &&
       modulePathname !== undefined &&
+      !modulePathname.startsWith(`${basePath}/_mcp-use/`) &&
+      !isInspectorPath(modulePathname, basePath) &&
+      modulePathname !== basePath &&
       ((viewsEnabled &&
         viewsUrlPrefix !== undefined &&
         modulePathname.startsWith(viewsUrlPrefix)) ||
