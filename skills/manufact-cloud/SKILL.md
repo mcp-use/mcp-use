@@ -50,6 +50,21 @@ the installed version's skills into `.agents/skills`, `.claude/skills`, and
 - Use the returned `dashboardUrl` when a human needs the dashboard. Keep
   credentials and environment variable values out of chat, logs, and commits.
 
+## Report CLI feedback
+
+When the user asks you to report a CLI problem or suggestion, submit a concise
+report with `mcp-use feedback send --message "..." --command deploy --source agent
+--json`. Use a known command name (or quoted subcommand such as `"env push"`),
+without arguments or flags. Include expected and observed behavior in the message;
+omit secrets, personal data, raw logs, and conversation contents. Ask before
+sending when the user has not authorized a report.
+
+No login is needed. Explicit feedback is sent even when passive usage analytics
+is disabled. Exit 0 means the capture endpoint accepted the request; retain the
+`reportId`. It does not confirm human review. Inspect `error.code` on failure:
+`feedback_rejected`, `feedback_network_error`, or `feedback_timeout`. Network
+failures and timeouts leave acceptance unknown; do not retry automatically.
+
 ## Choose a command
 
 - **Deploy or redeploy:** read [deployment workflows](references/deployments.md).

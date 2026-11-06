@@ -723,6 +723,44 @@ mcp-use alerts options [options]
 
 Use the [dashboard YAML format](https://docs.manufact.com/dashboard/alerts). Choose a minimum traffic count alongside rate thresholds and separate trigger/recovery thresholds. `alerts options` lists current metrics.
 
+## Feedback commands
+
+### `feedback send`
+
+Send feedback about the CLI to Manufact through the SDK's PostHog project. No
+Cloud login or linked server is required.
+
+```bash
+mcp-use feedback send --message "The deployment error needs a recovery command." --command deploy --source agent --json
+```
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `--message <text>` | Required report text, 1–10,000 characters after trimming. | Required |
+| `--command <name>` | Known command or subcommand, e.g. `deploy` or `"env push"`. Excludes argument values and flags. | Omitted |
+| `--source <source>` | `user` or `agent`. | `user` |
+| `--json` | One JSON value on stdout, including failures. | Disabled |
+| `-h`, `--help` | Show help without submitting a report. | Disabled |
+
+Only the supplied report, source, related command, report ID, random installation
+ID, CLI version, OS, architecture, Node version, and CI/terminal indicators are
+sent. Files, logs, credentials, account details, and conversations are not
+collected. Review the message and omit secrets or personal data.
+
+This explicit action works even with `MCP_USE_ANONYMIZED_TELEMETRY=false`,
+`DO_NOT_TRACK=1`, or `NODE_ENV=test`. It reuses the anonymous usage installation
+ID; if storage is unavailable, it uses a temporary random ID. Feedback events
+(`mcp_use_cli_feedback`) are separate from passive usage events
+(`mcp_use_cli_command`), which never include report text.
+
+Exit 0 and `{ "accepted": true, "reportId": "<uuid>" }` mean the capture endpoint
+accepted the request. They do not confirm downstream ingestion or human review.
+The request times out after 10 seconds and is not automatically retried. Exit 1
+returns `feedback_rejected` for HTTP errors, `feedback_network_error` for network
+failures, or `feedback_timeout`. Network failures and timeouts leave acceptance
+unknown; check connectivity before retrying. Invalid input exits 2 with
+`usage_error`. Without `--json`, success prints a receipt and failures go to stderr.
+
 ## Agent skills commands
 
 ### `skills install`

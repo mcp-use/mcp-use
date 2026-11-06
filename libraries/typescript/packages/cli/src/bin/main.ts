@@ -99,6 +99,7 @@ Account:
 
 Tools:
   client       Connect to and invoke MCP servers
+  feedback     Send CLI feedback to Manufact
   screenshot   Capture an MCP Apps view
   skills       Install version-matched coding agent skills
   help         Show help for a command
@@ -209,6 +210,10 @@ export async function main(
 
   const command = argv[0];
   const commandArgs = stripForwardingSeparator(argv.slice(1));
+  if (command === "feedback") {
+    const { runFeedback } = await import("../feedback.js");
+    return runFeedback(commandArgs);
+  }
   if (command === "login") {
     const { runLogin } = await import("../cloud/auth/login.js");
     return runLogin(commandArgs);

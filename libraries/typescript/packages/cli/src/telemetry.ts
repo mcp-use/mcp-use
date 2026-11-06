@@ -13,9 +13,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "./bin/args.js";
 
-declare const __MCP_USE_CLI_VERSION__: string;
-declare const __MCP_USE_POSTHOG_HOST__: string;
-declare const __MCP_USE_POSTHOG_KEY__: string;
+import { posthogEndpoint, posthogEvent } from "./posthog.js";
 
 // Only these literals may leave the process. Never capture raw argv: even a
 // positional command segment can be a server name, URL, token, or tool input.
@@ -31,6 +29,7 @@ const COMMANDS: Record<string, readonly string[]> = {
   logout: [],
   whoami: [],
   screenshot: [],
+  feedback: ["send"],
   skills: ["install"],
   logs: [],
   org: ["list", "current", "use", "create", "update", "members", "invites"],
@@ -50,7 +49,8 @@ const CLIENT_OPERATIONS: Record<string, readonly string[]> = {
   auth: ["status", "login", "logout"],
 };
 
-function commandProperties(argv: readonly string[]) {
+/** Normalize argv to known command literals, excluding all argument values. */
+export function commandProperties(argv: readonly string[]) {
   const help =
     argv.length === 0 ||
     argv[0] === "help" ||
@@ -119,7 +119,7 @@ function commandProperties(argv: readonly string[]) {
 }
 
 /** A random installation ID, independent of accounts, projects and credentials. */
-function installationId(): string | undefined {
+export function installationId(): string | undefined {
   const directory = join(homedir(), ".mcp-use");
   const file = join(directory, "cli-telemetry.json");
   const read = (): string | undefined => {
@@ -220,30 +220,13 @@ export async function captureCliUsage(argv: readonly string[]): Promise<void> {
       }, 500);
     });
     await Promise.race([
-      fetch(`${__MCP_USE_POSTHOG_HOST__}/i/v0/e/`, {
+      fetch(posthogEndpoint(), {
         method: "POST",
         headers: { "content-type": "application/json" },
         signal: controller.signal,
-        body: JSON.stringify({
-          api_key: __MCP_USE_POSTHOG_KEY__,
-          event: "mcp_use_cli_command",
-          distinct_id: `cli:${id}`,
-          timestamp: new Date().toISOString(),
-          properties: {
-            ...commandProperties(argv),
-            cli_version: __MCP_USE_CLI_VERSION__,
-            platform: process.platform,
-            arch: process.arch,
-            node_version: process.versions.node,
-            is_ci: Boolean(
-              process.env.CI &&
-              !["false", "0"].includes(process.env.CI.toLowerCase())
-            ),
-            is_interactive: Boolean(process.stdin.isTTY),
-            $process_person_profile: false,
-            $geoip_disable: true,
-          },
-        }),
+        body: JSON.stringify(
+          posthogEvent("mcp_use_cli_command", id, commandProperties(argv))
+        ),
       }).then(() => undefined),
       timeout,
     ]);
