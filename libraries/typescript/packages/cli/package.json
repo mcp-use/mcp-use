@@ -48,6 +48,7 @@
     "node": ">=22.22.2"
   },
   "scripts": {
+    "generate:cloud-client": "node scripts/generate-cloud-client.mjs",
     "build": "rimraf dist && tsup --config tsup.config.ts && node scripts/copy-third-party-licenses.mjs && node scripts/verify-package.mjs",
     "test": "node --test tests/proxy.test.mjs && vitest run",
     "test:run": "npm run typecheck && npm test",
@@ -80,6 +81,8 @@
     "@types/node": "^22.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "openapi-fetch": "0.17.0",
+    "openapi-typescript": "7.13.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "rimraf": "^6.1.3",

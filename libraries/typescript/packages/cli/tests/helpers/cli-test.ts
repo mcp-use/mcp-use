@@ -6,7 +6,9 @@
  * import { test } from "../helpers/cli-test.js";
  *
  * test("lists deployments", async ({ cloud, cli }) => {
- *   cloud.on("GET", "/api/v1/deployments", { body: { items: [] } });
+ *   cloud.on("GET", "/api/v1/deployments", {
+ *     body: { items: [], total: 0, limit: 30, skip: 0 },
+ *   });
  *   const result = await cli.run(["deployments", "list", "--json"], {
  *     env: { MCP_USE_API_KEY: "test_key" },
  *   });
@@ -17,7 +19,8 @@
  * Each test gets its own fake Cloud and its own sandbox directories. Both are
  * created only when the test asks for them and are torn down after it, so
  * nothing leaks between tests. A request the test did not register a route
- * for fails the test during teardown.
+ * for, or a reply that does not match the Cloud spec, fails the test during
+ * teardown.
  */
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";

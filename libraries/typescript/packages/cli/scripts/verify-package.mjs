@@ -25,6 +25,7 @@ const bundledLicenses = new Map([
   ["modelcontextprotocol-server-LICENSE", ["Apache License", "MIT License"]],
   ["modelcontextprotocol-core-LICENSE", ["Apache License", "MIT License"]],
   ["zod-LICENSE", ["MIT License"]],
+  ["openapi-fetch-LICENSE", ["MIT License", "Drew Powers"]],
 ]);
 for (const [filename, expectedTerms] of bundledLicenses) {
   const license = join("dist", "third-party-licenses", filename);

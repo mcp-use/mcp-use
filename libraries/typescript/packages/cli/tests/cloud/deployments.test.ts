@@ -1,13 +1,20 @@
+import { createServer } from "node:net";
+
 import { describe, expect } from "vitest";
 
 import { test } from "../helpers/cli-test.js";
+import { deployment } from "../helpers/cloud-fixtures.js";
 import type { FakeCloud } from "../helpers/fake-cloud.js";
 
 const SIGNED_IN = { MCP_USE_API_KEY: "test_key" };
 
-/** Answer today's identity call with one organization, the account default. */
+/**
+ * Answer today's identity call with one organization, the account default.
+ * `/api/v1/test-auth` is not in Cloud's OpenAPI document; the auth PR in the
+ * CLI rewrite replaces it.
+ */
 function signInToOrg1(cloud: FakeCloud): void {
-  cloud.on("GET", "/api/v1/test-auth", {
+  cloud.onUndocumented("GET", "/api/v1/test-auth", {
     body: {
       user_id: "user_1",
       email: "dev@example.com",
@@ -33,7 +40,7 @@ describe("deployment human output", () => {
     cloud.on("GET", "/api/v1/deployments", {
       body: {
         items: [
-          {
+          deployment({
             id: "12345678-abcd",
             serverId: "server_1",
             status: "failed",
@@ -41,9 +48,11 @@ describe("deployment human output", () => {
             gitBranch: "main",
             createdAt: "2026-07-24T00:00:00Z",
             error: "Build failed\nvery long build output",
-            providerInfo: { noisy: true },
-          },
+          }),
         ],
+        total: 1,
+        limit: 30,
+        skip: 0,
       },
     });
 
@@ -136,3 +145,150 @@ describe("deployment JSON output", () => {
     });
   });
 });
+
+describe("deployments get", () => {
+  test("--json prints the deployment Cloud returned as the only output", async ({
+    cloud,
+    cli,
+  }) => {
+    signInToOrg1(cloud);
+    const failed = deployment({
+      id: "dep_1",
+      status: "failed",
+      error: "Build failed",
+    });
+    cloud.on("GET", "/api/v1/deployments/dep_1", { body: failed });
+
+    const result = await cli.run(["deployments", "get", "dep_1", "--json"], {
+      env: SIGNED_IN,
+    });
+
+    expect(result.stderr).toBe("");
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toEqual(failed);
+    expect(cloud.requestsTo("GET", "/api/v1/deployments/dep_1")).toMatchObject([
+      { headers: { "x-api-key": "test_key", "x-profile-id": "org_1" } },
+    ]);
+  });
+
+  test("prints one field per line, with the build logs command for a failed deployment", async ({
+    cloud,
+    cli,
+  }) => {
+    signInToOrg1(cloud);
+    cloud.on("GET", "/api/v1/deployments/dep_1", {
+      body: deployment({
+        id: "dep_1",
+        serverId: "server_1",
+        status: "failed",
+        deploymentTrigger: "manual",
+        gitBranch: "main",
+        createdAt: "2026-07-24T00:00:00Z",
+        error: "Build failed\nvery long build output",
+      }),
+    });
+
+    const result = await cli.run(["deployments", "get", "dep_1"], {
+      env: SIGNED_IN,
+    });
+
+    expect(result.stderr).toBe("");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(
+      [
+        "Deployment: dep_1",
+        "Server: server_1",
+        "Status: failed",
+        "Trigger: manual",
+        "Branch: main",
+        "Created: 2026-07-24T00:00:00Z",
+        "Error: Build failed",
+        "Build logs: mcp-use deployments logs dep_1 --build",
+        "",
+      ].join("\n")
+    );
+  });
+
+  test("an unknown deployment is a deployment_not_found error on stdout, exit 1", async ({
+    cloud,
+    cli,
+  }) => {
+    signInToOrg1(cloud);
+    cloud.on("GET", "/api/v1/deployments/dep_missing", {
+      status: 404,
+      body: { error: "Deployment not found" },
+    });
+
+    const result = await cli.run(
+      ["deployments", "get", "dep_missing", "--json"],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(result.json).toEqual({
+      error: {
+        code: "deployment_not_found",
+        message: expect.any(String),
+        nextSteps: [
+          {
+            description: "List deployments",
+            command: "mcp-use deployments list --json",
+          },
+        ],
+      },
+    });
+  });
+
+  test("a missing deployment ID is a usage error, exit 2, and calls no Cloud API", async ({
+    cloud,
+    cli,
+  }) => {
+    const result = await cli.run(["deployments", "get", "--json"], {
+      env: SIGNED_IN,
+    });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.json).toMatchObject({ error: { code: "usage_error" } });
+    expect(cloud.requests).toEqual([]);
+  });
+
+  test("without credentials it is a not_authenticated error that suggests logging in", async ({
+    cloud,
+    cli,
+  }) => {
+    const result = await cli.run(["deployments", "get", "dep_1", "--json"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toEqual({
+      error: {
+        code: "not_authenticated",
+        message: expect.any(String),
+        nextSteps: [{ description: "Log in", command: "mcp-use login" }],
+      },
+    });
+    expect(cloud.requests).toEqual([]);
+  });
+
+  test("an unreachable Cloud is a cloud_unreachable error, exit 1", async ({
+    cli,
+  }) => {
+    const result = await cli.run(["deployments", "get", "dep_1", "--json"], {
+      env: { ...SIGNED_IN, MCP_USE_CLOUD_API_URL: await closedOrigin() },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      error: { code: "cloud_unreachable", nextSteps: [] },
+    });
+  });
+});
+
+/** An origin on a localhost port nothing listens on. */
+async function closedOrigin(): Promise<string> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as { port: number };
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  return `http://127.0.0.1:${port}`;
+}

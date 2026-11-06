@@ -31,21 +31,15 @@ builds before it tests.
 ```ts
 import { describe, expect } from "vitest";
 import { test } from "../helpers/cli-test.js";
+import { deployment } from "../helpers/cloud-fixtures.js";
 
 test("restart redeploys the same server and branch", async ({ cloud, cli }) => {
   signInToOrg1(cloud); // registers GET /api/v1/test-auth; see deployments.test.ts
   cloud.on("GET", "/api/v1/deployments/dep_1", {
-    body: {
-      id: "dep_1",
-      status: "running",
-      serverId: "srv_1",
-      gitBranch: "main",
-    },
+    body: deployment({ id: "dep_1", serverId: "srv_1", gitBranch: "main" }),
   });
-  cloud.on("POST", "/api/v1/deployments", {
-    status: 201,
-    body: { id: "dep_2" },
-  });
+  // Answers 201, the route's documented success status.
+  cloud.on("POST", "/api/v1/deployments", { body: { id: "dep_2" } });
 
   const result = await cli.run(["deployments", "restart", "dep_1", "--json"], {
     env: { MCP_USE_API_KEY: "test_key" },
@@ -67,17 +61,34 @@ For table tests, use `test.for(cases)(name, ([a, b], { cli, cloud }) => …)`.
 
 ## The `cloud` fixture
 
-A fresh fake Cloud per test, listening on `127.0.0.1` on a free port.
+A fresh fake Cloud per test, listening on `127.0.0.1` on a free port. Its
+routes are typed from the generated Cloud client
+(`tests/helpers/cloud-routes.gen.ts`).
 
 - `cloud.on(method, path, reply)` answers every matching call with `reply`.
 - `cloud.sequence(method, path, [reply1, reply2])` answers one call per
   reply, in order. A call after the last reply counts as unhandled, which is
   how a test proves a poll loop stopped or a request was not repeated.
-- A reply is `{ status?, body?, headers? }`, or a function of the recorded
-  request that returns one. `body` is sent as JSON.
-- `path` is the **full pathname** the CLI requests, such as
-  `/api/v1/deployments`, with no query string. Assert on query parameters
+- `path` is the **full concrete pathname** the CLI requests, such as
+  `/api/v1/deployments/dep_1`, with no query string. It must belong to a route
+  in the spec, or the call does not compile. Assert on query parameters
   through `request.query`.
+- A reply is `{ status?, body?, headers? }`, or a function of the request that
+  returns one. `body` is sent as JSON and typed as the route's response for
+  that `status`. `status` defaults to the route's documented success status
+  (201 for `POST /api/v1/deployments`). A reply function also gets
+  `request.params`, the path parameters (`{ id: "dep_1" }`).
+- **Reply bodies are type-checked against Cloud's response types**, for fixed
+  replies and reply functions alike, so a fixture that doesn't match Cloud
+  fails `typecheck`. Error statuses the spec doesn't list, such as a 500 or
+  503, may carry any body.
+- Cloud objects have many required fields. Build them with
+  `tests/helpers/cloud-fixtures.ts` (for example `deployment({ id, status })`)
+  and pass every field your assertions depend on, so the values are visible
+  in the test. Add a builder there when you need a new object.
+- `cloud.onUndocumented(method, path, reply)` registers a route the spec
+  leaves out, untyped and unchecked. It throws for a route the spec has. Today
+  only `GET /api/v1/test-auth` needs it; say why in a comment when you use it.
 - `cloud.requests` lists every request in arrival order;
   `cloud.requestsTo(method, path)` filters it. Each one has `method`, `path`,
   `query`, `headers` (lower-case), `body` (parsed JSON, a string, or
@@ -86,8 +97,9 @@ A fresh fake Cloud per test, listening on `127.0.0.1` on a free port.
   The fixture **fails the test** after it finishes if `unhandled` is not
   empty, so register only the routes the behaviour needs.
 
-Routes are untyped for now. Once the CLI has a client generated from Cloud's
-OpenAPI spec, the harness will type routes and bodies against it.
+When Cloud changes, regenerate the client
+(`pnpm --filter @mcp-use/cli generate:cloud-client <openapi.json>`); a fake
+that no longer matches the API then fails `typecheck`.
 
 ## The `cli` fixture
 
@@ -123,11 +135,14 @@ A sandbox wired to the test's fake Cloud.
 identity route the command calls (today `GET /api/v1/test-auth`). The auth
 PR in the CLI rewrite stack replaces this with a shared helper.
 
-**JSON errors.** Assert the exit code and the error `code`, not the message:
+**JSON errors.** Commands on the conventions in `src/core/command.ts` print
+the error document on **stdout** (`result.json`); commands not yet ported print
+it on stderr (`result.errorJson`). Assert the exit code and the error `code`,
+not the message:
 
 ```ts
 expect(result.exitCode).toBe(1);
-expect(result.errorJson).toMatchObject({
+expect(result.json).toMatchObject({
   error: { code: "deployment_not_found" },
 });
 ```
