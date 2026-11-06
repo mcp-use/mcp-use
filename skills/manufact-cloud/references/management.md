@@ -10,6 +10,13 @@ mcp-use env list --json
 Use `--server` and `--org` to override the linked project. Cloud commands do not
 need to run inside an mcp-use application.
 
+Without `--json`, server details show status, organization, production branch,
+repository, region, MCP URL, active deployment, and dashboard link when
+available. Environment lists show names and metadata in a table, never values.
+Domain output includes verification/certificate readiness and copyable CNAME or
+TXT records when supplied by Cloud; use those exact records rather than guessing
+DNS targets. Create/update/remove commands print named confirmation receipts.
+
 `servers update` changes user-visible settings: name, description, production
 branch, repository root, build/start commands, watch paths, deployment branch
 patterns, CI waiting, repository connection, and allowed IP ranges.

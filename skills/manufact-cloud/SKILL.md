@@ -5,9 +5,27 @@ description: Deploy and manage MCP servers on Manufact Cloud with the mcp-use CL
 
 # Manufact Cloud CLI
 
-Use the installed `mcp-use` CLI. Cloud commands work with any MCP framework.
+Use the CLI executable selected by the user (normally `mcp-use`). Cloud commands
+work with any MCP framework.
 Check `mcp-use <command> --help` before using unfamiliar flags; this skill ships
 with the CLI version whose commands it describes.
+
+Install or refresh the bundled guidance with `mcp-use skills install`. It copies
+the installed version's skills into `.agents/skills`, `.claude/skills`, and
+`.cursor/skills` in the selected project and works offline.
+
+## Choose output for the task
+
+- For a human reviewing results or taking screenshots, omit `--json`. Commands
+  print readable summaries and tables; narrow tables become labeled records.
+  Deploy and checklist waits show a spinner in an interactive terminal.
+- For an agent parsing results or a CI script, use `--json` and the exit code.
+  JSON output stays machine-readable and suppresses spinners. Do not parse
+  terminal columns or depend on colors or human wording.
+- Checklist reports group results by category, expand findings and fix guidance,
+  and show **Client Readiness**. `checklist get <run-id> --verbose` includes all
+  passing checks and full finding details. Read the checklist reference below
+  before interpreting readiness or a raw failed check as a publishing blocker.
 
 ## Agent workflow
 

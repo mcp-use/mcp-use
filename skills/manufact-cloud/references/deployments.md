@@ -17,6 +17,9 @@ be pushed. `github connect` returns the installation URL. For a monorepo, use
 
 A project link is stored under `.manufact/`, separate from local build output.
 Subsequent deploys reuse the link; `--new` creates another server.
+An unlinked deploy creates a server and saves its link automatically; a separate
+`link` step is not required. Declining a Git commit/push prompt continues the
+deployment using the pushed remote branch, without including unpushed changes.
 
 ## Local source
 
@@ -53,6 +56,15 @@ mcp-use deployments get DEPLOYMENT_ID --json
 mcp-use logs DEPLOYMENT_ID --build --json
 mcp-use logs DEPLOYMENT_ID --follow
 ```
+
+For human review, omit `--json`. The deploy receipt includes elapsed command
+time, source branch/commit, MCP URL and IDs when available. Deployment lists
+show build duration and production traffic; absence of production traffic does
+not establish that a deployment is a preview. Keep full IDs for later commands.
+
+A timeout during creation or start can leave the outcome uncertain. Inspect any
+returned server/deployment ID before retrying instead of assuming the operation
+did not take effect.
 
 `deployments restart` starts a replacement, `promote` promotes a deployment,
 `stop` stops it, and `rm` removes it. Read each command's help for required

@@ -29,3 +29,24 @@ from `github installations --json`.
 
 `checklist run` waits by default. Both run and list accept `--branch`;
 list also accepts `--limit` and `--skip`.
+
+## Interpret checklist results
+
+Without `--json`, run/get/cancel group results into Protocol, Tools, MCP Apps,
+Client compatibility, Policy review, and any additional categories returned by
+Cloud. Passing checks are summarized; findings, skipped checks, and remediation
+hints remain visible. Add `--verbose` to run/get/cancel to include every passing
+check and full finding details. List prints run status, branch, duration, age,
+and full IDs when available.
+
+The human report uses each check's severity: a raw `fail` can be an advisory
+warning rather than a blocking error. JSON preserves the existing raw statuses;
+use the human report to inspect severity and remediation rather than treating
+every raw failure as a blocker. Dynamic policy concerns are called out separately
+from technical warnings. The score weights check severity and is not a count of
+all passed checks.
+
+**Client Readiness** reports Cloud's ChatGPT and Claude readiness flags. A
+completed command or a high score does not guarantee directory approval, and
+reported readiness can coexist with policy concerns. Inspect the actual findings
+before recommending a submission.

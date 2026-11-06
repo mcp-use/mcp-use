@@ -10,6 +10,14 @@ mcp-use alerts list --json
 mcp-use alerts get ALERT_ID --json
 ```
 
+For human review, omit `--json`. `alerts get` describes the enabled or paused
+setting, delivery methods, and trigger/recovery conditions, preserving nested
+`all`/`any` groups. `alerts list` also shows current firing/resolved state and
+trigger counts when returned by Cloud. The detail response does not return
+state or occurrence history; do not invent them from the rule configuration.
+An enabled rule is being evaluated; a firing rule currently matches its trigger.
+Slack as a delivery method does not establish that a notification was delivered.
+
 ## Example: sustained tool failures
 
 ```yaml
