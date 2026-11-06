@@ -1,5 +1,26 @@
 # mcp-use
 
+## 2.12.3
+
+### Patch Changes
+
+- d57fa5e: Rewrite the Manufact Cloud CLI for agents with typed requests, consistent JSON results and errors, framework-independent deployment, project links in .manufact, scoped environment variables, and Cloud management commands. Install the version-matched Manufact Cloud skill with skills install. Update the framework's bundled CLI without changing its server APIs.
+- e16c952: Run `resources/read` middleware, observers, and usage telemetry for view resources (`ui://views/<name>.html`). View reads previously skipped the middleware chain, so access checks and result changes in `server.use("mcp:resources/read", ...)` did not apply to them. View reads now set `ctx.view` (`{ name }`) on the `resources/read` context. On `mixedAuth` servers, hosts read views before sign-in, so `resources/read` middleware can now see a view read with `ctx.auth` undefined; check `ctx.view` before requiring `ctx.auth`.
+- Updated dependencies [b97451e]
+- Updated dependencies [a9b6557]
+- Updated dependencies [715874b]
+- Updated dependencies [9be9d1f]
+- Updated dependencies [4c747f7]
+- Updated dependencies [d57fa5e]
+- Updated dependencies [b085554]
+- Updated dependencies [680943b]
+- Updated dependencies [ae8c4b8]
+- Updated dependencies [8e566cb]
+- Updated dependencies
+- Updated dependencies [30784bc]
+  - @mcp-use/cli@5.0.0
+  - @mcp-use/inspector@20.3.28
+
 ## 2.12.3-canary.2
 
 ### Patch Changes
