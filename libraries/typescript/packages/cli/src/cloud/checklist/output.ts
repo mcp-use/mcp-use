@@ -201,7 +201,7 @@ export function formatChecklist(
       readiness.push(
         `${name.padEnd(10)}${ready ? paint("Ready", 32) : paint("Not ready", 33)}`
       );
-  if (readiness.length) lines.push("", "API readiness", ...readiness);
+  if (readiness.length) lines.push("", "Client Readiness", ...readiness);
   lines.push(
     "",
     fields([
