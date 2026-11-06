@@ -1,1607 +1,476 @@
-import {
-  chmod,
-  mkdtemp,
-  mkdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
-import { execFile, execFileSync } from "node:child_process";
-import { createServer } from "node:http";
-import { tmpdir } from "node:os";
-import { join, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createServer } from "node:https";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { gunzipSync } from "node:zlib";
+import { describe, expect } from "vitest";
+import { test } from "../helpers/cli-test.js";
+import { signIn, SIGNED_IN } from "../helpers/cloud-auth.js";
+import { deployment, server } from "../helpers/cloud-fixtures.js";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+const exec = promisify(execFile);
 
-const { api, cloudApiForOrganization, cloudWebUrl, openBrowser } = vi.hoisted(
-  () => {
-    const api = {
-      request: vi.fn(),
-      multipartRequest: vi.fn(),
-    };
-    return {
-      api,
-      cloudWebUrl: vi.fn(() => "https://cloud.example.test"),
-      openBrowser: vi.fn(),
-      cloudApiForOrganization: vi.fn(async () => ({
-        api,
-        organizationId: "org_1",
-        organizationSlug: "primary-demo" as string | null,
-      })),
-    };
-  }
-);
-
-vi.mock("../../src/cloud/cloud-api.js", () => ({
-  cloudApiForOrganization,
-  cloudWebUrl,
-}));
-
-vi.mock("../../src/core/open-browser.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/core/open-browser.js")>()),
-  openBrowser,
-}));
-
-import { assertManagedArchiveSize, runDeploy } from "../../src/cloud/deploy.js";
-
-const directories: string[] = [];
-const execFileAsync = promisify(execFile);
-
-afterEach(async () => {
-  vi.unstubAllEnvs();
-  vi.restoreAllMocks();
-  api.request.mockReset();
-  api.multipartRequest.mockReset();
-  cloudApiForOrganization.mockClear();
-  cloudWebUrl.mockClear();
-  openBrowser.mockClear();
-  await Promise.all(
-    directories.splice(0).map((directory) =>
-      // Retry transient filesystem errors while removing Git repositories.
-      rm(directory, {
-        recursive: true,
-        force: true,
-        maxRetries: 5,
-        retryDelay: 100,
-      })
-    )
-  );
-});
-
-async function project(name: string): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "mcp-use-deploy-"));
-  directories.push(directory);
+async function link(cwd: string): Promise<void> {
+  await mkdir(join(cwd, ".manufact"), { recursive: true });
   await writeFile(
-    join(directory, "package.json"),
-    `${JSON.stringify({ name, dependencies: { "mcp-use": "*" } })}\n`
+    join(cwd, ".manufact", "project.json"),
+    JSON.stringify({ orgId: "org_1", serverId: "srv_1" })
   );
-  return directory;
 }
 
-function initializeRepository(
-  directory: string,
-  remote: string | null = "https://github.com/example/project.git"
-): void {
-  execFileSync("git", ["init", "-b", "main"], { cwd: directory });
-  execFileSync("git", ["config", "user.email", "test@example.com"], {
-    cwd: directory,
-  });
-  execFileSync("git", ["config", "user.name", "CLI Test"], {
-    cwd: directory,
-  });
-  execFileSync("git", ["add", "."], { cwd: directory });
-  execFileSync("git", ["commit", "-m", "Initial commit"], { cwd: directory });
-  if (remote !== null) {
-    execFileSync("git", ["remote", "add", "origin", remote], {
-      cwd: directory,
-    });
-  }
+async function repository(cwd: string, branch = "main"): Promise<void> {
+  await writeFile(join(cwd, "weather.py"), "print('weather')\n");
+  await writeFile(join(cwd, ".gitignore"), ".manufact/\n");
+  for (const args of [
+    ["init", "-b", branch],
+    ["config", "user.email", "fixture@example.test"],
+    ["config", "user.name", "Fixture"],
+    ["add", "."],
+    ["commit", "-m", "Fixture"],
+    ["remote", "add", "origin", "https://github.com/example/weather.git"],
+  ])
+    await exec("git", args, { cwd });
 }
 
-describe("deploy agent contract", () => {
-  it("shows complete offline help without resolving cloud state", async () => {
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy(["--help"])).resolves.toBe(0);
-
-    const output = stdout.mock.calls.flat().join("");
-    for (const option of [
-      "--org",
-      "--name",
-      "--branch",
-      "--root-dir",
-      "--region",
-      "--env",
-      "--env-file",
-      "--build-command",
-      "--start-command",
-      "--dockerfile",
-      "--watch-paths",
-      "--wait-for-ci",
-      "--no-github",
-      "--new",
-      "--open",
-      "--yes",
-      "--json",
-      "--help",
-    ]) {
-      expect(output).toContain(option);
-    }
-    expect(output).toContain("--json does not authorize mutations");
-    expect(output).toContain("Incompatible combinations:");
-    expect(output).toContain("Exit codes:");
-    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+describe("deploy", () => {
+  test("help and malformed flags make no Cloud requests", async ({
+    cli,
+    cloud,
+  }) => {
+    const help = await cli.run(["deploy", "--help"]);
+    expect(help.exitCode).toBe(0);
+    expect(help.stdout).toContain("--no-wait");
+    expect(help.stdout).toContain("--external-url");
+    const invalid = await cli.run(["deploy", "--unknown", "--json"]);
+    expect(invalid.exitCode).toBe(2);
+    expect(invalid.json).toMatchObject({ error: { code: "usage_error" } });
+    expect(cloud.requests).toEqual([]);
   });
 
-  it("requires an explicit source mode for a headless gitless project", async () => {
-    const directory = await project("headless");
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(2);
-
-    const output = stderr.mock.calls.flat().join("");
-    expect(JSON.parse(output)).toEqual({
-      error: {
-        code: "deployment_mode_required",
-        message:
-          "No GitHub origin was found. Choose a deployment mode explicitly.",
-        details: {
-          nextSteps: [
-            {
-              description: "Upload local source without GitHub",
-              command: "mcp-use deploy --no-github",
-            },
-            {
-              description: "Create a private GitHub repository and push",
-              command: "mcp-use deploy --yes",
-            },
-          ],
-        },
-      },
+  test("uploads a non-Node project and --no-wait returns one document and saves the link", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    await writeFile(join(cli.cwd, "weather.py"), "print('weather')\n");
+    await writeFile(join(cli.cwd, ".env"), "SECRET=do-not-upload\n");
+    await mkdir(join(cli.cwd, ".manufact"), { recursive: true });
+    await writeFile(join(cli.cwd, ".manufact", "auth.json"), "private-token");
+    cloud.on("POST", "/api/v1/servers", {
+      body: { server: { id: "srv_1", slug: "weather" }, deploymentId: "dep_1" },
     });
-    expect(api.multipartRequest).not.toHaveBeenCalled();
-  });
-
-  it("requires an explicit source mode for a repository without origin", async () => {
-    const directory = await project("no-origin");
-    initializeRepository(directory, null);
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(2);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: { code: "deployment_mode_required" },
-    });
-  });
-
-  it("rejects --open in JSON mode before cloud or filesystem work", async () => {
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy(["--json", "--open"])).resolves.toBe(2);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "invalid_argument_combination",
-        details: {
-          nextSteps: [
-            { command: "mcp-use deploy --json" },
-            { command: "mcp-use deploy --open" },
-          ],
-        },
-      },
-    });
-    expect(cloudApiForOrganization).not.toHaveBeenCalled();
-  });
-
-  it("does not replace a linked GitHub server with managed source", async () => {
-    const directory = await project("linked-github");
-    const linkDirectory = join(directory, ".mcp-use", "cloud");
-    await mkdir(linkDirectory, { recursive: true });
-    await writeFile(
-      join(linkDirectory, "link.json"),
-      `${JSON.stringify({
-        organizationId: "org_1",
-        serverId: "srv_github",
-        repository: "example/linked-github",
-        sourceType: "github",
-      })}\n`
+    const result = await cli.run(
+      ["deploy", "--no-github", "--name", "weather", "--no-wait", "--json"],
+      { env: SIGNED_IN }
     );
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--no-github", "--json"])).resolves.toBe(
-      2
-    );
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "source_mode_conflict",
-        details: {
-          serverId: "srv_github",
-          nextSteps: [
-            { command: "mcp-use deploy" },
-            { command: "mcp-use deploy --no-github --new --yes" },
-          ],
-        },
-      },
-    });
-    expect(api.multipartRequest).not.toHaveBeenCalled();
-  });
-
-  it("rejects GitHub trigger options for managed uploads", async () => {
-    const directory = await project("managed-trigger-conflict");
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runDeploy([directory, "--no-github", "--watch-paths", "src/**", "--json"])
-    ).resolves.toBe(2);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: { code: "source_mode_conflict" },
-    });
-    expect(api.multipartRequest).not.toHaveBeenCalled();
-  });
-
-  it("returns a stable usage error for a missing env file", async () => {
-    const directory = await project("missing-env-file");
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runDeploy([
-        directory,
-        "--no-github",
-        "--env-file",
-        "missing.env",
-        "--json",
-      ])
-    ).resolves.toBe(2);
-
-    const output = stderr.mock.calls.flat().join("");
-    expect(output.trim().split("\n")).toHaveLength(1);
-    expect(JSON.parse(output)).toMatchObject({
-      error: {
-        code: "usage_error",
-        message: expect.stringContaining("missing.env"),
-      },
-    });
-    expect(api.multipartRequest).not.toHaveBeenCalled();
-  });
-
-  it("rejects managed source and Dockerfile paths outside the project", async () => {
-    const directory = await project("path-containment");
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runDeploy([directory, "--no-github", "--root-dir", "..", "--json"])
-    ).resolves.toBe(2);
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "usage_error",
-        message: expect.stringContaining("--root-dir"),
-      },
-    });
-
-    stderr.mockClear();
-    await expect(
-      runDeploy([
-        directory,
-        "--no-github",
-        "--dockerfile",
-        "../Dockerfile",
-        "--json",
-      ])
-    ).resolves.toBe(2);
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "usage_error",
-        message: expect.stringContaining("--dockerfile"),
-      },
-    });
-    expect(api.multipartRequest).not.toHaveBeenCalled();
-  });
-
-  it("returns the canonical dashboard for the managed-upload regression", async () => {
-    const directory = await project("travel-agent-demo");
-    const serverId = "00000000-0000-4000-8000-000000000001";
-    cloudWebUrl.mockReturnValueOnce("https://manufact.com");
-    api.multipartRequest.mockResolvedValue({
-      server: {
-        id: serverId,
-        slug: "wild-cloud-example",
-        mcpUrl: "https://wild-cloud-example.run.mcp-use.com/mcp",
-      },
-      deploymentId: "00000000-0000-4000-8000-000000000002",
-    });
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--no-github", "--json"])).resolves.toBe(
-      0
-    );
-
-    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toEqual({
-      sourceType: "managed",
-      serverId,
-      deploymentId: "00000000-0000-4000-8000-000000000002",
-      status: "pending",
-      webUrl: `https://manufact.com/cloud/primary-demo/servers/${serverId}/overview`,
-    });
-    expect(openBrowser).not.toHaveBeenCalled();
-  });
-
-  it("encodes the selected organization and server ID as separate route segments", async () => {
-    const directory = await project("encoded-dashboard");
-    cloudApiForOrganization.mockResolvedValueOnce({
-      api,
-      organizationId: "org_2",
-      organizationSlug: "other org/?#",
-    });
-    api.multipartRequest.mockResolvedValue({
-      server: { id: "server/id?#", slug: null },
-      deploymentId: "dep_1",
-    });
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runDeploy([directory, "--org", "org_2", "--no-github", "--json"])
-    ).resolves.toBe(0);
-
-    expect(cloudApiForOrganization).toHaveBeenCalledWith("org_2");
-    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
-      webUrl:
-        "https://cloud.example.test/cloud/other%20org%2F%3F%23/servers/server%2Fid%3F%23/overview",
-    });
-  });
-
-  it.each([null, ""])(
-    "keeps successful deployments without inventing a dashboard for slug %j",
-    async (organizationSlug) => {
-      const directory = await project("missing-org-slug");
-      cloudApiForOrganization.mockResolvedValueOnce({
-        api,
-        organizationId: "org_1",
-        organizationSlug,
-      });
-      api.multipartRequest.mockResolvedValue({
-        server: { id: "srv_1", slug: "not-an-org" },
-        deploymentId: "dep_1",
-      });
-      const stdout = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation(() => true);
-
-      await expect(
-        runDeploy([directory, "--no-github", "--json"])
-      ).resolves.toBe(0);
-
-      expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
-        serverId: "srv_1",
-        deploymentId: "dep_1",
-        status: "pending",
-        webUrl: null,
-      });
-      expect(openBrowser).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each(["primary-demo", null])(
-    "opens only a canonical dashboard for slug %j",
-    async (organizationSlug) => {
-      const directory = await project("open-dashboard");
-      cloudApiForOrganization.mockResolvedValueOnce({
-        api,
-        organizationId: "org_1",
-        organizationSlug,
-      });
-      api.multipartRequest.mockResolvedValue({
-        server: { id: "srv_1", slug: "wrong-dashboard" },
-        deploymentId: "dep_1",
-      });
-      vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-      const stderr = vi
-        .spyOn(process.stderr, "write")
-        .mockImplementation(() => true);
-
-      await expect(
-        runDeploy([directory, "--no-github", "--open"])
-      ).resolves.toBe(0);
-
-      if (organizationSlug === null) {
-        expect(openBrowser).not.toHaveBeenCalled();
-        expect(stderr.mock.calls.flat().join("")).toContain(
-          "no dashboard slug"
-        );
-      } else {
-        expect(openBrowser).toHaveBeenCalledExactlyOnceWith(
-          "https://cloud.example.test/cloud/primary-demo/servers/srv_1/overview"
-        );
-      }
-    }
-  );
-
-  it("creates a managed server from a local source archive", async () => {
-    const directory = await project("managed-app");
-    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
-    await writeFile(join(directory, ".env"), "SECRET=do-not-upload\n");
-    await writeFile(join(directory, ".envrc"), "SECRET=also-do-not-upload\n");
-    await mkdir(join(directory, ".pytest_cache"));
-    await writeFile(join(directory, ".pytest_cache", "state"), "cache\n");
-    await symlink("index.ts", join(directory, "linked-index.ts"));
-    await mkdir(join(directory, "src"));
-    await writeFile(join(directory, "src", "nested.ts"), "export {};\n");
-    const longDirectory = "segment-".repeat(12);
-    const longRelativePath = join(
-      longDirectory,
-      longDirectory,
-      "unicode-工具.ts"
-    );
-    await mkdir(join(directory, longDirectory, longDirectory), {
-      recursive: true,
-    });
-    await writeFile(join(directory, longRelativePath), "export {};\n");
-    api.multipartRequest.mockResolvedValue({
-      server: { id: "srv_1", slug: "managed-app" },
-      deploymentId: "dep_1",
-    });
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runDeploy([
-        directory,
-        "--no-github",
-        "--region",
-        "US",
-        "--build-command",
-        "npm run build",
-        "--start-command",
-        "npm start",
-        "--dockerfile",
-        "Dockerfile.custom",
-        "--json",
-      ])
-    ).resolves.toBe(0);
-
-    expect(api.multipartRequest).toHaveBeenCalledWith(
-      "/servers",
-      expect.any(FormData)
-    );
-    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
-    expect(form.get("managed")).toBe("true");
-    expect(form.get("name")).toBe("managed-app");
-    expect(form.get("region")).toBe("US");
-    expect(form.get("buildCommand")).toBe("npm run build");
-    expect(form.get("startCommand")).toBe("npm start");
-    expect(form.get("dockerfilePath")).toBe("Dockerfile.custom");
-    expect(form.get("sourceFile")).toBeInstanceOf(Blob);
-    const entries = await archiveEntries(form.get("sourceFile") as Blob);
-    expect(entries).toContain("app/index.ts");
-    expect(entries).toContain("app/src/nested.ts");
-    expect(entries).toContain(`app/${longRelativePath.split(sep).join("/")}`);
-    expect(entries).not.toContain("app/.env");
-    expect(entries).not.toContain("app/.envrc");
-    expect(entries).not.toContain("app/.pytest_cache/state");
-    expect(entries).not.toContain("app/linked-index.ts");
-    expect(entries.every((entry) => !entry.includes("/.mcp-use/"))).toBe(true);
-    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.json).toEqual({
       sourceType: "managed",
       serverId: "srv_1",
       deploymentId: "dep_1",
-      webUrl:
-        "https://cloud.example.test/cloud/primary-demo/servers/srv_1/overview",
+      status: "pending",
+      dashboardUrl: "https://manufact.com/cloud/org-one/servers/srv_1/overview",
     });
     expect(
       JSON.parse(
-        await readFile(join(directory, ".manufact", "project.json"), "utf8")
+        await readFile(join(cli.cwd, ".manufact", "project.json"), "utf8")
       )
     ).toEqual({ orgId: "org_1", serverId: "srv_1" });
-  });
-
-  it("applies .gitignore patterns and negation when packaging managed servers", async () => {
-    const directory = await project("gitignore-managed-app");
-    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
-    await writeFile(
-      join(directory, ".gitignore"),
-      [
-        "# Ignore local database",
-        "*.sqlite",
-        "",
-        "# Ignore temporary logs with negation exception",
-        "logs/*",
-        "!logs/keep.log",
-        "",
-        "# Directory pattern with trailing slash",
-        "temp-cache/",
-        "",
-        "# Root-anchored pattern",
-        "/root-only.txt",
-        "",
-        "# Relative path glob",
-        "nested/*.tmp",
-      ].join("\n")
-    );
-    await writeFile(join(directory, "data.sqlite"), "binary data\n");
-    await mkdir(join(directory, "logs"));
-    await writeFile(join(directory, "logs", "app.log"), "error\n");
-    await writeFile(join(directory, "logs", "keep.log"), "retained\n");
-    await mkdir(join(directory, "temp-cache"));
-    await writeFile(join(directory, "temp-cache", "scratch.json"), "123\n");
-    await writeFile(join(directory, "root-only.txt"), "ignored at root\n");
-    await mkdir(join(directory, "sub"));
-    await writeFile(
-      join(directory, "sub", "root-only.txt"),
-      "included in sub\n"
-    );
-    await mkdir(join(directory, "nested"));
-    await writeFile(join(directory, "nested", "one.tmp"), "temp\n");
-    await mkdir(join(directory, "nested", "deep"));
-    await writeFile(
-      join(directory, "nested", "deep", "two.tmp"),
-      "not matched by nested/*.tmp\n"
-    );
-
-    api.multipartRequest.mockResolvedValue({
-      server: { id: "srv_gitignore", slug: "gitignore-managed-app" },
-      deploymentId: "dep_gitignore",
+    const requests = cloud.requestsTo("POST", "/api/v1/servers");
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.headers).toMatchObject({
+      "x-api-key": "test_key",
+      "x-profile-id": "org_1",
     });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await expect(
-      runDeploy([directory, "--no-github", "--region", "US", "--json"])
-    ).resolves.toBe(0);
-
-    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
-    const entries = await archiveEntries(form.get("sourceFile") as Blob);
-
-    // Included files
-    expect(entries).toContain("app/index.ts");
-    expect(entries).toContain("app/.gitignore");
-    expect(entries).toContain("app/logs/keep.log");
-    expect(entries).toContain("app/sub/root-only.txt");
-    expect(entries).toContain("app/nested/deep/two.tmp");
-
-    // Excluded files by .gitignore
-    expect(entries).not.toContain("app/data.sqlite");
-    expect(entries).not.toContain("app/logs/app.log");
-    expect(entries).not.toContain("app/root-only.txt");
-    expect(entries).not.toContain("app/nested/one.tmp");
-    expect(entries.some((entry) => entry.includes("temp-cache"))).toBe(false);
+    const request = requests[0]!;
+    const boundary =
+      request.headers["content-type"]!.match(/boundary=(.+)$/)![1]!;
+    const start = request.rawBody.indexOf("\r\n\r\n") + 4;
+    const end = request.rawBody.indexOf(`\r\n--${boundary}`, start);
+    const archive = gunzipSync(request.rawBody.subarray(start, end)).toString();
+    expect(archive).toContain("app/weather.py");
+    expect(archive).not.toContain("do-not-upload");
+    expect(archive).not.toContain("private-token");
+    expect(cloud.requestsTo("GET", "/api/v1/deployments/dep_1")).toEqual([]);
   });
 
-  it("ensures critical baseline exclusions cannot be bypassed by .gitignore negation", async () => {
-    const directory = await project("gitignore-bypass-safety");
-    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
-    await writeFile(
-      join(directory, ".gitignore"),
-      ["!.env", "!.envrc", "!.git", "!node_modules", "!.DS_Store"].join("\n")
-    );
-    await writeFile(join(directory, ".env"), "SECRET=leak\n");
-    await writeFile(join(directory, ".envrc"), "SECRET=leak\n");
-    await writeFile(join(directory, ".DS_Store"), "os metadata\n");
-    await mkdir(join(directory, "node_modules"));
-    await writeFile(
-      join(directory, "node_modules", "dep.js"),
-      "console.log('dep');\n"
-    );
-    await mkdir(join(directory, ".git"));
-    await writeFile(join(directory, ".git", "config"), "[core]\n");
-
-    api.multipartRequest.mockResolvedValue({
-      server: { id: "srv_bypass", slug: "gitignore-bypass-safety" },
-      deploymentId: "dep_bypass",
+  test("waits by default through pending to running and emits only the final result", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    await writeFile(join(cli.cwd, "server.py"), "pass\n");
+    cloud.on("POST", "/api/v1/servers", {
+      body: { server: { id: "srv_1", slug: null }, deploymentId: "dep_1" },
     });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await expect(
-      runDeploy([directory, "--no-github", "--region", "US", "--json"])
-    ).resolves.toBe(0);
-
-    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
-    const entries = await archiveEntries(form.get("sourceFile") as Blob);
-
-    expect(entries).toContain("app/index.ts");
-    expect(entries).not.toContain("app/.env");
-    expect(entries).not.toContain("app/.envrc");
-    expect(entries).not.toContain("app/.DS_Store");
-    expect(entries.some((entry) => entry.includes("node_modules"))).toBe(false);
-    expect(entries).not.toContain("app/.git/config");
-    expect(entries.some((entry) => entry.includes("/.git/"))).toBe(false);
-  });
-
-  it("preserves case-sensitive Git ignore matching in archive contents", async () => {
-    const directory = await project("gitignore-case-sensitive");
-    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
-    await writeFile(join(directory, ".gitignore"), "config.ts\n");
-    await writeFile(
-      join(directory, "Config.ts"),
-      "export const title = 'Config';\n"
-    );
-    await mkdir(join(directory, "nested"));
-    await writeFile(
-      join(directory, "nested", "config.ts"),
-      "export const title = 'config';\n"
-    );
-    await writeFile(
-      join(directory, "nested", "other.ts"),
-      "export const other = true;\n"
-    );
-
-    api.multipartRequest.mockResolvedValue({
-      server: { id: "srv_case", slug: "gitignore-case-sensitive" },
-      deploymentId: "dep_case",
+    cloud.sequence("GET", "/api/v1/deployments/dep_1", [
+      { body: deployment({ id: "dep_1", status: "building" }) },
+      {
+        body: deployment({
+          id: "dep_1",
+          status: "running",
+          mcpUrl: "https://weather.example/mcp",
+        }),
+      },
+    ]);
+    const result = await cli.run(["deploy", "--no-github", "--json"], {
+      env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" },
     });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await expect(
-      runDeploy([directory, "--no-github", "--region", "US", "--json"])
-    ).resolves.toBe(0);
-
-    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
-    const entries = await archiveEntries(form.get("sourceFile") as Blob);
-
-    // Case-distinct allowed file is preserved
-    expect(entries).toContain("app/Config.ts");
-    // Traversal inside nested directory succeeds for non-ignored files
-    expect(entries).toContain("app/nested/other.ts");
-    // Matching-case exclusion control is excluded
-    expect(entries).not.toContain("app/nested/config.ts");
-  });
-
-  it("settles the archive collector without unhandled rejection when .gitignore is a directory", async () => {
-    const directory = await project("gitignore-is-directory");
-    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
-    await mkdir(join(directory, ".gitignore"));
-
-    const server = createServer((_req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(
-        // The organization lookup; with one organization the CLI uses it.
-        JSON.stringify({
-          organizations: [
-            { id: "org_1", name: "Org", slug: "org", role: "owner" },
-          ],
-        })
-      );
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.json).toMatchObject({
+      serverId: "srv_1",
+      deploymentId: "dep_1",
+      status: "running",
+      mcpUrl: "https://weather.example/mcp",
     });
-
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", () => resolve())
+    expect(cloud.requestsTo("GET", "/api/v1/deployments/dep_1")).toHaveLength(
+      2
     );
-    const port = (server.address() as { port: number }).port;
-    const binPath = fileURLToPath(
-      new URL("../../dist/bin.js", import.meta.url)
-    );
-
-    try {
-      await execFileAsync(
-        process.execPath,
-        [binPath, "deploy", directory, "--no-github", "--json"],
-        {
-          env: {
-            ...process.env,
-            MCP_USE_API_KEY: "test_key",
-            MCP_USE_CLOUD_API_URL: `http://127.0.0.1:${port}/api/v1`,
-          },
-        }
-      );
-      expect.unreachable("expected deploy to fail");
-    } catch (error: unknown) {
-      const execError = error as {
-        code?: number;
-        stderr: string;
-        stdout: string;
-      };
-      expect(execError.code).toBe(1);
-      const lines = execError.stderr.trim().split(/\r?\n/).filter(Boolean);
-      expect(lines).toHaveLength(1);
-      const parsed = JSON.parse(lines[0]!);
-      expect(parsed).toMatchObject({
-        error: {
-          code: "command_failed",
-          message: expect.stringMatching(/EISDIR|EPERM/),
-        },
-      });
-      expect(execError.stderr).not.toContain("UnhandledPromiseRejection");
-      expect(execError.stderr).not.toContain("triggerUncaughtException");
-    } finally {
-      server.closeAllConnections?.();
-      server.close();
-    }
   });
 
-  it("accepts -y as the documented non-interactive consent alias", async () => {
-    const directory = await project("short-yes");
-    api.multipartRequest.mockResolvedValue({
-      server: { id: "srv_short_yes", slug: "short-yes" },
-      deploymentId: "dep_short_yes",
+  test("a failed deployment exits 1 with a logs next step", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    cloud.on("POST", "/api/v1/servers", {
+      body: { server: { id: "srv_1", slug: null }, deploymentId: "dep_1" },
     });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await expect(
-      runDeploy([directory, "--no-github", "--new", "-y", "--json"])
-    ).resolves.toBe(0);
-  });
-
-  it.each([
-    "https://notgithub.com/example/lookalike.git",
-    "https://git.example.com/mirror/github.com/example/lookalike.git",
-    "git@notgithub.com:example/lookalike.git",
-    "git@github.com.evil.com:example/lookalike.git",
-    "https://github.com:8443/example/custom-port.git",
-    "https://github.com:443/example/explicit-default-port.git",
-    "ssh://git@github.com:22/example/ssh-port.git",
-    "git://github.com:9418/example/git-port.git",
-    "https://github.com/example/query.git?ref=main",
-    "https://github.com/example/hash.git#main",
-    "file://github.com/example/local-path.git",
-    "ftp://github.com/example/unsupported-protocol.git",
-    "custom://github.com/example/unsupported-protocol.git",
-    "https:/github.com/example/missing-slash.git",
-    "https:github.com/example/missing-authority.git",
-    String.raw`https:\github.com\example\backslash-path.git`,
-    "https://github.com/example/nested/../normalized-path.git",
-    "https://github.com/./dot-owner.git",
-    "https://github.com/example/..",
-    "git@github.com:../dot-owner.git",
-    "git@github.com:example/..",
-  ])("rejects an unsupported GitHub origin: %s", async (remote) => {
-    const directory = await project("lookalike-origin");
-    initializeRepository(directory, remote);
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
+    cloud.on("GET", "/api/v1/deployments/dep_1", {
+      body: deployment({ id: "dep_1", status: "failed" }),
+    });
+    const result = await cli.run(["deploy", "--no-github", "--json"], {
+      env: SIGNED_IN,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
       error: {
-        code: "unsupported_remote",
-        details: { remote },
+        code: "deployment_failed",
+        nextSteps: [{ command: "mcp-use logs dep_1 --build --json" }],
       },
     });
-    expect(api.request).not.toHaveBeenCalled();
   });
 
-  it.each([
-    [
-      "https://GitHub.com/example/case-insensitive.git",
-      "example/case-insensitive",
-    ],
-    ["git@github.com:example/scp-style.git", "example/scp-style"],
-    ["git@GITHUB.COM:example/upper-host.git", "example/upper-host"],
-    ["ssh://git@github.com/example/ssh-style.git", "example/ssh-style"],
-    ["http://github.com/example/http-style.git", "example/http-style"],
-    ["git://github.com/example/git-style.git", "example/git-style"],
-  ])(
-    "accepts supported GitHub remote syntax: %s",
-    async (remote, repository) => {
-      const directory = await project("supported-origin");
-      initializeRepository(directory, remote);
-      api.request.mockImplementation(
-        async (path: string, init?: { body?: string }) => {
-          if (path.startsWith("/github/installations?")) {
-            return {
-              installations: [
-                {
-                  id: "installation-row",
-                  installationId: "123",
-                  account: { login: "example", type: "Organization" },
-                },
-              ],
-            };
-          }
-          if (path.includes("/access")) return { hasAccess: true };
-          if (path === "/servers") {
-            expect(JSON.parse(init?.body ?? "{}")).toMatchObject({
-              type: "github",
-              repoFullName: repository,
-            });
-            return {
-              server: { id: "srv_supported", slug: "supported-origin" },
-              deploymentId: "dep_supported",
-            };
-          }
-          throw new Error(`Unexpected request: ${path}`);
-        }
+  test.for([
+    ["main", null, "production"],
+    ["feature-weather", "feature-weather", "preview"],
+  ] as const)(
+    "scopes --env on %s to the deployment environment",
+    async ([branch, scope, environment], { cli, cloud }) => {
+      signIn(cloud);
+      await repository(cli.cwd, branch);
+      await link(cli.cwd);
+      cloud.on("GET", "/api/v1/servers/srv_1", {
+        body: server({
+          id: "srv_1",
+          connectedRepository: { isManaged: false, productionBranch: "main" },
+        }),
+      });
+      cloud.on("GET", "/api/v1/servers/srv_1/env-variables", { body: [] });
+      cloud.on("POST", "/api/v1/servers/srv_1/env-variables", {
+        body: { id: "var_1" },
+      });
+      cloud.on("POST", "/api/v1/deployments", { body: { id: "dep_1" } });
+      const result = await cli.run(
+        ["deploy", "--env", "WEATHER_KEY=secret", "--no-wait", "--json"],
+        { env: SIGNED_IN }
       );
-      vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-      await expect(runDeploy([directory, "--json"])).resolves.toBe(0);
+      expect(result.exitCode).toBe(0);
+      expect(
+        cloud.requestsTo("POST", "/api/v1/servers/srv_1/env-variables")
+      ).toMatchObject([
+        {
+          body: {
+            key: "WEATHER_KEY",
+            value: "secret",
+            branch: scope,
+            environments: [environment],
+          },
+        },
+      ]);
+      expect(cloud.requestsTo("POST", "/api/v1/deployments")).toMatchObject([
+        { body: { serverId: "srv_1", branch, trigger: "manual" } },
+      ]);
     }
   );
 
-  it("rejects an unsupported origin with recovery commands", async () => {
-    const directory = await project("unsupported-origin");
-    initializeRepository(
-      directory,
-      "https://token-secret@gitlab.com/example/unsupported-origin.git"
-    );
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
-
-    const output = stderr.mock.calls.flat().join("");
-    expect(output).not.toContain("token-secret");
-    expect(JSON.parse(output)).toMatchObject({
-      error: {
-        code: "unsupported_remote",
-        message: expect.stringContaining("https://[REDACTED]@gitlab.com"),
-        details: {
-          remote:
-            "https://[REDACTED]@gitlab.com/example/unsupported-origin.git",
-          nextSteps: [
-            { command: expect.stringContaining("git remote set-url origin") },
-            { command: "mcp-use deploy --no-github" },
-          ],
-        },
-      },
-    });
-  });
-
-  it("reports unexpected read-only Git probe failures without guessing state", async () => {
-    // This fixture is a POSIX shell wrapper; Windows Git behavior is covered
-    // by the remaining deploy contract tests.
-    if (process.platform === "win32") return;
-    const directory = await project("probe-failure");
-    initializeRepository(directory);
-    const bin = join(directory, "fake-bin");
-    await mkdir(bin);
-    const wrapper = join(bin, "git");
-    await writeFile(
-      wrapper,
-      [
-        "#!/bin/sh",
-        'if [ "$1" = "status" ]; then',
-        '  echo "probe exploded" >&2',
-        "  exit 42",
-        "fi",
-        'exec "$MCP_USE_TEST_REAL_GIT" "$@"',
-        "",
-      ].join("\n")
-    );
-    await chmod(wrapper, 0o755);
-    vi.stubEnv(
-      "MCP_USE_TEST_REAL_GIT",
-      execFileSync("which", ["git"], { encoding: "utf8" }).trim()
-    );
-    vi.stubEnv("PATH", `${bin}:${process.env.PATH ?? ""}`);
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "git_command_failed",
-        message: "git status --porcelain failed: probe exploded",
-        details: {
-          command: "git status --porcelain",
-          exitCode: 42,
-          nextSteps: [
-            { command: "git status" },
-            { command: "mcp-use deploy --no-github" },
-          ],
-        },
-      },
-    });
-    expect(api.request).not.toHaveBeenCalled();
-  });
-
-  it("rejects detached HEAD unless a branch is explicit", async () => {
-    const directory = await project("detached-head");
-    initializeRepository(directory);
-    execFileSync("git", ["checkout", "--detach"], { cwd: directory });
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "detached_head",
-        details: {
-          nextSteps: [{ command: "mcp-use deploy --branch <branch>" }],
-        },
-      },
-    });
-  });
-
-  it("requires explicit consent before committing a dirty repository", async () => {
-    const directory = await project("dirty-repository");
-    initializeRepository(directory);
-    await writeFile(
-      join(directory, "changed.ts"),
-      "export const changed = true;\n"
-    );
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(2);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "git_changes_require_confirmation",
-        details: {
-          nextSteps: expect.arrayContaining([
-            expect.objectContaining({ command: "mcp-use deploy --yes" }),
-          ]),
-        },
-      },
-    });
-    expect(api.request).not.toHaveBeenCalled();
-  });
-
-  it("maps rejected pushes to a stable remediation error", async () => {
-    const directory = await project("rejected-push");
-    initializeRepository(
-      directory,
-      "https://github.com/example/rejected-push.git"
-    );
-    const bareRemote = await mkdtemp(join(tmpdir(), "mcp-use-rejected-"));
-    directories.push(bareRemote);
-    execFileSync("git", ["init", "--bare"], { cwd: bareRemote });
-    const hook = join(bareRemote, "hooks", "pre-receive");
-    await writeFile(
-      hook,
-      "#!/bin/sh\necho 'push rejected by test' >&2\nexit 1\n"
-    );
-    await chmod(hook, 0o755);
-    execFileSync(
-      "git",
-      ["config", "remote.origin.pushurl", `file://${bareRemote}`],
-      { cwd: directory }
-    );
-    await writeFile(
-      join(directory, "changed.ts"),
-      "export const changed = true;\n"
-    );
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--yes", "--json"])).resolves.toBe(1);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "git_push_rejected",
-        details: {
-          nextSteps: [
-            expect.objectContaining({
-              command: expect.stringContaining("git pull --rebase"),
-            }),
-          ],
-        },
-      },
-    });
-    expect(api.request).not.toHaveBeenCalled();
-  });
-
-  it("reports a missing GitHub installation without attempting creation", async () => {
-    const directory = await project("missing-installation");
-    initializeRepository(directory);
-    api.request.mockResolvedValue({ installations: [] });
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "github_installation_required",
-        details: { nextSteps: expect.any(Array) },
-      },
-    });
-  });
-
-  it("preserves the created repository when Git identity is missing", async () => {
-    const directory = await project("missing-identity");
-    const emptyGitConfig = join(directory, "empty-gitconfig");
-    await writeFile(emptyGitConfig, "");
-    const previousGlobal = process.env.GIT_CONFIG_GLOBAL;
-    const previousNoSystem = process.env.GIT_CONFIG_NOSYSTEM;
-    const identityEnvironment = [
-      "GIT_AUTHOR_NAME",
-      "GIT_AUTHOR_EMAIL",
-      "GIT_COMMITTER_NAME",
-      "GIT_COMMITTER_EMAIL",
-      "EMAIL",
-    ] as const;
-    const previousIdentity = Object.fromEntries(
-      identityEnvironment.map((key) => [key, process.env[key]])
-    );
-    process.env.GIT_CONFIG_GLOBAL = emptyGitConfig;
-    process.env.GIT_CONFIG_NOSYSTEM = "1";
-    for (const key of identityEnvironment) process.env[key] = "";
-    api.request.mockImplementation(async (path: string) => {
-      if (path.startsWith("/github/installations?")) {
-        return {
-          installations: [
-            {
-              id: "installation-row",
-              installationId: "123",
-              account: { login: "example", type: "Organization" },
-            },
-          ],
-        };
-      }
-      if (path.endsWith("/repos")) {
-        return {
-          fullName: "example/missing-identity",
-          cloneUrl: "https://github.com/example/missing-identity.git",
-          htmlUrl: "https://github.com/example/missing-identity",
-        };
-      }
-      throw new Error(`Unexpected request: ${path}`);
-    });
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    try {
-      await expect(runDeploy([directory, "--yes", "--json"])).resolves.toBe(1);
-    } finally {
-      if (previousGlobal === undefined) delete process.env.GIT_CONFIG_GLOBAL;
-      else process.env.GIT_CONFIG_GLOBAL = previousGlobal;
-      if (previousNoSystem === undefined)
-        delete process.env.GIT_CONFIG_NOSYSTEM;
-      else process.env.GIT_CONFIG_NOSYSTEM = previousNoSystem;
-      for (const key of identityEnvironment) {
-        const previous = previousIdentity[key];
-        if (previous === undefined) delete process.env[key];
-        else process.env[key] = previous;
-      }
-    }
-
-    const identityError = JSON.parse(stderr.mock.calls.flat().join(""));
-    expect(identityError, JSON.stringify(identityError)).toMatchObject({
-      error: {
-        code: "git_identity_required",
-        details: {
-          repository: "example/missing-identity",
-          url: "https://github.com/example/missing-identity",
-          nextSteps: expect.arrayContaining([
-            expect.objectContaining({ command: "mcp-use deploy --yes" }),
-          ]),
-        },
-      },
-    });
-    expect(
-      execFileSync("git", ["remote", "get-url", "origin"], {
-        cwd: directory,
-        encoding: "utf8",
-      }).trim()
-    ).toBe("https://github.com/example/missing-identity.git");
-  });
-
-  it("returns a stable repository-creation failure with alternatives", async () => {
-    const directory = await project("repo-create-failure");
-    api.request.mockImplementation(async (path: string) => {
-      if (path.startsWith("/github/installations?")) {
-        return {
-          installations: [
-            {
-              id: "installation-row",
-              installationId: "123",
-              account: { login: "example", type: "Organization" },
-            },
-          ],
-        };
-      }
-      if (path.endsWith("/repos")) throw new Error("name already exists");
-      throw new Error(`Unexpected request: ${path}`);
-    });
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--yes", "--json"])).resolves.toBe(1);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "github_repository_creation_failed",
-        details: {
-          account: "example",
-          cause: "name already exists",
-          nextSteps: [
-            { command: "mcp-use deploy --name <unique-name> --yes" },
-            { command: "mcp-use deploy --no-github" },
-          ],
-        },
-      },
-    });
-  });
-
-  it("reports inaccessible GitHub repositories with install and retry steps", async () => {
-    const directory = await project("missing-access");
-    initializeRepository(directory);
-    api.request.mockImplementation(async (path: string) => {
-      if (path.startsWith("/github/installations?")) {
-        return {
-          installations: [
-            {
-              id: "installation-row",
-              installationId: "123",
-              account: { login: "example", type: "Organization" },
-            },
-          ],
-        };
-      }
-      if (path.includes("/access")) return { hasAccess: false };
-      throw new Error(`Unexpected request: ${path}`);
-    });
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "github_access_required",
-        details: {
-          repository: "example/project",
-          nextSteps: expect.any(Array),
-        },
-      },
-    });
-  });
-
-  it("reports when server creation does not start a deployment", async () => {
-    const directory = await project("missing-deployment");
-    initializeRepository(directory);
-    api.request.mockImplementation(
-      async (path: string, init?: { body?: string }) => {
-        if (path.startsWith("/github/installations?")) {
-          return {
-            installations: [
-              {
-                id: "installation-row",
-                installationId: "123",
-                account: { login: "example", type: "Organization" },
-              },
-            ],
-          };
-        }
-        if (path.includes("/access")) return { hasAccess: true };
-        if (path === "/servers") {
-          expect(init?.body).toBeDefined();
-          return {
-            server: { id: "srv_without_deployment", slug: "missing" },
-            deploymentId: null,
-          };
-        }
-        throw new Error(`Unexpected request: ${path}`);
-      }
-    );
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(1);
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "deployment_not_created",
-        details: {
-          serverId: "srv_without_deployment",
-          nextSteps: [
-            {
-              command: "mcp-use servers get srv_without_deployment",
-            },
-          ],
-        },
-      },
-    });
-  });
-
-  it("enforces the managed 80 MB compressed archive limit", () => {
-    expect(() => assertManagedArchiveSize(80 * 1024 * 1024)).not.toThrow();
-    expect(() => assertManagedArchiveSize(80 * 1024 * 1024 + 1)).toThrowError(
-      expect.objectContaining({
-        code: "archive_too_large",
-        details: expect.objectContaining({
-          maxBytes: 80 * 1024 * 1024,
-          nextSteps: expect.any(Array),
-        }),
-      })
-    );
-  });
-
-  it("auto-detects and reuses a linked managed server", async () => {
-    const directory = await project("managed-redeploy");
-    const linkDirectory = join(directory, ".mcp-use", "cloud");
-    await mkdir(linkDirectory, { recursive: true });
-    await writeFile(
-      join(linkDirectory, "link.json"),
-      `${JSON.stringify({
-        organizationId: "org_1",
-        serverId: "srv_existing",
-        serverSlug: "existing",
-        repository: "managed/hidden",
-      })}\n`
-    );
-    api.request.mockImplementation(async (path: string) => {
-      if (path === "/servers/srv_existing") {
-        return { connectedRepository: { isManaged: true } };
-      }
-      if (path === "/deployments") return { id: "dep_redeploy" };
-      throw new Error(`Unexpected request: ${path}`);
-    });
-    api.multipartRequest.mockResolvedValue({ commitSha: "abc123" });
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--json"])).resolves.toBe(0);
-
-    expect(api.multipartRequest).toHaveBeenCalledWith(
-      "/servers/srv_existing/source",
-      expect.any(FormData)
-    );
-    expect(api.request).toHaveBeenCalledWith("/deployments", {
-      method: "POST",
-      body: JSON.stringify({
-        serverId: "srv_existing",
-        branch: "main",
-        trigger: "redeploy",
+  test("--branch deploys a preview without repointing the saved production branch, and rotations preserve sensitive", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    await repository(cli.cwd);
+    await link(cli.cwd);
+    cloud.on("GET", "/api/v1/servers/srv_1", {
+      body: server({
+        id: "srv_1",
+        connectedRepository: { isManaged: false, productionBranch: "main" },
       }),
     });
-    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
-      webUrl:
-        "https://cloud.example.test/cloud/primary-demo/servers/srv_existing/overview",
+    cloud.on("GET", "/api/v1/servers/srv_1/env-variables", {
+      body: [
+        {
+          id: "var_1",
+          key: "KEY",
+          branch: "feature",
+          environments: ["preview"],
+        },
+      ],
     });
+    cloud.on("PATCH", "/api/v1/servers/srv_1/env-variables/var_1", {
+      body: { id: "var_1" },
+    });
+    cloud.on("POST", "/api/v1/deployments", { body: { id: "dep_1" } });
+    const result = await cli.run(
+      [
+        "deploy",
+        "--branch",
+        "feature",
+        "--env",
+        "KEY=rotated",
+        "--no-wait",
+        "--json",
+      ],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(cloud.requestsTo("PATCH", "/api/v1/servers/srv_1")).toEqual([]);
+    expect(
+      cloud.requestsTo("PATCH", "/api/v1/servers/srv_1/env-variables/var_1")
+    ).toMatchObject([
+      {
+        body: {
+          value: "rotated",
+          branch: "feature",
+          environments: ["preview"],
+        },
+      },
+    ]);
+    expect(
+      cloud.requestsTo("PATCH", "/api/v1/servers/srv_1/env-variables/var_1")[0]!
+        .body
+    ).not.toHaveProperty("sensitive");
   });
 
-  it("synchronizes configuration before a linked managed redeploy", async () => {
-    const directory = await project("managed-config-redeploy");
-    await mkdir(join(directory, ".manufact"), { recursive: true });
-    await writeFile(
-      join(directory, ".manufact", "project.json"),
-      `${JSON.stringify({ orgId: "org_1", serverId: "srv_managed_config" })}\n`
-    );
-    api.request.mockImplementation(async (path: string) => {
-      if (path === "/servers/srv_managed_config")
-        return {
-          id: "srv_managed_config",
-          connectedRepository: { isManaged: true },
-        };
-      if (path === "/deployments") return { id: "dep_managed_config" };
-      throw new Error(`Unexpected request: ${path}`);
+  test("new GitHub deploy checks installation access and creates a server with build settings", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    await repository(cli.cwd);
+    cloud.on("GET", "/api/v1/github/installations", {
+      body: {
+        installations: [
+          {
+            id: "inst_record",
+            installationId: "123",
+            account: { login: "example", type: "Organization" },
+          },
+        ],
+      },
     });
-    api.multipartRequest.mockResolvedValue({ commitSha: "abc123" });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await expect(
-      runDeploy([
-        directory,
+    cloud.on(
+      "GET",
+      "/api/v1/github/installations/123/repos/example/weather/access",
+      { body: { hasAccess: true } }
+    );
+    cloud.on("POST", "/api/v1/servers", {
+      body: { server: { id: "srv_1", slug: "weather" }, deploymentId: "dep_1" },
+    });
+    const result = await cli.run(
+      [
+        "deploy",
+        "--build-command",
+        "python build.py",
+        "--start-command",
+        "python weather.py",
         "--region",
         "EU",
-        "--root-dir",
-        ".",
-        "--build-command",
-        "npm run build:cloud",
-        "--start-command",
-        "npm run start:cloud",
-        "--dockerfile",
-        "Dockerfile.cloud",
+        "--no-wait",
         "--json",
-      ])
-    ).resolves.toBe(0);
-
-    expect(api.request).toHaveBeenCalledWith("/servers/srv_managed_config", {
-      method: "PATCH",
-      body: JSON.stringify({
-        region: "EU",
-        config: {
-          rootDir: ".",
-          buildCommand: "npm run build:cloud",
-          startCommand: "npm run start:cloud",
-          dockerfilePath: "Dockerfile.cloud",
+      ],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(cloud.requestsTo("POST", "/api/v1/servers")).toMatchObject([
+      {
+        body: {
+          type: "github",
+          organizationId: "org_1",
+          installationId: "inst_record",
+          repoFullName: "example/weather",
+          branch: "main",
+          buildCommand: "python build.py",
+          startCommand: "python weather.py",
+          region: "EU",
         },
-      }),
-    });
+      },
+    ]);
   });
 
-  it("uploads the workspace root and preserves managed root-dir configuration", async () => {
-    const directory = await project("workspace-root");
-    await writeFile(
-      join(directory, "package.json"),
-      `${JSON.stringify({ name: "workspace-root", workspaces: ["apps/*"] })}\n`
-    );
-    await mkdir(join(directory, "apps", "server"), { recursive: true });
-    await writeFile(
-      join(directory, "apps", "server", "package.json"),
-      `${JSON.stringify({
-        name: "workspace-server",
-        dependencies: { shared: "workspace:*" },
-      })}\n`
-    );
-    await writeFile(
-      join(directory, "apps", "server", "index.ts"),
-      "export {};\n"
-    );
-    api.multipartRequest.mockResolvedValue({
-      server: { id: "srv_workspace", slug: "workspace" },
-      deploymentId: "dep_workspace",
-    });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await expect(
-      runDeploy([
-        directory,
-        "--no-github",
-        "--root-dir",
-        "apps/server",
-        "--json",
-      ])
-    ).resolves.toBe(0);
-
-    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
-    expect(form.get("rootDir")).toBe("apps/server");
-    const entries = await archiveEntries(form.get("sourceFile") as Blob);
-    expect(entries).toContain("app/package.json");
-    expect(entries).toContain("app/apps/server/package.json");
-    expect(entries).toContain("app/apps/server/index.ts");
-  });
-
-  it("rejects unresolved workspace dependencies in standalone uploads", async () => {
-    const directory = await project("workspace-child");
-    await writeFile(
-      join(directory, "package.json"),
-      `${JSON.stringify({
-        name: "workspace-child",
-        dependencies: { shared: "workspace:*" },
-      })}\n`
-    );
-    const stderr = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-
-    await expect(runDeploy([directory, "--no-github", "--json"])).resolves.toBe(
-      1
-    );
-
-    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
-      error: {
-        code: "workspace_dependencies_unresolved",
-        details: { dependencies: ["shared"] },
+  test("a server API error cannot disclose an --env secret", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    cloud.on("POST", "/api/v1/servers", {
+      status: 400,
+      body: {
+        error: "Rejected WEATHER_KEY=top-secret",
+        code: "invalid",
+        details: null,
       },
     });
-    expect(api.multipartRequest).not.toHaveBeenCalled();
+    const result = await cli.run(
+      ["deploy", "--no-github", "--env", "WEATHER_KEY=top-secret", "--json"],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({ error: { code: "validation_error" } });
+    expect(result.stdout).not.toContain("top-secret");
+    expect(result.stderr).not.toContain("top-secret");
   });
 
-  it("uses the installation row UUID when creating a GitHub server", async () => {
-    const directory = await project("github-deploy");
-    execFileSync("git", ["init", "-b", "main"], { cwd: directory });
-    execFileSync("git", ["config", "user.email", "test@example.com"], {
-      cwd: directory,
-    });
-    execFileSync("git", ["config", "user.name", "CLI Test"], {
-      cwd: directory,
-    });
-    execFileSync("git", ["add", "."], { cwd: directory });
-    execFileSync("git", ["commit", "-m", "Initial commit"], { cwd: directory });
-    execFileSync(
-      "git",
-      [
-        "remote",
-        "add",
-        "origin",
-        "https://github.com/example/github-deploy.git",
-      ],
-      { cwd: directory }
-    );
-    api.request.mockImplementation(
-      async (path: string, init?: { body?: string }) => {
-        if (path.startsWith("/github/installations?")) {
-          return {
-            installations: [
-              {
-                id: "00000000-0000-4000-8000-000000000001",
-                installationId: "12345678",
-                account: { login: "example", type: "Organization" },
-              },
-            ],
-          };
+  test("external URLs reject conflicting flags and insecure URLs before Cloud auth", async ({
+    cli,
+    cloud,
+  }) => {
+    for (const args of [
+      ["--external-url", "http://example.test/mcp"],
+      ["--external-url", "https://example.test/mcp", "--no-github"],
+    ]) {
+      const result = await cli.run(["deploy", ...args, "--json"]);
+      expect(result.exitCode).toBe(2);
+      expect(result.json).toHaveProperty("error");
+    }
+    expect(cloud.requests).toEqual([]);
+  });
+
+  test("registers an HTTPS MCP endpoint after a real handshake and updates the linked external server", async ({
+    cli,
+    cloud,
+  }) => {
+    const cert = join(cli.home, "cert.pem");
+    const key = join(cli.home, "key.pem");
+    await exec("openssl", [
+      "req",
+      "-x509",
+      "-newkey",
+      "rsa:2048",
+      "-nodes",
+      "-keyout",
+      key,
+      "-out",
+      cert,
+      "-days",
+      "1",
+      "-subj",
+      "/CN=localhost",
+      "-addext",
+      "subjectAltName=IP:127.0.0.1",
+    ]);
+    const methods: string[] = [];
+    let invalidMcp = false;
+    const endpoint = createServer(
+      { key: await readFile(key), cert: await readFile(cert) },
+      (request, response) => {
+        if (invalidMcp) {
+          response
+            .writeHead(200, { "Content-Type": "text/html" })
+            .end("<html>A website</html>");
+          return;
         }
-        if (path.includes("/access")) return { hasAccess: true };
-        if (path === "/servers") {
-          expect(JSON.parse(init?.body ?? "{}")).toMatchObject({
-            installationId: "00000000-0000-4000-8000-000000000001",
-            repoFullName: "example/github-deploy",
-            watchPaths: ["apps/server/**", "packages/shared/**"],
-            waitForCi: true,
-          });
-          return {
-            server: { id: "srv_github", slug: "github-deploy" },
-            deploymentId: "dep_github",
-          };
+        if (request.method !== "POST") {
+          response.writeHead(405).end();
+          return;
         }
-        throw new Error(`Unexpected request: ${path}`);
+        let body = "";
+        request.on("data", (chunk) => {
+          body += chunk;
+        });
+        request.on("end", () => {
+          const message = JSON.parse(body) as {
+            id?: number;
+            method: string;
+            params?: { protocolVersion: string };
+          };
+          methods.push(message.method);
+          if (message.id === undefined) {
+            response.writeHead(202).end();
+            return;
+          }
+          const result =
+            message.method === "initialize"
+              ? {
+                  protocolVersion: message.params!.protocolVersion,
+                  capabilities: {},
+                  serverInfo: { name: "weather", version: "1" },
+                }
+              : message.method === "tools/list"
+                ? { tools: [] }
+                : { resources: [] };
+          response
+            .writeHead(200, { "Content-Type": "application/json" })
+            .end(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }));
+        });
       }
     );
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runDeploy([
-        directory,
-        "--watch-paths",
-        "apps/server/**",
-        "--watch-paths",
-        "packages/shared/**",
-        "--wait-for-ci",
-        "--json",
-      ])
-    ).resolves.toBe(0);
-    expect(
-      execFileSync("git", ["status", "--porcelain"], {
-        cwd: directory,
-        encoding: "utf8",
-      }).trim()
-    ).toBe("");
-    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
-      webUrl:
-        "https://cloud.example.test/cloud/primary-demo/servers/srv_github/overview",
-    });
-  });
-
-  it("synchronizes configuration before a linked GitHub redeploy", async () => {
-    const directory = await project("github-config-redeploy");
-    initializeRepository(
-      directory,
-      "https://github.com/example/github-config-redeploy.git"
+    await new Promise<void>((resolve) =>
+      endpoint.listen(0, "127.0.0.1", resolve)
     );
-    await writeFile(join(directory, ".gitignore"), ".mcp-use/\n");
-    execFileSync("git", ["add", ".gitignore"], { cwd: directory });
-    execFileSync("git", ["commit", "-m", "Ignore local cloud state"], {
-      cwd: directory,
-    });
-    const linkDirectory = join(directory, ".mcp-use", "cloud");
-    await mkdir(linkDirectory, { recursive: true });
-    await writeFile(
-      join(linkDirectory, "link.json"),
-      `${JSON.stringify({
-        organizationId: "org_1",
-        serverId: "srv_github_config",
-        repository: "example/github-config-redeploy",
-        sourceType: "github",
-      })}\n`
-    );
-    api.request.mockImplementation(async (path: string) => {
-      if (path === "/servers/srv_github_config") {
-        return { id: "srv_github_config" };
-      }
-      if (path === "/deployments") return { id: "dep_github_config" };
-      throw new Error(`Unexpected request: ${path}`);
-    });
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runDeploy([
-        directory,
-        "--region",
-        "APAC",
-        "--root-dir",
-        ".",
-        "--build-command",
-        "npm run build:cloud",
-        "--start-command",
-        "npm run start:cloud",
-        "--dockerfile",
-        "Dockerfile.cloud",
-        "--watch-paths",
-        "apps/api/**",
-        "--wait-for-ci",
-        "--json",
-      ])
-    ).resolves.toBe(0);
-
-    expect(api.request).toHaveBeenCalledWith("/servers/srv_github_config", {
-      method: "PATCH",
-      body: JSON.stringify({
-        region: "APAC",
-        watchPaths: ["apps/api/**"],
-        waitForCi: true,
-        config: {
-          rootDir: ".",
-          buildCommand: "npm run build:cloud",
-          startCommand: "npm run start:cloud",
-          dockerfilePath: "Dockerfile.cloud",
-        },
-      }),
-    });
-    expect(api.request).toHaveBeenCalledWith("/deployments", {
-      method: "POST",
-      body: JSON.stringify({
-        serverId: "srv_github_config",
-        branch: "main",
-        trigger: "manual",
-      }),
-    });
-    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toMatchObject({
-      webUrl:
-        "https://cloud.example.test/cloud/primary-demo/servers/srv_github_config/overview",
-    });
-  });
-});
-
-async function archiveEntries(blob: Blob): Promise<string[]> {
-  const entries: string[] = [];
-  const archive = gunzipSync(Buffer.from(await blob.arrayBuffer()));
-  let offset = 0;
-  let paxPath: string | undefined;
-  while (offset + 512 <= archive.length) {
-    const header = archive.subarray(offset, offset + 512);
-    if (header.every((byte) => byte === 0)) break;
-    const expectedChecksum = Number.parseInt(
-      tarString(header, 148, 8) || "0",
-      8
-    );
-    const checksumHeader = Buffer.from(header);
-    checksumHeader.fill(0x20, 148, 156);
-    const actualChecksum = checksumHeader.reduce((sum, byte) => sum + byte, 0);
-    if (actualChecksum !== expectedChecksum) {
-      throw new Error(
-        `Invalid tar checksum: expected ${expectedChecksum}, got ${actualChecksum}`
+    try {
+      const url = `https://127.0.0.1:${(endpoint.address() as { port: number }).port}/mcp`;
+      signIn(cloud);
+      cloud.on("POST", "/api/v1/servers", {
+        body: { server: { id: "srv_1", slug: "weather" }, deploymentId: null },
+      });
+      const env = { ...SIGNED_IN, NODE_EXTRA_CA_CERTS: cert };
+      const created = await cli.run(
+        ["deploy", "--external-url", url, "--json"],
+        { env }
+      );
+      expect(created.exitCode).toBe(0);
+      expect(created.json, created.stdout).toMatchObject({
+        sourceType: "external",
+        serverId: "srv_1",
+        status: "registered",
+        externalUrl: url,
+      });
+      expect(methods).toContain("initialize");
+      cloud.on("GET", "/api/v1/servers/srv_1", {
+        body: server({ id: "srv_1", isExternal: true }),
+      });
+      cloud.on("PATCH", "/api/v1/servers/srv_1", {
+        body: { id: "srv_1", slug: "weather" },
+      });
+      const updated = await cli.run(
+        ["deploy", "--external-url", url, "--name", "renamed", "--json"],
+        { env }
+      );
+      expect(updated.exitCode).toBe(0);
+      expect(cloud.requestsTo("POST", "/api/v1/servers")).toHaveLength(1);
+      expect(cloud.requestsTo("PATCH", "/api/v1/servers/srv_1")).toMatchObject([
+        { body: { externalUrl: url, name: "renamed" } },
+      ]);
+      const requestsBeforeInvalid = cloud.requests.length;
+      invalidMcp = true;
+      const invalid = await cli.run(
+        ["deploy", "--external-url", url, "--new", "--json"],
+        { env }
+      );
+      expect(invalid.exitCode).toBe(1);
+      expect(invalid.json).toMatchObject({
+        error: { code: "invalid_mcp_server" },
+      });
+      expect(cloud.requests).toHaveLength(requestsBeforeInvalid);
+    } finally {
+      endpoint.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        endpoint.close((error) => (error ? reject(error) : resolve()))
       );
     }
-    const name = tarString(header, 0, 100);
-    const prefix = tarString(header, 345, 155);
-    const size = Number.parseInt(tarString(header, 124, 12) || "0", 8);
-    const type = String.fromCharCode(header[156] ?? 0);
-    const body = archive.subarray(offset + 512, offset + 512 + size);
-    if (type === "x") {
-      const match = body.toString("utf8").match(/(?:^|\n)\d+ path=([^\n]+)/);
-      paxPath = match?.[1];
-    } else {
-      entries.push(paxPath ?? (prefix === "" ? name : `${prefix}/${name}`));
-      paxPath = undefined;
-    }
-    offset += 512 + Math.ceil(size / 512) * 512;
-  }
-  return entries;
-}
-
-function tarString(buffer: Buffer, offset: number, length: number): string {
-  const end = buffer.indexOf(0, offset);
-  return buffer
-    .subarray(
-      offset,
-      end === -1 || end > offset + length ? offset + length : end
-    )
-    .toString("utf8")
-    .trim();
-}
+  });
+});

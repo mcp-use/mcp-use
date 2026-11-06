@@ -40,6 +40,15 @@ const OPERATIONS = [
   "GET /api/v1/deployments/{id}/logs",
   "GET /api/v1/servers",
   "GET /api/v1/servers/{id}",
+  "POST /api/v1/servers",
+  "PATCH /api/v1/servers/{id}",
+  "POST /api/v1/servers/{id}/source",
+  "GET /api/v1/github/installations",
+  "POST /api/v1/github/installations/{installationId}/repos",
+  "GET /api/v1/github/installations/{installationId}/repos/{owner}/{repo}/access",
+  "GET /api/v1/servers/{id}/env-variables",
+  "POST /api/v1/servers/{id}/env-variables",
+  "PATCH /api/v1/servers/{id}/env-variables/{varId}",
 ];
 
 /**
@@ -67,7 +76,32 @@ const RESPONSE_FIELDS = {
     "limit",
     "skip",
   ],
-  "GET /api/v1/servers/{id}": ["id", "slug", "name", "organizationId"],
+  "GET /api/v1/servers/{id}": [
+    "id",
+    "slug",
+    "name",
+    "organizationId",
+    "isExternal",
+    "connectedRepository.isManaged",
+    "connectedRepository.productionBranch",
+  ],
+  "POST /api/v1/servers": ["server.id", "server.slug", "deploymentId"],
+  "PATCH /api/v1/servers/{id}": ["id", "slug"],
+  "POST /api/v1/servers/{id}/source": ["commitSha"],
+  "GET /api/v1/github/installations": [
+    "installations[].id",
+    "installations[].installationId",
+    "installations[].account.login",
+    "installations[].account.type",
+  ],
+  "GET /api/v1/servers/{id}/env-variables": [
+    "[].id",
+    "[].key",
+    "[].branch",
+    "[].environments",
+  ],
+  "POST /api/v1/servers/{id}/env-variables": ["id"],
+  "PATCH /api/v1/servers/{id}/env-variables/{varId}": ["id"],
 };
 
 const spec = JSON.parse(await readFile(resolve(process.cwd(), input), "utf8"));
@@ -199,6 +233,18 @@ console.log(`Generated types for ${operations.length} Cloud operations.`);
 /** Keep selected success fields, failing if a field was renamed or removed. */
 function keepFields(schema, paths, where) {
   const resolved = resolveRef(schema);
+  for (const union of ["anyOf", "oneOf"]) {
+    if (resolved[union] !== undefined) {
+      return {
+        ...resolved,
+        [union]: resolved[union].map((variant) =>
+          resolveRef(variant).type === "null"
+            ? variant
+            : keepFields(variant, paths, where)
+        ),
+      };
+    }
+  }
   if (resolved.type === "array" || resolved.items !== undefined) {
     return {
       ...resolved,

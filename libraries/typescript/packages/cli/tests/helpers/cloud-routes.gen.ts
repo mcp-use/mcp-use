@@ -96,6 +96,50 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/github/installations": {
+    data: T.operations["getApiV1GithubInstallations"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1GithubInstallations"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1GithubInstallations"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1GithubInstallations"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1GithubInstallations"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1GithubInstallations"]["responses"][404]
+      >;
+    };
+  };
+  "GET /api/v1/github/installations/{installationId}/repos/{owner}/{repo}/access": {
+    data: T.operations["getApiV1GithubInstallationsByInstallationIdReposByOwnerByRepoAccess"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1GithubInstallationsByInstallationIdReposByOwnerByRepoAccess"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1GithubInstallationsByInstallationIdReposByOwnerByRepoAccess"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1GithubInstallationsByInstallationIdReposByOwnerByRepoAccess"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1GithubInstallationsByInstallationIdReposByOwnerByRepoAccess"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1GithubInstallationsByInstallationIdReposByOwnerByRepoAccess"]["responses"][404]
+      >;
+    };
+  };
   "GET /api/v1/organizations": {
     data: T.operations["getApiV1Organizations"]["parameters"];
     responses: {
@@ -142,6 +186,28 @@ export interface CloudRoutes {
       404: ResponseBody<T.operations["getApiV1ServersById"]["responses"][404]>;
     };
   };
+  "GET /api/v1/servers/{id}/env-variables": {
+    data: T.operations["getApiV1ServersByIdEnvVariables"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1ServersByIdEnvVariables"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1ServersByIdEnvVariables"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1ServersByIdEnvVariables"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1ServersByIdEnvVariables"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1ServersByIdEnvVariables"]["responses"][404]
+      >;
+    };
+  };
   "GET /api/v1/user-preferences": {
     data: T.operations["getApiV1UserPreferences"]["parameters"];
     responses: {
@@ -161,6 +227,50 @@ export interface CloudRoutes {
       >;
       404: ResponseBody<
         T.operations["getApiV1UserPreferences"]["responses"][404]
+      >;
+    };
+  };
+  "PATCH /api/v1/servers/{id}": {
+    data: T.operations["patchApiV1ServersById"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["patchApiV1ServersById"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["patchApiV1ServersById"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["patchApiV1ServersById"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["patchApiV1ServersById"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["patchApiV1ServersById"]["responses"][404]
+      >;
+    };
+  };
+  "PATCH /api/v1/servers/{id}/env-variables/{varId}": {
+    data: T.operations["patchApiV1ServersByIdEnvVariablesByVarId"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["patchApiV1ServersByIdEnvVariablesByVarId"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["patchApiV1ServersByIdEnvVariablesByVarId"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["patchApiV1ServersByIdEnvVariablesByVarId"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["patchApiV1ServersByIdEnvVariablesByVarId"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["patchApiV1ServersByIdEnvVariablesByVarId"]["responses"][404]
       >;
     };
   };
@@ -232,6 +342,84 @@ export interface CloudRoutes {
       404: ResponseBody<T.operations["postApiV1Deployments"]["responses"][404]>;
     };
   };
+  "POST /api/v1/github/installations/{installationId}/repos": {
+    data: T.operations["postApiV1GithubInstallationsByInstallationIdRepos"]["parameters"];
+    responses: {
+      201: ResponseBody<
+        T.operations["postApiV1GithubInstallationsByInstallationIdRepos"]["responses"][201]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1GithubInstallationsByInstallationIdRepos"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1GithubInstallationsByInstallationIdRepos"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1GithubInstallationsByInstallationIdRepos"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1GithubInstallationsByInstallationIdRepos"]["responses"][404]
+      >;
+    };
+  };
+  "POST /api/v1/servers": {
+    data: T.operations["postApiV1Servers"]["parameters"];
+    responses: {
+      201: ResponseBody<T.operations["postApiV1Servers"]["responses"][201]>;
+    };
+    errors: {
+      400: ResponseBody<T.operations["postApiV1Servers"]["responses"][400]>;
+      401: ResponseBody<T.operations["postApiV1Servers"]["responses"][401]>;
+      403: ResponseBody<T.operations["postApiV1Servers"]["responses"][403]>;
+      404: ResponseBody<T.operations["postApiV1Servers"]["responses"][404]>;
+    };
+  };
+  "POST /api/v1/servers/{id}/env-variables": {
+    data: T.operations["postApiV1ServersByIdEnvVariables"]["parameters"];
+    responses: {
+      201: ResponseBody<
+        T.operations["postApiV1ServersByIdEnvVariables"]["responses"][201]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1ServersByIdEnvVariables"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1ServersByIdEnvVariables"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1ServersByIdEnvVariables"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1ServersByIdEnvVariables"]["responses"][404]
+      >;
+    };
+  };
+  "POST /api/v1/servers/{id}/source": {
+    data: T.operations["postApiV1ServersByIdSource"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiV1ServersByIdSource"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1ServersByIdSource"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1ServersByIdSource"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1ServersByIdSource"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1ServersByIdSource"]["responses"][404]
+      >;
+    };
+  };
 }
 
 /** Route templates used by the fake Cloud at runtime. */
@@ -241,13 +429,22 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "GET /api/v1/deployments/{id}",
   "GET /api/v1/deployments/{id}/build-logs",
   "GET /api/v1/deployments/{id}/logs",
+  "GET /api/v1/github/installations",
+  "GET /api/v1/github/installations/{installationId}/repos/{owner}/{repo}/access",
   "GET /api/v1/organizations",
   "GET /api/v1/servers",
   "GET /api/v1/servers/{id}",
+  "GET /api/v1/servers/{id}/env-variables",
   "GET /api/v1/user-preferences",
+  "PATCH /api/v1/servers/{id}",
+  "PATCH /api/v1/servers/{id}/env-variables/{varId}",
   "POST /api/auth/api-key/create",
   "POST /api/auth/api-key/delete",
   "POST /api/v1/deployments",
+  "POST /api/v1/github/installations/{installationId}/repos",
+  "POST /api/v1/servers",
+  "POST /api/v1/servers/{id}/env-variables",
+  "POST /api/v1/servers/{id}/source",
 ];
 
 /** Documented default success status for each route. */
@@ -259,11 +456,20 @@ export const cloudRouteSuccessStatus: Readonly<
   "GET /api/v1/deployments/{id}": 200,
   "GET /api/v1/deployments/{id}/build-logs": 200,
   "GET /api/v1/deployments/{id}/logs": 200,
+  "GET /api/v1/github/installations": 200,
+  "GET /api/v1/github/installations/{installationId}/repos/{owner}/{repo}/access": 200,
   "GET /api/v1/organizations": 200,
   "GET /api/v1/servers": 200,
   "GET /api/v1/servers/{id}": 200,
+  "GET /api/v1/servers/{id}/env-variables": 200,
   "GET /api/v1/user-preferences": 200,
+  "PATCH /api/v1/servers/{id}": 200,
+  "PATCH /api/v1/servers/{id}/env-variables/{varId}": 200,
   "POST /api/auth/api-key/create": 200,
   "POST /api/auth/api-key/delete": 200,
   "POST /api/v1/deployments": 201,
+  "POST /api/v1/github/installations/{installationId}/repos": 201,
+  "POST /api/v1/servers": 201,
+  "POST /api/v1/servers/{id}/env-variables": 201,
+  "POST /api/v1/servers/{id}/source": 200,
 };

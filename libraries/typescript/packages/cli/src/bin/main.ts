@@ -231,7 +231,7 @@ export async function main(
     return runUnlink(commandArgs);
   }
   if (command === "deploy") {
-    const { runDeploy } = await import("../cloud/deploy.js");
+    const { runDeploy } = await import("../cloud/deploy/index.js");
     return runDeploy(commandArgs);
   }
   if (command === "client") {

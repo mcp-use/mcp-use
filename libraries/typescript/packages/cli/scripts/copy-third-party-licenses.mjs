@@ -19,6 +19,17 @@ const requireFromServer = createRequire(serverManifest);
 const packageRoots = new Map([
   ["@modelcontextprotocol/server", dirname(serverManifest)],
   [
+    "@modelcontextprotocol/client",
+    dirname(
+      fileURLToPath(
+        new URL(
+          "../node_modules/@modelcontextprotocol/client/package.json",
+          import.meta.url
+        )
+      )
+    ),
+  ],
+  [
     "@modelcontextprotocol/core",
     resolvePackageRoot("@modelcontextprotocol/core"),
   ],
