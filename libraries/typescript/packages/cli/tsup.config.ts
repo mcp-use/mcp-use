@@ -66,10 +66,10 @@ export default defineConfig({
     // Reuse the SDK's public ingestion project at build time. The CLI stays
     // independent of the optional client package at runtime.
     __MCP_USE_POSTHOG_HOST__: JSON.stringify(
-      process.env.MCP_USE_POSTHOG_HOST ?? POSTHOG_HOST
+      process.env.MCP_USE_POSTHOG_HOST?.trim() || POSTHOG_HOST
     ),
     __MCP_USE_POSTHOG_KEY__: JSON.stringify(
-      process.env.MCP_USE_POSTHOG_API_KEY ?? POSTHOG_API_KEY
+      process.env.MCP_USE_POSTHOG_API_KEY?.trim() || POSTHOG_API_KEY
     ),
   },
 });

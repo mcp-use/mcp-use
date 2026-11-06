@@ -1,4 +1,11 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -106,6 +113,12 @@ describe("anonymous CLI analytics", () => {
     [["help", "org", "use"], "org", "use", true],
     [["build", "--help"], "build", undefined, true],
     [["--version"], "version", undefined, false],
+    [["dev", "--version"], "version", undefined, false],
+    [["build", "-v"], "version", undefined, false],
+    [["typecheck", "--", "--version"], "typecheck", undefined, false],
+    [["dev", "--port", "invalid", "--version"], "dev", undefined, false],
+    [["servers", "get", "--version"], "servers", "get", false],
+    [[], "help", undefined, true],
   ] as const)(
     "captures only known command literals for %j",
     async (argv, command, subcommand, help) => {
@@ -119,6 +132,8 @@ describe("anonymous CLI analytics", () => {
 
   it.each([
     ["MCP_USE_ANONYMIZED_TELEMETRY", "false"],
+    ["MCP_USE_ANONYMIZED_TELEMETRY", "FALSE"],
+    ["MCP_USE_ANONYMIZED_TELEMETRY", "FaLsE"],
     ["DO_NOT_TRACK", "1"],
     ["NODE_ENV", "test"],
   ])("%s=%s prevents network and identity writes", async (name, value) => {
@@ -135,6 +150,25 @@ describe("anonymous CLI analytics", () => {
     await captureCliUsage(["dev"]);
     expect(capture).not.toHaveBeenCalled();
   });
+
+  it.each(["", "{", "null", "{}", '{"installationId":"invalid"}'])(
+    "repairs damaged installation state %j and keeps the recovered ID",
+    async (contents) => {
+      const directory = join(home, ".mcp-use");
+      const file = join(directory, "cli-telemetry.json");
+      await mkdir(directory);
+      await writeFile(file, contents);
+      await captureCliUsage(["dev"]);
+      await captureCliUsage(["build"]);
+      expect(events()).toHaveLength(2);
+      expect(events()[0].distinct_id).toMatch(/^cli:[0-9a-f-]{36}$/);
+      expect(events()[1].distinct_id).toBe(events()[0].distinct_id);
+      expect(JSON.parse(await readFile(file, "utf8")).installationId).toBe(
+        events()[0].distinct_id.slice(4)
+      );
+      expect(await readdir(directory)).toEqual(["cli-telemetry.json"]);
+    }
+  );
 
   it("silently tolerates offline capture", async () => {
     capture.mockRejectedValue(new Error("offline"));
@@ -177,15 +211,19 @@ cliTest(
     // build pipeline. Loading those modules on a busy Windows runner can
     // legitimately exhaust the best-effort capture's 500 ms delivery budget.
     const build = await cli.run(["build", "--help"], { env });
+    const failed = await cli.run(["unknown-command", "/private/missing.ts"], {
+      env,
+    });
     expect(help.exitCode).toBe(0);
     expect(build.exitCode).toBe(0);
     expect(build.stdout).toContain("Usage: mcp-use build");
     expect(build.stderr).toBe("");
+    expect(failed.exitCode).toBe(2);
     const events = (await readFile(output, "utf8"))
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(3);
     expect(events[0].event).toBe("mcp_use_cli_command");
     expect(events[0].properties).toMatchObject({
       command: "org",
@@ -197,5 +235,18 @@ cliTest(
       is_help: true,
     });
     expect(events[0].distinct_id).toBe(events[1].distinct_id);
+    expect(events[2].properties).toMatchObject({
+      command: "unknown",
+      is_help: false,
+    });
+    expect(events[2].distinct_id).toBe(events[0].distinct_id);
+    expect(JSON.stringify(events)).not.toMatch(
+      /unknown-command|private|missing\.ts/
+    );
+    expect(
+      events.every(
+        (event) => typeof event.api_key === "string" && event.api_key.length > 0
+      )
+    ).toBe(true);
   }
 );

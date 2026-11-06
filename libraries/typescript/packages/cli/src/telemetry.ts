@@ -1,7 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  linkSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { parseArgs } from "./bin/args.js";
 
 declare const __MCP_USE_CLI_VERSION__: string;
 declare const __MCP_USE_POSTHOG_HOST__: string;
@@ -42,13 +50,15 @@ const CLIENT_OPERATIONS: Record<string, readonly string[]> = {
 
 function commandProperties(argv: readonly string[]) {
   const help =
-    argv[0] === "help" || argv.some((arg) => arg === "--help" || arg === "-h");
+    argv.length === 0 ||
+    argv[0] === "help" ||
+    argv.some((arg) => arg === "--help" || arg === "-h");
   let args = argv[0] === "help" ? argv.slice(1) : argv;
   if (args[1] === "--") args = [args[0]!, ...args.slice(2)];
   // The client accepts --json anywhere, including before the saved name.
   if (args[0] === "client") args = args.filter((arg) => arg !== "--json");
   const root = args[0];
-  const command =
+  let command =
     root !== undefined && Object.hasOwn(COMMANDS, root)
       ? root
       : help || args.length === 0
@@ -56,6 +66,18 @@ function commandProperties(argv: readonly string[]) {
         : args.length === 1 && (root === "--version" || root === "-v")
           ? "version"
           : "unknown";
+  // Only local/global requests reach this parser in main(). Cloud and client
+  // commands have their own flag grammar; typecheck forwards flags after --.
+  if (
+    !help &&
+    ["dev", "build", "start", "typecheck", "unknown"].includes(command)
+  ) {
+    try {
+      if (parseArgs(argv).version) command = "version";
+    } catch {
+      // Invalid invocations remain attributed to their command, as in main().
+    }
+  }
   let subcommand: string | undefined;
   if (command === "client" && !COMMANDS.client!.includes(args[1] ?? "")) {
     // `client <saved-server-name> tools call <tool>`: skip the saved name.
@@ -99,7 +121,12 @@ function installationId(): string | undefined {
   const directory = join(homedir(), ".mcp-use");
   const file = join(directory, "cli-telemetry.json");
   const read = (): string | undefined => {
-    const value: unknown = JSON.parse(readFileSync(file, "utf8"));
+    let value: unknown;
+    try {
+      value = JSON.parse(readFileSync(file, "utf8"));
+    } catch {
+      return undefined;
+    }
     if (
       typeof value !== "object" ||
       value === null ||
@@ -113,25 +140,42 @@ function installationId(): string | undefined {
       ? value.installationId
       : undefined;
   };
+  const existing = read();
+  if (existing !== undefined) return existing;
+  const temporary = `${file}.${randomUUID()}.tmp`;
   try {
-    return read();
-  } catch {
-    try {
-      mkdirSync(directory, { recursive: true, mode: 0o700 });
-      const id = randomUUID();
-      writeFileSync(file, JSON.stringify({ installationId: id }) + "\n", {
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    writeFileSync(
+      temporary,
+      JSON.stringify({ installationId: randomUUID() }) + "\n",
+      {
         flag: "wx",
         mode: 0o600,
-      });
-      return id;
-    } catch {
-      // Another CLI may have created the identity concurrently. If storage is
-      // unavailable, skip capture instead of inflating adoption with fresh IDs.
-      try {
-        return read();
-      } catch {
-        return undefined;
       }
+    );
+    try {
+      // Publish complete contents without replacing a concurrent creator's ID.
+      linkSync(temporary, file);
+    } catch (error) {
+      const raced = read();
+      if (raced !== undefined) return raced;
+      if (
+        !(error instanceof Error && "code" in error && error.code === "EEXIST")
+      )
+        return undefined;
+      // The existing file is malformed. Replace it with a complete document,
+      // so an interrupted write cannot leave the next run with partial JSON.
+      renameSync(temporary, file);
+    }
+    return read();
+  } catch {
+    // Skip capture when identity storage is unavailable.
+    return undefined;
+  } finally {
+    try {
+      rmSync(temporary, { force: true });
+    } catch {
+      /* Best-effort cleanup. */
     }
   }
 }
@@ -139,7 +183,7 @@ function installationId(): string | undefined {
 /** Record one invocation without delaying command execution or surfacing errors. */
 export async function captureCliUsage(argv: readonly string[]): Promise<void> {
   if (
-    process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false" ||
+    process.env.MCP_USE_ANONYMIZED_TELEMETRY?.toLowerCase() === "false" ||
     process.env.DO_NOT_TRACK === "1" ||
     process.env.NODE_ENV === "test"
   )
