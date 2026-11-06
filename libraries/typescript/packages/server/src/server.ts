@@ -2156,13 +2156,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #createMiddlewareContext<M extends McpMiddlewareMethod>(
     method: M,
     params: MiddlewareContext<M, TEnv>["params"],
-    ctx: ServerContext
+    ctx: ServerContext,
+    fields: { view?: { name: string } } = {}
   ): MiddlewareContext<M, TEnv> {
     const requestContext = toRequestContext<TEnv>(ctx);
     // `requestContext` is the Hono Context shared with the tool callback, whose
     // own `ctx.auth` has a different shape. Keep the middleware fields on a
     // per-operation overlay instead of writing them onto the shared object.
     const overlay: Record<PropertyKey, unknown> = {
+      ...fields,
       method,
       params,
       ...(ctx.sessionId !== undefined && {
@@ -2207,6 +2209,28 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         return own;
       },
     }) as unknown as MiddlewareContext<M, TEnv>;
+  }
+
+  /**
+   * Run a `resources/read` handler through MCP middleware, observers, and
+   * usage telemetry. `view` is set only for tool view reads.
+   */
+  #hookResourceRead(
+    uri: URL,
+    ctx: ServerContext,
+    innerFn: () => Promise<McpMiddlewareResult<"resources/read">>,
+    view?: { name: string }
+  ): Promise<McpMiddlewareResult<"resources/read">> {
+    const mwCtx = this.#createMiddlewareContext(
+      "resources/read",
+      {
+        uri: uri.href,
+        ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
+      },
+      ctx,
+      view === undefined ? {} : { view }
+    );
+    return this.#runMcpHook("resources/read", mwCtx, innerFn);
   }
 
   #runMcpHook<M extends McpMiddlewareMethod>(
@@ -2557,47 +2581,57 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       uri,
       resourceConfig,
       async (readUri, ctx) => {
-        const req = ctx.http?.req;
-        const readOptions: BuildResourceUiMetaOptions =
-          req !== undefined
-            ? {
-                request: req,
-                ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
-              }
-            : metaOptions.hmrWs === true
-              ? { hmrWs: true }
-              : {};
-        const assetsBase =
-          req !== undefined
-            ? resolveAssetsBase(req)
-            : metaOptions.request !== undefined
-              ? resolveAssetsBase(metaOptions.request)
-              : "";
-        const html = synthesizeViewDocument(
-          entry,
-          assetsBase,
-          basePath,
-          viewName
-        );
-        // UI origin and MCP endpoint identity are separate. Claude hashes the
-        // full public endpoint, never the website or asset origin.
-        const meta = await applyClaudeResourceDomain(
-          buildResourceUiMeta(authorFacts, readOptions),
-          requestClientInfo(ctx),
-          (req ?? metaOptions.request)?.headers.get("user-agent"),
-          resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
-            authorFacts?.domain
-        );
-        return {
-          contents: [
-            {
-              uri: readUri.href,
-              mimeType: resourceConfig.mimeType,
-              text: html,
-              _meta: meta,
-            },
-          ],
+        const innerFn = async () => {
+          const req = ctx.http?.req;
+          const readOptions: BuildResourceUiMetaOptions =
+            req !== undefined
+              ? {
+                  request: req,
+                  ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
+                }
+              : metaOptions.hmrWs === true
+                ? { hmrWs: true }
+                : {};
+          const assetsBase =
+            req !== undefined
+              ? resolveAssetsBase(req)
+              : metaOptions.request !== undefined
+                ? resolveAssetsBase(metaOptions.request)
+                : "";
+          const html = synthesizeViewDocument(
+            entry,
+            assetsBase,
+            basePath,
+            viewName
+          );
+          // UI origin and MCP endpoint identity are separate. Claude hashes the
+          // full public endpoint, never the website or asset origin.
+          const meta = await applyClaudeResourceDomain(
+            buildResourceUiMeta(authorFacts, readOptions),
+            requestClientInfo(ctx),
+            (req ?? metaOptions.request)?.headers.get("user-agent"),
+            resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
+              authorFacts?.domain
+          );
+          return {
+            contents: [
+              {
+                uri: readUri.href,
+                mimeType: resourceConfig.mimeType,
+                text: html,
+                _meta: meta,
+              },
+            ],
+          };
         };
+        // Only tool-bound views are views to middleware; on a `mixedAuth`
+        // server these are the ones the OAuth gate serves signed out.
+        return await this.#hookResourceRead(
+          readUri,
+          ctx,
+          innerFn,
+          this.#viewBindings.has(viewName) ? { name: viewName } : undefined
+        );
       }
     );
   }
@@ -2625,20 +2659,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }),
       },
       async (uri, ctx) => {
-        const mwCtx = this.#createMiddlewareContext(
-          "resources/read",
-          {
-            uri: uri.href,
-            ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
-          },
-          ctx
-        );
         const innerFn = async () =>
           toResourceResult(
             await callback(uri, this.#toRequestContext(ctx)),
             uri.href
           );
-        return await this.#runMcpHook("resources/read", mwCtx, innerFn);
+        return await this.#hookResourceRead(uri, ctx, innerFn);
       }
     );
   }
@@ -2670,14 +2696,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }),
       },
       async (uri, variables, ctx) => {
-        const mwCtx = this.#createMiddlewareContext(
-          "resources/read",
-          {
-            uri: uri.href,
-            ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
-          },
-          ctx
-        );
         const innerFn = async () =>
           toResourceResult(
             await callback(
@@ -2687,7 +2705,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             ),
             uri.href
           );
-        return await this.#runMcpHook("resources/read", mwCtx, innerFn);
+        return await this.#hookResourceRead(uri, ctx, innerFn);
       }
     );
   }

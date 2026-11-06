@@ -6,6 +6,27 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.3" description="November 2026">
+  ## Manufact Cloud CLI
+  Canary release updating the bundled CLI to v5 with new Cloud workflows, alongside server and agent fixes.
+
+- **New** (@mcp-use/cli): sign in with device authorization, link a project to a Cloud server and organization, and deploy from GitHub, local source, or an external MCP endpoint. Deployments wait for a running state by default; `--no-wait` returns immediately (`#3027`, `#3026`, `#3030`)
+- **New** (@mcp-use/cli): manage servers, environment variables, deployments, domains, GitHub connections, organizations, team members, alerts, and publishing checklists from the CLI (`#3031`, `#3032`, `#3033`)
+- **Enhancement** (@mcp-use/cli): Cloud commands use typed requests and consistent JSON results and errors, with readable human output and deployment progress. Publishing checks group results and include severity, policy, and client readiness details; use `--verbose` for more detail (`#3021`, `#3030`, `#3033`)
+- **New** (@mcp-use/cli): install the bundled version-matched Manufact Cloud skill with `mcp-use skills install` (`#3034`)
+- **Fix** (server): run `resources/read` middleware, observers, and usage telemetry for view resources. View reads expose `ctx.view`; on mixed-auth servers they may reach middleware before sign-in (`#2849`)
+- **Fix** (@mcp-use/agent): preserve Gemini thought signatures when replaying tool calls, preventing Gemini 3 requests from failing after a tool call (`#2718`)
+- **Update**: Updated @mcp-use/cli to v5.0.0
+- **Documentation**: update the [CLI reference](/typescript/api-reference/cli-reference) and [deployment guide](/typescript/server/deployment/mcp-use) for the Cloud commands (`#3034`)
+</Update>
+
+<Update label="@mcp-use/cli v4.5.5" description="October 2026">
+  ## CLI package refresh
+  Patch release rebuilding bundled workspace code and synchronizing internal package metadata. `mcp-use` is unchanged.
+
+- **Update**: Updated @mcp-use/cli to v4.5.5
+</Update>
+
 <Update label="v2.12.2" description="October 2026">
   ## CSP_URLS scope
   Patch release limiting the `CSP_URLS` shortcut to connect and resource domains. `@mcp-use/cli`, `@mcp-use/inspector`, and `create-mcp-use-app` are unchanged.

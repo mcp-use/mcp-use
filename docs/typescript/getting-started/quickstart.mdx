@@ -15,8 +15,8 @@ generated project includes a server, two tools, and a React View.
 <Note>
   This quickstart uses the `mcp-apps` template. To build a tool-only server, use
   `--template mcp-server`. For an MCP client or agent, start with the [MCP
-  Client](/typescript/client/index) or [MCP
-  Agent](/typescript/agent/index) documentation.
+  Client](/typescript/client/index) or [MCP Agent](/typescript/agent/index)
+  documentation.
 </Note>
 
 ## Prerequisites
@@ -208,8 +208,8 @@ npx mcp-use client local tools list
 ## Deploy the project
 
 Sign in to Manufact, then deploy the generated project. `deploy` does not sign
-you in; without saved credentials or `MCP_USE_API_KEY`, it exits with
-`Not logged in`.
+you in; without saved credentials or `MANUFACT_TOKEN`, it reports
+`not_authenticated`.
 
 <CodeGroup>
 ```bash npm
@@ -229,7 +229,8 @@ bun run deploy
 
 </CodeGroup>
 
-The first deployment links the local project. See the
+Deploy waits for completion by default and links the local project in
+`.manufact/project.json`. Use `--no-wait` to get the deployment ID immediately. See the
 [Manufact deployment guide](/typescript/server/deployment/mcp-use) for
 environment variables, regions, and subsequent deployments.
 

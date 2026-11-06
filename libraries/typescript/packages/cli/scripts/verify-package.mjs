@@ -23,8 +23,10 @@ if (!files.includes(join("dist", "index.js"))) {
 }
 const bundledLicenses = new Map([
   ["modelcontextprotocol-server-LICENSE", ["Apache License", "MIT License"]],
+  ["modelcontextprotocol-client-LICENSE", ["Apache License", "MIT License"]],
   ["modelcontextprotocol-core-LICENSE", ["Apache License", "MIT License"]],
   ["zod-LICENSE", ["MIT License"]],
+  ["openapi-fetch-LICENSE", ["MIT License", "Drew Powers"]],
 ]);
 for (const [filename, expectedTerms] of bundledLicenses) {
   const license = join("dist", "third-party-licenses", filename);
@@ -47,6 +49,11 @@ if (!existsSync(join(root, "types", "internal", "skills-loader.d.ts"))) {
 }
 if (!existsSync(join(root, "THIRD_PARTY_NOTICES.md"))) {
   throw new Error("Missing THIRD_PARTY_NOTICES.md");
+}
+for (const skill of ["mcp-apps-builder", "manufact-cloud"]) {
+  if (!files.includes(join("dist", "agent-skills", skill, "SKILL.md"))) {
+    throw new Error(`Missing bundled agent skill: ${skill}`);
+  }
 }
 if (files.some((file) => file.endsWith(".map"))) {
   throw new Error("CLI package must not publish source maps");

@@ -10,8 +10,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { resolveHost, resolvePort } from "./args.js";
-import { isInspectorRequest } from "../cli/inspector-route.js";
-import { loadProjectEnv } from "../cli/next-compat.js";
+import { isInspectorRequest } from "../toolchain/inspector-route.js";
+import { loadProjectEnv } from "../toolchain/next-compat.js";
 import type { FetchHandler } from "../fetch-app.js";
 
 /*

@@ -19,10 +19,29 @@ const requireFromServer = createRequire(serverManifest);
 const packageRoots = new Map([
   ["@modelcontextprotocol/server", dirname(serverManifest)],
   [
+    "@modelcontextprotocol/client",
+    dirname(
+      fileURLToPath(
+        new URL(
+          "../node_modules/@modelcontextprotocol/client/package.json",
+          import.meta.url
+        )
+      )
+    ),
+  ],
+  [
     "@modelcontextprotocol/core",
     resolvePackageRoot("@modelcontextprotocol/core"),
   ],
   ["zod", resolvePackageRoot("zod")],
+  [
+    "openapi-fetch",
+    dirname(
+      fileURLToPath(
+        new URL("../node_modules/openapi-fetch/package.json", import.meta.url)
+      )
+    ),
+  ],
 ]);
 
 mkdirSync(targetDirectory, { recursive: true });
