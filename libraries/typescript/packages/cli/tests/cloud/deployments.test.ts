@@ -7,7 +7,7 @@ import { deployment, organization } from "../helpers/cloud-fixtures.js";
 import { SIGNED_IN, signIn } from "../helpers/cloud-auth.js";
 
 describe("deployment human output", () => {
-  test("lists one tab-separated row per deployment, keeping only the first line of an error", async ({
+  test("lists deployment details, keeping only the first line of an error", async ({
     cloud,
     cli,
   }) => {
@@ -35,10 +35,12 @@ describe("deployment human output", () => {
 
     expect(result.stderr).toBe("");
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe(
-      "DEPLOYMENT\tSERVER\tSTATUS\tTRIGGER\tBRANCH\tCREATED\tERROR\n" +
-        "12345678\tserver_1\tfailed\tmanual\tmain\t2026-07-24T00:00:00Z\tBuild failed\n"
-    );
+    expect(result.stdout).toContain("Deployments");
+    expect(result.stdout).toContain("failed");
+    expect(result.stdout).toContain("12345678-abcd");
+    expect(result.stdout).toContain("main");
+    expect(result.stdout).toContain("Build failed");
+    expect(result.stdout).not.toContain("very long build output");
     expect(cloud.requestsTo("GET", "/api/v1/deployments")).toMatchObject([
       {
         query: { limit: "30", skip: "0" },
@@ -143,19 +145,11 @@ describe("deployments get", () => {
 
     expect(result.stderr).toBe("");
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe(
-      [
-        "Deployment: dep_1",
-        "Server: server_1",
-        "Status: failed",
-        "Trigger: manual",
-        "Branch: main",
-        "Created: 2026-07-24T00:00:00Z",
-        "Error: Build failed",
-        "Build logs: mcp-use logs dep_1 --build",
-        "",
-      ].join("\n")
-    );
+    expect(result.stdout).toContain("Deployment failed");
+    expect(result.stdout).toContain("ID       dep_1");
+    expect(result.stdout).toContain("Source   main");
+    expect(result.stdout).toContain("Error: Build failed");
+    expect(result.stdout).toContain("Build logs: mcp-use logs dep_1 --build");
   });
 
   test("an unknown deployment is a deployment_not_found error on stdout, exit 1", async ({

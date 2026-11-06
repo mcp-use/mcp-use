@@ -1,29 +1,16 @@
+import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
 import { cloudWebUrl } from "../cloud-api.js";
 import type { operations } from "../api/generated/types.gen.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
+import { plain, fields } from "../../core/format.js";
+import { formatAlert, formatAlertList } from "./output.js";
 import { readAlertFile } from "./config.js";
 
 const USAGE =
   "mcp-use alerts <list|get <id>|create|update <id>|rm <id>|options> [options]";
-const HELP = `Usage: ${USAGE}
-
-Create and update use the dashboard alert YAML format:
-https://docs.manufact.com/dashboard/alerts
-
-Options:
-  --server <id-or-slug>  Server, or the linked project
-  --org <id-or-slug>     Organization override
-  --path <dir>          Linked project directory
-  --file <rule.yaml>    Required for create and update
-  --reason <text>       Change description for create and update
-  --limit <n>           List page size, 1-100 (default: 25)
-  --skip <n>            List offset (default: 0)
-  --yes                 Confirm rm (alias: remove) without prompting
-  --json                Emit one JSON result or error
-  -h, --help            Show this help`;
 
 type Rule =
   operations["getApiV1ServersByIdAlertsRulesByRuleId"]["responses"][200]["content"]["application/json"]["rule"];
@@ -48,11 +35,12 @@ function publicRule(rule: Rule) {
 
 /** Manage alert rules using dashboard-compatible YAML. */
 export async function runAlerts(argv: readonly string[]): Promise<number> {
+  const help = cloudHelp("alerts", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`${HELP}\n`);
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const command = argv[0] === "remove" ? "rm" : argv[0];
     if (
       !["list", "get", "create", "update", "rm", "options"].includes(
@@ -146,23 +134,30 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
       }));
       output.result(
         { total: result.total, rules, dashboardUrl },
-        rules
-          .map((rule) => `${rule.id}\t${rule.config.name}\t${rule.status}`)
-          .join("\n") || "No alert rules."
+        formatAlertList(
+          result.rules,
+          result.total,
+          found.name ?? found.slug ?? id
+        )
       );
     } else if (command === "create") {
       const result = await cloud.call(
         cloud.client.POST("/api/v1/servers/{id}/alerts/rules", {
           params: { path: { id } },
           body: {
-            config: { ...config!, enabled: config!.enabled ?? true },
+            config: {
+              ...config!,
+              enabled: config!.enabled ?? true,
+              audience: "customer",
+              targets: { serverIds: [id] },
+            },
             reason,
           },
         })
       );
       output.result(
         { rule: publicRule(result.rule), dashboardUrl },
-        `Created alert ${result.rule.id}.`
+        `✓ Created alert “${plain(result.rule.config.name)}”\n${fields([["ID", result.rule.id]])}`
       );
     } else {
       const current = await cloud.call(
@@ -173,7 +168,11 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
       if (command === "get")
         output.result(
           { rule: publicRule(current.rule), dashboardUrl },
-          JSON.stringify(publicRule(current.rule), null, 2)
+          formatAlert(
+            current.rule,
+            found.name ?? found.slug ?? id,
+            dashboardUrl
+          )
         );
       else if (command === "rm") {
         const result = await cloud.call(
@@ -182,7 +181,10 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
             body: { expectedRevision: current.rule.revision },
           })
         );
-        output.result({ ...result, dashboardUrl }, `Removed alert ${ruleId}.`);
+        output.result(
+          { ...result, dashboardUrl },
+          `✓ Removed alert “${plain(current.rule.config.name)}”\n${fields([["ID", ruleId]])}`
+        );
       } else {
         const result = await cloud.call(
           cloud.client.PUT("/api/v1/servers/{id}/alerts/rules/{ruleId}", {
@@ -192,6 +194,8 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
                 ...config!,
                 id: ruleId,
                 enabled: config!.enabled ?? current.rule.config.enabled,
+                audience: "customer",
+                targets: { serverIds: [id] },
               },
               expectedRevision: current.rule.revision,
               reason,
@@ -200,7 +204,10 @@ export async function runAlerts(argv: readonly string[]): Promise<number> {
         );
         output.result(
           { rule: publicRule(result.rule), dashboardUrl },
-          `Updated alert ${ruleId}.`
+          `✓ Updated alert “${plain(result.rule.config.name)}”\n${fields([
+            ["Rule", result.rule.config.enabled ? "Enabled" : "Paused"],
+            ["ID", ruleId],
+          ])}`
         );
       }
     }

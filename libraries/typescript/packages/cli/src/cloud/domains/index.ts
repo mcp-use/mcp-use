@@ -1,3 +1,6 @@
+import { plain } from "../../core/format.js";
+import { formatDomain } from "./output.js";
+import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
@@ -5,32 +8,15 @@ import { cloudWebUrl } from "../cloud-api.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
 
 const USAGE = "mcp-use domains <get|set-subdomain|add|verify|rm> [options]";
-const HELP = `Usage: ${USAGE}
-
-Commands:
-  get                     Show custom domain status
-  set-subdomain <name>     Change the server's managed subdomain
-  add <hostname>          Configure a custom domain and show its CNAME target
-  verify                  Verify custom domain DNS and certificate
-  rm                      Remove the custom domain (alias: remove)
-
-Options:
-  --server <id-or-slug>    Server, or the linked project
-  --org <id-or-slug>       Organization override
-  --path <dir>            Linked project directory
-  --branch <name>         Branch for a custom domain
-  --domain-id <id>        Select a custom domain for get, verify, or rm
-  --yes                   Confirm removal without prompting
-  --json                  Emit one JSON result or error
-  -h, --help              Show this help`;
 
 /** Manage a server's managed subdomain and custom domain. */
 export async function runDomains(argv: readonly string[]): Promise<number> {
+  const help = cloudHelp("domains", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`${HELP}\n`);
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const command = argv[0] === "remove" ? "rm" : argv[0];
     if (
       !["get", "set-subdomain", "add", "verify", "rm"].includes(command ?? "")
@@ -79,7 +65,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
       })
     );
     const id = found.id;
-    const dashboardUrl = `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(id)}/settings`;
+    const dashboardUrl = `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(id)}/domains`;
     const query =
       typeof values["domain-id"] !== "string"
         ? {}
@@ -93,7 +79,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
       );
       output.result(
         { serverId: id, subdomain: argument, dashboardUrl },
-        `Subdomain set to ${argument}.`
+        `✓ Subdomain set to ${plain(argument)}.`
       );
     } else if (command === "add") {
       const result = await cloud.call(
@@ -109,7 +95,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
       );
       output.result(
         { ...result, dashboardUrl },
-        `Add CNAME ${result.domain} → ${result.cnameTarget}\n${result.dnsInstructions}`
+        formatDomain(result, found.name ?? id, found.mcpUrl)
       );
     } else if (command === "verify") {
       const result = await cloud.call(
@@ -129,7 +115,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
           params: { path: { id }, query },
         })
       );
-      output.result({ ...result, dashboardUrl }, result.message);
+      output.result({ ...result, dashboardUrl }, `✓ ${plain(result.message)}`);
     } else {
       const result = await cloud.call(
         cloud.client.GET("/api/v1/servers/{id}/domain/status", {
@@ -138,9 +124,7 @@ export async function runDomains(argv: readonly string[]): Promise<number> {
       );
       output.result(
         { ...result, dashboardUrl },
-        result.domain
-          ? `${result.domain}: ${result.verified ? "verified" : "pending"}\nCNAME target: ${result.cnameTarget ?? "pending"}`
-          : "No custom domain configured."
+        formatDomain(result, found.name ?? id, found.mcpUrl)
       );
     }
   });

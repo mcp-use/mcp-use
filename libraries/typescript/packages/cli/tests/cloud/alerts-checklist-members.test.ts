@@ -214,6 +214,65 @@ test("checklist run waits for completion and emits one public result", async ({
   ).toHaveLength(2);
 });
 
+for (const operation of ["run", "get"] as const) {
+  test(`checklist ${operation} prints the human summary without changing JSON conventions`, async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    const completed = {
+      id: "run_1",
+      status: "completed",
+      gitBranch: "main",
+      startedAt: "2026-11-05T10:00:00Z",
+      completedAt: "2026-11-05T10:00:42Z",
+      isReadyForChatgpt: true,
+      isReadyForClaudeai: false,
+      checks: [
+        { checkId: "connection", checkName: "MCP connection", status: "pass" },
+        {
+          checkId: "schema",
+          checkName: "Tool schemas",
+          status: "fail",
+          message: "Missing schema",
+        },
+      ],
+      hidden: "must not appear",
+    };
+    if (operation === "run")
+      cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+        status: 201,
+        body: { id: "run_1", status: "pending" },
+      });
+    cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+      body: completed,
+    });
+    const result = await cli.run(
+      [
+        "checklist",
+        operation,
+        ...(operation === "get" ? ["run_1"] : []),
+        "--server",
+        "weather",
+      ],
+      { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe(
+      operation === "run" ? "Running checklist\n" : "Loading checklist\n"
+    );
+    expect(result.stdout).toContain(
+      "Checklist completed in 42s\nWeather · main"
+    );
+    expect(result.stdout).toContain("1 passed · 1 failed");
+    expect(result.stdout).toContain("      Missing schema");
+    expect(result.stdout).toContain("ChatGPT   Ready");
+    expect(result.stdout).toContain("Claude    Not ready");
+    expect(result.stdout).not.toContain("must not appear");
+    expect(result.stdout).not.toContain("\u001b");
+  });
+}
+
 test("checklist --no-wait returns immediately and cancel sends the selected run", async ({
   cloud,
   cli,
@@ -245,7 +304,7 @@ test("checklist --no-wait returns immediately and cancel sends the selected run"
   ).toHaveLength(1);
 });
 
-test("alerts create accepts dashboard YAML and sends public config fields", async ({
+test("alerts create accepts dashboard YAML and adds metadata for the resolved server", async ({
   cloud,
   cli,
 }) => {
@@ -266,7 +325,16 @@ test("alerts create accepts dashboard YAML and sends public config fields", asyn
     cloud
       .requestsTo("POST", "/api/v1/servers/srv_1/alerts/rules")
       .map((request) => request.body)
-  ).toEqual([{ config: CONFIG, reason: "Updated using the CLI" }]);
+  ).toEqual([
+    {
+      config: {
+        ...CONFIG,
+        audience: "customer",
+        targets: { serverIds: ["srv_1"] },
+      },
+      reason: "Updated using the CLI",
+    },
+  ]);
 });
 
 test("alerts update preserves pause state and sends the current revision", async ({
@@ -314,13 +382,106 @@ test("alerts update preserves pause state and sends the current revision", async
   ).toMatchObject([
     {
       body: {
-        config: { id: "rule_1", enabled: false },
+        config: {
+          id: "rule_1",
+          enabled: false,
+          audience: "customer",
+          targets: { serverIds: ["srv_1"] },
+        },
         expectedRevision: 7,
         reason: "Tune deployment alerts",
       },
     },
   ]);
 });
+
+test("alerts create preserves an explicit disabled setting", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  const path = join(cli.cwd, "rule.yaml");
+  await writeFile(path, `${YAML}enabled: false\n`);
+  cloud.on("POST", "/api/v1/servers/srv_1/alerts/rules", {
+    body: {
+      rule: {
+        id: "rule_1",
+        revision: 1,
+        config: { ...CONFIG, enabled: false },
+      },
+    },
+  });
+  const result = await cli.run(["alerts", "create", "--file", path, ...SCOPE], {
+    env: SIGNED_IN,
+  });
+  expect(result.exitCode).toBe(0);
+  expect(
+    cloud.requestsTo("POST", "/api/v1/servers/srv_1/alerts/rules")[0]?.body
+  ).toMatchObject({
+    config: {
+      enabled: false,
+      audience: "customer",
+      targets: { serverIds: ["srv_1"] },
+    },
+  });
+});
+
+test("alerts update respects an explicit enabled setting on a paused rule", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  const path = join(cli.cwd, "rule.yaml");
+  await writeFile(path, `${YAML}enabled: true\n`);
+  cloud.on("GET", "/api/v1/servers/srv_1/alerts/rules/rule_1", {
+    body: {
+      rule: {
+        id: "rule_1",
+        revision: 7,
+        config: { ...CONFIG, enabled: false },
+      },
+    },
+  });
+  cloud.on("PUT", "/api/v1/servers/srv_1/alerts/rules/rule_1", {
+    body: { rule: { id: "rule_1", revision: 8, config: CONFIG } },
+  });
+  const result = await cli.run(
+    ["alerts", "update", "rule_1", "--file", path, ...SCOPE],
+    { env: SIGNED_IN }
+  );
+  expect(result.exitCode).toBe(0);
+  expect(
+    cloud.requestsTo("PUT", "/api/v1/servers/srv_1/alerts/rules/rule_1")[0]
+      ?.body
+  ).toMatchObject({
+    config: {
+      enabled: true,
+      audience: "customer",
+      targets: { serverIds: ["srv_1"] },
+    },
+    expectedRevision: 7,
+  });
+});
+
+for (const metadata of [
+  "audience: customer\n",
+  "targets:\n  serverIds: [other-server]\n",
+]) {
+  test(`alerts rejects routing metadata in YAML: ${metadata.split(":")[0]}`, async ({
+    cloud,
+    cli,
+  }) => {
+    const path = join(cli.cwd, "rule.yaml");
+    await writeFile(path, `${YAML}${metadata}`);
+    const result = await cli.run(
+      ["alerts", "create", "--file", path, ...SCOPE],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(2);
+    expect(result.json).toMatchObject({ error: { code: "usage_error" } });
+    expect(cloud.requests).toEqual([]);
+  });
+}
 
 test("alerts rejects unknown YAML fields before contacting Cloud", async ({
   cloud,
@@ -359,7 +520,12 @@ test("alerts get filters response extras and remove uses optimistic concurrency"
     rule: {
       id: "rule_1",
       revision: 7,
-      config: { ...CONFIG, hidden: "must not appear" },
+      config: {
+        ...CONFIG,
+        audience: "customer",
+        targets: { serverIds: ["srv_1"] },
+        hidden: "must not appear",
+      },
       hidden: "must not appear",
     },
   };
@@ -369,6 +535,8 @@ test("alerts get filters response extras and remove uses optimistic concurrency"
   });
   expect(fetched.exitCode).toBe(0);
   expect(fetched.stdout).not.toContain("must not appear");
+  expect(fetched.stdout).not.toContain('"audience"');
+  expect(fetched.stdout).not.toContain('"targets"');
   cloud.on("DELETE", "/api/v1/servers/srv_1/alerts/rules/rule_1", {
     body: { deleted: true },
   });

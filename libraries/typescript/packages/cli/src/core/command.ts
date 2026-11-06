@@ -43,9 +43,11 @@ interface CommandOutput {
  *
  * `body` writes its result through `output.result`. Anything it throws is
  * reported as one error document: `UsageError` exits 2, everything else 1.
+ * Human-readable usage errors include the same `help` page as --help.
  */
 export async function runCommand(
   argv: readonly string[],
+  help: string,
   body: (output: CommandOutput) => Promise<void>
 ): Promise<number> {
   const json = argv.includes("--json");
@@ -64,7 +66,7 @@ export async function runCommand(
     await body(output);
     return EXIT_SUCCESS;
   } catch (error) {
-    return reportFailure(error, json);
+    return reportFailure(error, json, help);
   }
 }
 
@@ -108,7 +110,7 @@ export function parseCommandArgs<
 }
 
 /** Write `error` as the command's one failure report; return the exit code. */
-function reportFailure(error: unknown, json: boolean): number {
+function reportFailure(error: unknown, json: boolean, help?: string): number {
   const usage = error instanceof UsageError || isLegacyUsageError(error);
   const known = error instanceof UsageError || error instanceof CommandError;
   const document = {
@@ -119,11 +121,16 @@ function reportFailure(error: unknown, json: boolean): number {
   if (json) {
     process.stdout.write(`${JSON.stringify({ error: document })}\n`);
   } else {
-    process.stderr.write(`${document.message}\n`);
+    const message =
+      usage && help
+        ? document.message.replace(/^Usage:.*$/gm, "").trim()
+        : document.message;
+    if (message) process.stderr.write(`${message}\n`);
     for (const step of document.nextSteps) {
       process.stderr.write(`\n${step.description}:\n  ${step.command}\n`);
     }
   }
+  if (usage && help && !json) process.stderr.write(`\n${help.trim()}\n`);
   return usage ? EXIT_USAGE : EXIT_FAILURE;
 }
 

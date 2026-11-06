@@ -1,22 +1,9 @@
+import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { connectCloud } from "../api/client.js";
 
 const USAGE = "mcp-use github <connect|installations|repos> [options]";
-const HELP = `Usage: ${USAGE}
-
-Commands:
-  connect                 Print the GitHub App installation URL
-  installations           List connected GitHub installations
-  repos                   List repositories available to an installation
-
-Options:
-  --org <id-or-slug>       Organization override (or MANUFACT_ORG)
-  --installation <id>     GitHub installation for repos; auto-selected if unique
-  --page <n>              Repository page (default: 1)
-  --limit <n>             Repositories per page, 1-100 (default: 50)
-  --json                  Emit one JSON result or error
-  -h, --help              Show this help`;
 
 function positiveInteger(
   value: string | undefined,
@@ -38,11 +25,12 @@ function positiveInteger(
 
 /** Inspect GitHub App access or print an installation URL. */
 export async function runGithub(argv: readonly string[]): Promise<number> {
+  const help = cloudHelp("github", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`${HELP}\n`);
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     const command = argv[0];
     if (!["connect", "installations", "repos"].includes(command ?? ""))
       throw new UsageError(`Usage: ${USAGE}`);

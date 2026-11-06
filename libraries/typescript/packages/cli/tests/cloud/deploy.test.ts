@@ -52,6 +52,97 @@ async function repository(cwd: string, branch = "main"): Promise<void> {
 }
 
 describe("deploy", () => {
+  for (const step of ["create", "start", "wait"] as const) {
+    test(`a timeout during ${step} explains recovery without retrying creation`, async ({
+      cli,
+      cloud,
+    }) => {
+      signIn(cloud);
+      await repository(cli.cwd);
+      if (step === "start") {
+        await link(cli.cwd);
+        cloud.on("GET", "/api/v1/servers/srv_1", {
+          body: server({
+            id: "srv_1",
+            connectedRepository: { ...CONNECTED_REPOSITORY },
+          }),
+        });
+        cloud.on("POST", "/api/v1/deployments", {
+          status: 504,
+          body: { error: "Raw proxy timeout" },
+        });
+      } else {
+        cloud.on("GET", "/api/v1/github/installations", {
+          body: {
+            installations: [
+              {
+                id: "inst_record",
+                installationId: "123",
+                organizationId: "org_1",
+                isActive: true,
+                account: { login: "example", type: "Organization" },
+              },
+            ],
+          },
+        });
+        cloud.on(
+          "GET",
+          "/api/v1/github/installations/123/repos/example/weather/access",
+          { body: { hasAccess: true } }
+        );
+        if (step === "create")
+          cloud.on("POST", "/api/v1/servers", {
+            status: 524,
+            body: { error: "Raw proxy timeout" },
+          });
+        else {
+          cloud.on("POST", "/api/v1/servers", {
+            body: {
+              server: { id: "srv_1", slug: "weather" },
+              deploymentId: "dep_1",
+            },
+          });
+          cloud.on("GET", "/api/v1/deployments/dep_1", {
+            status: 504,
+            body: { error: "Raw proxy timeout" },
+          });
+        }
+      }
+      const result = await cli.run(["deploy", "--json"], { env: SIGNED_IN });
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toBe("");
+      expect(result.json).toMatchObject({
+        error: {
+          code: "cloud_timeout",
+          message: expect.stringContaining(
+            step === "create"
+              ? "creating the server"
+              : step === "start"
+                ? "starting the deployment"
+                : "checking deployment dep_1"
+          ),
+        },
+      });
+      expect(result.stdout).not.toContain("Raw proxy timeout");
+      expect(
+        cloud.requestsTo(
+          "POST",
+          step === "start" ? "/api/v1/deployments" : "/api/v1/servers"
+        )
+      ).toHaveLength(1);
+      if (step === "wait")
+        expect(
+          JSON.parse(
+            await readFile(join(cli.cwd, ".manufact/project.json"), "utf8")
+          )
+        ).toEqual({ orgId: "org_1", serverId: "srv_1" });
+      if (step === "create")
+        await expect(
+          readFile(join(cli.cwd, ".manufact/project.json"), "utf8")
+        ).rejects.toMatchObject({ code: "ENOENT" });
+    });
+  }
+
   test("help and malformed flags make no Cloud requests", async ({
     cli,
     cloud,

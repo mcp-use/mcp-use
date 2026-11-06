@@ -266,6 +266,8 @@ const REQUEST_FIELDS = {
     "config.name",
     "config.description",
     "config.enabled",
+    "config.audience",
+    "config.targets.serverIds",
     "config.trigger",
     "config.recover",
     "config.notify",
@@ -276,6 +278,8 @@ const REQUEST_FIELDS = {
     "config.name",
     "config.description",
     "config.enabled",
+    "config.audience",
+    "config.targets.serverIds",
     "config.trigger",
     "config.recover",
     "config.notify",
@@ -307,6 +311,43 @@ for (const [key, fields] of Object.entries(REQUEST_FIELDS)) {
     spec.paths[key.slice(space + 1)]?.[key.slice(0, space).toLowerCase()];
   const content = operation?.requestBody?.content?.["application/json"];
   if (!content?.schema) throw new Error(`No request schema for ${key}.`);
+  if (key.includes("/alerts/rules")) {
+    const request = resolveRef(content.schema);
+    const config = resolveRef(request.properties.config);
+    const audience = resolveRef(config.properties.audience);
+    const targets = resolveRef(config.properties.targets);
+    const serverTarget = (targets.anyOf ?? targets.oneOf ?? [targets]).find(
+      (variant) => resolveRef(variant).properties?.serverIds
+    );
+    if (!audience.enum?.includes("customer") || serverTarget === undefined)
+      throw new Error(
+        `${key} no longer supports customer alerts for a server.`
+      );
+    // The CLI writes only customer alerts for its resolved server. Keep the
+    // generated request contract narrow and require this metadata explicitly.
+    content.schema = {
+      ...request,
+      properties: {
+        ...request.properties,
+        config: {
+          ...config,
+          properties: {
+            ...config.properties,
+            audience: { type: "string", enum: ["customer"] },
+            targets: serverTarget,
+          },
+          required: [
+            ...new Set([
+              ...(config.required ?? []),
+              "enabled",
+              "audience",
+              "targets",
+            ]),
+          ],
+        },
+      },
+    };
+  }
   content.schema = keepFields(content.schema, fields, `${key} request`);
 }
 

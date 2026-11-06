@@ -1,12 +1,15 @@
+import { plain, fields } from "../../core/format.js";
 import { isIP } from "node:net";
 
-import { human, parseCloudArgs, projectServer } from "../options.js";
+import { parseCloudArgs, projectServer } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 
 /** Update only explicitly supplied server settings. */
 export async function updateServer(argv: readonly string[]): Promise<number> {
-  return runCommand(argv, async (output) => {
+  const help = cloudHelp("servers", ["update", ...argv]);
+  return runCommand(argv, help, async (output) => {
     const { values, positionals } = parseCloudArgs(
       argv,
       {
@@ -171,7 +174,21 @@ export async function updateServer(argv: readonly string[]): Promise<number> {
           ? { allowedIps: cidrs ?? [] }
           : {}),
       },
-      `Updated ${server}.\n${human(result)}`
+      `✓ Updated server “${plain(result.name ?? details.name ?? server)}”\n${fields(
+        [
+          ["ID", server],
+          ["Repository", values.repo],
+          [
+            "Repository disconnected",
+            values["disconnect-repo"] ? "Yes" : undefined,
+          ],
+          [
+            "Allowed IPs",
+            cidrs?.join(", ") ??
+              (values["clear-allow-ip"] ? "Cleared" : undefined),
+          ],
+        ]
+      )}`
     );
   });
 }

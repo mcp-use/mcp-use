@@ -33,7 +33,7 @@ export async function runWhoami(argv: readonly string[]): Promise<number> {
     process.stdout.write(`${HELP}\n`);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, HELP, async (output) => {
     parseCommandArgs(argv, {
       options: { json: { type: "boolean" } },
       positionals: 0,

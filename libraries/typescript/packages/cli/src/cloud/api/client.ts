@@ -43,6 +43,8 @@ interface CallContext {
   notFound?: { code: string; nextSteps?: readonly NextStep[] };
   /** Error code and next steps for a 403. Defaults to `forbidden`. */
   forbidden?: { code: string; nextSteps?: readonly NextStep[] };
+  /** Explain the operation and how to recover when its outcome is unknown. */
+  timeout?: { message: string; nextSteps?: readonly NextStep[] };
 }
 
 /** The shape every typed fetch function resolves to. */
@@ -63,6 +65,7 @@ export function callerFor(secret: string): Call {
   return async (pending, context = {}) => {
     try {
       const result = await pending.catch((error: unknown) => {
+        if (isTimeout(error)) throw cloudTimeout(context);
         throw new CommandError(
           "cloud_unreachable",
           `Could not reach Manufact Cloud at ${cloudBaseUrl()}: ${messageOf(error) ?? "network error"}.`
@@ -95,6 +98,19 @@ function settle<T>(
   if (response.ok) return result.data as Exclude<T, undefined>;
 
   const status = response.status;
+  const upstreamTimeout =
+    status >= 500 &&
+    /proxy read timeout|\b(?:error code|http)[:\s]+(?:504|524)\b/i.test(
+      messageOf(result.error) ?? ""
+    );
+  if ([408, 504, 524].includes(status) || upstreamTimeout)
+    throw cloudTimeout(context, status);
+  if (status === 404 && isMissingApplication(result.error)) {
+    throw new CommandError(
+      "cloud_unreachable",
+      `The Manufact Cloud API at ${cloudBaseUrl()} is unavailable. Its hosting service could not find the application. Try again once the service is available.`
+    );
+  }
   const message =
     messageOf(result.error) ?? `Manufact Cloud request failed (${status}).`;
   if (status === 401) {
@@ -136,7 +152,7 @@ interface CloudConnection {
    * `CommandError` with a stable code: `cloud_unreachable`,
    * `not_authenticated`, `forbidden` (or `context.forbidden.code`),
    * `context.notFound.code` (default `not_found`), `validation_error`,
-   * `rate_limited` or `cloud_api_error`.
+   * `rate_limited`, `cloud_timeout` or `cloud_api_error`.
    */
   call: Call;
 }
@@ -177,7 +193,7 @@ export function createCloudClient(auth: {
   bearer?: string;
   organizationId?: string;
 }): Client<paths> {
-  return createClient<paths>({
+  const client = createClient<paths>({
     baseUrl: cloudBaseUrl(),
     headers: {
       Accept: "application/json",
@@ -190,6 +206,63 @@ export function createCloudClient(auth: {
         : {}),
     },
   });
+  client.use({
+    async onResponse({ response }) {
+      if (response.ok || response.headers.get("content-type")?.includes("json"))
+        return response;
+      // Hosting proxies return HTML or plain text. Normalize it before the
+      // JSON parser runs, preserving the status for timeout classification.
+      await response.body?.cancel();
+      return new Response(
+        JSON.stringify({
+          error: `Manufact Cloud request failed (HTTP ${response.status}).`,
+        }),
+        {
+          status: response.status,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    },
+  });
+  return client;
+}
+
+/** A hosting-router failure is not an application-level missing resource. */
+function isMissingApplication(error: unknown): boolean {
+  if (error === null || typeof error !== "object") return false;
+  const body = error as Record<string, unknown>;
+  return (
+    body.status === "error" &&
+    body.code === 404 &&
+    body.message === "Application not found" &&
+    typeof body.request_id === "string"
+  );
+}
+
+function cloudTimeout(context: CallContext, status?: number): CommandError {
+  return new CommandError(
+    "cloud_timeout",
+    context.timeout?.message ??
+      `Manufact Cloud at ${cloudBaseUrl()} did not respond in time${status ? ` (HTTP ${status})` : ""}.`,
+    undefined,
+    context.timeout?.nextSteps
+  );
+}
+
+function isTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === "TimeoutError" ||
+    (error.cause !== undefined &&
+      typeof error.cause === "object" &&
+      error.cause !== null &&
+      "code" in error.cause &&
+      [
+        "UND_ERR_HEADERS_TIMEOUT",
+        "UND_ERR_CONNECT_TIMEOUT",
+        "ETIMEDOUT",
+      ].includes(String(error.cause.code)))
+  );
 }
 
 /** The message in a Cloud error body (`{ error, code, details }`). */

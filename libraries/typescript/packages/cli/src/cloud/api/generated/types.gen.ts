@@ -4268,6 +4268,11 @@ export interface operations {
                         name: string;
                         description?: string;
                         enabled: boolean;
+                        /** @enum {string} */
+                        audience: "customer";
+                        targets: {
+                            serverIds: string[];
+                        };
                         trigger: {
                             when: components["schemas"]["AlertRuleCondition0"];
                             for: string;
@@ -4515,6 +4520,11 @@ export interface operations {
                         name: string;
                         description?: string;
                         enabled: boolean;
+                        /** @enum {string} */
+                        audience: "customer";
+                        targets: {
+                            serverIds: string[];
+                        };
                         trigger: {
                             when: components["schemas"]["AlertRuleCondition0"];
                             for: string;

@@ -14,6 +14,7 @@ import {
 import { validateSourcePath, syncEnvironment } from "./env.js";
 import { syncServerConfiguration, region } from "./config.js";
 import { projectName } from "./upload.js";
+import { serverCreationTimeout, deploymentStartTimeout } from "./errors.js";
 import type {
   Cloud,
   DeployInput,
@@ -28,7 +29,13 @@ async function installations(cloud: Cloud): Promise<Installation[]> {
   const result = await cloud.call(
     cloud.client.GET("/api/v1/github/installations", {
       params: { query: { organizationId: cloud.organization.id } },
-    })
+    }),
+    {
+      timeout: {
+        message:
+          "Cloud timed out while loading GitHub installations. No server creation request was made.",
+      },
+    }
   );
   if (result.installations.length === 0)
     throw new CommandError(
@@ -125,6 +132,7 @@ export async function deployGitHub(
   validateSourcePath(root, values.dockerfile, "--dockerfile");
   if (probe.dirty)
     await handleDirtyRepository(root, branch, values, values.json === true);
+  input.onDeploying();
   let serverId: string;
   let deploymentId: string;
   if (existing !== null) {
@@ -140,7 +148,8 @@ export async function deployGitHub(
     const deployed = await cloud.call(
       cloud.client.POST("/api/v1/deployments", {
         body: { serverId, branch, trigger: "manual" },
-      })
+      }),
+      deploymentStartTimeout(serverId)
     );
     deploymentId = deployed.id;
   } else {
@@ -155,7 +164,13 @@ export async function deployGitHub(
                 path: { installationId: candidate.installationId, owner, repo },
               },
             }
-          )
+          ),
+          {
+            timeout: {
+              message:
+                "Cloud timed out while checking GitHub repository access. No server creation request was made.",
+            },
+          }
         );
         if (access.hasAccess) {
           installation = candidate;
@@ -207,7 +222,8 @@ export async function deployGitHub(
             : {}),
           ...(Object.keys(env).length ? { env } : {}),
         },
-      })
+      }),
+      serverCreationTimeout()
     );
     serverId = created.server.id;
     if (created.deploymentId === null)

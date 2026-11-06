@@ -1,3 +1,5 @@
+import { elapsed } from "../../core/format.js";
+import { formatDeployReceipt } from "../deployments/output.js";
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { connectCloud } from "../api/client.js";
@@ -15,7 +17,8 @@ import {
   validateExternalServer,
 } from "./external-url.js";
 import { waitForDeployment } from "./wait.js";
-import type { DeployValues, DeployInput } from "./types.js";
+import { createProgress, withProgress } from "../../core/progress.js";
+import type { DeployValues, DeployInput, StartedDeployment } from "./types.js";
 
 const HELP = `Usage: mcp-use deploy [path] [options]
 
@@ -125,7 +128,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
     process.stdout.write(`${HELP}\n`);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, HELP, async (output) => {
     const { values, cwd } = parse(argv);
     const env = await loadEnvironment(
       cwd,
@@ -133,7 +136,9 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
       values.env ?? []
     );
     if (values["external-url"] !== undefined)
-      await validateExternalServer(values["external-url"]);
+      await withProgress("Checking MCP endpoint", output.json, () =>
+        validateExternalServer(values["external-url"]!)
+      );
     const link = values.new ? null : await readProjectLink(cwd);
     const cloud = await connectCloud({
       organization: values.org ?? process.env["MANUFACT_ORG"] ?? link?.orgId,
@@ -163,6 +168,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
             }),
             { notFound: { code: "server_not_found" } }
           );
+    const progress = createProgress("Deploying", output.json);
     const input: DeployInput = {
       cloud,
       cwd,
@@ -171,6 +177,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         : null,
       values,
       env,
+      onDeploying: progress.start,
       ...(linkedServer !== undefined ? { linkedServer } : {}),
     };
     const dashboard = (id: string) =>
@@ -178,7 +185,9 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         ? `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug)}/servers/${encodeURIComponent(id)}/overview`
         : null;
     if (values["external-url"] !== undefined) {
-      const result = await deployExternal(input);
+      const result = await withProgress("Registering server", output.json, () =>
+        deployExternal(input)
+      );
       const dashboardUrl = dashboard(result.serverId);
       if (values.open && dashboardUrl) openBrowser(dashboardUrl);
       output.result(
@@ -211,17 +220,35 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
         "--watch-paths and --wait-for-ci require GitHub deployments.",
         { code: "source_mode_conflict" }
       );
-    const started = managed
-      ? await deployUpload(input)
-      : await deployGitHub(input);
-    const terminal = values["no-wait"]
-      ? { status: "pending" }
-      : await waitForDeployment(cloud, started.deploymentId);
+    let started: StartedDeployment;
+    let terminal: {
+      status: string;
+      mcpUrl?: string | null;
+      gitBranch?: string | null;
+      gitCommitSha?: string | null;
+    };
+    const deploymentStartedAt = new Date().toISOString();
+    try {
+      started = managed ? await deployUpload(input) : await deployGitHub(input);
+      terminal = values["no-wait"]
+        ? { status: "pending" }
+        : await waitForDeployment(cloud, started.deploymentId);
+    } finally {
+      progress.stop();
+    }
     const dashboardUrl = dashboard(started.serverId);
     if (values.open && dashboardUrl) openBrowser(dashboardUrl);
     output.result(
-      { ...started, ...terminal, dashboardUrl },
-      `Deployment ${started.deploymentId} ${terminal.status}.${dashboardUrl ? `\n${dashboardUrl}` : ""}`
+      {
+        ...started,
+        status: terminal.status,
+        ...(terminal.mcpUrl !== undefined ? { mcpUrl: terminal.mcpUrl } : {}),
+        dashboardUrl,
+      },
+      formatDeployReceipt(
+        { ...started, ...terminal, dashboardUrl },
+        elapsed(deploymentStartedAt, new Date().toISOString())
+      )
     );
   });
 }

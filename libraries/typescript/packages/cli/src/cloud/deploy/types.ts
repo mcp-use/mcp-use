@@ -35,6 +35,8 @@ export interface DeployInput {
   existing: ProjectLink | null;
   values: DeployValues;
   env: Record<string, string>;
+  /** Begin progress after interactive Git preparation has finished. */
+  onDeploying: () => void;
   linkedServer?: {
     isExternal: boolean;
     connectedRepository?: { isManaged: boolean; productionBranch: string };

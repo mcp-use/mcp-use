@@ -241,281 +241,501 @@ npx @mcp-use/tunnel 3000
 
 See the [Tunneling guide](/tunneling/index) for client setup and testing workflows.
 
-## `deploy`
+## Cloud command conventions
 
-**Purpose:** Create or update a Manufact Cloud deployment for an MCP server.
+Manufact Cloud commands work with any MCP framework. With `--json`, stdout
+contains one JSON result or an error envelope:
 
-**Syntax:**
-
-```bash
-mcp-use deploy [path] [options]
+```json
+{
+  "error": {
+    "code": "not_authenticated",
+    "message": "Sign in to Manufact Cloud.",
+    "nextSteps": [{ "description": "Log in", "command": "mcp-use login" }]
+  }
+}
 ```
 
-`[path]` is the project directory. It defaults to the current directory.
+Exit codes are 0 for success, 1 for an operational failure, and 2 for invalid or
+missing arguments. JSON and non-interactive commands never prompt for missing
+input. Use each command's `--help` for its complete flag list.
 
-**Options:**
-
-| Option                    | Description                                                                            | Default            |
-| ------------------------- | -------------------------------------------------------------------------------------- | ------------------ |
-| `--open`                  | Open the deployment in a browser after a successful deploy.                            | Disabled           |
-| `--name <name>`           | Server name. Also names the GitHub repository when the CLI creates one.                | GitHub repository name; with `--no-github`, the `package.json` name or directory name |
-| `--new`                   | Create a new server instead of reusing the linked project.                             | Disabled           |
-| `--env <key=value>`       | Environment variable assignment. Repeatable.                                           | None               |
-| `--env-file <path>`       | Load environment variables from a `.env` file.                                         | None               |
-| `--branch <name>`         | Branch to deploy. Also scopes env sync to that branch preview environment.             | Current git branch; `main` with `--no-github` |
-| `--root-dir <path>`       | Root directory inside the repository for monorepos.                                    | Repository root    |
-| `--org <slug-or-id>`      | Target organization.                                                                   | Active org         |
-| `-y, --yes`               | Accept confirmation prompts and authorize Git and repository changes: creating a private GitHub repository, committing and pushing uncommitted changes, and selecting the default GitHub App installation. | Disabled           |
-| `--region <region>`       | Deployment region: `US`, `EU`, or `APAC`.                                              | `US`               |
-| `--build-command <cmd>`   | Build command override.                                                                | Auto-detected      |
-| `--start-command <cmd>`   | Start command override.                                                                | Auto-detected      |
-| `--dockerfile <path>`     | Non-default Dockerfile path, relative to `--root-dir` or repository root.              | None               |
-| `--watch-paths <glob>`    | Only auto-deploy when matching files change. Repeatable. GitHub only.                  | All changes        |
-| `--wait-for-ci`           | Hold GitHub auto-deploys until other check runs pass. GitHub only.                     | Disabled           |
-| `--no-github`             | Upload local source without connecting GitHub.                                         | Disabled           |
-| `--json`                  | Emit exactly one JSON result or error. Never prompts or opens a browser; cannot be combined with `--open`. | Human-readable text |
-
-**Examples:**
-
-```bash
-mcp-use deploy
-mcp-use deploy --no-github
-mcp-use deploy --name my-server --open
-mcp-use deploy --env DATABASE_URL=postgres://... --env API_KEY=secret
-mcp-use deploy --env-file .env.production
-mcp-use deploy --root-dir apps/mcp-server
-mcp-use deploy --root-dir apps/mcp-server --watch-paths "apps/mcp-server/**" --watch-paths "packages/shared/**"
-mcp-use deploy --new --name my-server-v2
-mcp-use deploy --org manufact-inc --region EU --yes
-```
-
-**Notes and behavior:**
-
-- The default path deploys from GitHub. When it creates a new GitHub-backed server and the organization has no GitHub App installation, the command exits with `github_installation_required` and a link to the dashboard settings. If the project has no `origin` remote, an interactive run offers to create a private repository, initialize Git, commit, and push to `main`. If the working tree has uncommitted changes, it offers to commit and push them with `git add .`. `--yes` authorizes these Git changes without prompting.
-- `--no-github` packs and uploads local source to a platform-managed repository.
-- Redeploys of a project already linked to a platform-managed server auto-detect the upload path. `--no-github` is only required on the first deploy for that path.
-- The command writes `.mcp-use/cloud/link.json` to link the local project to the cloud server.
-- When it writes the project link, the CLI adds `.mcp-use/` to the repository's local `.git/info/exclude` if that file exists. It writes `.mcp-use/` to `.gitignore` only when it creates a new repository.
-- On a redeploy of a linked server, the supplied `--name`, `--branch`, `--region`, `--root-dir`, `--build-command`, `--start-command`, `--dockerfile`, `--watch-paths`, and `--wait-for-ci` values update that server's configuration before the deployment starts.
-- Environment variables passed through `--env` and `--env-file` are synced to the target branch preview environment when `--branch` is set.
+Cloud credentials live in `~/.manufact/auth.json` (mode 0600). Project links live
+in `.manufact/project.json`. Server selection is `--server`, `MANUFACT_SERVER`,
+then the project link. Organization selection is `--org`, `MANUFACT_ORG`, the
+project link, the active organization, then the account default.
 
 ## Authentication commands
 
-Authentication commands manage the user-level Manufact Cloud credentials in `~/.mcp-use/config.json`.
-
 ### `login`
 
-**Purpose:** Authenticate the CLI with Manufact Cloud.
-
-**Syntax:**
+Sign in to Manufact Cloud.
 
 ```bash
-mcp-use login [options]
+mcp-use login [--api-key <key> | --device-code <code>] [--org <id-or-slug>] [--no-open] [--json]
 ```
 
-**Options:**
+`--api-key` uses an existing key; `--device-code` completes an approved device flow. They are mutually exclusive. `--no-open` leaves browser navigation to you.
 
-| Option                 | Description                                                | Default             |
-| ---------------------- | ---------------------------------------------------------- | ------------------- |
-| `--api-key <key>`      | Authenticate with an API key.                              | Browser/device flow |
-| `--device-code <code>` | Redeem a short-lived, pre-approved RFC 8628 device code.   | None                |
-| `--org <id-or-slug>`   | Select the active organization by ID or slug.              | Account default     |
-| `--no-open`            | Do not open the verification URL during interactive login. | Opens on a TTY      |
-| `--json`               | Emit one machine-readable JSON result.                     | Human-readable text |
-
-**Examples:**
-
-```bash
-mcp-use login
-mcp-use login --device-code ABC123
-mcp-use login --api-key mcp_... --org my-org
-```
-
-**Notes and behavior:**
-
-- Interactive login starts a device-code flow and opens a browser.
-- `--device-code` skips the browser and redeems the code through the same token endpoint. The CLI then creates, validates, and stores a persistent API key.
-- `--api-key` and `--device-code` cannot be combined. An explicit `--device-code` takes precedence over `MCP_USE_API_KEY`.
-- The CLI never writes the device code, bearer token, or API key to human-readable or JSON output.
-- If `--org` is omitted, the CLI stores the account-default organization when one is available.
-- `MCP_USE_API_KEY` can provide the API key for non-interactive login.
-
-### `whoami`
-
-**Purpose:** Print the current authentication status and user information.
-
-**Syntax:**
-
-```bash
-mcp-use whoami
-```
-
-**Options:**
-
-| Option   | Description                                     | Default             |
-| -------- | ----------------------------------------------- | ------------------- |
-| `--json` | Emit a machine-readable identity object.        | Human-readable text |
-
-**Examples:**
-
-```bash
-mcp-use whoami
-```
-
-**Notes and behavior:** The command reads `~/.mcp-use/config.json`. When that file selects no organization, it reports the account default, matching `org current` and the `servers`/`deployments` commands. This is the usual case when authenticating with `MCP_USE_API_KEY` instead of `mcp-use login`.
+In a terminal, login opens the verification URL and waits. Without a terminal or with `--json`, it prints the device code and exits. Approve it in a browser, then run the returned completion command. Device login creates a named key. Credentials are stored in `~/.manufact/auth.json` with mode 0600.
 
 ### `logout`
 
-**Purpose:** Remove saved Manufact Cloud credentials.
-
-**Syntax:**
+Remove the local credential and revoke the key created by device login.
 
 ```bash
 mcp-use logout [options]
 ```
 
-**Options:**
+Pass `--yes` to confirm non-interactively. `--json` emits the result.
 
-| Option   | Description                                                    | Default             |
-| -------- | -------------------------------------------------------------- | ------------------- |
-| `--yes`  | Skip confirmation. Required for non-interactive and JSON runs. | Prompts on a TTY    |
-| `--json` | Emit one machine-readable JSON result.                         | Human-readable text |
+An existing key supplied by the user is removed locally without revoking that shared key remotely.
 
-**Examples:**
+### `whoami`
+
+Show the signed-in account, active organization, credential source, and key name.
 
 ```bash
-mcp-use logout --yes
+mcp-use whoami [--json]
 ```
 
-**Notes and behavior:** The command removes credentials from `~/.mcp-use/config.json`.
+`MANUFACT_TOKEN` overrides stored credentials; `MCP_USE_API_KEY` is the fallback.
+
+## Projects commands
+
+### `link`
+
+Link a project directory to a Cloud server.
+
+```bash
+mcp-use link [--server <id-or-slug>] [--org <id-or-slug>] [--path <dir>] [--json]
+```
+
+Writes `.manufact/project.json` and adds `.manufact/` to the project ignore rules. This works for projects using any MCP framework. Without a terminal, supply a server or an existing link.
+
+### `unlink`
+
+Remove the local project link.
+
+```bash
+mcp-use unlink [--path <dir>] [--json]
+```
+
+The Cloud server and deployments remain available.
+
+## `deploy`
+
+### `deploy`
+
+Deploy from GitHub, upload local source, or register an already-hosted MCP URL.
+
+```bash
+mcp-use deploy [path] [options]
+```
+
+`--no-github` uploads local source. `--external-url <url>` registers a hosted endpoint. `--new` creates another server. Use `--name`, `--branch`, `--root-dir`, `--build-command`, `--start-command`, `--dockerfile`, and `--region` as needed. Repeat `--env KEY=VALUE` or use `--env-file <path>`. `--no-wait` returns early; `--open` opens the dashboard from a terminal.
+
+Deployment waits by default. A project link is stored in `.manufact/project.json`. Cloud deployment works with any MCP framework. Deploy-time variables use production scope on the saved production branch, otherwise a preview override for the deployed branch.
 
 ## Organization commands
 
-Organization commands control the active Manufact Cloud organization for cloud commands.
+### `org list`
 
-| Command                  | Purpose                                                 | Syntax                           |
-| ------------------------ | ------------------------------------------------------- | -------------------------------- |
-| `org list`               | List organizations available to the authenticated user. | `mcp-use org list`               |
-| `org current`            | Show the active organization.                           | `mcp-use org current`            |
-| `org use <id-or-slug>`   | Select and persist a different active organization.     | `mcp-use org use <id-or-slug>`   |
-
-**Notes and behavior:**
-
-- `deploy`, `deployments`, and `servers` use the active organization unless `--org` overrides it.
-- For CI or agent runs, pass `--org <org>` to `login`, `deploy`, `servers`, or `deployments` commands instead of switching global state. The value can be an organization slug, ID, or name.
-
-## Deployment management commands
-
-**Purpose:** Inspect and manage existing Manufact Cloud deployments.
-
-**Syntax:**
+List your organizations.
 
 ```bash
-mcp-use deployments <subcommand> [options]
+mcp-use org list [--json]
 ```
 
-**Subcommands:**
+### `org current`
 
-| Subcommand                | Purpose                                      | Options                                                                          |
-| ------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
-| `list`                    | List deployments.                            | `--org <id-or-slug>`, `--server <id>`, `--limit <n>`, `--skip <n>`, `--json`     |
-| `get <deployment-id>`     | Show deployment details.                     | `--json`                                                                         |
-| `logs <deployment-id>`    | View runtime logs.                           | `--build`, `--follow`, `--json`                                                  |
-| `restart <deployment-id>` | Trigger a new deployment on the same server. | `--follow`, `--branch <name>`, `--json`                                          |
-| `stop <deployment-id>`    | Stop a running deployment.                   | `--yes`, `--json`                                                               |
-| `delete <deployment-id>`  | Delete a deployment.                         | `--yes`, `--json`                                                               |
-
-**Examples:**
+Show the active organization.
 
 ```bash
-mcp-use deployments list
-mcp-use deployments get dep_abc123
-mcp-use deployments logs dep_abc123 --build --follow
-mcp-use deployments restart dep_abc123 --branch main --follow
-mcp-use deployments stop dep_abc123 --yes
-mcp-use deployments delete dep_abc123 --yes
+mcp-use org current [--json]
 ```
 
-**Notes and behavior:**
+### `org use`
 
-- `logs` shows runtime logs by default. Use `--build` for build logs.
-- `restart` redeploys the same server and uses the deployment branch unless `--branch` is set.
-- `stop` and `delete` prompt for confirmation on a TTY. Pass `--yes` in non-interactive or JSON runs.
-
-## Server management commands
-
-**Purpose:** Manage cloud servers, which are long-lived Git-backed deploy targets that own deployments.
-
-**Syntax:**
+Save the active organization.
 
 ```bash
-mcp-use servers <subcommand> [options]
+mcp-use org use <id-or-slug> [--json]
 ```
 
-**Subcommands:**
+### `org create`
 
-| Subcommand            | Purpose                                     | Options                                                                                                                                                                                                                                                |
-| --------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `list`                | List servers for an organization.           | `--org <slug-or-id>`, `--limit <n>`, `--skip <n>`                                                                                                                                                                                                      |
-| `get <id-or-slug>`    | Show server details and recent deployments. | `--org <slug-or-id>`                                                                                                                                                                                                                                   |
-| `update <id-or-slug>` | Update server configuration.                | `--branch <name>`, `--name <name>`, `--description <text>`, `--build-command <cmd>`, `--start-command <cmd>`, `--root-dir <path>`, `--watch-paths <glob>`, `--deploy-branches <glob>`, `--wait-for-ci`, `--no-wait-for-ci`, `--org <slug-or-id>` |
-| `delete <server-id>`  | Delete a server and its deployments.        | `--yes`, `--org <slug-or-id>`                                                                                                                                                                                                                      |
-| `env <subcommand>`    | Manage server environment variables.        | See [Server environment commands](#server-environment-commands).                                                                                                                                                                                       |
-
-**Examples:**
+Create an organization.
 
 ```bash
-mcp-use servers list
-mcp-use servers get srv_abc123
-mcp-use servers update srv_abc123 --branch main
-mcp-use servers update srv_abc123 --build-command "npm run build"
-mcp-use servers update srv_abc123 --watch-paths "apps/api/**" --watch-paths "packages/shared/**" --deploy-branches "release/*"
-mcp-use servers delete srv_abc123 --yes
+mcp-use org create <name> [--slug <slug>] [--json]
 ```
 
-**Notes and behavior:**
+### `org update`
 
-- `servers update --branch` changes the production branch for future production deploys.
-- `--watch-paths` and `--deploy-branches` are repeatable. Pass the flag once per pattern; a second bare value is read as a positional, not as another pattern.
-- Pass an empty string to `--build-command`, `--start-command`, `--root-dir`, `--watch-paths`, or `--deploy-branches` to clear that setting.
-- `--wait-for-ci` and `--no-wait-for-ci` control whether auto-deploys wait for other check runs before deploying.
-- `servers delete` prompts for confirmation unless `--yes` is set.
-
-## Server environment commands
-
-**Purpose:** List, set, and unset environment variables on a cloud server.
-
-**Syntax:**
+Update the selected organization.
 
 ```bash
-mcp-use servers env <subcommand> [options]
+mcp-use org update [--name <name>] [--slug <slug>] [--logo <file>] [options]
 ```
 
-**Subcommands:**
+### `org members`
 
-| Subcommand                 | Purpose                                   | Required arguments       | Other options                 |
-| -------------------------- | ----------------------------------------- | ------------------------ | ----------------------------- |
-| `list <server>`            | List environment variable metadata.       | Server ID or slug        | `--org <id-or-slug>`, `--branch <name>`             |
-| `set <server> <KEY=VALUE>` | Create or update an environment variable. | Server ID or slug, value | `--org <id-or-slug>`, `--branch <name>`, `--secret` |
-| `unset <server> <key>`     | Delete an environment variable by key.    | Server ID or slug, key   | `--org <id-or-slug>`, `--branch <name>`, `--yes`    |
-
-**Examples:**
+List organization members.
 
 ```bash
-mcp-use servers env list srv_abc123
-mcp-use servers env list srv_abc123 --branch feature/example
-mcp-use servers env set srv_abc123 API_KEY=secret --secret
-mcp-use servers env set srv_abc123 FEATURE_FLAG=true --branch feature/example
-mcp-use servers env unset srv_abc123 API_KEY --yes
+mcp-use org members [options]
 ```
 
-**Notes and behavior:**
+### `org invites list`
 
-- `env list` returns metadata only. Values are never returned.
-- `env set` creates a production variable when `--branch` is omitted, or a preview variable when it is supplied.
-- `--secret` stores a value as write-only. It must be passed on **every** write to the variable, including updates and rotations: omitting it stores the value as non-sensitive, even if the variable was previously write-only.
-- `--branch <name>` scopes preview environment variables to a branch. Omit `--branch` for production resolution.
-- `env unset` prompts for confirmation unless `--yes` is set. If the key doesn't exist in the selected production or branch scope, it fails with `env_variable_not_found`.
+List organization invitations.
+
+```bash
+mcp-use org invites list [options]
+```
+
+### `org invites send`
+
+Invite a member to the organization.
+
+```bash
+mcp-use org invites send <email> [--role member|admin] [options]
+```
+
+### `org invites cancel`
+
+Cancel a pending invitation.
+
+```bash
+mcp-use org invites cancel <invite-id> [options]
+```
+
+## Servers commands
+
+### `servers list`
+
+List accessible Cloud servers.
+
+```bash
+mcp-use servers list [--limit <n>] [--skip <n>] [options]
+```
+
+### `servers get`
+
+Inspect a server.
+
+```bash
+mcp-use servers get [server] [options]
+```
+
+### `servers update`
+
+Change server and repository settings.
+
+```bash
+mcp-use servers update [server] [options]
+```
+
+`--name`, `--description`, `--branch`, `--root-dir`, `--build-command`, `--start-command`, `--watch-paths`, `--deploy-branches`, `--wait-for-ci` / `--no-wait-for-ci`, `--repo <owner/name>`, `--disconnect-repo`, and `--allow-ip <cidr>` configure supported settings.
+
+### `servers rm`
+
+Remove a Cloud server.
+
+```bash
+mcp-use servers rm [server] [options]
+```
+
+## Environment commands
+
+### `env list`
+
+List environment keys and metadata.
+
+```bash
+mcp-use env list [options]
+```
+
+`--environment production|preview|development` selects scope; `--branch` selects a preview override. Set/push support `--phase runtime|build|both`. Use `env set --help` for passing a secret through stdin with `--sensitive`.
+
+Values are write-only. Listing returns keys and metadata. A branch-specific override can shadow the shared preview value.
+
+### `env set`
+
+Create or update environment variables.
+
+```bash
+mcp-use env set <KEY=VALUE...> [options]
+```
+
+`--environment production|preview|development` selects scope; `--branch` selects a preview override. Set/push support `--phase runtime|build|both`. Use `env set --help` for passing a secret through stdin with `--sensitive`.
+
+Values are write-only. Listing returns keys and metadata. A branch-specific override can shadow the shared preview value.
+
+### `env rm`
+
+Remove an environment variable.
+
+```bash
+mcp-use env rm <KEY> [options]
+```
+
+`--environment production|preview|development` selects scope; `--branch` selects a preview override. Set/push support `--phase runtime|build|both`. Use `env set --help` for passing a secret through stdin with `--sensitive`.
+
+Values are write-only. Listing returns keys and metadata. A branch-specific override can shadow the shared preview value.
+
+### `env push`
+
+Apply variables from an environment file.
+
+```bash
+mcp-use env push <file> [options]
+```
+
+`--environment production|preview|development` selects scope; `--branch` selects a preview override. Set/push support `--phase runtime|build|both`. Use `env set --help` for passing a secret through stdin with `--sensitive`.
+
+Values are write-only. Listing returns keys and metadata. A branch-specific override can shadow the shared preview value.
+
+## Deployments commands
+
+### `deployments list`
+
+List deployments.
+
+```bash
+mcp-use deployments list [--limit <n>] [--skip <n>] [options]
+```
+
+### `deployments get`
+
+Inspect one deployment.
+
+```bash
+mcp-use deployments get <id> [options]
+```
+
+### `deployments restart`
+
+Start a replacement deployment.
+
+```bash
+mcp-use deployments restart <id> [--branch <branch>] [options]
+```
+
+### `deployments promote`
+
+Promote a deployment to production.
+
+```bash
+mcp-use deployments promote <id> [options]
+```
+
+### `deployments stop`
+
+Stop a deployment.
+
+```bash
+mcp-use deployments stop <id> [options]
+```
+
+### `deployments rm`
+
+Remove a deployment.
+
+```bash
+mcp-use deployments rm <id> [options]
+```
+
+### `logs`
+
+Read runtime or build logs.
+
+```bash
+mcp-use logs [deployment-id] [--build] [--since <duration>] [--limit <n>] [--follow] [options]
+```
+
+`--build` selects build output; `--follow` follows updates. Runtime logs support a time window and line limit. Runtime following continues until interrupted; build following ends at a terminal status. With `--json`, output is emitted when following ends.
+
+Use the deployment ID returned by deploy to inspect a failed build. When omitting it, select the server through its project link or `--server`.
+
+## Domains commands
+
+### `domains get`
+
+Inspect server domain and DNS details.
+
+```bash
+mcp-use domains get [--domain-id <id>] [options]
+```
+
+### `domains set-subdomain`
+
+Choose a hosted subdomain.
+
+```bash
+mcp-use domains set-subdomain <name> [options]
+```
+
+### `domains add`
+
+Attach a custom domain.
+
+```bash
+mcp-use domains add <hostname> [--branch <branch>] [options]
+```
+
+Configure the exact CNAME target returned by `domains add` at your DNS provider, then verify the domain.
+
+### `domains verify`
+
+Verify a domain DNS record.
+
+```bash
+mcp-use domains verify [--domain-id <id>] [options]
+```
+
+Configure the exact CNAME target returned by `domains add` at your DNS provider, then verify the domain.
+
+### `domains rm`
+
+Remove a custom domain.
+
+```bash
+mcp-use domains rm [--domain-id <id>] [options]
+```
+
+## GitHub commands
+
+### `github connect`
+
+Get the GitHub App installation URL.
+
+```bash
+mcp-use github connect [options]
+```
+
+### `github installations`
+
+List available GitHub App installations.
+
+```bash
+mcp-use github installations [options]
+```
+
+### `github repos`
+
+List repositories accessible to the GitHub App.
+
+```bash
+mcp-use github repos [--installation <id>] [--page <n>] [--limit <n>] [options]
+```
+
+## Checklist commands
+
+### `checklist run`
+
+Run the publishing checklist for a server.
+
+```bash
+mcp-use checklist run [--branch <branch>] [--no-wait] [options]
+```
+
+Retain the run ID when using `--no-wait`, then inspect it with `checklist get`. A completed check does not publish the server.
+
+### `checklist list`
+
+List publishing checklist runs.
+
+```bash
+mcp-use checklist list [--branch <branch>] [--limit <n>] [--skip <n>] [options]
+```
+
+### `checklist get`
+
+Inspect a publishing checklist run.
+
+```bash
+mcp-use checklist get <run-id> [options]
+```
+
+### `checklist cancel`
+
+Cancel a checklist run.
+
+```bash
+mcp-use checklist cancel <run-id> [options]
+```
+
+## Alerts commands
+
+### `alerts list`
+
+List server alert rules.
+
+```bash
+mcp-use alerts list [options]
+```
+
+### `alerts get`
+
+Inspect an alert rule.
+
+```bash
+mcp-use alerts get <id> [options]
+```
+
+### `alerts create`
+
+Create an alert from dashboard-format YAML.
+
+```bash
+mcp-use alerts create --file <rule.yaml> [options]
+```
+
+Use the [dashboard YAML format](https://docs.manufact.com/dashboard/alerts). Choose a minimum traffic count alongside rate thresholds and separate trigger/recovery thresholds. `alerts options` lists current metrics.
+
+### `alerts update`
+
+Update an alert from dashboard-format YAML.
+
+```bash
+mcp-use alerts update <id> --file <rule.yaml> [options]
+```
+
+Use the [dashboard YAML format](https://docs.manufact.com/dashboard/alerts). Choose a minimum traffic count alongside rate thresholds and separate trigger/recovery thresholds. `alerts options` lists current metrics.
+
+### `alerts rm`
+
+Remove an alert rule.
+
+```bash
+mcp-use alerts rm <id> [options]
+```
+
+### `alerts options`
+
+List available alert metrics and limits.
+
+```bash
+mcp-use alerts options [options]
+```
+
+Use the [dashboard YAML format](https://docs.manufact.com/dashboard/alerts). Choose a minimum traffic count alongside rate thresholds and separate trigger/recovery thresholds. `alerts options` lists current metrics.
+
+## Agent skills commands
+
+### `skills install`
+
+Install version-matched coding-agent guidance, including the full Cloud CLI skill.
+
+```bash
+mcp-use skills install [--path <directory>] [--json]
+```
+
+Installs into `.cursor/skills`, `.claude/skills`, and `.agents/skills`. The skills are bundled with the CLI and work offline. `skills add` remains an alias. Other project skills are preserved.
+
+Destructive removals and deployment promotion/stopping require `--yes` without a terminal.
 
 ## `client`
 
@@ -534,7 +754,7 @@ mcp-use client <name> <scope> <action>
 | ---------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `connect <name> <url>` | Verify and save an HTTP(S) MCP server. | `-H, --header`, `--no-oauth`, `--auth-timeout <ms>`, `--protocol <auto\|legacy\|modern>`, `--no-open`, `--json` |
 | `list`                 | List saved servers.                    | `--json`                                                                                                        |
-| `remove <name>`        | Remove a saved server and credentials. | `--json`                                                                                                         |
+| `remove <name>`        | Remove a saved server and credentials. | `--json`                                                                                                        |
 
 **Per-server scopes:**
 
@@ -602,28 +822,28 @@ Pass tool arguments after the options, either as one JSON object or as
 
 **Source options:**
 
-| Option                        | Description                                                              |
-| ----------------------------- | ------------------------------------------------------------------------ |
-| `--server <name>`             | Use a server saved by `mcp-use client`.                                   |
-| `--mcp <url>`                 | Connect directly to an HTTP(S) MCP endpoint.                              |
-| `-H, --header <"Key: Value">` | Header for `--mcp`. Repeatable, and incompatible with `--server`.         |
+| Option                        | Description                                                       |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `--server <name>`             | Use a server saved by `mcp-use client`.                           |
+| `--mcp <url>`                 | Connect directly to an HTTP(S) MCP endpoint.                      |
+| `-H, --header <"Key: Value">` | Header for `--mcp`. Repeatable, and incompatible with `--server`. |
 
 **Capture options:**
 
-| Option                      | Description                                                       | Default                      |
-| --------------------------- | ----------------------------------------------------------------- | ---------------------------- |
-| `--tool <name>`             | View-backed tool to call. Required.                                | None                         |
-| `--output <path>`           | Output PNG path.                                                   | Timestamped view name        |
-| `--width <px>`              | Host and widget width, an integer from `1` to `10000000`.          | `768`                        |
-| `--height <px>`             | Host viewport height, an integer from `1` to `10000000`. The PNG is cropped to the widget bounds. | `720`                        |
-| `--device-scale-factor <n>` | Pixel density, greater than 0 and at most 4.                       | `1`                          |
-| `--theme <light\|dark>`     | Host theme.                                                        | `light`                      |
-| `--wait-for <selector>`     | Wait for a selector before capture.                                | None                         |
-| `--delay <ms>`              | Additional delay after readiness.                                  | `0`                          |
-| `--timeout <ms>`            | Tool, browser, and readiness timeout.                              | `30000`                      |
-| `--inspector <url>`         | Use an existing Inspector origin.                                  | Starts one                   |
-| `--cdp-url <url>`           | Use an existing Chrome DevTools endpoint.                          | Launches Chrome              |
-| `--json`                    | Emit one result or error and never prompt.                         | Off                          |
+| Option                      | Description                                                                                       | Default               |
+| --------------------------- | ------------------------------------------------------------------------------------------------- | --------------------- |
+| `--tool <name>`             | View-backed tool to call. Required.                                                               | None                  |
+| `--output <path>`           | Output PNG path.                                                                                  | Timestamped view name |
+| `--width <px>`              | Host and widget width, an integer from `1` to `10000000`.                                         | `768`                 |
+| `--height <px>`             | Host viewport height, an integer from `1` to `10000000`. The PNG is cropped to the widget bounds. | `720`                 |
+| `--device-scale-factor <n>` | Pixel density, greater than 0 and at most 4.                                                      | `1`                   |
+| `--theme <light\|dark>`     | Host theme.                                                                                       | `light`               |
+| `--wait-for <selector>`     | Wait for a selector before capture.                                                               | None                  |
+| `--delay <ms>`              | Additional delay after readiness.                                                                 | `0`                   |
+| `--timeout <ms>`            | Tool, browser, and readiness timeout.                                                             | `30000`               |
+| `--inspector <url>`         | Use an existing Inspector origin.                                                                 | Starts one            |
+| `--cdp-url <url>`           | Use an existing Chrome DevTools endpoint.                                                         | Launches Chrome       |
+| `--json`                    | Emit one result or error and never prompt.                                                        | Off                   |
 
 **Examples:**
 
@@ -635,41 +855,44 @@ mcp-use screenshot --mcp https://example.com/mcp --tool show-app \
 
 **Exit codes:**
 
-| Code | Meaning                                                              |
-| ---- | -------------------------------------------------------------------- |
-| `0`  | Capture succeeded, or help was requested.                             |
-| `2`  | Invalid arguments.                                                    |
-| `1`  | MCP, tool, Inspector, browser, readiness, or write failure.           |
+| Code | Meaning                                                     |
+| ---- | ----------------------------------------------------------- |
+| `0`  | Capture succeeded, or help was requested.                   |
+| `2`  | Invalid arguments.                                          |
+| `1`  | MCP, tool, Inspector, browser, readiness, or write failure. |
 
 ## Environment variables
 
-| Variable                    | Used by                                   | Description                                                                                                                                                                                                 | Default                             |
-| --------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `PORT`                      | `dev`, `start`, server runtime            | Server port when `--port` is not provided. `dev` sets it to the resolved listener port before importing the entry; `start` reads it before importing the built entry.                                       | `3000`                              |
-| `HOST`                      | `dev`, `start`, server runtime            | Bind host when `--host` is not provided. `start` and direct `listen()` fall back to `config.host` before `127.0.0.1`.                                                                                       | `127.0.0.1`                         |
-| `NODE_ENV`                  | `dev`, `build`, `start`                   | Runtime environment. When it is not already set, `dev` uses `development`, and `build` and `start` set `production` before loading the project `.env`.                                                      | Command-specific                    |
-| `MCP_URL`                   | server runtime, `dev`, `build`            | **Server public origin**, such as `https://mcp.example.com`. OAuth resource URL, CSP `connectDomains`, dev HMR websocket. When OAuth derives its resource from `MCP_URL` (the provider sets no `resource`), a value with a path, query, or credentials makes the server constructor throw; views and CSP use only its origin. Lower priority than `CSP_URLS`. `dev` sets it only while importing the entry on loopback binds, `build` sets `http://localhost:3000` only while inspecting the entry, and `start` never sets it. | None (request origin)               |
-| `MCP_ASSETS_URL`            | `build`, server runtime                   | **Assets URL prefix** (origin + optional path) for view JS/CSS and `public/`. Falls back to `MCP_URL` origin. When set at build, manifest paths become full CDN URLs (path segment from server `basePath`). | None (falls back to server origin)  |
-| `CSP_URLS`                  | server runtime                            | Comma-separated CSP domain shortcut — applied to `connectDomains` and `resourceDomains` when their per-category vars are unset. Higher priority than `MCP_URL` auto-append.                                 | None                                |
-| `CSP_CONNECT_DOMAINS`       | server runtime                            | Overrides `CSP_URLS` for `connectDomains`                                                                                                                                                                   | None                                |
-| `CSP_RESOURCE_DOMAINS`      | server runtime                            | Overrides `CSP_URLS` for `resourceDomains`                                                                                                                                                                  | None                                |
-| `CSP_FRAME_DOMAINS`         | server runtime                            | Sets `frameDomains` (not covered by `CSP_URLS`)                                                                                                                                                             | None                                |
-| `CSP_BASE_URI_DOMAINS`      | server runtime                            | Sets `baseUriDomains` (not covered by `CSP_URLS`)                                                                                                                                                           | None                                |
-| `MCP_USE_CLOUD_WEB_URL`     | `deploy`                                  | Manufact web URL for dashboard and GitHub settings links.                                                                                                                                                   | `https://manufact.com`              |
-| `MCP_USE_CLOUD_API_URL`     | `login` and all cloud commands            | Manufact API URL. Takes precedence over `MCP_API_URL`. The CLI normalizes it to include `/api/v1`.                                                                                                          | `https://cloud.manufact.com/api/v1` |
-| `MCP_API_URL`               | `login` and all cloud commands            | Fallback Manufact API URL when `MCP_USE_CLOUD_API_URL` is unset.                                                                                                                                            | `https://cloud.manufact.com/api/v1` |
-| `MCP_USE_API_KEY`           | `login` and all cloud commands            | API key for non-interactive login. Cloud commands (`deploy`, `servers`, `deployments`, `org`, `whoami`) use it directly and prefer it over the saved credential.                                           | None                                |
-| `MCP_USE_WS_RELAY`          | `dev --tunnel`, `start --tunnel`          | WebSocket relay API origin used when creating authenticated local tunnels.                                                                                                                                  | `https://api.tunnel.mcp-use.run`    |
-| `MCP_USE_CHROME_PATH`       | `screenshot`                              | Chrome executable path for screenshots.                                                                                                                                                                     | Auto-detected                       |
-| `PUPPETEER_EXECUTABLE_PATH` | `screenshot`                              | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |
-| `CHROME_PATH`               | `screenshot`                              | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |
+| Variable                    | Used by                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default                             |
+| --------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| `PORT`                      | `dev`, `start`, server runtime   | Server port when `--port` is not provided. `dev` sets it to the resolved listener port before importing the entry; `start` reads it before importing the built entry.                                                                                                                                                                                                                                                                                                                                                          | `3000`                              |
+| `HOST`                      | `dev`, `start`, server runtime   | Bind host when `--host` is not provided. `start` and direct `listen()` fall back to `config.host` before `127.0.0.1`.                                                                                                                                                                                                                                                                                                                                                                                                          | `127.0.0.1`                         |
+| `NODE_ENV`                  | `dev`, `build`, `start`          | Runtime environment. When it is not already set, `dev` uses `development`, and `build` and `start` set `production` before loading the project `.env`.                                                                                                                                                                                                                                                                                                                                                                         | Command-specific                    |
+| `MCP_URL`                   | server runtime, `dev`, `build`   | **Server public origin**, such as `https://mcp.example.com`. OAuth resource URL, CSP `connectDomains`, dev HMR websocket. When OAuth derives its resource from `MCP_URL` (the provider sets no `resource`), a value with a path, query, or credentials makes the server constructor throw; views and CSP use only its origin. Lower priority than `CSP_URLS`. `dev` sets it only while importing the entry on loopback binds, `build` sets `http://localhost:3000` only while inspecting the entry, and `start` never sets it. | None (request origin)               |
+| `MCP_ASSETS_URL`            | `build`, server runtime          | **Assets URL prefix** (origin + optional path) for view JS/CSS and `public/`. Falls back to `MCP_URL` origin. When set at build, manifest paths become full CDN URLs (path segment from server `basePath`).                                                                                                                                                                                                                                                                                                                    | None (falls back to server origin)  |
+| `CSP_URLS`                  | server runtime                   | Comma-separated CSP domain shortcut — applied to `connectDomains` and `resourceDomains` when their per-category vars are unset. Higher priority than `MCP_URL` auto-append.                                                                                                                                                                                                                                                                                                                                                    | None                                |
+| `CSP_CONNECT_DOMAINS`       | server runtime                   | Overrides `CSP_URLS` for `connectDomains`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | None                                |
+| `CSP_RESOURCE_DOMAINS`      | server runtime                   | Overrides `CSP_URLS` for `resourceDomains`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | None                                |
+| `CSP_FRAME_DOMAINS`         | server runtime                   | Sets `frameDomains` (not covered by `CSP_URLS`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | None                                |
+| `CSP_BASE_URI_DOMAINS`      | server runtime                   | Sets `baseUriDomains` (not covered by `CSP_URLS`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | None                                |
+| `MCP_USE_CLOUD_WEB_URL`     | `deploy`                         | Manufact web URL for dashboard and GitHub settings links.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `https://manufact.com`              |
+| `MCP_USE_CLOUD_API_URL`     | `login` and all cloud commands   | Manufact API URL. Takes precedence over `MCP_API_URL`. The CLI normalizes it to include `/api/v1`.                                                                                                                                                                                                                                                                                                                                                                                                                             | `https://cloud.manufact.com/api/v1` |
+| `MCP_API_URL`               | `login` and all cloud commands   | Fallback Manufact API URL when `MCP_USE_CLOUD_API_URL` is unset.                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `https://cloud.manufact.com/api/v1` |
+| `MANUFACT_TOKEN`            | Cloud commands                   | API key that overrides the stored credential.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | None                                |
+| `MANUFACT_SERVER`           | Project-scoped Cloud commands    | Server ID or slug, after `--server` and before the project link.                                                                                                                                                                                                                                                                                                                                                                                                                                                               | None                                |
+| `MANUFACT_ORG`              | Project-scoped Cloud commands    | Organization ID or slug, after `--org` and before the project link.                                                                                                                                                                                                                                                                                                                                                                                                                                                            | None                                |
+| `MCP_USE_API_KEY`           | Cloud commands                   | Legacy credential fallback when `MANUFACT_TOKEN` is unset.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | None                                |
+| `MCP_USE_WS_RELAY`          | `dev --tunnel`, `start --tunnel` | WebSocket relay API origin used when creating authenticated local tunnels.                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `https://api.tunnel.mcp-use.run`    |
+| `MCP_USE_CHROME_PATH`       | `screenshot`                     | Chrome executable path for screenshots.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Auto-detected                       |
+| `PUPPETEER_EXECUTABLE_PATH` | `screenshot`                     | Fallback Chrome executable path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Auto-detected                       |
+| `CHROME_PATH`               | `screenshot`                     | Fallback Chrome executable path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Auto-detected                       |
 
 **Examples:**
 
 ```bash
 PORT=8080 mcp-use start
 MCP_URL=https://my-server.example.com MCP_ASSETS_URL=https://cdn.example.com/bucket mcp-use build
-MCP_USE_API_KEY=mcp_... mcp-use login --org my-org
+MANUFACT_TOKEN="$CI_MANUFACT_TOKEN" mcp-use whoami --json
 MCP_USE_CHROME_PATH=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   mcp-use screenshot --server local --tool show-board
 ```

@@ -1,6 +1,8 @@
+import { plain, table } from "../../core/format.js";
 import { readFile } from "node:fs/promises";
 
 import { parseCloudArgs, projectServer, stdinText } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { CommandError, UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
@@ -12,13 +14,12 @@ type Phase = "runtime" | "build" | "both";
 /** Manage write-only Cloud environment values and their scopes. */
 export async function runEnv(argv: readonly string[]): Promise<number> {
   const operation = argv[0];
+  const help = cloudHelp("env", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(
-      `Usage: mcp-use env${COMMANDS.includes(operation ?? "") ? ` ${operation}` : ""} [options]\n\nCommands:\n  list                 List keys and metadata\n  set <KEY=VALUE...>    Create or update values\n  set <KEY> --sensitive Read one secret from stdin\n  rm <KEY>             Remove a variable (alias: remove)\n  push <file>          Set variables from a dotenv file\n\nOptions:\n  --server <id-or-slug>\n  --org <id-or-slug>\n  --environment <production|preview|development>\n  --branch <name>      Preview branch override\n  --phase <runtime|build|both>\n  --sensitive          Read a value from stdin\n  --yes                Confirm removal\n  --json               Emit one result or error; values are never printed\n`
-    );
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     if (!COMMANDS.includes(operation ?? ""))
       throw new UsageError("Usage: mcp-use env <list|set|rm|push>");
     const { values, positionals } = parseCloudArgs(
@@ -88,12 +89,17 @@ export async function runEnv(argv: readonly string[]): Promise<number> {
       const safe = scoped.map(metadata);
       output.result(
         safe,
-        safe
-          .map(
-            (item) =>
-              `${item.key}\t${item.environments.join(",")}\t${item.phase}\t${item.sensitive ? "sensitive" : "plain"}`
-          )
-          .join("\n") || "No environment variables."
+        safe.length
+          ? table(
+              ["NAME", "ENVIRONMENTS", "PHASE", "VALUE"],
+              safe.map((item) => [
+                item.key,
+                item.environments.join(", "),
+                item.phase,
+                item.sensitive ? "Sensitive" : "Plain",
+              ])
+            )
+          : "No environment variables in this scope.\nSet one: mcp-use env set NAME=value"
       );
       return;
     }
@@ -122,7 +128,7 @@ export async function runEnv(argv: readonly string[]): Promise<number> {
         );
       output.result(
         { removed: existing.key, environment, branch: values.branch ?? null },
-        `Removed ${existing.key}.`
+        `✓ Removed ${plain(existing.key)} from ${plain(environment)}.`
       );
       return;
     }
@@ -176,7 +182,7 @@ export async function runEnv(argv: readonly string[]): Promise<number> {
     }
     output.result(
       { serverId: server, variables: results },
-      results.map((item) => `Set ${item.key}.`).join("\n")
+      results.map((item) => `✓ Set ${plain(item.key)}.`).join("\n")
     );
   });
 }

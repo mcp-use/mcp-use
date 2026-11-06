@@ -17,6 +17,7 @@ import { callerFor, createCloudClient } from "../api/client.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { UsageError, type NextStep } from "../../core/errors.js";
 import { openBrowser } from "../../core/open-browser.js";
+import { withProgress } from "../../core/progress.js";
 import {
   chooseOrganization,
   findOrganization,
@@ -70,7 +71,7 @@ export async function runLogin(argv: readonly string[]): Promise<number> {
     process.stdout.write(`${HELP}\n`);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, HELP, async (output) => {
     const { values } = parseCommandArgs(argv, {
       options: {
         "api-key": { type: "string" },
@@ -97,7 +98,9 @@ export async function runLogin(argv: readonly string[]): Promise<number> {
     if (apiKeyFlag !== undefined) {
       key = { apiKey: apiKeyFlag };
     } else if (deviceCode !== undefined) {
-      key = await createApiKey(await waitForApproval(deviceCode));
+      key = await withProgress("Waiting for approval", output.json, async () =>
+        createApiKey(await waitForApproval(deviceCode))
+      );
     } else {
       const code = await requestDeviceCode();
       if (output.json || process.stdout.isTTY !== true) {
@@ -126,18 +129,22 @@ export async function runLogin(argv: readonly string[]): Promise<number> {
       }
       const url = code.verification_uri_complete ?? code.verification_uri;
       process.stderr.write(
-        `Open ${url} and enter the code ${code.user_code}.\nWaiting for approval...\n`
+        `Open ${url} and enter the code ${code.user_code}.\n`
       );
       if (values["no-open"] !== true) openBrowser(url);
-      key = await createApiKey(
-        await waitForApproval(code.device_code, {
-          intervalSeconds: code.interval,
-          expiresInSeconds: code.expires_in,
-        })
+      key = await withProgress("Waiting for approval", output.json, async () =>
+        createApiKey(
+          await waitForApproval(code.device_code, {
+            intervalSeconds: code.interval,
+            expiresInSeconds: code.expires_in,
+          })
+        )
       );
     }
 
-    const result = await finishLogin(key, org, previous);
+    const result = await withProgress("Signing in", output.json, () =>
+      finishLogin(key, org, previous)
+    );
     output.result(result, humanSummary(result));
   });
 }

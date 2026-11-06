@@ -1,13 +1,16 @@
 import {
   cloudFor,
-  human,
   integer,
   parseCloudArgs,
   projectServer,
 } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
+import { formatServer, formatServerList } from "./output.js";
+import { plain } from "../../core/format.js";
+import { cloudWebUrl } from "../cloud-api.js";
 import { updateServer } from "./update.js";
 
 const COMMANDS = ["list", "get", "update", "rm", "remove"];
@@ -15,14 +18,13 @@ const COMMANDS = ["list", "get", "update", "rm", "remove"];
 /** Manage servers and their deployment settings. */
 export async function runServers(argv: readonly string[]): Promise<number> {
   const operation = argv[0];
+  const help = cloudHelp("servers", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(
-      `Usage: mcp-use servers${COMMANDS.includes(operation ?? "") ? ` ${operation}` : ""} [server] [options]\n\nCommands: list, get, update, rm (alias: remove)\n\nOptions:\n  --server <id-or-slug>     Default: MANUFACT_SERVER or the project link\n  --org <id-or-slug>        Organization override\n  --limit <n> --skip <n>    List pagination\n  --name <name> --description <text>\n  --branch <name> --root-dir <path>\n  --build-command <cmd> --start-command <cmd>\n  --watch-paths <glob> --deploy-branches <glob> (repeatable)\n  --wait-for-ci | --no-wait-for-ci\n  --repo <owner/name> | --disconnect-repo\n  --allow-ip <cidr>         Replace custom IP ranges (repeatable)\n  --clear-allow-ip          Clear custom IP ranges\n  --yes                    Confirm removal\n  --json                   Emit one result or error\n`
-    );
+    process.stdout.write(help);
     return 0;
   }
   if (operation === "update") return updateServer(argv.slice(1));
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     if (!COMMANDS.includes(operation ?? ""))
       throw new UsageError("Usage: mcp-use servers <list|get|update|rm>");
     const { values, positionals } = parseCloudArgs(
@@ -47,15 +49,7 @@ export async function runServers(argv: readonly string[]): Promise<number> {
           },
         })
       );
-      output.result(
-        page,
-        page.items
-          .map(
-            (item) =>
-              `${item.id}\t${item.name ?? item.slug ?? "-"}\t${item.status}`
-          )
-          .join("\n") || "No servers."
-      );
+      output.result(page, formatServerList(page.items, page.total));
       return;
     }
     const { cloud, server, details } = await projectServer(
@@ -63,7 +57,18 @@ export async function runServers(argv: readonly string[]): Promise<number> {
       positionals[0]
     );
     if (operation === "get") {
-      output.result(details, human(details));
+      output.result(
+        details,
+        formatServer(
+          {
+            ...details,
+            dashboardUrl: `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(server)}/overview`,
+          },
+          cloud.organization.name ??
+            cloud.organization.slug ??
+            cloud.organization.id
+        )
+      );
       return;
     }
     if (
@@ -80,6 +85,9 @@ export async function runServers(argv: readonly string[]): Promise<number> {
         params: { path: { id: server } },
       })
     );
-    output.result(result, `Removed ${server}.`);
+    output.result(
+      result,
+      `✓ Removed server “${plain(details.name ?? details.slug ?? server)}”\nID  ${plain(server)}`
+    );
   });
 }

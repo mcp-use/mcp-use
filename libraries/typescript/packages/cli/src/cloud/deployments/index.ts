@@ -1,7 +1,9 @@
-import { cloudFor, human, integer, parseCloudArgs } from "../options.js";
+import { cloudFor, integer, parseCloudArgs } from "../options.js";
+import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
 import { UsageError } from "../../core/errors.js";
 import { confirm } from "../../core/prompt.js";
+import { plain } from "../../core/format.js";
 import { formatDeployment, formatDeploymentList } from "./output.js";
 
 const COMMANDS = ["list", "get", "restart", "promote", "stop", "rm", "remove"];
@@ -9,14 +11,12 @@ const COMMANDS = ["list", "get", "restart", "promote", "stop", "rm", "remove"];
 /** Manage deployment history, traffic and lifecycle. */
 export async function runDeployments(argv: readonly string[]): Promise<number> {
   const operation = argv[0];
+  const help = cloudHelp("deployments", argv);
   if (argv.includes("--help") || argv.includes("-h")) {
-    const sub = COMMANDS.includes(operation ?? "") ? ` ${operation}` : "";
-    process.stdout.write(
-      `Usage: mcp-use deployments${sub} [options]\n\nCommands: list, get <id>, restart <id>, promote <id>, stop <id>, rm <id> (alias: remove)\n\nOptions:\n  --org <id-or-slug>  Organization override\n  --server <id>       Filter list by server\n  --limit <n>         Results per page (default 30, maximum 200)\n  --skip <n>          Pagination offset\n  --branch <name>     Restart branch override\n  --yes              Confirm promote, stop or removal\n  --json             Emit one result or error\n`
-    );
+    process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, async (output) => {
+  return runCommand(argv, help, async (output) => {
     if (!COMMANDS.includes(operation ?? ""))
       throw new UsageError(
         "Usage: mcp-use deployments <list|get|restart|promote|stop|rm>"
@@ -100,13 +100,18 @@ export async function runDeployments(argv: readonly string[]): Promise<number> {
           },
         })
       );
-      output.result(result, `Created deployment ${result.id}.`);
+      output.result(
+        result,
+        `✓ Created deployment ${plain(result.id)}\nInspect: mcp-use deployments get ${plain(result.id)}`
+      );
       return;
     }
     const result =
       operation === "promote"
         ? await cloud.call(
-            cloud.client.POST("/api/v1/deployments/{id}/activate", { params }),
+            cloud.client.POST("/api/v1/deployments/{id}/activate", {
+              params,
+            }),
             context
           )
         : operation === "stop"
@@ -118,6 +123,9 @@ export async function runDeployments(argv: readonly string[]): Promise<number> {
               cloud.client.DELETE("/api/v1/deployments/{id}", { params }),
               context
             );
-    output.result(result, human(result));
+    output.result(
+      result,
+      `✓ ${operation === "promote" ? "Promoted" : operation === "stop" ? "Stopped" : "Removed"} deployment ${plain(id)}`
+    );
   });
 }
