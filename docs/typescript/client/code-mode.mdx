@@ -80,6 +80,18 @@ release anything on its behalf. A non-arrow function is invoked with the
 }}
 ```
 
+## Searching tools from sandboxed code
+
+`search_tools(query, detailLevel)` is available inside executed code. It returns the same `{ meta, results }` envelope on the VM and E2B executors, so read `results` instead of treating the return value as an array:
+
+```typescript
+const { results, meta } = await search_tools("github", "descriptions");
+for (const tool of results) {
+  console.log(`${tool.server}.${tool.name}: ${tool.description}`);
+}
+console.log(`matched ${meta.result_count} tools`);
+```
+
 ## Agent integration
 
 Use with `@mcp-use/agent` and `PROMPTS.CODE_MODE`:

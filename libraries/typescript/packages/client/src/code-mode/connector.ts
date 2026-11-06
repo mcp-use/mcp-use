@@ -20,13 +20,13 @@ You have access to an MCP Code Mode Client that allows you to execute JavaScript
 
 \`\`\`javascript
 // Find all GitHub-related tools
-const tools = await search_tools("github");
-for (const tool of tools) {
+const { results } = await search_tools("github");
+for (const tool of results) {
     console.log(\`\${tool.server}.\${tool.name}: \${tool.description}\`);
 }
 
 // Get only tool names for quick overview
-const tools = await search_tools("", "names");
+const { results: names } = await search_tools("", "names");
 \`\`\`
 
 ### 2. Interface Introspection
@@ -61,8 +61,8 @@ const tools = await search_tools("", "names");
 
 \`\`\`javascript
 // 1. Discover available tools
-const github_tools = await search_tools("github pull request");
-console.log(\`Available GitHub PR tools: \${github_tools.map(t => t.name)}\`);
+const { results: githubTools } = await search_tools("github pull request");
+console.log(\`Available GitHub PR tools: \${githubTools.map(t => t.name)}\`);
 
 // 2. Call tools with proper parameters
 const pr = await github.get_pull_request({
