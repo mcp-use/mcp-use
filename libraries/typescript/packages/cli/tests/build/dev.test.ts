@@ -6,10 +6,11 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   Client,
   StreamableHTTPClientTransport,
@@ -17,6 +18,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runDev } from "../../src/toolchain/index.js";
+import type { DevOptions } from "../../src/toolchain/dev.js";
 import {
   bindBasicToolToView,
   copyFixture,
@@ -96,7 +98,8 @@ async function startDev(
   cwd: string,
   port: number,
   host?: string,
-  inspector?: boolean
+  inspector?: boolean,
+  directories: Pick<DevOptions, "viewsDir" | "mcpDir"> = {}
 ): Promise<DevHandle> {
   const lines: string[] = [];
   const logSpy = vi
@@ -116,6 +119,7 @@ async function startDev(
     port,
     ...(host !== undefined && { host }),
     ...(inspector !== undefined && { inspector }),
+    ...directories,
     signal: controller.signal,
   });
   // Surface startup failures instead of hanging in waitFor.
@@ -1060,6 +1064,85 @@ async function rawGetBody(
 }
 
 describe("runDev (views)", () => {
+  it.each(
+    [
+      { label: "default views", viewsDir: "views", directories: {} },
+      {
+        label: "custom viewsDir",
+        viewsDir: "src/views",
+        directories: { viewsDir: "src/views" },
+      },
+      {
+        label: "custom mcpDir",
+        viewsDir: "src/mcp/views",
+        directories: { mcpDir: "src/mcp" },
+      },
+    ].flatMap((configuration) =>
+      [false, true].map((landing) => ({ ...configuration, landing }))
+    )
+  )(
+    "serves shared imports with $label and landing=$landing",
+    async ({ viewsDir, directories, landing }) => {
+      const cwd = copyFixture("dev-shared-import", "views");
+      cleanups.push(() => removeDir(cwd));
+      const sourceRoot = join(cwd, directories.mcpDir ?? ".");
+      if (directories.mcpDir !== undefined) {
+        mkdirSync(sourceRoot, { recursive: true });
+        renameSync(join(cwd, "src/index.ts"), join(sourceRoot, "index.ts"));
+      }
+      if (viewsDir !== "views") {
+        renameSync(join(cwd, "views"), join(cwd, viewsDir));
+      }
+      const sharedPath = join(cwd, "src/shared.ts");
+      writeFileSync(sharedPath, 'export const greeting = "shared greeting";');
+      const viewDir = join(cwd, viewsDir, "product-search-result");
+      const sharedImport = relative(viewDir, sharedPath).split("\\").join("/");
+      writeFileSync(
+        join(viewDir, "view.tsx"),
+        `import { greeting } from ${JSON.stringify(sharedImport)};
+         export default function View() { return <main>{greeting}</main>; }`
+      );
+      if (landing) {
+        writeFileSync(
+          join(sourceRoot, "landing.tsx"),
+          "export default function Landing() { return <main>Landing</main>; }"
+        );
+      }
+
+      const dev = await startDev(
+        cwd,
+        await getFreePort(),
+        undefined,
+        false,
+        directories
+      );
+      cleanups.push(dev.stop);
+      const base = new URL(dev.url).origin;
+      // Match browser dependency discovery: virtual entry -> view -> shared.
+      const virtual = await fetch(
+        `${base}/@id/__x00__virtual:mcp-use/views/product-search-result`
+      );
+      expect(virtual.status).toBe(200);
+      await virtual.text();
+      const view = await fetch(
+        `${base}/${viewsDir}/product-search-result/view.tsx`
+      );
+      expect(view.status).toBe(200);
+      expect(await view.text()).toContain('from "/src/shared.ts"');
+      const shared = await fetch(`${base}/src/shared.ts`);
+      expect(shared.status).toBe(200);
+      expect(await shared.text()).toContain("shared greeting");
+
+      const missingModule = await fetch(`${base}/src/not-a-module.ts`);
+      expect(missingModule.status).toBe(404);
+      await missingModule.text();
+      expect(await listToolNames(dev.url)).toContain("search-products");
+      const info = await fetch(`${base}/mcp/inspector/api/dev/info`);
+      expect(info.status).toBe(200);
+      expect(await info.json()).toMatchObject({ fromCli: true });
+    }
+  );
+
   it("serves Vite modules through a public sandbox hostname", async () => {
     process.env["MCP_URL"] = "https://sandbox.example.com/mcp";
     const cwd = copyFixture("dev-views", "views");

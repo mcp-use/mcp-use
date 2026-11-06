@@ -23,7 +23,7 @@ import { existsSync } from "node:fs";
 import { createServer as createNodeServer } from "node:http";
 import { createRequire } from "node:module";
 import { networkInterfaces } from "node:os";
-import { join, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import tailwindcss from "@tailwindcss/vite";
@@ -483,6 +483,16 @@ export async function runDev(options: DevOptions): Promise<void> {
   const viewsDirectory =
     options.viewsDir ??
     (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
+  const viewsRelativePath = normalizePath(
+    relative(options.cwd, resolveViewsDir(options.cwd, viewsDirectory))
+  );
+  // Views outside the Vite root use /@fs/ URLs, handled separately below.
+  const viewsUrlPrefix =
+    isAbsolute(viewsRelativePath) ||
+    viewsRelativePath === ".." ||
+    viewsRelativePath.startsWith("../")
+      ? undefined
+      : `/${viewsRelativePath === "" ? "" : `${viewsRelativePath}/`}`;
   const conventionalSkillsDirectory =
     options.mcpDir === undefined ? "skills" : join(options.mcpDir, "skills");
   if (!existsSync(resolveViewsDir(options.cwd, viewsDirectory))) {
@@ -1264,19 +1274,22 @@ export async function runDev(options: DevOptions): Promise<void> {
     const landingUrlPath = landingRelativePath.startsWith("../")
       ? undefined
       : `/${landingRelativePath}`;
-    const knownLandingModule =
-      landingEnabled &&
+    const knownClientModule =
+      (viewsEnabled || landingEnabled) &&
       !pathname.startsWith(`${basePath}/_mcp-use/`) &&
       !isInspectorPath(pathname, basePath) &&
       pathname !== basePath &&
-      (pathname === landingUrlPath ||
-        linkedLandingCss.has(pathname) ||
+      ((viewsEnabled &&
+        viewsUrlPrefix !== undefined &&
+        pathname.startsWith(viewsUrlPrefix)) ||
+        (landingEnabled &&
+          (pathname === landingUrlPath || linkedLandingCss.has(pathname))) ||
         (pathname.startsWith("/") &&
           (vite.environments.client.moduleGraph.getModulesByFile(
             normalizePath(resolve(options.cwd, pathname.slice(1)))
           )?.size ?? 0) > 0));
     // Vite sees module-graph URLs (/@vite/client, /@id/virtual:…,
-    // /.mcp-use/cache/deps/…, view files under /views/…) plus standard
+    // /.mcp-use/cache/deps/…, configured view sources…) plus standard
     // node_modules pre-bundles; everything else — the MCP endpoint included —
     // goes straight to the fetch handler.
     const isViteRequest =
@@ -1284,8 +1297,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       (pathname.startsWith("/@") ||
         pathname.startsWith("/node_modules/") ||
         pathname.startsWith("/.mcp-use/") ||
-        (viewsEnabled && pathname.startsWith("/views/")) ||
-        knownLandingModule);
+        knownClientModule);
     const isViteBootstrap =
       pathname.startsWith("/@vite/") ||
       (pathname.startsWith("/@fs/") &&
