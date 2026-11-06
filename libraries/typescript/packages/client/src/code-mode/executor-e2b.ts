@@ -226,75 +226,85 @@ ${shim}
       const filename = `exec_${Date.now()}.js`;
       await sandbox.files.write(filename, wrappedCode);
 
+      let pendingStdout = "";
+      const handleToolCall = async (line: string): Promise<void> => {
+        if (!line.trim().startsWith('{"type":"__MCP_TOOL_CALL__"')) {
+          return;
+        }
+
+        let call: any;
+        try {
+          call = JSON.parse(line);
+        } catch {
+          return;
+        }
+        if (call.type !== "__MCP_TOOL_CALL__") {
+          return;
+        }
+
+        try {
+          logger.debug(
+            `[E2B Bridge] Calling tool ${call.server}.${call.tool}`
+          );
+
+          const activeSessions = this.client.getAllActiveSessions();
+          const session = activeSessions[call.server];
+
+          if (!session) {
+            throw new Error(`Server ${call.server} not found`);
+          }
+
+          const toolResult = await session.connector.callTool(
+            call.tool,
+            call.args
+          );
+
+          let extractedResult: any = toolResult;
+          if (toolResult.content && toolResult.content.length > 0) {
+            const item = toolResult.content[0];
+            if (item.type === "text") {
+              try {
+                extractedResult = JSON.parse(item.text);
+              } catch {
+                extractedResult = item.text;
+              }
+            } else {
+              extractedResult = item;
+            }
+          }
+
+          const resultPath = `/tmp/mcp_result_${call.id}.json`;
+          await sandbox.files.write(
+            resultPath,
+            JSON.stringify({ data: extractedResult })
+          );
+        } catch (err: any) {
+          logger.error(`[E2B Bridge] Tool execution failed: ${err.message}`);
+          const resultPath = `/tmp/mcp_result_${call.id}.json`;
+          await sandbox.files.write(
+            resultPath,
+            JSON.stringify({ error: err.message || String(err) })
+          );
+        }
+      };
+
       // Execute the file
       const execution = await sandbox.commands.run(`node ${filename}`, {
         timeoutMs: timeout,
         onStdout: async (data: string) => {
-          // Check for tool calls
-          try {
-            const lines = data.split("\n");
-            for (const line of lines) {
-              if (line.trim().startsWith('{"type":"__MCP_TOOL_CALL__"')) {
-                const call = JSON.parse(line);
-                if (call.type === "__MCP_TOOL_CALL__") {
-                  // Execute tool on host
-                  try {
-                    logger.debug(
-                      `[E2B Bridge] Calling tool ${call.server}.${call.tool}`
-                    );
-
-                    // Get the session and call the tool
-                    const activeSessions = this.client.getAllActiveSessions();
-                    const session = activeSessions[call.server];
-
-                    if (!session) {
-                      throw new Error(`Server ${call.server} not found`);
-                    }
-
-                    const toolResult = await session.connector.callTool(
-                      call.tool,
-                      call.args
-                    );
-
-                    // Extract result from MCP response
-                    let extractedResult: any = toolResult;
-                    if (toolResult.content && toolResult.content.length > 0) {
-                      const item = toolResult.content[0];
-                      if (item.type === "text") {
-                        try {
-                          extractedResult = JSON.parse(item.text);
-                        } catch {
-                          extractedResult = item.text;
-                        }
-                      } else {
-                        extractedResult = item;
-                      }
-                    }
-
-                    // Write result back to sandbox
-                    const resultPath = `/tmp/mcp_result_${call.id}.json`;
-                    await sandbox.files.write(
-                      resultPath,
-                      JSON.stringify({ data: extractedResult })
-                    );
-                  } catch (err: any) {
-                    logger.error(
-                      `[E2B Bridge] Tool execution failed: ${err.message}`
-                    );
-                    // Write error back to sandbox
-                    const resultPath = `/tmp/mcp_result_${call.id}.json`;
-                    await sandbox.files.write(
-                      resultPath,
-                      JSON.stringify({
-                        error: err.message || String(err),
-                      })
-                    );
-                  }
-                }
-              }
+          pendingStdout += data;
+          let newlineIndex = pendingStdout.indexOf("\n");
+          while (newlineIndex !== -1) {
+            const line = pendingStdout.slice(0, newlineIndex);
+            pendingStdout = pendingStdout.slice(newlineIndex + 1);
+            try {
+              await handleToolCall(line);
+            } catch (err: any) {
+              logger.error(
+                `[E2B Bridge] Failed to process stdout record: ${err?.message ?? String(err)}`
+              );
             }
-          } catch (e) {
-            // Ignore parsing errors for non-JSON lines
+            newlineIndex = pendingStdout.indexOf("\n");
           }
         },
       });
