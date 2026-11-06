@@ -48,6 +48,28 @@ export interface CloudRoutes {
       >;
     };
   };
+  "DELETE /api/v1/servers/{id}/alerts/rules/{ruleId}": {
+    data: T.operations["deleteApiV1ServersByIdAlertsRulesByRuleId"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["deleteApiV1ServersByIdAlertsRulesByRuleId"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["deleteApiV1ServersByIdAlertsRulesByRuleId"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["deleteApiV1ServersByIdAlertsRulesByRuleId"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["deleteApiV1ServersByIdAlertsRulesByRuleId"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["deleteApiV1ServersByIdAlertsRulesByRuleId"]["responses"][404]
+      >;
+    };
+  };
   "DELETE /api/v1/servers/{id}/domain": {
     data: T.operations["deleteApiV1ServersByIdDomain"]["parameters"];
     responses: {
@@ -316,6 +338,50 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/organizations/{id}/invitations": {
+    data: T.operations["getApiV1OrganizationsByIdInvitations"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdInvitations"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdInvitations"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdInvitations"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdInvitations"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdInvitations"]["responses"][404]
+      >;
+    };
+  };
+  "GET /api/v1/organizations/{id}/members": {
+    data: T.operations["getApiV1OrganizationsByIdMembers"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdMembers"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdMembers"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdMembers"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdMembers"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdMembers"]["responses"][404]
+      >;
+    };
+  };
   "GET /api/v1/servers": {
     data: T.operations["getApiV1Servers"]["parameters"];
     responses: {
@@ -338,6 +404,72 @@ export interface CloudRoutes {
       401: ResponseBody<T.operations["getApiV1ServersById"]["responses"][401]>;
       403: ResponseBody<T.operations["getApiV1ServersById"]["responses"][403]>;
       404: ResponseBody<T.operations["getApiV1ServersById"]["responses"][404]>;
+    };
+  };
+  "GET /api/v1/servers/{id}/alerts/options": {
+    data: T.operations["getApiV1ServersByIdAlertsOptions"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsOptions"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsOptions"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsOptions"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsOptions"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsOptions"]["responses"][404]
+      >;
+    };
+  };
+  "GET /api/v1/servers/{id}/alerts/rules": {
+    data: T.operations["getApiV1ServersByIdAlertsRules"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRules"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRules"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRules"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRules"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRules"]["responses"][404]
+      >;
+    };
+  };
+  "GET /api/v1/servers/{id}/alerts/rules/{ruleId}": {
+    data: T.operations["getApiV1ServersByIdAlertsRulesByRuleId"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRulesByRuleId"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRulesByRuleId"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRulesByRuleId"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRulesByRuleId"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1ServersByIdAlertsRulesByRuleId"]["responses"][404]
+      >;
     };
   };
   "GET /api/v1/servers/{id}/domain/status": {
@@ -684,6 +816,53 @@ export interface CloudRoutes {
       >;
     };
   };
+  "POST /api/v1/organizations/{id}/invitations": {
+    data: T.operations["postApiV1OrganizationsByIdInvitations"]["parameters"];
+    responses: {
+      201: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitations"]["responses"][201]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitations"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitations"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitations"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitations"]["responses"][404]
+      >;
+      429: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitations"]["responses"][429]
+      >;
+    };
+  };
+  "POST /api/v1/organizations/{id}/invitations/{invitationId}/cancel": {
+    data: T.operations["postApiV1OrganizationsByIdInvitationsByInvitationIdCancel"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitationsByInvitationIdCancel"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitationsByInvitationIdCancel"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitationsByInvitationIdCancel"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitationsByInvitationIdCancel"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdInvitationsByInvitationIdCancel"]["responses"][404]
+      >;
+    };
+  };
   "POST /api/v1/organizations/{id}/logo": {
     data: T.operations["postApiV1OrganizationsByIdLogo"]["parameters"];
     responses: {
@@ -719,6 +898,28 @@ export interface CloudRoutes {
       401: ResponseBody<T.operations["postApiV1Servers"]["responses"][401]>;
       403: ResponseBody<T.operations["postApiV1Servers"]["responses"][403]>;
       404: ResponseBody<T.operations["postApiV1Servers"]["responses"][404]>;
+    };
+  };
+  "POST /api/v1/servers/{id}/alerts/rules": {
+    data: T.operations["postApiV1ServersByIdAlertsRules"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiV1ServersByIdAlertsRules"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1ServersByIdAlertsRules"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1ServersByIdAlertsRules"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1ServersByIdAlertsRules"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1ServersByIdAlertsRules"]["responses"][404]
+      >;
     };
   };
   "POST /api/v1/servers/{id}/domain/request": {
@@ -812,6 +1013,28 @@ export interface CloudRoutes {
       >;
     };
   };
+  "PUT /api/v1/servers/{id}/alerts/rules/{ruleId}": {
+    data: T.operations["putApiV1ServersByIdAlertsRulesByRuleId"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["putApiV1ServersByIdAlertsRulesByRuleId"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["putApiV1ServersByIdAlertsRulesByRuleId"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["putApiV1ServersByIdAlertsRulesByRuleId"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["putApiV1ServersByIdAlertsRulesByRuleId"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["putApiV1ServersByIdAlertsRulesByRuleId"]["responses"][404]
+      >;
+    };
+  };
   "PUT /api/v1/servers/{id}/repository": {
     data: T.operations["putApiV1ServersByIdRepository"]["parameters"];
     responses: {
@@ -840,6 +1063,7 @@ export interface CloudRoutes {
 export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "DELETE /api/v1/deployments/{id}",
   "DELETE /api/v1/servers/{id}",
+  "DELETE /api/v1/servers/{id}/alerts/rules/{ruleId}",
   "DELETE /api/v1/servers/{id}/domain",
   "DELETE /api/v1/servers/{id}/env-variables/{varId}",
   "DELETE /api/v1/servers/{id}/repository",
@@ -853,8 +1077,13 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "GET /api/v1/github/installations/{installationId}/repos",
   "GET /api/v1/github/installations/{installationId}/repos/{owner}/{repo}/access",
   "GET /api/v1/organizations",
+  "GET /api/v1/organizations/{id}/invitations",
+  "GET /api/v1/organizations/{id}/members",
   "GET /api/v1/servers",
   "GET /api/v1/servers/{id}",
+  "GET /api/v1/servers/{id}/alerts/options",
+  "GET /api/v1/servers/{id}/alerts/rules",
+  "GET /api/v1/servers/{id}/alerts/rules/{ruleId}",
   "GET /api/v1/servers/{id}/domain/status",
   "GET /api/v1/servers/{id}/env-variables",
   "GET /api/v1/servers/{id}/logs",
@@ -870,12 +1099,16 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "POST /api/v1/deployments/{id}/activate",
   "POST /api/v1/deployments/{id}/stop",
   "POST /api/v1/github/installations/{installationId}/repos",
+  "POST /api/v1/organizations/{id}/invitations",
+  "POST /api/v1/organizations/{id}/invitations/{invitationId}/cancel",
   "POST /api/v1/organizations/{id}/logo",
   "POST /api/v1/servers",
+  "POST /api/v1/servers/{id}/alerts/rules",
   "POST /api/v1/servers/{id}/domain/request",
   "POST /api/v1/servers/{id}/domain/verify",
   "POST /api/v1/servers/{id}/env-variables",
   "POST /api/v1/servers/{id}/source",
+  "PUT /api/v1/servers/{id}/alerts/rules/{ruleId}",
   "PUT /api/v1/servers/{id}/repository",
 ];
 
@@ -885,6 +1118,7 @@ export const cloudRouteSuccessStatus: Readonly<
 > = {
   "DELETE /api/v1/deployments/{id}": 200,
   "DELETE /api/v1/servers/{id}": 200,
+  "DELETE /api/v1/servers/{id}/alerts/rules/{ruleId}": 200,
   "DELETE /api/v1/servers/{id}/domain": 200,
   "DELETE /api/v1/servers/{id}/env-variables/{varId}": 200,
   "DELETE /api/v1/servers/{id}/repository": 200,
@@ -898,8 +1132,13 @@ export const cloudRouteSuccessStatus: Readonly<
   "GET /api/v1/github/installations/{installationId}/repos": 200,
   "GET /api/v1/github/installations/{installationId}/repos/{owner}/{repo}/access": 200,
   "GET /api/v1/organizations": 200,
+  "GET /api/v1/organizations/{id}/invitations": 200,
+  "GET /api/v1/organizations/{id}/members": 200,
   "GET /api/v1/servers": 200,
   "GET /api/v1/servers/{id}": 200,
+  "GET /api/v1/servers/{id}/alerts/options": 200,
+  "GET /api/v1/servers/{id}/alerts/rules": 200,
+  "GET /api/v1/servers/{id}/alerts/rules/{ruleId}": 200,
   "GET /api/v1/servers/{id}/domain/status": 200,
   "GET /api/v1/servers/{id}/env-variables": 200,
   "GET /api/v1/servers/{id}/logs": 200,
@@ -915,11 +1154,15 @@ export const cloudRouteSuccessStatus: Readonly<
   "POST /api/v1/deployments/{id}/activate": 200,
   "POST /api/v1/deployments/{id}/stop": 200,
   "POST /api/v1/github/installations/{installationId}/repos": 201,
+  "POST /api/v1/organizations/{id}/invitations": 201,
+  "POST /api/v1/organizations/{id}/invitations/{invitationId}/cancel": 200,
   "POST /api/v1/organizations/{id}/logo": 200,
   "POST /api/v1/servers": 201,
+  "POST /api/v1/servers/{id}/alerts/rules": 200,
   "POST /api/v1/servers/{id}/domain/request": 200,
   "POST /api/v1/servers/{id}/domain/verify": 200,
   "POST /api/v1/servers/{id}/env-variables": 201,
   "POST /api/v1/servers/{id}/source": 200,
+  "PUT /api/v1/servers/{id}/alerts/rules/{ruleId}": 200,
   "PUT /api/v1/servers/{id}/repository": 200,
 };

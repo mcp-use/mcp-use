@@ -31,6 +31,8 @@ export default defineConfig({
     "commands/unlink": "src/cloud/project/unlink.ts",
     "commands/domains": "src/cloud/domains/index.ts",
     "commands/github": "src/cloud/github/index.ts",
+    "commands/checklist": "src/cloud/checklist/index.ts",
+    "commands/alerts": "src/cloud/alerts/index.ts",
     "commands/client": "src/client/client.ts",
     "commands/screenshot": "src/client/screenshot.ts",
   },
