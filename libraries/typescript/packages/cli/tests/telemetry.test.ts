@@ -96,6 +96,24 @@ describe("anonymous CLI analytics", () => {
     [["alerts", "remove", "secret-rule"], "alerts", "rm", false],
     [["env", "set", "SECRET=secret"], "env", "set", false],
     [
+      ["analytics", "query", "SELECT 'secret'", "--server", "secret-server"],
+      "analytics",
+      "query",
+      false,
+    ],
+    [
+      ["analytics", "query", "--json", "--", "--help"],
+      "analytics",
+      "query",
+      false,
+    ],
+    [
+      ["analytics", "catalog", "--branch", "secret-branch"],
+      "analytics",
+      "catalog",
+      false,
+    ],
+    [
       ["org", "invites", "send", "secret@example.com"],
       "org",
       "invites send",

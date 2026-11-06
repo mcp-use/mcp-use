@@ -40,6 +40,8 @@ const OPERATIONS = [
   "GET /api/v1/deployments/{id}/logs",
   "GET /api/v1/servers",
   "GET /api/v1/servers/{id}",
+  "GET /api/v1/servers/{id}/analytics/catalog",
+  "POST /api/v1/servers/{id}/analytics/sql",
   "POST /api/v1/servers",
   "PATCH /api/v1/servers/{id}",
   "POST /api/v1/servers/{id}/source",

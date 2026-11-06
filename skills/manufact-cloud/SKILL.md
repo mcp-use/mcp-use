@@ -77,6 +77,8 @@ Network failures and timeouts leave acceptance unknown; do not retry automatical
   [other Cloud commands](references/cloud-commands.md).
 - **Create or update alerts:** read [alert rules](references/alerts.md) for the
   dashboard YAML format, metric selection, and useful recovery conditions.
+- **Analyze server usage, errors, latency, or clients:** use the bundled
+  `manufact-analytics` skill for `analytics catalog` and read-only SQL queries.
 
 `rm` is the destructive verb, with `remove` as an alias. Confirm the target
 organization and server from the user's request before running destructive

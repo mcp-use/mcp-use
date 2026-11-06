@@ -472,6 +472,43 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/servers/{id}/analytics/catalog": {
+    data: T.operations["getApiV1ServersByIdAnalyticsCatalog"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][404]
+      >;
+      408: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][408]
+      >;
+      413: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][413]
+      >;
+      422: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][422]
+      >;
+      429: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][429]
+      >;
+      503: ResponseBody<
+        T.operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][503]
+      >;
+    };
+  };
   "GET /api/v1/servers/{id}/domain/status": {
     data: T.operations["getApiV1ServersByIdDomainStatus"]["parameters"];
     responses: {
@@ -922,6 +959,43 @@ export interface CloudRoutes {
       >;
     };
   };
+  "POST /api/v1/servers/{id}/analytics/sql": {
+    data: T.operations["postApiV1ServersByIdAnalyticsSql"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][404]
+      >;
+      408: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][408]
+      >;
+      413: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][413]
+      >;
+      422: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][422]
+      >;
+      429: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][429]
+      >;
+      503: ResponseBody<
+        T.operations["postApiV1ServersByIdAnalyticsSql"]["responses"][503]
+      >;
+    };
+  };
   "POST /api/v1/servers/{id}/domain/request": {
     data: T.operations["postApiV1ServersByIdDomainRequest"]["parameters"];
     responses: {
@@ -1084,6 +1158,7 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "GET /api/v1/servers/{id}/alerts/options",
   "GET /api/v1/servers/{id}/alerts/rules",
   "GET /api/v1/servers/{id}/alerts/rules/{ruleId}",
+  "GET /api/v1/servers/{id}/analytics/catalog",
   "GET /api/v1/servers/{id}/domain/status",
   "GET /api/v1/servers/{id}/env-variables",
   "GET /api/v1/servers/{id}/logs",
@@ -1104,6 +1179,7 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "POST /api/v1/organizations/{id}/logo",
   "POST /api/v1/servers",
   "POST /api/v1/servers/{id}/alerts/rules",
+  "POST /api/v1/servers/{id}/analytics/sql",
   "POST /api/v1/servers/{id}/domain/request",
   "POST /api/v1/servers/{id}/domain/verify",
   "POST /api/v1/servers/{id}/env-variables",
@@ -1139,6 +1215,7 @@ export const cloudRouteSuccessStatus: Readonly<
   "GET /api/v1/servers/{id}/alerts/options": 200,
   "GET /api/v1/servers/{id}/alerts/rules": 200,
   "GET /api/v1/servers/{id}/alerts/rules/{ruleId}": 200,
+  "GET /api/v1/servers/{id}/analytics/catalog": 200,
   "GET /api/v1/servers/{id}/domain/status": 200,
   "GET /api/v1/servers/{id}/env-variables": 200,
   "GET /api/v1/servers/{id}/logs": 200,
@@ -1159,6 +1236,7 @@ export const cloudRouteSuccessStatus: Readonly<
   "POST /api/v1/organizations/{id}/logo": 200,
   "POST /api/v1/servers": 201,
   "POST /api/v1/servers/{id}/alerts/rules": 200,
+  "POST /api/v1/servers/{id}/analytics/sql": 200,
   "POST /api/v1/servers/{id}/domain/request": 200,
   "POST /api/v1/servers/{id}/domain/verify": 200,
   "POST /api/v1/servers/{id}/env-variables": 201,
