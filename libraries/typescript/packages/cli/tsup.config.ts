@@ -22,6 +22,7 @@ export default defineConfig({
     "commands/dev": "src/toolchain/commands/dev.ts",
     "commands/build": "src/toolchain/commands/build.ts",
     "commands/typecheck": "src/toolchain/commands/typecheck.ts",
+    "commands/feedback": "src/feedback.ts",
     "commands/login": "src/cloud/auth/login.ts",
     "commands/logout": "src/cloud/auth/logout.ts",
     "commands/whoami": "src/cloud/auth/whoami.ts",
