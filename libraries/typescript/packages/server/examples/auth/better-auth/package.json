@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@better-auth/oauth-provider": "^1.7.6",
-    "@hono/node-server": "^2.0.5",
+    "@hono/node-server": "^2.1.3",
     "better-auth": "^1.7.6",
     "hono": "^4.13.7",
     "mcp-use": "workspace:*"
