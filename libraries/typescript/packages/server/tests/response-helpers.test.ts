@@ -40,6 +40,18 @@ describe("response helpers", () => {
     });
   });
 
+  it("object forwards number arrays to array", () => {
+    const data = [1, 2];
+    expect(object(data)).toEqual(array(data));
+    expect(object(data).structuredContent).toBe(data);
+  });
+
+  it("object forwards object arrays to array", () => {
+    const data = [{ id: 1 }];
+    expect(object(data)).toEqual(array(data));
+    expect(object(data).structuredContent).toBe(data);
+  });
+
   it("error sets isError", () => {
     expect(error("boom")).toEqual({
       isError: true,
