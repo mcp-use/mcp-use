@@ -62,8 +62,9 @@ sending when the user has not authorized a report.
 No login is needed. Explicit feedback is sent even when passive usage analytics
 is disabled. Exit 0 means the capture endpoint accepted the request; retain the
 `reportId`. It does not confirm human review. Inspect `error.code` on failure:
-`feedback_rejected`, `feedback_network_error`, or `feedback_timeout`. Network
-failures and timeouts leave acceptance unknown; do not retry automatically.
+`feedback_rejected`, `feedback_network_error`, or `feedback_timeout` (exit 1).
+Invalid input exits 2 with `usage_error`; correct the arguments before sending.
+Network failures and timeouts leave acceptance unknown; do not retry automatically.
 
 ## Choose a command
 

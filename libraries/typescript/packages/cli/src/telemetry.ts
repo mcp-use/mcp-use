@@ -49,8 +49,36 @@ const CLIENT_OPERATIONS: Record<string, readonly string[]> = {
   auth: ["status", "login", "logout"],
 };
 
-/** Normalize argv to known command literals, excluding all argument values. */
-export function commandProperties(argv: readonly string[]) {
+function canonicalOperation(command: string, operation: string | undefined) {
+  return command === "skills" && operation === "add"
+    ? "install"
+    : operation === "remove" && command !== "client"
+      ? "rm"
+      : operation;
+}
+
+/** Validate a complete command name and canonicalize recognized aliases. */
+export function knownCommandName(input: string): string | undefined {
+  const [root, operation, ...rest] = input.trim().split(/\s+/);
+  if (root === undefined || !Object.hasOwn(COMMANDS, root)) return undefined;
+  if (operation === undefined) return root;
+  const canonical = canonicalOperation(root, operation)!;
+  if (rest.length === 0 && COMMANDS[root]!.includes(canonical))
+    return `${root} ${canonical}`;
+  if (
+    rest.length === 1 &&
+    ((root === "org" &&
+      canonical === "invites" &&
+      ["list", "send", "cancel"].includes(rest[0]!)) ||
+      (root === "client" &&
+        Object.hasOwn(CLIENT_OPERATIONS, canonical) &&
+        CLIENT_OPERATIONS[canonical]!.includes(rest[0]!)))
+  )
+    return `${root} ${canonical} ${rest[0]}`;
+  return undefined;
+}
+
+function commandProperties(argv: readonly string[]) {
   const help =
     argv.length === 0 ||
     argv[0] === "help" ||
@@ -94,12 +122,7 @@ export function commandProperties(argv: readonly string[]) {
       subcommand = `${family} ${operation}`;
     }
   } else {
-    const operation =
-      command === "skills" && args[1] === "add"
-        ? "install"
-        : args[1] === "remove" && command !== "client"
-          ? "rm"
-          : args[1];
+    const operation = canonicalOperation(command, args[1]);
     if (operation !== undefined && COMMANDS[command]?.includes(operation)) {
       subcommand = operation;
     }
