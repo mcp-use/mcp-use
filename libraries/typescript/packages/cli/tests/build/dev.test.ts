@@ -1065,32 +1065,46 @@ async function rawGetBody(
 
 describe("runDev (views)", () => {
   it.each([
-    ["inspector", "%69nspector"],
-    ["_mcp-use", "%5fmcp-use"],
+    { reserved: "inspector", encodedReserved: "%69nspector", basePath: "/mcp" },
+    { reserved: "_mcp-use", encodedReserved: "%5fmcp-use", basePath: "/mcp" },
+    { reserved: "_mcp-use", encodedReserved: "%5fmcp-use", basePath: "/" },
   ])(
-    "keeps raw and encoded %s URLs out of Vite",
-    async (reserved, encodedReserved) => {
+    "keeps raw and encoded $reserved URLs out of Vite with base $basePath",
+    async ({ reserved, encodedReserved, basePath }) => {
       const cwd = copyFixture("dev-encoded-reserved", "views");
       cleanups.push(() => removeDir(cwd));
-      renameSync(join(cwd, "views"), join(cwd, "mcp"));
-      mkdirSync(join(cwd, "mcp", reserved), { recursive: true });
+      const viewsDir = basePath === "/" ? "_mcp-use" : "mcp";
+      renameSync(join(cwd, "views"), join(cwd, viewsDir));
+      const entry = join(cwd, "src/index.ts");
       writeFileSync(
-        join(cwd, "mcp", reserved, "routing-probe.ts"),
+        entry,
+        readFileSync(entry, "utf8").replace(
+          'name: "fixture-views",',
+          `name: "fixture-views", basePath: ${JSON.stringify(basePath)},`
+        )
+      );
+      const basePrefix = basePath === "/" ? "" : basePath;
+      const reservedDir = join(cwd, basePrefix, reserved);
+      mkdirSync(reservedDir, { recursive: true });
+      writeFileSync(
+        join(reservedDir, "routing-probe.ts"),
         'export const value = "reserved source";'
       );
       const dev = await startDev(cwd, await getFreePort(), undefined, false, {
-        viewsDir: "mcp",
+        viewsDir,
       });
       cleanups.push(dev.stop);
       const base = new URL(dev.url).origin;
-      const view = await fetch(`${base}/mcp/product-search-result/view.tsx`);
+      const view = await fetch(
+        `${base}${basePath === "/" ? "/@vite/client" : "/mcp/product-search-result/view.tsx"}`
+      );
       expect(view.status).toBe(200);
       await view.text();
 
       for (const prefix of [
-        `/mcp/${reserved}`,
-        `/mcp/${encodedReserved}`,
-        `/%6dcp/${reserved}`,
+        `${basePrefix}/${reserved}`,
+        `${basePrefix}/${encodedReserved}`,
+        ...(basePath === "/mcp" ? [`/%6dcp/${reserved}`] : []),
       ]) {
         const response = await fetch(`${base}${prefix}/routing-probe.ts`);
         expect(response.status, prefix).toBe(404);

@@ -1286,13 +1286,14 @@ export async function runDev(options: DevOptions): Promise<void> {
       // Malformed escapes must not throw from the HTTP request listener.
       modulePathname = undefined;
     }
+    const internalRoutePrefix = pathUnderBase(basePath, "_mcp-use/");
     const knownClientModule =
       (viewsEnabled || landingEnabled) &&
-      !pathname.startsWith(`${basePath}/_mcp-use/`) &&
+      !pathname.startsWith(internalRoutePrefix) &&
       !isInspectorPath(pathname, basePath) &&
       pathname !== basePath &&
       modulePathname !== undefined &&
-      !modulePathname.startsWith(`${basePath}/_mcp-use/`) &&
+      !modulePathname.startsWith(internalRoutePrefix) &&
       !isInspectorPath(modulePathname, basePath) &&
       modulePathname !== basePath &&
       ((viewsEnabled &&
