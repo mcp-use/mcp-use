@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import { parseCommandArgs, runCommand } from "./core/command.js";
 import { CommandError, UsageError } from "./core/errors.js";
 import { posthogEndpoint, posthogEvent } from "./posthog.js";
-import { knownCommandName, installationId } from "./telemetry.js";
+import { installationId } from "./telemetry.js";
 
-const USAGE = "mcp-use feedback send --message <text> [options]";
+const USAGE = "mcp-use feedback send <message> [options]";
 const HELP = `Usage: mcp-use feedback <send> [options]
 
 Send feedback about the CLI to Manufact through PostHog. No login required.
@@ -13,10 +13,10 @@ Send feedback about the CLI to Manufact through PostHog. No login required.
 Commands:
   send              Submit a report
 
-Options for send:
-  --message <text>   Required report text (1–10,000 characters)
-  --command <name>   Related command, e.g. deploy or "env push"
-  --source <source>  user (default) or agent
+Arguments for send:
+  <message>          Required report text (1–10,000 characters); quote spaces
+
+Options:
   --json             Print one JSON result, including failures
   -h, --help         Show this help
 
@@ -39,31 +39,16 @@ export async function runFeedback(argv: readonly string[]): Promise<number> {
   }
   return runCommand(argv, help, async (output) => {
     if (argv[0] !== "send") throw new UsageError(`Usage: ${USAGE}`);
-    const { values } = parseCommandArgs(argv.slice(1), {
+    const { positionals } = parseCommandArgs(argv.slice(1), {
       options: {
-        message: { type: "string" },
-        command: { type: "string" },
-        source: { type: "string" },
         json: { type: "boolean" },
       },
-      positionals: 0,
+      positionals: 1,
       usage: USAGE,
     });
-    const message = values.message?.trim();
+    const message = positionals[0]?.trim();
     if (!message || [...message].length > 10_000)
-      throw new UsageError("Pass --message with 1–10,000 characters.");
-    const source = values.source ?? "user";
-    if (source !== "user" && source !== "agent")
-      throw new UsageError("Pass --source user or --source agent.");
-    let relatedCommand: string | undefined;
-    if (values.command !== undefined) {
-      relatedCommand = knownCommandName(values.command);
-      if (relatedCommand === undefined)
-        throw new UsageError(
-          "Pass a known command name, e.g. --command deploy or --command 'env push'."
-        );
-    }
-
+      throw new UsageError("Pass a quoted message with 1–10,000 characters.");
     const reportId = randomUUID();
     const event = {
       ...posthogEvent(
@@ -71,11 +56,7 @@ export async function runFeedback(argv: readonly string[]): Promise<number> {
         installationId() ?? randomUUID(),
         {
           message,
-          source,
           report_id: reportId,
-          ...(relatedCommand !== undefined && {
-            related_command: relatedCommand,
-          }),
         }
       ),
       uuid: reportId,
