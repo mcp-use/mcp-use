@@ -21,9 +21,22 @@ describe("scaffolding GitHub repository templates", () => {
   it.each([
     ["mcp-use-test/template-repo", "template-repo"],
     ["mcp-use-test/template.repo", "template.repo"],
+    ["mcp-use-test/template-repo.git", "template-repo"],
+    ["mcp-use-test/template.repo.git", "template.repo"],
+    [
+      "mcp-use-test/template.repo.git#feature/template",
+      "template.repo",
+      "feature/template",
+    ],
+    ["github.com/mcp-use-test/template.repo.git", "template.repo"],
     ["https://github.com/mcp-use-test/template.repo", "template.repo"],
     ["https://github.com/mcp-use-test/template.repo.git", "template.repo"],
-  ])("creates a project from %s", (template, repository) => {
+    [
+      "https://github.com/mcp-use-test/template.repo.git#feature/template",
+      "template.repo",
+      "feature/template",
+    ],
+  ])("creates a project from %s", (template, repository, branch) => {
     const source = join(cwd, "template");
     const git = (args: string[]) => {
       const result = spawnSync("git", args, {
@@ -60,6 +73,25 @@ describe("scaffolding GitHub repository templates", () => {
       "Add template",
     ]);
 
+    if (branch) {
+      git(["-C", source, "checkout", "-b", branch]);
+      writeFileSync(join(source, "branch.txt"), branch);
+      git(["-C", source, "add", "branch.txt"]);
+      git([
+        "-C",
+        source,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "Add branch marker",
+      ]);
+    }
+
     // Replace only the GitHub boundary; the CLI still invokes real Git.
     const result = spawnSync(
       process.execPath,
@@ -95,5 +127,10 @@ describe("scaffolding GitHub repository templates", () => {
     expect(
       readFileSync(join(cwd, "my-project", "index.ts"), "utf8").trim()
     ).toBe('export const serverName = "my-project";');
+    if (branch) {
+      expect(readFileSync(join(cwd, "my-project", "branch.txt"), "utf8")).toBe(
+        branch
+      );
+    }
   });
 });

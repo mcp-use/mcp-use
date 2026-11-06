@@ -386,7 +386,7 @@ function parseGitHubRepoUrl(url: string): GitHubRepoInfo | null {
     return validateGitHubRepoInfo(result) ? result : null;
   }
 
-  match = trimmed.match(/^([^/#]+)\/([^/#]+?)(?:#(.+))?$/);
+  match = trimmed.match(/^([^/#]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/);
   if (match) {
     const result = {
       owner: match[1],
