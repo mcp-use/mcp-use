@@ -227,6 +227,31 @@ describe("explicit CLI feedback", () => {
     ]);
   });
 
+  test.for([
+    ["help", "feedback", "send", "--", "Report text"],
+    ["help", "feedback", "--", "send", "--", "Report text"],
+  ])(
+    "the help alias never submits text after a delimiter",
+    async (args, { cli, capture }) => {
+      const result = await cli.run(args, {
+        env: { ...capture.env, MCP_USE_ANONYMIZED_TELEMETRY: "true" },
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toMatch(/^Usage: mcp-use feedback send /);
+      expect(result.stderr).toBe("");
+      expect(await capture.events()).toEqual([
+        expect.objectContaining({
+          event: "mcp_use_cli_command",
+          properties: expect.objectContaining({
+            command: "feedback",
+            subcommand: "send",
+            is_help: true,
+          }),
+        }),
+      ]);
+    }
+  );
+
   test("preserves the message delimiter after a forwarding separator", async ({
     cli,
     capture,
