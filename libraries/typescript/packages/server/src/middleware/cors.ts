@@ -40,10 +40,6 @@ function corsHeaders(
     Pick<CorsOptions, "origin">,
   request: Request
 ): HeadersInit | undefined {
-  if (request.headers.has("Access-Control-Allow-Origin")) {
-    return undefined;
-  }
-
   const requestOrigin = request.headers.get("Origin");
   const allowedOrigin = resolveAllowedOrigin(options.origin, requestOrigin);
   if (allowedOrigin === null) {
