@@ -402,4 +402,96 @@ describe("McpClientProvider metadata-only updates", () => {
     const lastClearStorage = clearStorageSpies[clearStorageSpies.length - 1];
     expect(lastClearStorage).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["config", "metadata", "restore", "helpers"])(
+    "keeps successive %s updates from the same handler",
+    async (kind) => {
+      const storage = new MemoryStorageProvider();
+      let renderer: ReturnType<typeof create>;
+      await act(async () => {
+        renderer = create(
+          React.createElement(
+            McpClientProvider,
+            { storageProvider: storage },
+            React.createElement(TestHarness)
+          )
+        );
+      });
+      await flushUpdates();
+      const client = latestClient!;
+      let pending: Promise<void>;
+      act(() => {
+        pending = (async () => {
+          if (kind === "helpers") {
+            const server = client.getServer("sandbox")!;
+            await server.updateConfig({ timeout: 5000 });
+            await server.setDisplayName("Renamed");
+            return;
+          }
+          await client.updateServer("sandbox", { timeout: 5000 });
+          if (kind === "metadata") {
+            await client.updateServerMetadata("sandbox", { name: "Renamed" });
+          } else {
+            await client.updateServer(
+              "sandbox",
+              kind === "restore"
+                ? { timeout: undefined }
+                : { autoReconnect: false }
+            );
+          }
+        })();
+      });
+      await flushUpdates();
+      await pending!;
+      await flushUpdates();
+      const saved = storage.getServers().sandbox;
+      expect(saved.url).toBe("http://localhost:3000/mcp");
+      expect(saved.timeout).toBe(kind === "restore" ? undefined : 5000);
+      if (kind === "metadata" || kind === "helpers")
+        expect(saved.displayName).toBe("Renamed");
+      if (kind === "config") expect(saved.autoReconnect).toBe(false);
+      act(() => renderer!.unmount());
+    }
+  );
+
+  it("preserves metadata saved while a config update waits for disconnect", async () => {
+    const storage = new MemoryStorageProvider();
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        React.createElement(
+          McpClientProvider,
+          { storageProvider: storage },
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await flushUpdates();
+    const client = latestClient!;
+    let release!: () => void;
+    disconnectSpies[0].mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+    );
+    let update!: Promise<void>;
+    act(() => {
+      update = client.updateServer("sandbox", { timeout: 5000 });
+    });
+    let rename!: Promise<void>;
+    act(() => {
+      rename = client.updateServerMetadata("sandbox", { name: "Renamed" });
+    });
+    await flushUpdates();
+    await rename;
+    act(() => release());
+    await update;
+    await flushUpdates();
+    expect(storage.getServers().sandbox).toMatchObject({
+      timeout: 5000,
+      displayName: "Renamed",
+    });
+    act(() => renderer!.unmount());
+  });
 });
