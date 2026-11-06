@@ -1,4 +1,5 @@
 import { main, type CliMainOptions } from "./main.js";
+import { captureCliUsage } from "../telemetry.js";
 
 /**
  * Exit once stdout and stderr have flushed. `process.exit` alone can cut off
@@ -23,17 +24,20 @@ function exitAfterFlush(code: number): void {
  * @internal
  */
 export function runBin(argv: readonly string[], options: CliMainOptions): void {
+  const telemetry = captureCliUsage(argv);
   // `build` evaluates the user's entry to validate views. Anything that entry
   // opens at module scope (a database connection, a timer) would otherwise
   // keep the process alive after the build is done, so a build exits
   // explicitly.
   const exitWhenDone = argv[0] === "build";
   main(argv, options).then(
-    (code) => {
+    async (code) => {
+      await telemetry;
       process.exitCode = code;
       if (exitWhenDone) exitAfterFlush(code);
     },
-    (error: unknown) => {
+    async (error: unknown) => {
+      await telemetry;
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
       if (exitWhenDone) exitAfterFlush(1);
