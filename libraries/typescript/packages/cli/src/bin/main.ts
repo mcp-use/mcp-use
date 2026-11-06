@@ -189,7 +189,16 @@ export async function main(
   options: CliMainOptions = { frameworkVersion: "unknown" }
 ): Promise<number> {
   if (argv[0] === "help") {
-    return main([...argv.slice(1), "--help"], options);
+    const args = argv.slice(1);
+    // Feedback preserves -- for literal messages. Keep the help flag before
+    // that delimiter so a help request can never become a submission.
+    const separator = args[0] === "feedback" ? args.indexOf("--", 2) : -1;
+    return main(
+      separator < 0
+        ? [...args, "--help"]
+        : [...args.slice(0, separator), "--help", ...args.slice(separator)],
+      options
+    );
   }
   if (argv.length === 1 && ["--version", "-v"].includes(argv[0] ?? "")) {
     console.log(options.frameworkVersion);
