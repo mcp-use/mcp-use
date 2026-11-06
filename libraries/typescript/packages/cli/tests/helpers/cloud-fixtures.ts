@@ -82,6 +82,13 @@ export function server(fields: Pick<Server, "id"> & Partial<Server>): Server {
     name: "Server",
     slug: "server",
     organizationId: "org_1",
+    description: null,
+    status: "running",
+    mcpUrl: "https://example.com/mcp",
+    dashboardUrl: "https://manufact.com/cloud/org-one/servers/srv_1",
+    publicRoutingMode: "gateway",
+    region: "AUTO",
+    activeDeploymentId: null,
     isExternal: false,
     ...fields,
   };

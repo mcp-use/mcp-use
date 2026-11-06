@@ -81,6 +81,8 @@ Commands:
   logout   Log out of the cloud CLI
   whoami   Show the authenticated cloud identity
   org      Manage the active organization
+  env               Manage Cloud environment variables
+  logs              Read Cloud build and runtime logs
   servers  Manage cloud servers and environment variables
   deployments Manage cloud deployments and logs
   deploy   Deploy from GitHub or upload local source
@@ -211,16 +213,24 @@ export async function main(
     return runWhoami(commandArgs);
   }
   if (command === "org") {
-    const { runOrganizations } = await import("../cloud/organizations.js");
+    const { runOrganizations } = await import("../cloud/org/index.js");
     return runOrganizations(commandArgs);
   }
   if (command === "servers") {
-    const { runServers } = await import("../cloud/servers.js");
+    const { runServers } = await import("../cloud/servers/index.js");
     return runServers(commandArgs);
   }
   if (command === "deployments") {
-    const { runDeployments } = await import("../cloud/deployments.js");
+    const { runDeployments } = await import("../cloud/deployments/index.js");
     return runDeployments(commandArgs);
+  }
+  if (command === "env") {
+    const { runEnv } = await import("../cloud/environment/index.js");
+    return runEnv(commandArgs);
+  }
+  if (command === "logs") {
+    const { runLogs } = await import("../cloud/logs/index.js");
+    return runLogs(commandArgs);
   }
   if (command === "link") {
     const { runLink } = await import("../cloud/project/link.js");

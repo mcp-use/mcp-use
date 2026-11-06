@@ -21,10 +21,12 @@ export default defineConfig({
     "commands/login": "src/cloud/auth/login.ts",
     "commands/logout": "src/cloud/auth/logout.ts",
     "commands/whoami": "src/cloud/auth/whoami.ts",
-    "commands/organizations": "src/cloud/organizations.ts",
-    "commands/servers": "src/cloud/servers.ts",
-    "commands/deployments": "src/cloud/deployments.ts",
+    "commands/organizations": "src/cloud/org/index.ts",
+    "commands/servers": "src/cloud/servers/index.ts",
+    "commands/deployments": "src/cloud/deployments/index.ts",
     "commands/deploy": "src/cloud/deploy/index.ts",
+    "commands/env": "src/cloud/environment/index.ts",
+    "commands/logs": "src/cloud/logs/index.ts",
     "commands/link": "src/cloud/project/link.ts",
     "commands/unlink": "src/cloud/project/unlink.ts",
     "commands/client": "src/client/client.ts",
@@ -49,11 +51,7 @@ export default defineConfig({
   ],
   // Ship tunnel support inside the CLI artifact without adding a runtime
   // dependency to either @mcp-use/cli or mcp-use.
-  noExternal: [
-    "@mcp-use/tunnel",
-    "openapi-fetch",
-    "@modelcontextprotocol/client",
-  ],
+  noExternal: ["@mcp-use/tunnel", "openapi-fetch"],
   define: {
     __MCP_USE_CLI_VERSION__: JSON.stringify(cliPackage.version),
   },
