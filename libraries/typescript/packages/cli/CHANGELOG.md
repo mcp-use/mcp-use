@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 5.1.0-canary.1
+
+### Minor Changes
+
+- a22376b: Add `mcp-use feedback send` for explicit CLI reports to PostHog, with a single positional message, anonymous identity, JSON receipts, bounded delivery, and actionable errors. Keep report contents separate from passive usage analytics and document the command for people and coding agents.
+- 3169325: Add `mcp-use analytics catalog` and `analytics query` for live schema discovery and scoped read-only ClickHouse SQL through Manufact Cloud. Include time and branch selection, bounded results, JSON metadata, and a bundled `manufact-analytics` skill with SQL and interpretation guidance.
+
+### Patch Changes
+
+- 4859469: Track anonymous CLI adoption and command usage in PostHog with a persistent random installation ID, allowlisted command names, version/platform metadata, and CI filtering. Honor MCP_USE_ANONYMIZED_TELEMETRY=false and DO_NOT_TRACK=1, omit argument values, and keep capture failures silent and bounded.
+
 ## 5.0.1-canary.0
 
 ### Patch Changes
