@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
+import {
+  POSTHOG_API_KEY,
+  POSTHOG_HOST,
+} from "../client/src/telemetry/tel-fetch.js";
 
 const cliPackage = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8")
@@ -18,6 +22,7 @@ export default defineConfig({
     "commands/dev": "src/toolchain/commands/dev.ts",
     "commands/build": "src/toolchain/commands/build.ts",
     "commands/typecheck": "src/toolchain/commands/typecheck.ts",
+    "commands/feedback": "src/feedback.ts",
     "commands/login": "src/cloud/auth/login.ts",
     "commands/logout": "src/cloud/auth/logout.ts",
     "commands/whoami": "src/cloud/auth/whoami.ts",
@@ -33,6 +38,7 @@ export default defineConfig({
     "commands/github": "src/cloud/github/index.ts",
     "commands/checklist": "src/cloud/checklist/index.ts",
     "commands/alerts": "src/cloud/alerts/index.ts",
+    "commands/analytics": "src/cloud/analytics/index.ts",
     "commands/skills": "src/skills/install.ts",
     "commands/client": "src/client/client.ts",
     "commands/screenshot": "src/client/screenshot.ts",
@@ -59,5 +65,13 @@ export default defineConfig({
   noExternal: ["@mcp-use/tunnel", "openapi-fetch"],
   define: {
     __MCP_USE_CLI_VERSION__: JSON.stringify(cliPackage.version),
+    // Reuse the SDK's public ingestion project at build time. The CLI stays
+    // independent of the optional client package at runtime.
+    __MCP_USE_POSTHOG_HOST__: JSON.stringify(
+      process.env.MCP_USE_POSTHOG_HOST?.trim() || POSTHOG_HOST
+    ),
+    __MCP_USE_POSTHOG_KEY__: JSON.stringify(
+      process.env.MCP_USE_POSTHOG_API_KEY?.trim() || POSTHOG_API_KEY
+    ),
   },
 });

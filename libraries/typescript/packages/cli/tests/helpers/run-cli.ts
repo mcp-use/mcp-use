@@ -91,6 +91,7 @@ export async function runCli(
     USERPROFILE: sandbox.home,
     XDG_CONFIG_HOME: sandbox.configHome,
     NO_COLOR: "1",
+    MCP_USE_ANONYMIZED_TELEMETRY: "false",
     ...options.env,
   });
 
