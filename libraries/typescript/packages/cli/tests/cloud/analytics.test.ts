@@ -143,6 +143,7 @@ test("query normalizes explicit dates to UTC and sends branch, row cap, and inte
 }) => {
   signIn(cloud);
   cloud.on("GET", "/api/v1/servers/weather", { body: server({ id: "srv_1" }) });
+  cloud.on("GET", "/api/v1/servers/srv_1/analytics/catalog", { body: CATALOG });
   cloud.on("POST", "/api/v1/servers/srv_1/analytics/sql", { body: SQL_RESULT });
   const result = await cli.run(
     [
@@ -175,6 +176,74 @@ test("query normalizes explicit dates to UTC and sends branch, row cap, and inte
     maxRows: 500,
     includeInternal: true,
   });
+});
+
+test.for([
+  ["catalog", "--branch", "featuer"],
+  ["query", "SELECT 1", "--branch", "featuer"],
+])(
+  "an unknown branch fails with the branches that have analytics (%j)",
+  async (args, { cli, cloud }) => {
+    signIn(cloud);
+    cloud.on("GET", "/api/v1/servers/weather", {
+      body: server({ id: "srv_1" }),
+    });
+    cloud.on("GET", "/api/v1/servers/srv_1/analytics/catalog", {
+      body: CATALOG,
+    });
+    cloud.on("POST", "/api/v1/servers/srv_1/analytics/sql", {
+      body: { ...SQL_RESULT, rows: [] },
+    });
+    const result = await cli.run(
+      ["analytics", ...args, "--server", "weather", "--json"],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(result.json).toMatchObject({
+      error: {
+        code: "ANALYTICS_BRANCH_NOT_FOUND",
+        nextSteps: [
+          {
+            command:
+              "mcp-use analytics catalog --server srv_1 --org org_1 --json",
+          },
+        ],
+      },
+    });
+    expect(result.stdout).toContain("feature");
+  }
+);
+
+test("query still runs when the branch lookup fails", async ({
+  cli,
+  cloud,
+}) => {
+  signIn(cloud);
+  cloud.on("GET", "/api/v1/servers/weather", { body: server({ id: "srv_1" }) });
+  cloud.on("GET", "/api/v1/servers/srv_1/analytics/catalog", {
+    status: 408,
+    body: { error: "Catalog timed out", code: "ANALYTICS_QUERY_TIMEOUT" },
+  });
+  cloud.on("POST", "/api/v1/servers/srv_1/analytics/sql", { body: SQL_RESULT });
+  const result = await cli.run(
+    [
+      "analytics",
+      "query",
+      "SELECT 1",
+      "--branch",
+      "feature",
+      "--server",
+      "weather",
+      "--json",
+    ],
+    { env: SIGNED_IN }
+  );
+  expect(result.exitCode).toBe(0);
+  expect(result.json).toEqual(SQL_RESULT);
+  expect(
+    cloud.requestsTo("GET", "/api/v1/servers/srv_1/analytics/catalog")
+  ).toHaveLength(1);
 });
 
 test("query passes a literal leading SQL comment and a chosen preset", async ({

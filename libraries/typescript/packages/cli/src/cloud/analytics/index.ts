@@ -10,6 +10,8 @@ type SqlBody =
   operations["postApiV1ServersByIdAnalyticsSql"]["requestBody"]["content"]["application/json"];
 type SqlResult =
   operations["postApiV1ServersByIdAnalyticsSql"]["responses"][200]["content"]["application/json"];
+type Branches =
+  operations["getApiV1ServersByIdAnalyticsCatalog"]["responses"][200]["content"]["application/json"]["branches"];
 const PRESETS = ["1h", "24h", "7d", "30d", "90d"] as const;
 const QUERY_ERRORS = new Set([
   "ANALYTICS_QUERY_INVALID",
@@ -54,8 +56,9 @@ export async function runAnalytics(argv: readonly string[]): Promise<number> {
       throw new UsageError("--branch must contain 1–255 characters.");
     // Validate all query inputs before resolving credentials or contacting Cloud.
     const { cloud, server } = await projectServer(values);
-    if (body === undefined) {
-      const catalog = await cloud.call(
+    const organization = cloud.organization.id;
+    const catalogRequest = (branch?: string) =>
+      cloud.call(
         cloud.client.GET("/api/v1/servers/{id}/analytics/catalog", {
           params: {
             path: { id: server },
@@ -64,12 +67,26 @@ export async function runAnalytics(argv: readonly string[]): Promise<number> {
           signal: AbortSignal.timeout(30_000),
         })
       );
+    if (body === undefined) {
+      const catalog = await catalogRequest(branch);
+      if (branch !== undefined)
+        requireBranch(branch, catalog.branches, server, organization);
       // The complete catalog is useful in both modes: columns, SQL expressions,
       // examples, limits, and notes are the query-writing contract.
       output.result(catalog, plain(JSON.stringify(catalog, null, 2)));
       return;
     }
-    const result = await queryResult(
+    // Cloud scopes an unknown branch to no rows instead of rejecting it, so a
+    // typo would read as zero traffic. Check the catalog's branch list
+    // alongside the query; if the lookup itself fails, let the query decide.
+    const knownBranches =
+      branch === undefined
+        ? undefined
+        : catalogRequest().then(
+            (catalog) => catalog.branches,
+            () => undefined
+          );
+    const pending = queryResult(
       cloud.call,
       cloud.client.POST("/api/v1/servers/{id}/analytics/sql", {
         params: { path: { id: server } },
@@ -77,10 +94,43 @@ export async function runAnalytics(argv: readonly string[]): Promise<number> {
         signal: AbortSignal.timeout(30_000),
       }),
       server,
-      cloud.organization.id
+      organization
     );
+    const branches = await knownBranches;
+    if (branch !== undefined && branches !== undefined) {
+      // The branch error is the root cause, so it wins over a query failure.
+      pending.catch(() => {});
+      requireBranch(branch, branches, server, organization);
+    }
+    const result = await pending;
     output.result(result, formatQuery(result));
   });
+}
+
+/** Reject a branch that has no analytics, naming the branches that do. */
+function requireBranch(
+  branch: string,
+  branches: Branches,
+  server: string,
+  organization: string
+): void {
+  if (branches.some((known) => known.branch === branch)) return;
+  const names = branches.map((known) => known.branch);
+  throw new CommandError(
+    "ANALYTICS_BRANCH_NOT_FOUND",
+    `Server ${server} has no analytics for branch "${branch}". ${
+      names.length
+        ? `Branches with analytics: ${names.join(", ")}.`
+        : "No branch has analytics yet."
+    } Omit --branch to include all environments.`,
+    { branch, branches: names },
+    [
+      {
+        description: "List the branches with analytics",
+        command: `mcp-use analytics catalog --server ${server} --org ${organization} --json`,
+      },
+    ]
+  );
 }
 
 /** Retain actionable analytics codes while sharing auth/network redaction. */

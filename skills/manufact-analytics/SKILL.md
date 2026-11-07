@@ -47,7 +47,9 @@ in the future. For comparisons, use equal-duration, non-overlapping windows
 with identical filters, and identify incomplete days.
 
 Omitting `--branch` includes all environments; it does not select production.
-An explicit branch selects that preview branch. Use the catalog's subdomain
+An explicit branch selects that preview branch and must be one of the
+catalog's `branches`; an unknown branch fails with
+`ANALYTICS_BRANCH_NOT_FOUND` rather than returning zero. Use the catalog's subdomain
 mapping when a production-only population or grouping needs SQL filtering.
 Manufact internal traffic is excluded unless `--include-internal` is passed.
 Pass the same branch to catalog and query when analyzing a preview.

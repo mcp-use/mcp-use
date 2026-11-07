@@ -21,6 +21,15 @@ sum(duration_n)`, guarding a zero denominator. Merge stored sketches with
 the expression returned by the catalog rather than counting cells or adding
 distinct estimates.
 
+Sketch merges such as `uniqCombined64Merge` are estimates, while
+`sum(events)` is exact. Each catalog measure states its `accuracy` and
+`errorBound`; distinct-count sketches can read a few percent high at tens of
+thousands of values. When most sessions contain one request, a result can
+therefore show more sessions or interactions than requests. That is
+estimation error, not a data defect; do not report it as one. When a conclusion depends
+on an exact distinct count, use `uniqExact` over `tool_interactions` or raw
+`events` with a narrow window.
+
 For example, when supported by the current catalog, a client breakdown with
 approximate interactions uses:
 
@@ -86,6 +95,9 @@ arguments. With `--json`, errors are one stdout document containing
   window, use a narrower rollup, or reduce output rows. Distinct counts and
   percentiles generally cannot be combined across split queries by addition
   or averaging.
+- Unknown branch (`ANALYTICS_BRANCH_NOT_FOUND`): choose a branch named in the
+  error or the catalog's `branches`, or omit `--branch` for all environments.
+  Do not report the typo as zero traffic.
 - Retention limit: inspect the catalog and state the available period before
   substituting a window that still answers the question.
 - Rate limit: reduce concurrency and follow retry guidance if supplied. SQL
