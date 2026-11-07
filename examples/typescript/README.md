@@ -4,6 +4,7 @@
 - **[excalidraw](excalidraw/)** — Excalidraw ported to MCP Apps views: hand-drawn diagrams streamed into a live view
 - **[property-search](property-search/)** — Zillow-style MCP Apps split view: San Francisco listings plus an interactive map, no external APIs
 - **[schema-validators](schema-validators/)** — the same server written with [arktype](schema-validators/arktype/), [typebox](schema-validators/typebox/), and [zod](schema-validators/zod/) schemas
+- **[secure-database](secure-database/)** — hardened analytical database server with default-deny RBAC, AST validation, worker-thread SQLite sandbox, and PII protection
 
 The full example collections live in each package:
 

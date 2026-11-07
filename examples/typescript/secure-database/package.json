@@ -1,0 +1,25 @@
+{
+  "name": "mcp-use-example-secure-database",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: Hardened analytical database MCP server with default-deny RBAC, AST validation, worker-thread SQLite sandbox, and PII protection.",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "^2.12.0",
+    "node-sql-parser": "^5.4.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^5.9.0"
+  }
+}

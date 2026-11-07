@@ -75,6 +75,7 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
   - [Skills over MCP](../libraries/typescript/packages/server/examples/skills-over-mcp/) - Publish Agent Skills and supporting files
   - [Middleware](../libraries/typescript/packages/server/examples/middleware/) - Built-in middleware pipeline
   - [Proxy](../libraries/typescript/packages/server/examples/proxy/) - Proxy MCP server
+  - [Secure Database](typescript/secure-database/) - Hardened analytical SQL database with default-deny RBAC, AST validation, worker sandbox, and PII protection
 - **[OAuth Examples](../libraries/typescript/packages/server/examples/auth/)** - OAuth implementations
   - [Auth0](../libraries/typescript/packages/server/examples/auth/auth0/)
   - [Better Auth (v2 + Hono)](../libraries/typescript/packages/server/examples/auth/better-auth/)
