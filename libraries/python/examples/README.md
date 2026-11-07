@@ -5,6 +5,7 @@
 | Example | Description |
 |---------|-------------|
 | [http_example.py](http_example.py) | HTTP client usage |
+| [remote_docs.py](remote_docs.py) | Search and read remote documentation without an API key or LLM |
 | [stream_example.py](stream_example.py) | Streaming responses |
 | [code_mode_example.py](code_mode_example.py) | Using MCP tools via code execution |
 | [direct_tool_call.py](direct_tool_call.py) | Direct tool invocation without an agent |
