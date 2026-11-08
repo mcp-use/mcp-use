@@ -5,14 +5,19 @@
  * then reads the page that the search returned. No local server, model, API
  * key, or account is needed, but the remote endpoint requires network access.
  *
- * Run from an installed checkout of this repo, inside packages/client:
- *   pnpm exec tsx examples/node/remote-docs.ts
+ * Run with Node.js 22.22.2+ from an installed and built checkout, inside
+ * packages/client (Node strips the erasable types natively; no tsx needed):
+ *   node examples/node/remote-docs.ts
  */
 
 import { MCPClient } from "@mcp-use/client";
 
 const TIMEOUT = 15000;
 const LANG = "en";
+// Internal QA runs set BLOCKVECTRA_INTERNAL_QA=1 so traffic can be told apart.
+const USER_AGENT =
+  "mcp-use-remote-docs-example/1" +
+  (process.env.BLOCKVECTRA_INTERNAL_QA === "1" ? " BlockVectraQA/1" : "");
 
 function textOf(
   result: { isError?: boolean; content: unknown[] },
@@ -54,7 +59,7 @@ async function main(): Promise<void> {
         detectMixedAuth: false,
         timeout: TIMEOUT,
         headers: {
-          "User-Agent": "mcp-use-remote-docs-example/1 BlockVectraQA/1",
+          "User-Agent": USER_AGENT,
         },
       },
     },
