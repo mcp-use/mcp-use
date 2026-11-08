@@ -104,6 +104,10 @@ describe("useMcp resets state when disabled", () => {
     expect(result!.state).toBe("ready");
     expect(result!.tools).toHaveLength(1);
     expect(result!.serverInfo).toBeDefined();
+    expect(result!.protocolVersion).toBeDefined();
+    expect(result!.extensions).toMatchObject({
+      "example.dev/feature": { enabled: true },
+    });
 
     // Disable the hook.
     await act(async () => {
@@ -114,14 +118,18 @@ describe("useMcp resets state when disabled", () => {
       await Promise.resolve();
     });
 
-    // Disabled: no stale data from the previous server.
+    // Disabled: no stale data or metadata from the previous server.
     expect(result!.state).toBe("discovering");
     expect(result!.tools).toEqual([]);
     expect(result!.resources).toEqual([]);
     expect(result!.resourceTemplates).toEqual([]);
     expect(result!.prompts).toEqual([]);
+    expect(result!.skills).toEqual([]);
     expect(result!.serverInfo).toBeUndefined();
     expect(result!.capabilities).toBeUndefined();
     expect(result!.instructions).toBeUndefined();
+    expect(result!.extensions).toEqual({});
+    expect(result!.protocolEra).toBeUndefined();
+    expect(result!.protocolVersion).toBeUndefined();
   });
 });

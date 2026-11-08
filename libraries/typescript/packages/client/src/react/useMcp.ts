@@ -2206,8 +2206,13 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
       setResourceTemplates([]);
       setPrompts([]);
       setSkills([]);
+      setError(undefined);
+      setAuthUrl(undefined);
+      setAuthTokens(undefined);
       setServerInfo(undefined);
       setCapabilities(undefined);
+      setProtocolEra(undefined);
+      setProtocolVersion(undefined);
       setInstructions(undefined);
       setExtensions({});
       return () => {
