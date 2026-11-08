@@ -16,15 +16,26 @@ const ROLE_TOOLS: Record<Role, readonly string[]> = {
   admin: ["list_tables", "query_analytics", "get_customer_billing"],
 };
 
+const MAX_ROWS = 100;
+const MAX_QUERY_LENGTH = 1000;
+const MAX_EXECUTION_MS = 2000;
+
 function resolveRole(authHeader?: string): Role | null {
   if (!authHeader) return null;
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  return TOKENS[token] ?? null;
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match || !match[1]) return null;
+  const token = match[1].trim();
+  if (Object.hasOwn(TOKENS, token)) {
+    const role = TOKENS[token];
+    return role ?? null;
+  }
+  return null;
 }
 
-// 1. Seed in-memory SQLite databases with engine-level write protection
+// 1. Seed in-memory SQLite databases with engine-level write protection and resource limits
 const analyticsDb = new DatabaseSync(":memory:");
 analyticsDb.exec(`
+  PRAGMA max_page_count = 5000;
   CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, price_usd REAL NOT NULL);
   CREATE TABLE orders (id INTEGER PRIMARY KEY, product_id INTEGER NOT NULL, customer_tier TEXT NOT NULL, amount_usd REAL NOT NULL);
   INSERT INTO products VALUES (1, 'Starter Plan', 'subscription', 29), (2, 'Pro Plan', 'subscription', 99), (3, 'Audit Add-on', 'addon', 49);
@@ -35,6 +46,7 @@ analyticsDb.exec(`
 // Sensitive PII is separated into billingDb, accessible only via admin-gated lookup
 const billingDb = new DatabaseSync(":memory:");
 billingDb.exec(`
+  PRAGMA max_page_count = 5000;
   CREATE TABLE customer_billing (id INTEGER PRIMARY KEY, company TEXT NOT NULL, billing_email TEXT NOT NULL, plan TEXT NOT NULL);
   INSERT INTO customer_billing VALUES (1, 'Acme Corp', 'billing@acme.com', 'enterprise'), (2, 'Globex Inc', 'ap@globex.io', 'starter');
   PRAGMA query_only = ON;
@@ -102,6 +114,10 @@ server.tool(
     inputSchema: z.object({
       sql: z
         .string()
+        .max(
+          MAX_QUERY_LENGTH,
+          `Query exceeds maximum length of ${MAX_QUERY_LENGTH} characters`,
+        )
         .describe(
           "SQL SELECT statement (e.g. SELECT p.name, SUM(o.amount_usd) FROM orders o JOIN products p ON p.id = o.product_id GROUP BY p.name)",
         ),
@@ -109,16 +125,37 @@ server.tool(
   },
   async ({ sql }) => {
     const query = sql.trim().replace(/;+\s*$/, "");
+    if (query.length > MAX_QUERY_LENGTH) {
+      throw new Error(
+        `Query exceeds maximum length of ${MAX_QUERY_LENGTH} characters.`,
+      );
+    }
     if (
       !/^SELECT\b/i.test(query) ||
+      /\bWITH\b/i.test(query) ||
+      /\bPRAGMA\b/i.test(query) ||
       query.includes(";") ||
       /--|\/\*/.test(query)
     ) {
       throw new Error(
-        "Only a single SELECT statement without comments is permitted.",
+        "Only a single SELECT statement without CTEs (WITH), PRAGMAs, or comments is permitted.",
       );
     }
-    const rows = analyticsDb.prepare(query).all().slice(0, 100);
+
+    const limitedQuery = `SELECT * FROM (${query}) LIMIT ${MAX_ROWS}`;
+    const stmt = analyticsDb.prepare(limitedQuery);
+    const rows: Record<string, unknown>[] = [];
+    const startTime = Date.now();
+    for (const row of stmt.iterate()) {
+      if (Date.now() - startTime > MAX_EXECUTION_MS) {
+        throw new Error(
+          `Query exceeded maximum execution time of ${MAX_EXECUTION_MS}ms.`,
+        );
+      }
+      rows.push(row);
+      if (rows.length >= MAX_ROWS) break;
+    }
+
     return {
       content: [
         {
