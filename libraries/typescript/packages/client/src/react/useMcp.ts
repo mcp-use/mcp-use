@@ -2198,6 +2198,18 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           : "Connection disabled via enabled flag."
       );
       setState("discovering");
+      // The lifecycle cleanup runs disconnect(true), whose quiet path skips the
+      // state reset. Clear the previous server's data here so a disabled hook
+      // (enabled: false or url cleared) stops reporting stale tools/info.
+      setTools([]);
+      setResources([]);
+      setResourceTemplates([]);
+      setPrompts([]);
+      setSkills([]);
+      setServerInfo(undefined);
+      setCapabilities(undefined);
+      setInstructions(undefined);
+      setExtensions({});
       return () => {
         isMountedRef.current = false;
       };
