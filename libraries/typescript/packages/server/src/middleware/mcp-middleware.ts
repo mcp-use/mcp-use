@@ -635,13 +635,33 @@ function dispatchMcpEvents<
     if (entry.phase !== phase || !matchesPattern(entry.pattern, method)) {
       continue;
     }
-    try {
-      entry.handler(frozen as unknown as ReadonlyMiddlewareContext, result);
-    } catch (error) {
+    const logThrow = (error: unknown): void => {
       console.error(
         `[mcp-use] MCP event listener for "${entry.pattern}" (${phase}) threw:`,
         error
       );
+    };
+    try {
+      // A listener may be async; its returned promise is not awaited here, so
+      // catch its rejection too. Otherwise an async listener that rejects
+      // produces an unhandled rejection that can crash the server process,
+      // instead of being logged like a synchronous throw.
+      const returned = (
+        entry.handler as (
+          ctx: ReadonlyMiddlewareContext,
+          result?: unknown
+        ) => unknown
+      )(frozen as unknown as ReadonlyMiddlewareContext, result);
+      if (
+        returned != null &&
+        typeof (returned as { then?: unknown }).then === "function"
+      ) {
+        // Normalize any thenable to a real promise so .catch() is always
+        // available, even for custom thenables without a catch method.
+        Promise.resolve(returned).catch(logThrow);
+      }
+    } catch (error) {
+      logThrow(error);
     }
   }
 }
