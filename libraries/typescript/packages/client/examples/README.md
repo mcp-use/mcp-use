@@ -28,6 +28,9 @@ Run the complete matrix:
 ## Feature examples
 
 - `node/basic-http.ts` — tools + automatic v1/v2 negotiation.
+- `node/remote-docs.ts` — read-only remote docs search → read flow against a
+  public MCP endpoint; needs network access but no local demo server, model, or
+  key.
 - `node/ai-sdk-openai/` — a runnable AI SDK `generateText` tool loop against a
   remote MCP server. It is an isolated example package, so AI SDK dependencies
   are not dependencies of `@mcp-use/client`.
