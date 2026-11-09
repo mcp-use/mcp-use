@@ -13,6 +13,7 @@ vi.mock("../../../src/utils/favicon.js", () => ({
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.mocked(detectFavicon).mockReset();
 });
 
@@ -144,10 +145,88 @@ describe("loadServerIcon", () => {
       addLog: vi.fn(),
     });
 
+    await Promise.resolve();
     isCurrent = false;
     resolveFavicon("data:image/png;base64,old-icon");
 
     expect(await loading).toBeNull();
+    expect(setServerInfo).not.toHaveBeenCalled();
+  });
+
+  it("stores a valid server image", async () => {
+    vi.stubGlobal(
+      "FileReader",
+      class {
+        result = "data:image/png;base64,server-icon";
+        onloadend: (() => void) | null = null;
+        onerror: ((error: unknown) => void) | null = null;
+
+        readAsDataURL() {
+          queueMicrotask(() => this.onloadend?.());
+        }
+      }
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("icon", {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      })
+    );
+    const setServerInfo = vi.fn();
+
+    const result = await loadServerIcon({
+      serverInfo: {
+        name: "demo",
+        icons: [{ src: "https://example.com/icon.png" }],
+      },
+      isMounted: () => true,
+      setServerInfo,
+      addLog: vi.fn(),
+    });
+
+    expect(result).toBe("data:image/png;base64,server-icon");
+    expect(setServerInfo).toHaveBeenCalledOnce();
+    expect(setServerInfo.mock.calls[0][0]({ name: "demo" })).toEqual({
+      name: "demo",
+      icon: result,
+    });
+  });
+
+  it("does not apply a server image from an outdated connection", async () => {
+    let isCurrent = true;
+    vi.stubGlobal(
+      "FileReader",
+      class {
+        result = "data:image/png;base64,old-icon";
+        onloadend: (() => void) | null = null;
+        onerror: ((error: unknown) => void) | null = null;
+
+        readAsDataURL() {
+          isCurrent = false;
+          queueMicrotask(() => this.onloadend?.());
+        }
+      }
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("icon", {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      })
+    );
+    const setServerInfo = vi.fn();
+
+    const result = await loadServerIcon({
+      serverInfo: {
+        name: "old-server",
+        icons: [{ src: "https://old.example.com/icon.png" }],
+      },
+      isMounted: () => true,
+      isCurrent: () => isCurrent,
+      setServerInfo,
+      addLog: vi.fn(),
+    });
+
+    expect(result).toBeNull();
     expect(setServerInfo).not.toHaveBeenCalled();
   });
 });
