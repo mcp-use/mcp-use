@@ -22,6 +22,7 @@ describe("runtime tool security", () => {
   let transport: StreamableHTTPClientTransport;
   const events: SecurityAuditEvent[] = [];
   const calls: string[] = [];
+  let shortCircuit = false;
 
   beforeAll(async () => {
     server = new MCPServer({
@@ -38,6 +39,15 @@ describe("runtime tool security", () => {
         },
         redactArguments: (args) => ({ toolInput: Object.keys(args) }),
       },
+    });
+
+    server.use("mcp:tools/call", async (_ctx, next) => {
+      if (shortCircuit) {
+        return {
+          content: [{ type: "text" as const, text: "short-circuited" }],
+        };
+      }
+      return next();
     });
 
     server.tool(
@@ -104,7 +114,23 @@ describe("runtime tool security", () => {
     ]);
 
     expect(results.map(textContent)).toEqual(["one", "two"]);
-    expect(calls).toEqual(["hello", "one", "two"]);
+    expect([...calls].sort()).toEqual(["hello", "one", "two"]);
+  });
+
+  it("runs the policy even when middleware short-circuits", async () => {
+    shortCircuit = true;
+    const result = await client.callTool({
+      name: "echo",
+      arguments: { message: "bypassed" },
+    });
+    shortCircuit = false;
+
+    expect(textContent(result)).toBe("short-circuited");
+    expect(calls).not.toContain("bypassed");
+    expect(events.slice(-2).map(({ phase }) => phase)).toEqual([
+      "requested",
+      "completed",
+    ]);
   });
 });
 

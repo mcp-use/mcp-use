@@ -2468,97 +2468,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         ctx
       );
       const toolContext = this.#toToolRequestContext(ctx, schemes);
-      const innerFn = async () => {
+      const executeTool = async () => {
         const effectiveArgs = (mwCtx.params.arguments ?? {}) as Record<
           string,
           unknown
         >;
-        const security = this.#config.security;
-        if (security === undefined) {
-          return callback(effectiveArgs, toolContext);
-        }
-
-        const securityContext: ToolSecurityContext<TUser> = {
-          tool: definition,
-          arguments: effectiveArgs,
-          ...(toolContext.auth !== undefined && {
-            auth: {
-              user: toolContext.auth.user,
-              payload: toolContext.auth.payload,
-              scopes: [...toolContext.auth.scopes],
-              permissions: [...toolContext.auth.permissions],
-              ...(toolContext.auth.clientId !== undefined && {
-                clientId: toolContext.auth.clientId,
-              }),
-              expiresAt: toolContext.auth.expiresAt,
-              ...(toolContext.auth.resource !== undefined && {
-                resource: toolContext.auth.resource,
-              }),
-            } as SecurityAuth<TUser>,
-          }),
-          ...(toolContext.request?.raw !== undefined && {
-            request: toolContext.request.raw,
-          }),
-          signal: toolContext.signal,
-        };
-        const eventId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-        const startedAt = Date.now();
-        const auditArguments = security.redactArguments?.(
-          effectiveArgs,
-          securityContext
-        );
-        const baseEvent = {
-          id: eventId,
-          type: "tool.call" as const,
-          timestamp: new Date().toISOString(),
-          tool: definition.name,
-          ...(auditArguments !== undefined && { arguments: auditArguments }),
-        };
-        await this.#emitSecurityEvent({ ...baseEvent, phase: "requested" });
-
-        try {
-          const decision = await security.policy(securityContext);
-          if (!decision.allowed) {
-            await this.#emitSecurityEvent({
-              ...baseEvent,
-              phase: "denied",
-              decision,
-              durationMs: Date.now() - startedAt,
-            });
-            return {
-              isError: true,
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Tool call denied${decision.reason ? `: ${decision.reason}` : ""}`,
-                },
-              ],
-            };
-          }
-
-          const result = await callback(effectiveArgs, toolContext);
-          await this.#emitSecurityEvent({
-            ...baseEvent,
-            phase: "completed",
-            decision,
-            durationMs: Date.now() - startedAt,
-          });
-          return result;
-        } catch (error) {
-          await this.#emitSecurityEvent({
-            ...baseEvent,
-            phase: "failed",
-            durationMs: Date.now() - startedAt,
-            error: {
-              name: error instanceof Error ? error.name : "Error",
-              message: error instanceof Error ? error.message : String(error),
-            },
-          });
-          throw error;
-        }
-      };
-      const securedInnerFn = async () => {
-        const result = await innerFn();
+        const result = await callback(effectiveArgs, toolContext);
         if (
           isInputRequiredResult(result) ||
           wireResultMeta === undefined ||
@@ -2571,9 +2486,100 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           _meta: { ...result._meta, ...wireResultMeta },
         };
       };
-      return (await this.#runMcpHook("tools/call", mwCtx, securedInnerFn)) as Awaited<
-        ReturnType<typeof callback>
+      const security = this.#config.security;
+      if (security === undefined) {
+        return (await this.#runMcpHook("tools/call", mwCtx, executeTool)) as Awaited<
+          ReturnType<typeof callback>
+        >;
+      }
+
+      const effectiveArgs = (mwCtx.params.arguments ?? {}) as Record<
+        string,
+        unknown
       >;
+      const securityContext: ToolSecurityContext<TUser> = {
+        tool: definition,
+        arguments: effectiveArgs,
+        ...(toolContext.auth !== undefined && {
+          auth: {
+            user: toolContext.auth.user,
+            payload: toolContext.auth.payload,
+            scopes: [...toolContext.auth.scopes],
+            permissions: [...toolContext.auth.permissions],
+            ...(toolContext.auth.clientId !== undefined && {
+              clientId: toolContext.auth.clientId,
+            }),
+            expiresAt: toolContext.auth.expiresAt,
+            ...(toolContext.auth.resource !== undefined && {
+              resource: toolContext.auth.resource,
+            }),
+          } as SecurityAuth<TUser>,
+        }),
+        ...(toolContext.request?.raw !== undefined && {
+          request: toolContext.request.raw,
+        }),
+        signal: toolContext.signal,
+      };
+      const eventId =
+        globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+      const startedAt = Date.now();
+      const auditArguments = security.redactArguments?.(
+        effectiveArgs,
+        securityContext
+      );
+      const baseEvent = {
+        id: eventId,
+        type: "tool.call" as const,
+        timestamp: new Date().toISOString(),
+        tool: definition.name,
+        ...(auditArguments !== undefined && { arguments: auditArguments }),
+      };
+      await this.#emitSecurityEvent({ ...baseEvent, phase: "requested" });
+
+      try {
+        const decision = await security.policy(securityContext);
+        if (!decision.allowed) {
+          await this.#emitSecurityEvent({
+            ...baseEvent,
+            phase: "denied",
+            decision,
+            durationMs: Date.now() - startedAt,
+          });
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text" as const,
+                text: `Tool call denied${decision.reason ? `: ${decision.reason}` : ""}`,
+              },
+            ],
+          };
+        }
+
+        const result = await this.#runMcpHook(
+          "tools/call",
+          mwCtx,
+          executeTool
+        );
+        await this.#emitSecurityEvent({
+          ...baseEvent,
+          phase: "completed",
+          decision,
+          durationMs: Date.now() - startedAt,
+        });
+        return result;
+      } catch (error) {
+        await this.#emitSecurityEvent({
+          ...baseEvent,
+          phase: "failed",
+          durationMs: Date.now() - startedAt,
+          error: {
+            name: error instanceof Error ? error.name : "Error",
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
+        throw error;
+      }
     };
 
     if (inputSchema !== undefined) {
