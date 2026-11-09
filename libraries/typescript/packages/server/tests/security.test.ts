@@ -53,20 +53,20 @@ describe("runtime tool security", () => {
     server.tool(
       {
         name: "echo",
-        inputSchema: z.object({ message: z.string(), allow: z.boolean().optional() }),
+        inputSchema: z.object({
+          message: z.string(),
+          allow: z.boolean().optional(),
+        }),
       },
       async ({ message }) => {
         calls.push(message);
         return { content: [{ type: "text", text: message }] };
       }
     );
-    server.tool(
-      { name: "blocked", inputSchema: z.object({}) },
-      async () => {
-        calls.push("blocked");
-        return { content: [{ type: "text", text: "should not run" }] };
-      }
-    );
+    server.tool({ name: "blocked", inputSchema: z.object({}) }, async () => {
+      calls.push("blocked");
+      return { content: [{ type: "text", text: "should not run" }] };
+    });
 
     server.__primeSkills(undefined);
     const { url } = await server.listen(0);
@@ -133,4 +133,3 @@ describe("runtime tool security", () => {
     ]);
   });
 });
-

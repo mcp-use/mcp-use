@@ -460,11 +460,16 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   /** Whether terminal shutdown has begun. */
   #closed = false;
 
-  async #emitSecurityEvent(event: SecurityAuditEvent<TUser>): Promise<void> {
+  #emitSecurityEvent(event: SecurityAuditEvent<TUser>): void {
     const audit = this.#config.security?.audit;
     if (audit === undefined) return;
     try {
-      await audit(event);
+      const result = audit(event);
+      if (result instanceof Promise) {
+        void result.catch((error) => {
+          console.warn("[mcp-use] Security audit hook failed:", error);
+        });
+      }
     } catch (error) {
       console.warn("[mcp-use] Security audit hook failed:", error);
     }
@@ -2488,9 +2493,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       };
       const security = this.#config.security;
       if (security === undefined) {
-        return (await this.#runMcpHook("tools/call", mwCtx, executeTool)) as Awaited<
-          ReturnType<typeof callback>
-        >;
+        return (await this.#runMcpHook(
+          "tools/call",
+          mwCtx,
+          executeTool
+        )) as Awaited<ReturnType<typeof callback>>;
       }
 
       const effectiveArgs = (mwCtx.params.arguments ?? {}) as Record<
@@ -2516,7 +2523,16 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           } as SecurityAuth<TUser>,
         }),
         ...(toolContext.request?.raw !== undefined && {
-          request: toolContext.request.raw,
+          request: (() => {
+            const headers = new Headers(toolContext.request.raw.headers);
+            headers.delete("authorization");
+            headers.delete("cookie");
+            headers.delete("proxy-authorization");
+            return new Request(toolContext.request.raw.url, {
+              method: toolContext.request.raw.method,
+              headers,
+            });
+          })(),
         }),
         signal: toolContext.signal,
       };
@@ -2534,12 +2550,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         tool: definition.name,
         ...(auditArguments !== undefined && { arguments: auditArguments }),
       };
-      await this.#emitSecurityEvent({ ...baseEvent, phase: "requested" });
+      this.#emitSecurityEvent({ ...baseEvent, phase: "requested" });
 
       try {
         const decision = await security.policy(securityContext);
         if (!decision.allowed) {
-          await this.#emitSecurityEvent({
+          this.#emitSecurityEvent({
             ...baseEvent,
             phase: "denied",
             decision,
@@ -2556,12 +2572,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           };
         }
 
-        const result = await this.#runMcpHook(
-          "tools/call",
-          mwCtx,
-          executeTool
-        );
-        await this.#emitSecurityEvent({
+        const result = await this.#runMcpHook("tools/call", mwCtx, executeTool);
+        this.#emitSecurityEvent({
           ...baseEvent,
           phase: "completed",
           decision,
@@ -2569,7 +2581,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         });
         return result;
       } catch (error) {
-        await this.#emitSecurityEvent({
+        this.#emitSecurityEvent({
           ...baseEvent,
           phase: "failed",
           durationMs: Date.now() - startedAt,

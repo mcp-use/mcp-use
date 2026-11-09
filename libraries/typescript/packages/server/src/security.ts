@@ -63,4 +63,3 @@ export interface SecurityOptions<TUser = unknown> {
     context: ToolSecurityContext<TUser>
   ) => unknown;
 }
-
