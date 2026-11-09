@@ -34,6 +34,8 @@ export type SecurityAuditPhase =
   | "requested"
   | "denied"
   | "completed"
+  | "error"
+  | "input_required"
   | "failed";
 
 /** Redacted, structured record emitted by the runtime security layer. */

@@ -2575,7 +2575,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         const result = await this.#runMcpHook("tools/call", mwCtx, executeTool);
         this.#emitSecurityEvent({
           ...baseEvent,
-          phase: "completed",
+          phase: isInputRequiredResult(result)
+            ? "input_required"
+            : result.isError === true
+              ? "error"
+              : "completed",
           decision,
           durationMs: Date.now() - startedAt,
         });

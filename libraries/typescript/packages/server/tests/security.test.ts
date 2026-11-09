@@ -67,6 +67,10 @@ describe("runtime tool security", () => {
       calls.push("blocked");
       return { content: [{ type: "text", text: "should not run" }] };
     });
+    server.tool({ name: "error", inputSchema: z.object({}) }, async () => ({
+      isError: true,
+      content: [{ type: "text" as const, text: "tool failed" }],
+    }));
 
     server.__primeSkills(undefined);
     const { url } = await server.listen(0);
@@ -130,6 +134,16 @@ describe("runtime tool security", () => {
     expect(events.slice(-2).map(({ phase }) => phase)).toEqual([
       "requested",
       "completed",
+    ]);
+  });
+
+  it("records MCP error results separately from successful calls", async () => {
+    const result = await client.callTool({ name: "error", arguments: {} });
+
+    expect(result.isError).toBe(true);
+    expect(events.slice(-2).map(({ phase }) => phase)).toEqual([
+      "requested",
+      "error",
     ]);
   });
 });
