@@ -293,6 +293,22 @@ interface ToolEntry<TUser, TEnv extends Env> {
   schemes: readonly ToolSecurityScheme[];
 }
 
+function serializeSecurityArguments(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(serializeSecurityArguments).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map(
+        (key) =>
+          `${JSON.stringify(key)}:${serializeSecurityArguments((value as Record<string, unknown>)[key])}`
+      )
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
+}
+
 /** Static resource definition and callback retained for per-request replay. */
 interface ResourceEntry<TUser, TEnv extends Env> {
   /** Declarative resource metadata supplied at registration time. */
@@ -2473,11 +2489,30 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         ctx
       );
       const toolContext = this.#toToolRequestContext(ctx, schemes);
+      const security = this.#config.security;
+      let approvedArguments: string | undefined;
+      let argumentsChanged = false;
       const executeTool = async () => {
         const effectiveArgs = (mwCtx.params.arguments ?? {}) as Record<
           string,
           unknown
         >;
+        if (
+          security !== undefined &&
+          approvedArguments !== undefined &&
+          serializeSecurityArguments(effectiveArgs) !== approvedArguments
+        ) {
+          argumentsChanged = true;
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text" as const,
+                text: "Tool call denied: arguments changed after policy approval",
+              },
+            ],
+          };
+        }
         const result = await callback(effectiveArgs, toolContext);
         if (
           isInputRequiredResult(result) ||
@@ -2491,7 +2526,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           _meta: { ...result._meta, ...wireResultMeta },
         };
       };
-      const security = this.#config.security;
       if (security === undefined) {
         return (await this.#runMcpHook(
           "tools/call",
@@ -2516,9 +2550,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       this.#emitSecurityEvent({ ...baseEvent, phase: "requested" });
 
       try {
+        const policyArguments = structuredClone(effectiveArgs);
+        approvedArguments = serializeSecurityArguments(policyArguments);
         const securityContext: ToolSecurityContext<TUser> = {
           tool: definition,
-          arguments: effectiveArgs,
+          arguments: policyArguments,
           ...(toolContext.auth !== undefined && {
             auth: {
               user: toolContext.auth.user,
@@ -2578,11 +2614,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         const result = await this.#runMcpHook("tools/call", mwCtx, executeTool);
         this.#emitSecurityEvent({
           ...event,
-          phase: isInputRequiredResult(result)
-            ? "input_required"
-            : result.isError === true
-              ? "error"
-              : "completed",
+          phase: argumentsChanged
+            ? "denied"
+            : isInputRequiredResult(result)
+              ? "input_required"
+              : result.isError === true
+                ? "error"
+                : "completed",
           decision,
           durationMs: Date.now() - startedAt,
         });

@@ -23,6 +23,7 @@ describe("runtime tool security", () => {
   const events: SecurityAuditEvent[] = [];
   const calls: string[] = [];
   let shortCircuit = false;
+  let rewriteArguments = false;
   let redactThrows = false;
 
   beforeAll(async () => {
@@ -50,6 +51,9 @@ describe("runtime tool security", () => {
         return {
           content: [{ type: "text" as const, text: "short-circuited" }],
         };
+      }
+      if (rewriteArguments) {
+        _ctx.params.arguments = { message: "rewritten" };
       }
       return next();
     });
@@ -138,6 +142,23 @@ describe("runtime tool security", () => {
     expect(events.slice(-2).map(({ phase }) => phase)).toEqual([
       "requested",
       "completed",
+    ]);
+  });
+
+  it("denies middleware-rewritten arguments after policy approval", async () => {
+    rewriteArguments = true;
+    const result = await client.callTool({
+      name: "echo",
+      arguments: { message: "approved" },
+    });
+    rewriteArguments = false;
+
+    expect(result.isError).toBe(true);
+    expect(textContent(result)).toContain("arguments changed");
+    expect(calls).not.toContain("rewritten");
+    expect(events.slice(-2).map(({ phase }) => phase)).toEqual([
+      "requested",
+      "denied",
     ]);
   });
 
