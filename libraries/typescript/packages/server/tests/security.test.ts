@@ -23,6 +23,7 @@ describe("runtime tool security", () => {
   const events: SecurityAuditEvent[] = [];
   const calls: string[] = [];
   let shortCircuit = false;
+  let redactThrows = false;
 
   beforeAll(async () => {
     server = new MCPServer({
@@ -37,7 +38,10 @@ describe("runtime tool security", () => {
         audit: (event) => {
           events.push(event);
         },
-        redactArguments: (args) => ({ toolInput: Object.keys(args) }),
+        redactArguments: (args) => {
+          if (redactThrows) throw new Error("redaction failed");
+          return { toolInput: Object.keys(args) };
+        },
       },
     });
 
@@ -96,7 +100,7 @@ describe("runtime tool security", () => {
       "requested",
       "completed",
     ]);
-    expect(events[0]?.arguments).toEqual({ toolInput: ["message"] });
+    expect(events[1]?.arguments).toEqual({ toolInput: ["message"] });
   });
 
   it("denies calls before the tool callback runs", async () => {
@@ -145,5 +149,21 @@ describe("runtime tool security", () => {
       "requested",
       "error",
     ]);
+  });
+
+  it("records redaction failures before propagating them", async () => {
+    redactThrows = true;
+    const result = await client.callTool({
+      name: "echo",
+      arguments: { message: "redact" },
+    });
+    redactThrows = false;
+
+    expect(result.isError).toBe(true);
+    expect(events.slice(-2).map(({ phase }) => phase)).toEqual([
+      "requested",
+      "failed",
+    ]);
+    expect(calls).not.toContain("redact");
   });
 });

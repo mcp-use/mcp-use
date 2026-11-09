@@ -2539,24 +2539,27 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       const eventId =
         globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
       const startedAt = Date.now();
-      const auditArguments = security.redactArguments?.(
-        effectiveArgs,
-        securityContext
-      );
       const baseEvent = {
         id: eventId,
         type: "tool.call" as const,
         timestamp: new Date().toISOString(),
         tool: definition.name,
-        ...(auditArguments !== undefined && { arguments: auditArguments }),
       };
       this.#emitSecurityEvent({ ...baseEvent, phase: "requested" });
 
       try {
+        const auditArguments = security.redactArguments?.(
+          effectiveArgs,
+          securityContext
+        );
+        const event = {
+          ...baseEvent,
+          ...(auditArguments !== undefined && { arguments: auditArguments }),
+        };
         const decision = await security.policy(securityContext);
         if (!decision.allowed) {
           this.#emitSecurityEvent({
-            ...baseEvent,
+            ...event,
             phase: "denied",
             decision,
             durationMs: Date.now() - startedAt,
@@ -2574,7 +2577,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
         const result = await this.#runMcpHook("tools/call", mwCtx, executeTool);
         this.#emitSecurityEvent({
-          ...baseEvent,
+          ...event,
           phase: isInputRequiredResult(result)
             ? "input_required"
             : result.isError === true
