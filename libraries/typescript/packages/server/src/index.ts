@@ -101,6 +101,14 @@ export type {
   SkillResourceSnapshot,
 } from "./skills/types.js";
 export type { ServerBranding } from "./branding.js";
+export type {
+  SecurityAuditEvent,
+  SecurityAuditPhase,
+  SecurityAuth,
+  SecurityDecision,
+  SecurityOptions,
+  ToolSecurityContext,
+} from "./security.js";
 /** Official MCP icon shape used by {@link ServerConfig.icons}. */
 export type { Icon } from "@modelcontextprotocol/server";
 export type {

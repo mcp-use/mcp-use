@@ -3,6 +3,7 @@ import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
 import type { LoggingOptions } from "./logging.js";
 import type { OAuthMetadataSource, OAuthProvider } from "./oauth/index.js";
 import type { SkillsOptions } from "./skills/types.js";
+import type { SecurityOptions } from "./security.js";
 
 /**
  * Common server identity and behavior, passed to `new MCPServer(...)`.
@@ -10,7 +11,7 @@ import type { SkillsOptions } from "./skills/types.js";
  * Includes the fields consumed by the core HTTP and OAuth resource-server
  * wiring. Other legacy configuration is added with the feature that reads it.
  */
-interface BaseServerConfig {
+interface BaseServerConfig<TUser = never> {
   /** Server name reported to clients during negotiation. */
   name: string;
   /** Server version reported to clients. */
@@ -230,6 +231,8 @@ interface BaseServerConfig {
    * ```
    */
   cors?: CorsOptions;
+  /** Optional policy and audit hooks for runtime tool-call security. */
+  security?: SecurityOptions<TUser>;
 }
 
 /**
@@ -341,7 +344,7 @@ export function assertServerConfig(config: {
  * callback from declaring authenticated context without authentication at
  * runtime. Omitting the type keeps the no-OAuth API ergonomic.
  */
-export type ServerConfig<TUser = never> = BaseServerConfig &
+export type ServerConfig<TUser = never> = BaseServerConfig<TUser> &
   ([TUser] extends [never]
     ? {
         /** OAuth is unavailable when no authenticated user type is declared. */
