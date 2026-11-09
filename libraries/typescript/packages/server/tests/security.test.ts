@@ -25,6 +25,7 @@ describe("runtime tool security", () => {
   let shortCircuit = false;
   let rewriteArguments = false;
   let redactThrows = false;
+  let policyThrows = false;
 
   beforeAll(async () => {
     server = new MCPServer({
@@ -32,10 +33,13 @@ describe("runtime tool security", () => {
       version: "1.0.0",
       skills: false,
       security: {
-        policy: async ({ tool, arguments: args }) => ({
-          allowed: tool.name !== "blocked" && args["allow"] !== false,
-          reason: "blocked by test policy",
-        }),
+        policy: async ({ tool, arguments: args }) => {
+          if (policyThrows) throw new Error("policy failed");
+          return {
+            allowed: tool.name !== "blocked" && args["allow"] !== false,
+            reason: "blocked by test policy",
+          };
+        },
         audit: (event) => {
           events.push(event);
         },
@@ -104,6 +108,7 @@ describe("runtime tool security", () => {
       "requested",
       "completed",
     ]);
+    expect(events[0]?.arguments).toEqual({ toolInput: ["message"] });
     expect(events[1]?.arguments).toEqual({ toolInput: ["message"] });
   });
 
@@ -181,10 +186,24 @@ describe("runtime tool security", () => {
     redactThrows = false;
 
     expect(result.isError).toBe(true);
+    expect(events.at(-1)?.phase).toBe("failed");
+    expect(calls).not.toContain("redact");
+  });
+
+  it("preserves redacted arguments when policy evaluation fails", async () => {
+    policyThrows = true;
+    const result = await client.callTool({
+      name: "echo",
+      arguments: { message: "policy" },
+    });
+    policyThrows = false;
+
+    expect(result.isError).toBe(true);
     expect(events.slice(-2).map(({ phase }) => phase)).toEqual([
       "requested",
       "failed",
     ]);
-    expect(calls).not.toContain("redact");
+    expect(events.at(-2)?.arguments).toEqual({ toolInput: ["message"] });
+    expect(events.at(-1)?.arguments).toEqual({ toolInput: ["message"] });
   });
 });

@@ -2547,8 +2547,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         timestamp: new Date().toISOString(),
         tool: definition.name,
       };
-      this.#emitSecurityEvent({ ...baseEvent, phase: "requested" });
-
+      let event: typeof baseEvent & { arguments?: unknown } = baseEvent;
       try {
         const policyArguments = structuredClone(effectiveArgs);
         approvedArguments = serializeSecurityArguments(policyArguments);
@@ -2588,10 +2587,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           effectiveArgs,
           securityContext
         );
-        const event = {
+        event = {
           ...baseEvent,
           ...(auditArguments !== undefined && { arguments: auditArguments }),
         };
+        this.#emitSecurityEvent({ ...event, phase: "requested" });
         const decision = await security.policy(securityContext);
         if (!decision.allowed) {
           this.#emitSecurityEvent({
@@ -2627,7 +2627,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         return result;
       } catch (error) {
         this.#emitSecurityEvent({
-          ...baseEvent,
+          ...event,
           phase: "failed",
           durationMs: Date.now() - startedAt,
           error: {
