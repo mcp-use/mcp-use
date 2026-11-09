@@ -2504,38 +2504,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         string,
         unknown
       >;
-      const securityContext: ToolSecurityContext<TUser> = {
-        tool: definition,
-        arguments: effectiveArgs,
-        ...(toolContext.auth !== undefined && {
-          auth: {
-            user: toolContext.auth.user,
-            payload: toolContext.auth.payload,
-            scopes: [...toolContext.auth.scopes],
-            permissions: [...toolContext.auth.permissions],
-            ...(toolContext.auth.clientId !== undefined && {
-              clientId: toolContext.auth.clientId,
-            }),
-            expiresAt: toolContext.auth.expiresAt,
-            ...(toolContext.auth.resource !== undefined && {
-              resource: toolContext.auth.resource,
-            }),
-          } as SecurityAuth<TUser>,
-        }),
-        ...(toolContext.request?.raw !== undefined && {
-          request: (() => {
-            const headers = new Headers(toolContext.request.raw.headers);
-            headers.delete("authorization");
-            headers.delete("cookie");
-            headers.delete("proxy-authorization");
-            return new Request(toolContext.request.raw.url, {
-              method: toolContext.request.raw.method,
-              headers,
-            });
-          })(),
-        }),
-        signal: toolContext.signal,
-      };
       const eventId =
         globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
       const startedAt = Date.now();
@@ -2548,6 +2516,38 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       this.#emitSecurityEvent({ ...baseEvent, phase: "requested" });
 
       try {
+        const securityContext: ToolSecurityContext<TUser> = {
+          tool: definition,
+          arguments: effectiveArgs,
+          ...(toolContext.auth !== undefined && {
+            auth: {
+              user: toolContext.auth.user,
+              payload: toolContext.auth.payload,
+              scopes: [...toolContext.auth.scopes],
+              permissions: [...toolContext.auth.permissions],
+              ...(toolContext.auth.clientId !== undefined && {
+                clientId: toolContext.auth.clientId,
+              }),
+              expiresAt: toolContext.auth.expiresAt,
+              ...(toolContext.auth.resource !== undefined && {
+                resource: toolContext.auth.resource,
+              }),
+            } as SecurityAuth<TUser>,
+          }),
+          ...(toolContext.request?.raw !== undefined && {
+            request: (() => {
+              const headers = new Headers(toolContext.request.raw.headers);
+              headers.delete("authorization");
+              headers.delete("cookie");
+              headers.delete("proxy-authorization");
+              return new Request(toolContext.request.raw.url, {
+                method: toolContext.request.raw.method,
+                headers,
+              });
+            })(),
+          }),
+          signal: toolContext.signal,
+        };
         const auditArguments = security.redactArguments?.(
           effectiveArgs,
           securityContext
