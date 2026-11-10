@@ -68,6 +68,34 @@ describe("getInstallTargets", () => {
     ]);
   });
 
+  it("links a loopback server to its own Inspector instead of the hosted one", () => {
+    // The hosted Inspector cannot reach localhost: the dev server refuses its
+    // CORS preflight and the first page of a new project shows a 403 (#3063).
+    for (const [url, expected] of [
+      ["http://localhost:3000/mcp", "http://localhost:3000/mcp/inspector"],
+      ["http://127.0.0.1:3000/mcp", "http://127.0.0.1:3000/mcp/inspector"],
+      ["http://[::1]:3000/mcp", "http://[::1]:3000/mcp/inspector"],
+      ["http://localhost:3000/mcp/", "http://localhost:3000/mcp/inspector"],
+      [
+        "http://app.localhost:3000/mcp",
+        "http://app.localhost:3000/mcp/inspector",
+      ],
+    ] as const) {
+      expect(getInstallTargets({ url, name: "local" }).inspector.url).toBe(
+        expected
+      );
+    }
+  });
+
+  it("keeps the hosted Inspector link for a non-loopback server", () => {
+    expect(
+      getInstallTargets({ url: "https://acme.com/mcp", name: "acme" }).inspector
+        .url
+    ).toBe(
+      "https://inspector.manufact.com/inspector?autoConnect=https%3A%2F%2Facme.com%2Fmcp&tab=chat"
+    );
+  });
+
   it("sanitizes non-ASCII server names into the config key", () => {
     const targets = getInstallTargets({
       url: "https://example.com/mcp",

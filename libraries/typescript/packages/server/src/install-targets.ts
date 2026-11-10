@@ -178,10 +178,39 @@ function generateClaudeCommand(url: string, name: string): string {
 const MANUFACT_INSPECTOR_ORIGIN = "https://inspector.manufact.com";
 
 /**
- * Deep link to hosted Manufact Inspector with this MCP server URL pre-filled
- * and the Chat tab selected (`tab=chat`).
+ * Whether `hostname` is a loopback address. A local dev server cannot be
+ * reached from the hosted Inspector (the browser preflight originates on
+ * inspector.manufact.com), so the landing page must use the Inspector that the
+ * local dev server serves itself.
+ */
+function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host.endsWith(".localhost")
+  );
+}
+
+/**
+ * Link to the Inspector for this server: the server's own `<mcp url>/inspector`
+ * mount for a loopback URL (the hosted Inspector cannot reach `localhost`, and
+ * refusing its preflight is what the user saw as a 403), otherwise the hosted
+ * Manufact Inspector with the server URL pre-filled and the Chat tab selected.
  */
 function getManufactInspectorUrl(serverUrl: string): string {
+  try {
+    const local = new URL(serverUrl);
+    if (isLoopbackHostname(local.hostname)) {
+      local.pathname = `${local.pathname.replace(/\/+$/, "")}/inspector`;
+      local.search = "";
+      local.hash = "";
+      return local.toString();
+    }
+  } catch {
+    // Not an absolute URL: keep the hosted link below.
+  }
   const params = new URLSearchParams({
     autoConnect: serverUrl,
     tab: "chat",
