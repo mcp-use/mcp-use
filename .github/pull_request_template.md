@@ -1,6 +1,6 @@
 # Pull Request Description
 
-## Linked issue (required)
+## Linked issue (required for contributors)
 
 Closes #<!-- Replace with an existing issue number, for example: Closes #123 -->
 
