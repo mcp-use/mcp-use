@@ -501,11 +501,11 @@ export class MCPClient extends BaseMCPClient {
       clientInfo: serverConfig.clientInfo ?? this.config.clientInfo,
     };
 
-    if ("command" in merged && "args" in merged) {
+    if ("command" in merged) {
       const { StdioConnector } = await import("../transport/stdio.js");
       const stdioConfig = merged as ServerConfig & {
         command: string;
-        args: string[];
+        args?: string[];
         env?: Record<string, string>;
         cwd?: string;
         stderr?: import("../transport/stdio.js").StdioStderrMode;
