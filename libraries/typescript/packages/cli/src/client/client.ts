@@ -419,6 +419,8 @@ async function callTool(
   return 0;
 }
 
+// Keeps each text block's leading whitespace (indented code frames, stack
+// traces) and drops only trailing whitespace, so blocks print one per line.
 function toolErrorText(result: { content?: unknown }): string {
   if (!Array.isArray(result.content)) return "";
   return result.content
@@ -428,12 +430,12 @@ function toolErrorText(result: { content?: unknown }): string {
       "type" in block &&
       block.type === "text" &&
       "text" in block &&
-      typeof block.text === "string"
-        ? [block.text]
+      typeof block.text === "string" &&
+      block.text.trim() !== ""
+        ? [block.text.trimEnd()]
         : []
     )
-    .join("\n")
-    .trim();
+    .join("\n");
 }
 
 function parseToolCallArgs(
