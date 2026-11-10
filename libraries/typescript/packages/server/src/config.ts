@@ -5,6 +5,41 @@ import type { OAuthMetadataSource, OAuthProvider } from "./oauth/index.js";
 import type { SkillsOptions } from "./skills/types.js";
 
 /**
+ * View serving options.
+ */
+export interface ViewsConfig {
+  /**
+   * Choose the `ui://` resource URI for a primed view.
+   *
+   * Hosts cache view documents by resource URI, so a server that redeploys a
+   * view needs a way to publish a new URI for it. When set, the resolver is
+   * called once per view — after views are primed and before the first
+   * request — and memoised for the life of the server. The returned URI is
+   * used everywhere a view URI appears: the `tools/list` descriptor, the
+   * successful `tools/call` result, view resource registration, and the OAuth
+   * gate's open-resource list.
+   *
+   * The resolver must return a unique `ui://` URI for each view. Throws at
+   * mount time when a value is not a `ui://` URI or two views resolve to the
+   * same URI.
+   *
+   * @defaultValue Every view keeps its stable `ui://views/<name>.html` URI.
+   *
+   * @example
+   * ```ts
+   * new MCPServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   views: {
+   *     resourceUri: (name) => `ui://views/${name}/${buildId}.html`,
+   *   },
+   * });
+   * ```
+   */
+  resourceUri?: (viewName: string) => string;
+}
+
+/**
  * Common server identity and behavior, passed to `new MCPServer(...)`.
  *
  * Includes the fields consumed by the core HTTP and OAuth resource-server
@@ -197,6 +232,13 @@ interface BaseServerConfig {
    */
   skills?: boolean | SkillsOptions;
   /**
+   * View serving options.
+   *
+   * @defaultValue View resources keep their stable `ui://views/<name>.html`
+   * URIs.
+   */
+  views?: ViewsConfig;
+  /**
    * Integrity verification for `requestState` echoed across
    * `input_required` rounds.
    *
@@ -279,6 +321,7 @@ export function assertServerConfig(config: {
   basePath?: unknown;
   port?: unknown;
   skills?: unknown;
+  views?: unknown;
   oauth?: unknown;
   mixedAuth?: unknown;
 }): void {
@@ -330,6 +373,21 @@ export function assertServerConfig(config: {
     const directory = (config.skills as Record<string, unknown>)["directory"];
     if (directory !== undefined && typeof directory !== "string") {
       throw new TypeError("skills.directory must be a string when provided");
+    }
+  }
+  if (config.views !== undefined) {
+    if (
+      typeof config.views !== "object" ||
+      config.views === null ||
+      Array.isArray(config.views)
+    ) {
+      throw new TypeError("views must be a configuration object");
+    }
+    const resourceUri = (config.views as Record<string, unknown>)[
+      "resourceUri"
+    ];
+    if (resourceUri !== undefined && typeof resourceUri !== "function") {
+      throw new TypeError("views.resourceUri must be a function when provided");
     }
   }
 }

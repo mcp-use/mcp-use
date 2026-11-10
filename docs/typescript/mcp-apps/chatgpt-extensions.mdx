@@ -813,6 +813,34 @@ export function ExpandButton() {
 If the host supplies no mode list, only `inline` is available.
 Requests for other modes reject before the runtime sends them.
 
+## Version a view's resource URI
+
+Hosts cache a view's HTML by resource URI.
+Every view is served at a stable `ui://views/<name>.html` URI by default, so a
+redeploy that changes the HTML, JavaScript, or CSS can keep showing the cached
+document.
+Publish a new URI when the view changes:
+
+```ts
+const BUILD_ID = process.env.BUILD_ID ?? "dev";
+
+const server = new MCPServer({
+  name: "parts-library",
+  version: "1.0.0",
+  views: {
+    resourceUri: (name) => `ui://views/${name}/${BUILD_ID}.html`,
+  },
+});
+```
+
+The resolver runs once per primed view, before the first request, and its result
+is reused for the rest of the process. It must return a `ui://` URI that is
+unique across views; `listen()` throws otherwise.
+The chosen URI appears on `tools/list`, successful `tools/call` results,
+`resources/list`, `resources/read`, and `contents[].uri`.
+Keep it deterministic within a deploy: deriving it from a content hash or build
+id gives each deploy its own cache entry without changing during a run.
+
 ## Verify the integration
 
 1. Call `tools/list` to check entrypoint metadata and settings tool names.

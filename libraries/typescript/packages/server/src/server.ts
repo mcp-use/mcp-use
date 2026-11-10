@@ -404,6 +404,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       config: ToolViewConfig;
     }
   >();
+  /**
+   * Resolved view resource URIs, memoised per view so a resolver that hashes
+   * generated content cannot change a URI while the server is running.
+   */
+  readonly #viewResourceUris = new Map<string, string>();
   #viewsPrimed = false;
   #embeddedViewAssets: EmbeddedViewAssets | undefined;
   /** When true, resource CSP emission includes the HMR websocket origin. */
@@ -1844,7 +1849,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           mixedAuth,
           toolSchemes: (name) => this.#tools.get(name)?.schemes,
           // Only views a tool binds; an unbound manifest entry stays gated.
-          openResourceUris: [...this.#viewBindings.keys()].map(viewResourceUri),
+          openResourceUris: [...this.#viewBindings.keys()].map((viewName) =>
+            this.#resolveViewResourceUri(viewName)
+          ),
         };
         // The gate and its challenge builder load on the first MCP request,
         // keeping them out of the static graph of servers without OAuth.
@@ -2065,6 +2072,56 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         );
       }
     }
+
+    // Resolve every view URI up front so an invalid or duplicate resolver
+    // result fails at mount, not on the first tools/list request.
+    for (const viewName of this.#views.keys()) {
+      this.#resolveViewResourceUri(viewName);
+    }
+  }
+
+  /**
+   * Resolve and memoise the resource URI for a primed view.
+   *
+   * Uses `config.views.resourceUri` when configured and otherwise keeps the
+   * stable `ui://views/<name>.html` URI. Throws when a resolver returns
+   * something that is not a `ui://` URI or reuses another view's URI.
+   */
+  #resolveViewResourceUri(viewName: string): string {
+    const cached = this.#viewResourceUris.get(viewName);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const resolver = this.#config.views?.resourceUri;
+    const uri =
+      resolver === undefined ? viewResourceUri(viewName) : resolver(viewName);
+
+    if (typeof uri !== "string" || !uri.startsWith("ui://")) {
+      throw new Error(
+        `views.resourceUri must return a ui:// URI for view "${viewName}"; ` +
+          `received ${JSON.stringify(uri)}`
+      );
+    }
+    try {
+      new URL(uri);
+    } catch {
+      throw new Error(
+        `views.resourceUri must return a valid ui:// URI for view "${viewName}"; ` +
+          `received ${JSON.stringify(uri)}`
+      );
+    }
+    for (const [otherName, otherUri] of this.#viewResourceUris) {
+      if (otherUri === uri) {
+        throw new Error(
+          `views.resourceUri returned the same URI "${uri}" for views ` +
+            `"${otherName}" and "${viewName}"; view resource URIs must be unique.`
+        );
+      }
+    }
+
+    this.#viewResourceUris.set(viewName, uri);
+    return uri;
   }
 
   /** Build a fully registered SDK server from the immutable registry. */
@@ -2425,7 +2482,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const serializedUiMeta = buildToolUiMeta(
       view?.name,
       definition.visibility,
-      buildEntrypointMeta(definition)
+      buildEntrypointMeta(definition),
+      view !== undefined ? this.#resolveViewResourceUri(view.name) : undefined
     );
     const uiMeta = entry.mentions
       ? finalizeMentionsMeta(definition, serializedUiMeta)
@@ -2459,7 +2517,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       ...(toolMeta !== undefined && { _meta: toolMeta }),
     };
     const wireResultMeta =
-      view !== undefined ? buildToolResultUiMeta(view.name) : undefined;
+      view !== undefined
+        ? buildToolResultUiMeta(
+            view.name,
+            this.#resolveViewResourceUri(view.name)
+          )
+        : undefined;
 
     const inputSchema = resolveToolInputSchema(definition);
 
@@ -2522,7 +2585,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     metaOptions: { request?: Request; hmrWs?: boolean },
     basePath: string
   ): void {
-    const uri = viewResourceUri(viewName);
+    const uri = this.#resolveViewResourceUri(viewName);
     const frontendConfig = normalizeViewConfig(entry.viewConfig);
     const authorFacts = {
       ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),

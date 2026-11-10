@@ -32,13 +32,16 @@ import {
  * @param existingMetadata - Optional author-supplied definition metadata. Other
  * keys pass through, while framework-owned resource URI and visibility keys
  * are derived exclusively from `viewName` and `visibility`.
+ * @param resourceUri - Optional resolved view URI. When omitted, the stable
+ * default for `viewName` is used.
  * @returns Wire metadata for the tool listing, or `undefined` when there is
  * nothing to emit.
  */
 export function buildToolUiMeta(
   viewName: string | undefined,
   visibility: "model" | "app" | undefined,
-  existingMetadata?: MetaObject
+  existingMetadata?: MetaObject,
+  resourceUri?: string
 ): MetaObject | undefined {
   if (
     viewName === undefined &&
@@ -57,9 +60,9 @@ export function buildToolUiMeta(
   const ui: MetaObject = existingUiIsObject ? { ...existingUi } : {};
 
   if (viewName !== undefined) {
-    const resourceUri = viewResourceUri(viewName);
-    ui["resourceUri"] = resourceUri;
-    meta[UI_RESOURCE_URI_META_KEY] = resourceUri;
+    const resolvedUri = resourceUri ?? viewResourceUri(viewName);
+    ui["resourceUri"] = resolvedUri;
+    meta[UI_RESOURCE_URI_META_KEY] = resolvedUri;
   } else {
     // These keys describe the top-level view contract. Do not advertise an
     // author-supplied URI when the tool has no declared view.
@@ -97,15 +100,18 @@ export function buildToolUiMeta(
  * never enters model context.
  *
  * @param viewName - Bound view directory / registry key.
+ * @param resourceUri - Optional resolved view URI. When omitted, the stable
+ * default for `viewName` is used.
  * @returns Nested and legacy resource-URI wire keys.
  */
 export function buildToolResultUiMeta(
-  viewName: string
+  viewName: string,
+  resourceUri?: string
 ): Record<string, unknown> {
-  const resourceUri = viewResourceUri(viewName);
+  const resolvedUri = resourceUri ?? viewResourceUri(viewName);
   return {
-    [UI_META_KEY]: { resourceUri },
-    [UI_RESOURCE_URI_META_KEY]: resourceUri,
+    [UI_META_KEY]: { resourceUri: resolvedUri },
+    [UI_RESOURCE_URI_META_KEY]: resolvedUri,
   };
 }
 
