@@ -34,6 +34,7 @@ async function makeProject(views?: unknown): Promise<string> {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -42,38 +43,45 @@ afterEach(async () => {
 });
 
 describe("createNextHandler", () => {
-  it("lazily primes the authored server and reuses one web handler", async () => {
-    const manifest: ViewsManifest = {
-      card: { kind: "inline", js: "export {};", css: "" },
-    };
-    const projectRoot = await makeProject(manifest);
-    vi.spyOn(process, "cwd").mockReturnValue(projectRoot);
-    const prime = vi.fn();
-    const fetch = vi.fn(async () => new Response("ok"));
-    const server = {
-      __primeViews: prime,
-      fetch,
-    } as unknown as MCPServer;
+  it.each(["production", "development"])(
+    "lazily primes and reuses the %s handler",
+    async (mode) => {
+      vi.stubEnv("NODE_ENV", mode);
+      const manifest: ViewsManifest = {
+        card: { kind: "inline", js: "export {};", css: "" },
+      };
+      const projectRoot = await makeProject(manifest);
+      vi.spyOn(process, "cwd").mockReturnValue(projectRoot);
+      const prime = vi.fn();
+      const fetch = vi.fn(async () => new Response("ok"));
+      const server = {
+        __primeViews: prime,
+        fetch,
+      } as unknown as MCPServer;
 
-    const handlers = createNextHandler(server);
-    const preflight = await handlers.OPTIONS(
-      new Request("http://localhost/api/mcp", { method: "OPTIONS" })
-    );
-    const first = await handlers.POST(
-      new Request("http://localhost/api/mcp", { method: "POST" })
-    );
-    const second = await handlers.GET(
-      new Request("http://localhost/api/mcp", { method: "GET" })
-    );
+      const handlers = createNextHandler(server);
+      const preflight = await handlers.OPTIONS(
+        new Request("http://localhost/api/mcp", { method: "OPTIONS" })
+      );
+      const first = await handlers.POST(
+        new Request("http://localhost/api/mcp", { method: "POST" })
+      );
+      const second = await handlers.GET(
+        new Request("http://localhost/api/mcp", { method: "GET" })
+      );
 
-    expect(await first.text()).toBe("ok");
-    expect(await second.text()).toBe("ok");
-    expect(preflight.status).toBe(204);
-    expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
-    expect(prime).toHaveBeenCalledOnce();
-    expect(prime).toHaveBeenCalledWith(manifest, { projectRoot });
-    expect(fetch).toHaveBeenCalledTimes(2);
-  });
+      expect(await first.text()).toBe("ok");
+      expect(await second.text()).toBe("ok");
+      expect(preflight.status).toBe(204);
+      expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
+      expect(prime).toHaveBeenCalledOnce();
+      expect(prime).toHaveBeenCalledWith(manifest, {
+        projectRoot,
+        ...(mode === "production" && { buildId: "test" }),
+      });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it("explains how to create a missing embedded build", async () => {
     const projectRoot = await makeProject();

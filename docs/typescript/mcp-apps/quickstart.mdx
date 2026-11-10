@@ -112,7 +112,9 @@ export const showApp = server.tool(
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     console.log(`The app name was: ${appName}`);
-    const data = { message: `The MCP App starter for ${appName ?? "your app"} is ready!` };
+    const data = {
+      message: `The MCP App starter for ${appName ?? "your app"} is ready!`,
+    };
 
     return {
       content: [{ type: "text", text: data.message }],
@@ -212,6 +214,12 @@ Use the Inspector to confirm that the server and view work.
 6. Select **Say Hello** in the view. Confirm that it shows `Tool Response: Hello, mcp-use!`.
 
 If the tool runs but no view appears, check that `view.name` exactly matches the folder under `views/` and that the handler returns `structuredContent`.
+
+## View caching in production
+
+Production builds automatically include the build ID in each view resource URI, such as `ui://views/my-view-a1b2c3.html`. Hosts use this URI as a cache key, so rebuilding the app gives its views fresh keys. All replicas deployed from the same build share the same URIs. This applies to external assets and `mcp-use build --inline`, including Next.js and Vite framework integrations.
+
+Development keeps the unversioned URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list` when reading a view; avoid hardcoding production URIs. A deployment serves only its current build's view URIs. Unversioned and previous-build URIs return a resource-not-found error rather than serving the current HTML under an old cache key.
 
 ## Next steps
 

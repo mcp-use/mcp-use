@@ -408,6 +408,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #embeddedViewAssets: EmbeddedViewAssets | undefined;
   /** When true, resource CSP emission includes the HMR websocket origin. */
   #viewsDevMode = false;
+
+  /** Immutable build identity used by every view URI on this instance. */
+  #viewBuildId: string | undefined;
   /** Project root for filesystem-backed view bundle and public routes. */
   #viewsProjectRoot = process.cwd();
 
@@ -753,7 +756,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * emission appends the serving origin's websocket variant to
    * `connectDomains` so Vite HMR passes host-enforced CSP. Pass
    * `projectRoot` in dev so the `public/` route resolves against the user's
-   * project directory rather than the CLI process cwd.
+   * project directory rather than the CLI process cwd. Production builds pass
+   * an immutable `buildId` to version view resource URIs across replicas;
+   * development ignores it and retains unversioned URIs.
    * @throws If views are already primed, or after the server has started.
    *
    * @internal
@@ -781,6 +786,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
     }
     this.#viewsDevMode = options?.dev === true;
+    this.#viewBuildId = this.#viewsDevMode ? undefined : options?.buildId;
     this.#embeddedViewAssets = options?.assets;
     if (options?.projectRoot !== undefined) {
       this.#viewsProjectRoot = options.projectRoot;
@@ -1844,7 +1850,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           mixedAuth,
           toolSchemes: (name) => this.#tools.get(name)?.schemes,
           // Only views a tool binds; an unbound manifest entry stays gated.
-          openResourceUris: [...this.#viewBindings.keys()].map(viewResourceUri),
+          openResourceUris: [...this.#viewBindings.keys()].map((name) =>
+            viewResourceUri(name, this.#viewBuildId)
+          ),
         };
         // The gate and its challenge builder load on the first MCP request,
         // keeping them out of the static graph of servers without OAuth.
@@ -2425,7 +2433,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const serializedUiMeta = buildToolUiMeta(
       view?.name,
       definition.visibility,
-      buildEntrypointMeta(definition)
+      buildEntrypointMeta(definition),
+      this.#viewBuildId
     );
     const uiMeta = entry.mentions
       ? finalizeMentionsMeta(definition, serializedUiMeta)
@@ -2459,7 +2468,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       ...(toolMeta !== undefined && { _meta: toolMeta }),
     };
     const wireResultMeta =
-      view !== undefined ? buildToolResultUiMeta(view.name) : undefined;
+      view !== undefined
+        ? buildToolResultUiMeta(view.name, this.#viewBuildId)
+        : undefined;
 
     const inputSchema = resolveToolInputSchema(definition);
 
@@ -2522,7 +2533,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     metaOptions: { request?: Request; hmrWs?: boolean },
     basePath: string
   ): void {
-    const uri = viewResourceUri(viewName);
+    const uri = viewResourceUri(viewName, this.#viewBuildId);
     const frontendConfig = normalizeViewConfig(entry.viewConfig);
     const authorFacts = {
       ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),

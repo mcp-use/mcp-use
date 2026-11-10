@@ -681,40 +681,62 @@ describe("mixed auth: resources, prompts, and views", () => {
     expect(values.result.completion.values).toEqual(["coffee", "tea"]);
   });
 
-  it("serves every tool's view signed out, whatever the tool declares", async () => {
-    // ChatGPT reads every view while an app is created, before sign-in.
-    expect((await shopServer().fetch(read(catalogView))).status).toBe(200);
+  it.each([undefined, "a1b2c3"])(
+    "serves every tool's view signed out with build %s",
+    async (buildId) => {
+      // ChatGPT reads every view while an app is created, before sign-in.
+      expect((await shopServer().fetch(read(catalogView))).status).toBe(200);
 
-    // A view of a tool that requires sign-in loads signed out too.
-    const server = oauthServer();
-    server.tool(
-      {
-        name: "private_card",
-        outputSchema: z.object({ ok: z.boolean() }),
-        view: { name: "private-card" },
-      },
-      async () => ({ structuredContent: { ok: true }, content: [] })
-    );
-    server.__primeViews({
-      "private-card": { kind: "external", entry: "assets/p.js", css: [] },
-      // No tool binds this view, so it stays behind sign-in.
-      orphan: { kind: "external", entry: "assets/o.js", css: [] },
-    });
-    server.__primeSkills(undefined);
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      expect(
-        (await server.fetch(read(viewResourceUri("private-card")))).status
-      ).toBe(200);
-      expect((await server.fetch(read(viewResourceUri("orphan")))).status).toBe(
-        401
+      // A view of a tool that requires sign-in loads signed out too.
+      const server = oauthServer();
+      server.tool(
+        {
+          name: "private_card",
+          outputSchema: z.object({ ok: z.boolean() }),
+          view: { name: "private-card" },
+        },
+        async () => ({ structuredContent: { ok: true }, content: [] })
       );
-    } finally {
-      warn.mockRestore();
+      server.__primeViews(
+        {
+          "private-card": { kind: "external", entry: "assets/p.js", css: [] },
+          // No tool binds this view, so it stays behind sign-in.
+          orphan: { kind: "external", entry: "assets/o.js", css: [] },
+        },
+        { ...(buildId !== undefined && { buildId }) }
+      );
+      server.__primeSkills(undefined);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        expect(
+          (
+            await server.fetch(
+              read(
+                buildId
+                  ? "ui://views/private-card-a1b2c3.html"
+                  : "ui://views/private-card.html"
+              )
+            )
+          ).status
+        ).toBe(200);
+        expect(
+          (
+            await server.fetch(
+              read(
+                buildId
+                  ? "ui://views/orphan-a1b2c3.html"
+                  : "ui://views/orphan.html"
+              )
+            )
+          ).status
+        ).toBe(401);
+      } finally {
+        warn.mockRestore();
+      }
+      // The tool behind the view still requires sign-in.
+      expect((await server.fetch(call("private_card"))).status).toBe(401);
     }
-    // The tool behind the view still requires sign-in.
-    expect((await server.fetch(call("private_card"))).status).toBe(401);
-  });
+  );
 
   it("marks signed-out view reads with ctx.view for resources/read middleware", async () => {
     const server = shopServer();

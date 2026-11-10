@@ -879,10 +879,13 @@ export default function Resources() {
       {},
       { ui: true }
     );
+    const manifest = JSON.parse(
+      readFileSync(join(cwd, ".mcp-use/build/manifest.json"), "utf8")
+    ) as { buildId: string };
     expect(resources["result"]).toMatchObject({
       resources: expect.arrayContaining([
         expect.objectContaining({
-          uri: "ui://views/product-search-result.html",
+          uri: `ui://views/product-search-result-${manifest.buildId}.html`,
         }),
       ]),
     });

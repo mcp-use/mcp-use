@@ -468,9 +468,12 @@ async function assertScenario(connection, example, origin) {
       const result = await connection.callTool("greet", { name: "Ada" });
       if (!text(result).includes("Ada"))
         throw new Error("Next.js greet did not include Ada.");
-      const view = await connection.readResource(
-        "ui://views/next-status-card.html"
-      );
+      const tools = await connection.listTools();
+      const resourceUri = tools.find((tool) => tool.name === "show-status-card")
+        ?._meta?.ui?.resourceUri;
+      if (typeof resourceUri !== "string")
+        throw new Error("Next.js status tool did not advertise its view URI.");
+      const view = await connection.readResource(resourceUri);
       const document =
         view.contents?.map((content) => content.text ?? "").join("\n") ?? "";
       if (
