@@ -35,7 +35,7 @@ If you have any questions or need guidance, join our [Discord](https://discord.g
 ## Contribution Requirements
 
 - Start with an existing GitHub issue, or open one describing the problem and its reproduction or proposed change. Wait for maintainer feedback before investing in an implementation; an issue or discussion is not a promise that a PR will be accepted.
-- Every PR, including documentation and small fixes, must link a GitHub issue in this repository. Put `Closes #123` in the PR description or ask a maintainer to link it in the Development sidebar. PRs without a linked issue are automatically closed; after linking an issue, ask a maintainer to reopen the PR.
+- Every PR from a contributor who is not a repository maintainer or admin, including documentation and small fixes, must link a GitHub issue in this repository. Put `Closes #123` in the PR description or ask a maintainer to link it in the Development sidebar. PRs without a linked issue are automatically closed; after linking an issue, ask a maintainer to reopen the PR.
 - Search for existing issues and PRs first. Keep the change focused, explain why it is needed, and include concrete test results and any limitations.
 - You are responsible for understanding and maintaining everything you submit. Disclose material AI assistance and follow the [AI contribution policy](./AI_POLICY.md).
 
@@ -362,7 +362,7 @@ concurrent branch updates.
 
 ### 1. Link an Issue and Create a Branch
 
-Discuss the work in a GitHub issue first, and wait for maintainer feedback. Include `Closes #123` in the PR description, replacing `123` with the issue number. The linked issue requirement applies to every PR.
+Discuss the work in a GitHub issue first, and wait for maintainer feedback. Include `Closes #123` in the PR description, replacing `123` with the issue number. Repository maintainers and admins are exempt from the automatic linked issue requirement.
 
 ```bash
 # Create a feature branch from main

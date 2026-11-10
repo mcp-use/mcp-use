@@ -25,6 +25,17 @@ jobs:
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number });
             if (pr.state !== 'open') return;
 
+            // Check the PR author, not the actor who triggered or reran the job.
+            // GitHub maps the maintain role to the legacy "write" permission,
+            // so use role_name to distinguish maintainers from other writers.
+            const { data: access } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner, repo, username: pr.user.login,
+            });
+            if (access.permission === 'admin' || access.role_name === 'maintain') {
+              core.info('PR author is a repository admin or maintainer; skipping the issue check.');
+              return;
+            }
+
             // Rerunning the original job must not close a PR reopened by a maintainer.
             const events = await github.paginate(github.rest.issues.listEvents, {
               owner, repo, issue_number: pull_number, per_page: 100,
