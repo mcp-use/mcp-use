@@ -23,7 +23,7 @@
 
 **MCP client** for connecting to [Model Context Protocol](https://modelcontextprotocol.io) servers — tools, resources, prompts, OAuth, and React hooks. Part of the [mcp-use](https://github.com/mcp-use/mcp-use) TypeScript framework.
 
-> **Docs:** [Client overview](https://mcp-use.com/docs/typescript/client) · [API reference](https://mcp-use.com/docs/typescript/api-reference/client/mcp-client)
+> **Docs:** [Client overview](https://mcp-use.com/docs/typescript/client)
 
 ---
 

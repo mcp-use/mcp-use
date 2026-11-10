@@ -21,7 +21,7 @@
 
 **Native cross-platform MCP agent** — connect an LLM to MCP servers, run a tool-calling loop, stream steps, and return answers. Works in **Node and browser** from the same import. Part of the [mcp-use](https://github.com/mcp-use/mcp-use) TypeScript framework.
 
-> **Docs:** [Agent overview](https://mcp-use.com/docs/typescript/agent) · [API reference](https://mcp-use.com/docs/typescript/api-reference/agent/mcp-agent)
+> **Docs:** [Agent overview](https://mcp-use.com/docs/typescript/agent)
 
 ---
 
