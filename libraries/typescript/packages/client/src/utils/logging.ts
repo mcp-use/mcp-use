@@ -66,6 +66,12 @@ class SimpleConsoleLogger {
       .map((a) => {
         if (typeof a === "string") return a;
         try {
+          if (
+            a instanceof Error ||
+            Object.prototype.toString.call(a) === "[object Error]"
+          ) {
+            return (a as Error).stack || String(a);
+          }
           return JSON.stringify(a);
         } catch {
           return String(a);
