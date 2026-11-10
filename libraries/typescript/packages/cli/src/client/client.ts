@@ -404,14 +404,31 @@ async function callTool(
     { timeout }
   );
   if (result.isError === true) {
+    // JSON callers already get the full result in `details`, so only the
+    // text output needs the tool's own explanation added to the message.
+    const reason = json ? "" : toolErrorText(result);
     throw new CommandError(
       "tool_error",
-      `Tool ${tool} returned an error.`,
+      reason === ""
+        ? `Tool ${tool} returned an error.`
+        : `Tool ${tool} returned an error:\n${reason}`,
       result
     );
   }
   printResult(result, json);
   return 0;
+}
+
+type ToolResult = Awaited<ReturnType<MCPConnection["callTool"]>>;
+
+// Keeps each text block's leading whitespace (indented code frames, stack
+// traces) and drops only trailing whitespace, so blocks print one per line.
+function toolErrorText(result: ToolResult): string {
+  return (result.content ?? [])
+    .filter((block) => block.type === "text")
+    .map((block) => block.text.trimEnd())
+    .filter((text) => text.trim() !== "")
+    .join("\n");
 }
 
 function parseToolCallArgs(

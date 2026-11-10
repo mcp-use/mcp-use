@@ -191,6 +191,6 @@ npx mcp-use client dev tools call get-weather city=Tokyo --json | jq '.content'
 - `protocol_mismatch`: reconnect with `--protocol auto`, or choose the protocol
   mode the server supports.
 - An OAuth command waits without opening a browser: open the authorization URL printed to stderr, then complete authorization before the configured timeout.
-- A tool returns an error: under `--json`, inspect `error.details` for the original MCP tool result.
+- A tool returns an error: the human-readable output prints the tool's text content after the error message. Under `--json`, inspect `error.details` for the original MCP tool result.
 
 For exhaustive command shapes, flags, and storage details, use the [CLI reference](/typescript/api-reference/cli-reference#client).
