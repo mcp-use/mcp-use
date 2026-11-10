@@ -10,6 +10,7 @@ Thank you for your interest in contributing to mcp-use! This document provides g
 
 - [Code of Conduct](#code-of-conduct)
 - [Ways to Contribute](#ways-to-contribute)
+- [Contribution Requirements](#contribution-requirements)
 - [Repository Structure](#repository-structure)
 - [Python Development](#python-development)
 - [TypeScript Development](#typescript-development)
@@ -30,6 +31,13 @@ We welcome all kinds of contributions! Here are some ways you can help:
 - **Improve documentation**: Fix typos, clarify explanations, or add examples
 
 If you have any questions or need guidance, join our [Discord](https://discord.gg/XkNkSkMz3V), we're super happy to help!
+
+## Contribution Requirements
+
+- Start with an existing GitHub issue, or open one describing the problem and its reproduction or proposed change. Wait for maintainer feedback before investing in an implementation; an issue or discussion is not a promise that a PR will be accepted.
+- Every PR, including documentation and small fixes, must link a GitHub issue in this repository. Put `Closes #123` in the PR description or ask a maintainer to link it in the Development sidebar. PRs without a linked issue are automatically closed; after linking an issue, ask a maintainer to reopen the PR.
+- Search for existing issues and PRs first. Keep the change focused, explain why it is needed, and include concrete test results and any limitations.
+- You are responsible for understanding and maintaining everything you submit. Disclose material AI assistance and follow the [AI contribution policy](./AI_POLICY.md).
 
 ## Repository Structure
 
@@ -352,7 +360,9 @@ concurrent branch updates.
 >
 > If the existing PR has gone inactive and the author doesn't respond to a comment, ask a maintainer on the PR or in [Discord](https://discord.gg/XkNkSkMz3V) before taking it over.
 
-### 1. Create a Branch
+### 1. Link an Issue and Create a Branch
+
+Discuss the work in a GitHub issue first, and wait for maintainer feedback. Include `Closes #123` in the PR description, replacing `123` with the issue number. The linked issue requirement applies to every PR.
 
 ```bash
 # Create a feature branch from main
