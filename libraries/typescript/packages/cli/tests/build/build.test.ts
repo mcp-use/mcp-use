@@ -597,11 +597,15 @@ describe("runBuild (views)", () => {
       const resources = (listBody["result"] as { resources: { uri: string }[] })
         .resources;
       expect(
-        resources.some((r) => r.uri === "ui://views/product-search-result.html")
+        resources.some(
+          (r) =>
+            r.uri ===
+            `ui://views/product-search-result-${manifest.buildId}.html`
+        )
       ).toBe(true);
 
       const readBody = await handlerMcp(handler, "resources/read", {
-        uri: "ui://views/product-search-result.html",
+        uri: `ui://views/product-search-result-${manifest.buildId}.html`,
       });
       const text = (readBody["result"] as { contents: { text: string }[] })
         .contents[0]!.text;
@@ -673,7 +677,7 @@ describe("runBuild (views)", () => {
       const readProxied = await handlerMcp(
         handler,
         "resources/read",
-        { uri: "ui://views/product-search-result.html" },
+        { uri: `ui://views/product-search-result-${manifest.buildId}.html` },
         {
           "x-forwarded-proto": "https",
           "x-forwarded-host": "fruit.example.com",
@@ -709,7 +713,8 @@ describe("runBuild (views)", () => {
           }[];
         }
       ).resources.find(
-        (r) => r.uri === "ui://views/product-search-result.html"
+        (r) =>
+          r.uri === `ui://views/product-search-result-${manifest.buildId}.html`
       );
       const resourceDomains = (
         viewResource?._meta?.ui as { csp?: { resourceDomains?: string[] } }
@@ -759,7 +764,7 @@ describe("runBuild (views)", () => {
       default: { fetch(request: Request): Promise<Response> };
     };
     const readBody = await handlerMcp(mod.default.fetch, "resources/read", {
-      uri: "ui://views/product-search-result.html",
+      uri: `ui://views/product-search-result-${manifest.buildId}.html`,
     });
     const text = (readBody["result"] as { contents: { text: string }[] })
       .contents[0]!.text;
@@ -876,13 +881,16 @@ describe("runBuild (views)", () => {
     process.chdir(cwd);
     try {
       const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
+      const manifest = JSON.parse(
+        readFileSync(join(buildDir, BUILD_MANIFEST_NAME), "utf8")
+      ) as BuildManifest;
       const mod = (await import(
         pathToFileURL(join(buildDir, "index.js")).href
       )) as { default: { fetch(request: Request): Promise<Response> } };
       const readBody = await handlerMcp(
         mod.default.fetch,
         "resources/read",
-        { uri: "ui://views/product-search-result.html" },
+        { uri: `ui://views/product-search-result-${manifest.buildId}.html` },
         {},
         "http://localhost/api/mcp"
       );

@@ -134,6 +134,8 @@ export interface EmbeddedViewAssets {
 export interface ViewRegistrationOptions {
   /** Whether view URLs target a development module server. */
   dev?: boolean;
+  /** Production build identifier shared by all replicas; ignored in dev. */
+  buildId?: string;
   /** Source project used by filesystem-backed assets. */
   projectRoot?: string;
   /** Bundled assets used instead of filesystem reads, including on misses. */

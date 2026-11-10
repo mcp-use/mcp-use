@@ -122,6 +122,7 @@ async function writeWrapperEntry(
   cacheDir: string,
   userEntry: string,
   viewsManifest: ViewsManifest,
+  buildId: string,
   skillsSnapshot: SkillsSnapshot | undefined,
   landing?: BuiltLanding
 ): Promise<string> {
@@ -143,7 +144,7 @@ async function writeWrapperEntry(
             `import { __withLandingData } from "mcp-use/landing";`,
             `import { fileURLToPath } from "node:url";`,
           ]),
-      `server[registerViews](${manifestJson});`,
+      `server[registerViews](${manifestJson}, { buildId: ${JSON.stringify(buildId)} });`,
       `server[registerSkills](${skillsJson});`,
       ...(landing === undefined
         ? []
@@ -487,6 +488,7 @@ async function buildView(
  */
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();
+  const buildId = randomBytes(8).toString("hex");
   // Vite's dev server, which evaluates the entry below, sets NODE_ENV to
   // development when it is unset, and every later build in this process
   // would then bundle React's development build: views would ship it, and
@@ -580,6 +582,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         paths.cache,
         entry,
         {},
+        buildId,
         skillsSnapshot,
         landing
       );
@@ -627,7 +630,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     await copyPublicAssets(options.cwd, join(paths.build, "views/public"));
 
     const manifest: BuildManifest = {
-      buildId: randomBytes(8).toString("hex"),
+      buildId,
       entryPoint: BUILD_ENTRY_NAME,
       createdAt: new Date().toISOString(),
       views: {},
@@ -746,6 +749,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     paths.cache,
     entry,
     viewsManifest,
+    buildId,
     skillsSnapshot,
     landing
   );
@@ -787,7 +791,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   });
 
   const manifest: BuildManifest = {
-    buildId: randomBytes(8).toString("hex"),
+    buildId,
     entryPoint: BUILD_ENTRY_NAME,
     createdAt: new Date().toISOString(),
     views: viewsManifest,

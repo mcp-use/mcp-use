@@ -273,8 +273,8 @@ for (const [name, scopes] of [
 for (const [uri, expected] of [
   ["demo://protected/profile", 401],
   ["demo://protected/notes/7", 401],
-  ["ui://views/public-card.html", 200],
-  ["ui://views/protected-card.html", 200],
+  [tools.get("public_card")._meta.ui.resourceUri, 200],
+  [tools.get("protected_card")._meta.ui.resourceUri, 200],
 ]) {
   const r = await read(uri);
   check(
@@ -328,8 +328,8 @@ check(
   r.status === 200 && /signed in as/.test(r.text ?? ""),
   r.text
 );
-for (const view of ["public-card", "protected-card"]) {
-  r = await read(`ui://views/${view}.html`, first.access_token);
+for (const view of ["public_card", "protected_card"]) {
+  r = await read(tools.get(view)._meta.ui.resourceUri, first.access_token);
   check(
     `${view} view readable with the baseline`,
     r.status === 200,
