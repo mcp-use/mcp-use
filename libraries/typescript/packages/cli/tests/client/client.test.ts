@@ -478,6 +478,54 @@ describe("client human-readable output", () => {
     });
   });
 
+  it("prints a failed tool's error text", async () => {
+    await runClient([
+      "connect",
+      "tool-error",
+      "https://mcp.example.com/mcp",
+      "--no-oauth",
+    ]);
+    connection.callTool.mockResolvedValueOnce({
+      content: [
+        { type: "text", text: "name: expected string, received undefined" },
+        { type: "text", text: "age: expected number, received string" },
+      ],
+      isError: true,
+    });
+    stdout = "";
+    stderr = "";
+
+    await expect(
+      runClient(["tool-error", "tools", "call", "echo"])
+    ).resolves.toBe(1);
+
+    expect(stdout).toBe("");
+    expect(stderr).toContain("name: expected string, received undefined");
+    expect(stderr).toContain("age: expected number, received string");
+  });
+
+  it("reports a failed tool that returns no text", async () => {
+    await runClient([
+      "connect",
+      "tool-error-empty",
+      "https://mcp.example.com/mcp",
+      "--no-oauth",
+    ]);
+    connection.callTool.mockResolvedValueOnce({
+      content: [{ type: "image", data: "aGk=", mimeType: "image/png" }],
+      isError: true,
+    });
+    stdout = "";
+    stderr = "";
+
+    await expect(
+      runClient(["tool-error-empty", "tools", "call", "echo"])
+    ).resolves.toBe(1);
+
+    expect(stdout).toBe("");
+    expect(stderr).toBe("Tool echo returned an error.\n");
+  });
+
   it("separates tool names and descriptions with a hyphen", async () => {
     await expect(
       runClient([

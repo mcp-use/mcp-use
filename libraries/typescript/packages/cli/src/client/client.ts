@@ -404,14 +404,36 @@ async function callTool(
     { timeout }
   );
   if (result.isError === true) {
+    // JSON callers already get the full result in `details`, so only the
+    // text output needs the tool's own explanation added to the message.
+    const reason = json ? "" : toolErrorText(result);
     throw new CommandError(
       "tool_error",
-      `Tool ${tool} returned an error.`,
+      reason === ""
+        ? `Tool ${tool} returned an error.`
+        : `Tool ${tool} returned an error:\n${reason}`,
       result
     );
   }
   printResult(result, json);
   return 0;
+}
+
+function toolErrorText(result: { content?: unknown }): string {
+  if (!Array.isArray(result.content)) return "";
+  return result.content
+    .flatMap((block: unknown) =>
+      typeof block === "object" &&
+      block !== null &&
+      "type" in block &&
+      block.type === "text" &&
+      "text" in block &&
+      typeof block.text === "string"
+        ? [block.text]
+        : []
+    )
+    .join("\n")
+    .trim();
 }
 
 function parseToolCallArgs(
