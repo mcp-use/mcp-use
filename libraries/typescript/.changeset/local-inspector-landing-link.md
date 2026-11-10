@@ -1,5 +1,6 @@
 ---
 "mcp-use": patch
+"@mcp-use/cli": patch
 ---
 
-Link loopback servers to their own Inspector from the landing page. The hosted Inspector cannot reach `localhost` (the dev server refuses its CORS preflight), so the first "Open in Inspector" click on a freshly scaffolded project failed with a 403; a server on `localhost`, `127.0.0.1`, `[::1]` or `*.localhost` now links to its own `<mcp url>/inspector` mount instead.
+Link the landing page to the server's Inspector only when the CLI has mounted it. Pass its request-resolved URL through landing data and the optional `inspectorUrl` input to `getInstallTargets()`, keeping the hosted Inspector fallback for plain servers, `dev --no-inspector`, and `start` without `--with-inspector`. Mounted links prefill the MCP endpoint and open the Chat tab.

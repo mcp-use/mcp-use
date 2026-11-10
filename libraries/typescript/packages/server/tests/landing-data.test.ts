@@ -73,6 +73,15 @@ describe("landing hooks", () => {
     });
   });
 
+  it("passes a runtime-supplied Inspector URL to install targets", () => {
+    const inspectorUrl = "https://server.example.test/mcp/inspector?tab=chat";
+    const targets = __withLandingData(
+      { server: { ...server, inspectorUrl } },
+      () => useInstallTargets()
+    );
+    expect(targets.inspector.url).toBe(inspectorUrl);
+  });
+
   it("restore the previous data after nested and throwing renders", () => {
     const outer: LandingData = { server: { ...server, name: "outer" } };
     const inner: LandingData = { server: { ...server, name: "inner" } };

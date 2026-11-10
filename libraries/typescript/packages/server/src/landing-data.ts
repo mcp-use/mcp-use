@@ -32,6 +32,9 @@ export interface LandingServerInfo {
   /** Absolute URL of the MCP endpoint, resolved from the incoming request. */
   url: string;
 
+  /** Request-resolved URL of the Inspector when the runtime mounted one. */
+  inspectorUrl?: string;
+
   /** The server's configured website, when present. */
   websiteUrl?: string;
 
@@ -181,8 +184,13 @@ export function useResourceList(): readonly LandingPageResource[] {
  * ```
  */
 export function useInstallTargets(): InstallTargets {
-  const { url, name, title } = readLandingData("useInstallTargets").server;
-  return getInstallTargets({ url, name: title ?? name });
+  const { url, name, title, inspectorUrl } =
+    readLandingData("useInstallTargets").server;
+  return getInstallTargets({
+    url,
+    name: title ?? name,
+    ...(inspectorUrl !== undefined && { inspectorUrl }),
+  });
 }
 
 /**

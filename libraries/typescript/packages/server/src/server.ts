@@ -389,6 +389,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #settings: ReturnType<typeof prepareSettings> | undefined;
   #landingPage: LandingPageRegistration | undefined;
   readonly #landingHtmlCache = new Map<string, Promise<string>>();
+  #inspectorPath: string | undefined;
   #skills: SkillsSnapshot | undefined;
   #skillsPrimed = false;
   #skillsDiscovery: Promise<void> | undefined;
@@ -1114,6 +1115,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   __setRequestLogPrefix(prefix: string | undefined): void {
     this.#assertNotStarted("request log prefix", "development");
     this.#requestLogPrefix = prefix;
+  }
+
+  /** Register an Inspector mounted by CLI tooling before the app is mounted. @internal */
+  __setInspectorPath(path: string | undefined): void {
+    this.#assertNotStarted("Inspector path", "landing page");
+    this.#inspectorPath = path;
   }
 
   /** Mount and validate the Hono/MCP application without serving a request. @internal */
@@ -1914,7 +1921,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             this.#prompts.values(),
             this.#resources.values(),
             this.#landingPage,
-            this.#landingHtmlCache
+            this.#landingHtmlCache,
+            this.#inspectorPath
           );
         };
         return respond();

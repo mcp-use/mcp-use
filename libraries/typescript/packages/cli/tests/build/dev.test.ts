@@ -494,6 +494,17 @@ describe("runDev", () => {
       autoConnectUrl: `${origin}/api/mcp`,
       logPrefix: "[inspector]",
     });
+    const html = await (
+      await fetch(`${origin}/api/mcp`, { headers: { accept: "text/html" } })
+    ).text();
+    const link = html
+      .match(/id="inspector-link" href="([^"]+)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+    expect(link).toBeDefined();
+    expect(new URL(link!).pathname).toBe("/api/mcp/inspector");
+    expect(new URL(link!).searchParams.get("autoConnect")).toBe(
+      `${origin}/api/mcp`
+    );
   });
 
   it("serves the built-in Inspector without a project dependency", async () => {
@@ -511,6 +522,21 @@ describe("runDev", () => {
     expect(dev.logs.join("\n")).not.toContain(
       "Built-in Inspector is unavailable"
     );
+    const html = await (
+      await fetch(dev.url, { headers: { accept: "text/html" } })
+    ).text();
+    const link = html
+      .match(/id="inspector-link" href="([^"]+)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+    expect(link).toBeDefined();
+    const target = new URL(link!);
+    expect(target.origin).toBe(new URL(dev.url).origin);
+    expect(target.pathname).toBe("/mcp/inspector");
+    expect(target.searchParams.get("autoConnect")).toBe(dev.url);
+    expect(target.searchParams.get("tab")).toBe("chat");
+    const shell = await fetch(target);
+    expect(shell.status).toBe(200);
+    expect(await shell.text()).toContain("inspector.js");
   });
 
   it("refuses to start when the project's Inspector has no mountInspector export", async () => {
@@ -539,6 +565,15 @@ describe("runDev", () => {
     expect((await fetch(`${dev.url}/inspector`)).status).toBe(404);
     expect(dev.logs.join("\n")).not.toContain("Inspector is not installed");
     expect(dev.logs.some((line) => line.includes("➜ Inspector:"))).toBe(false);
+    const html = await (
+      await fetch(dev.url, { headers: { accept: "text/html" } })
+    ).text();
+    const link = html
+      .match(/id="inspector-link" href="([^"]+)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+    expect(link).toBeDefined();
+    expect(new URL(link!).origin).toBe("https://inspector.manufact.com");
+    expect(new URL(link!).searchParams.get("autoConnect")).toBe(dev.url);
   });
 
   it("creates a missing root mcp-env.d.ts", async () => {

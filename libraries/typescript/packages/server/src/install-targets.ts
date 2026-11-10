@@ -57,12 +57,12 @@ export interface ChatGPTInstallTarget {
   steps: readonly string[];
 }
 
-/** Manufact Inspector target: the hosted inspector, connected to the server. */
+/** Manufact Inspector target: a mounted Inspector or the hosted fallback. */
 export interface InspectorInstallTarget {
   /** Tool name, suitable as a tab or button label. */
   label: "Manufact Inspector";
 
-  /** Hosted inspector URL that connects to the server and opens its chat. */
+  /** Inspector URL supplied by the runtime, or the hosted URL with this server prefilled. */
   url: string;
 }
 
@@ -70,6 +70,9 @@ export interface InspectorInstallTarget {
 export interface InstallTargetServer {
   /** Absolute URL of the MCP endpoint. */
   url: string;
+
+  /** URL of an available Inspector; omission uses the hosted Manufact Inspector. */
+  inspectorUrl?: string;
 
   /**
    * Server name. Clients store it lowercased, with characters other than
@@ -101,7 +104,7 @@ export interface InstallTargets {
   /** ChatGPT setup steps. */
   chatgpt: ChatGPTInstallTarget;
 
-  /** Hosted Manufact Inspector link. */
+  /** Mounted Inspector link when supplied, otherwise hosted Manufact Inspector. */
   inspector: InspectorInstallTarget;
 }
 
@@ -178,39 +181,10 @@ function generateClaudeCommand(url: string, name: string): string {
 const MANUFACT_INSPECTOR_ORIGIN = "https://inspector.manufact.com";
 
 /**
- * Whether `hostname` is a loopback address. A local dev server cannot be
- * reached from the hosted Inspector (the browser preflight originates on
- * inspector.manufact.com), so the landing page must use the Inspector that the
- * local dev server serves itself.
- */
-function isLoopbackHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  return (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "::1" ||
-    host.endsWith(".localhost")
-  );
-}
-
-/**
- * Link to the Inspector for this server: the server's own `<mcp url>/inspector`
- * mount for a loopback URL (the hosted Inspector cannot reach `localhost`, and
- * refusing its preflight is what the user saw as a 403), otherwise the hosted
- * Manufact Inspector with the server URL pre-filled and the Chat tab selected.
+ * Deep link to hosted Manufact Inspector with this MCP server URL pre-filled
+ * and the Chat tab selected (`tab=chat`).
  */
 function getManufactInspectorUrl(serverUrl: string): string {
-  try {
-    const local = new URL(serverUrl);
-    if (isLoopbackHostname(local.hostname)) {
-      local.pathname = `${local.pathname.replace(/\/+$/, "")}/inspector`;
-      local.search = "";
-      local.hash = "";
-      return local.toString();
-    }
-  } catch {
-    // Not an absolute URL: keep the hosted link below.
-  }
   const params = new URLSearchParams({
     autoConnect: serverUrl,
     tab: "chat",
@@ -233,6 +207,8 @@ function getChatGPTSteps(url: string): readonly string[] {
  *
  * Runs in Node, edge runtimes and browsers. Values are not HTML-escaped:
  * JSX escapes them, but HTML built as a string must.
+ * A supplied `inspectorUrl` is used as-is; otherwise the Inspector target is
+ * hosted. Inspector availability is never inferred from the endpoint hostname.
  *
  * @param server - Endpoint URL and name of the server to install.
  * @returns One install target per client, in display order.
@@ -265,7 +241,7 @@ export function getInstallTargets(server: InstallTargetServer): InstallTargets {
     chatgpt: { label: "ChatGPT", steps: getChatGPTSteps(url) },
     inspector: {
       label: "Manufact Inspector",
-      url: getManufactInspectorUrl(url),
+      url: server.inspectorUrl ?? getManufactInspectorUrl(url),
     },
   };
 }
