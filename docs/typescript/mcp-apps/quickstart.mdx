@@ -112,7 +112,9 @@ export const showApp = server.tool(
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     console.log(`The app name was: ${appName}`);
-    const data = { message: `The MCP App starter for ${appName ?? "your app"} is ready!` };
+    const data = {
+      message: `The MCP App starter for ${appName ?? "your app"} is ready!`,
+    };
 
     return {
       content: [{ type: "text", text: data.message }],
@@ -212,6 +214,36 @@ Use the Inspector to confirm that the server and view work.
 6. Select **Say Hello** in the view. Confirm that it shows `Tool Response: Hello, mcp-use!`.
 
 If the tool runs but no view appears, check that `view.name` exactly matches the folder under `views/` and that the handler returns `structuredContent`.
+
+## Version the view resource URI
+
+Hosts cache a view's HTML by resource URI.
+Every view is served at a stable `ui://views/<name>.html` URI by default, so a
+redeploy that changes the HTML, JavaScript, or CSS can keep showing the cached
+document.
+Publish a new URI when the view changes:
+
+```ts
+import { MCPServer } from "mcp-use";
+
+const BUILD_ID = process.env.BUILD_ID ?? "dev";
+
+const server = new MCPServer({
+  name: "parts-library",
+  version: "1.0.0",
+  views: {
+    resourceUri: (name) => `ui://views/${name}/${BUILD_ID}.html`,
+  },
+});
+```
+
+The resolver runs once per primed view, before the first request, and its result
+is reused for the rest of the process. It must return a `ui://` URI that is
+unique across views; `listen()` throws otherwise.
+The chosen URI appears on `tools/list`, successful `tools/call` results,
+`resources/list`, `resources/read`, and `contents[].uri`.
+Keep it deterministic within a deploy: deriving it from a content hash or build
+id gives each deploy its own cache entry without changing during a run.
 
 ## Next steps
 

@@ -91,7 +91,7 @@ export type {
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 
-export type { ServerConfig, CorsOptions } from "./config.js";
+export type { ServerConfig, CorsOptions, ViewsConfig } from "./config.js";
 export { registerSkills, SKILLS_EXTENSION_ID } from "./skills/types.js";
 export type {
   SkillsOptions,

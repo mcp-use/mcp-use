@@ -314,8 +314,9 @@ function isOAuthProviderLike(value: unknown): boolean {
  * @throws TypeError When `basePath` is present but not an absolute URL
  * pathname without empty segments, trailing slash, query, fragment, or
  * whitespace, when `skills` is not a boolean or valid configuration object,
- * or when `mixedAuth` is not a boolean or is `true` without an OAuth provider
- * (a missing, `null`, or malformed `oauth` value).
+ * when `views` is not a configuration object or its `resourceUri` is not a
+ * function, or when `mixedAuth` is not a boolean or is `true` without an OAuth
+ * provider (a missing, `null`, or malformed `oauth` value).
  */
 export function assertServerConfig(config: {
   basePath?: unknown;
