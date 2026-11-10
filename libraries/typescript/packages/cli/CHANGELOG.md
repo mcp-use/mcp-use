@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 5.1.0-canary.2
+
+### Patch Changes
+
+- a610070: Print a failed tool's error text with `mcp-use client <server> tools call`. Before, the text output said only "Tool <name> returned an error." and the reason was visible only with `--json`. JSON output is unchanged.
+
 ## 5.1.0-canary.1
 
 ### Minor Changes

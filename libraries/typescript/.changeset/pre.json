@@ -13,6 +13,7 @@
   "changesets": [
     "cli-feedback-send",
     "cli-server-analytics",
+    "cli-tool-error-text",
     "cli-usage-analytics",
     "fix-view-import-dev-routing",
     "propagated-b26ed08d112c3564"
