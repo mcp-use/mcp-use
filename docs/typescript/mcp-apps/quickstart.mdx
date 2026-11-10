@@ -219,7 +219,7 @@ If the tool runs but no view appears, check that `view.name` exactly matches the
 
 Production builds automatically include the build ID in each view resource URI, such as `ui://views/my-view-a1b2c3.html`. Hosts use this URI as a cache key, so rebuilding the app gives its views fresh keys. All replicas deployed from the same build share the same URIs. This applies to external assets and `mcp-use build --inline`, including Next.js and Vite framework integrations.
 
-Development keeps the unversioned URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list` when reading a view; avoid hardcoding production URIs. A deployment serves only its current build's view URIs. Unversioned and previous-build URIs return a resource-not-found error rather than serving the current HTML under an old cache key.
+Development keeps the unversioned URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list` when reading a view; avoid hardcoding production URIs. Refresh tool discovery after deployment so the host receives the new URI. A deployment serves only its current build's view URIs. When a read reaches resource lookup, unversioned and previous-build URIs return a resource-not-found error. OAuth-protected deployments can return HTTP 401 before lookup if the request lacks authorization. These old URIs never serve the current HTML under an old cache key.
 
 ## Next steps
 

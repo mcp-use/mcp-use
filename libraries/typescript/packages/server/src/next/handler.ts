@@ -62,7 +62,9 @@ function parseBuildManifest(
     typeof parsed.views !== "object" ||
     parsed.views === null ||
     Array.isArray(parsed.views) ||
-    !Object.values(parsed.views).every(isViewManifestEntry)
+    !Object.values(parsed.views).every(isViewManifestEntry) ||
+    ("buildId" in parsed &&
+      (typeof parsed.buildId !== "string" || parsed.buildId.trim() === ""))
   ) {
     throw new Error(`Invalid mcp-use build manifest at ${manifestPath}.`);
   }

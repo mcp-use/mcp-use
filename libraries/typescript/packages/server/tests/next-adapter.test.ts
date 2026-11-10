@@ -10,7 +10,10 @@ import type { ViewsManifest } from "../src/views/types.js";
 
 const temporaryDirectories: string[] = [];
 
-async function makeProject(views?: unknown): Promise<string> {
+async function makeProject(
+  views?: unknown,
+  buildId: unknown = "test"
+): Promise<string> {
   const root = join(
     tmpdir(),
     `mcp-use-next-${process.pid}-${Date.now()}-${temporaryDirectories.length}`
@@ -22,7 +25,7 @@ async function makeProject(views?: unknown): Promise<string> {
     await writeFile(
       join(build, "manifest.json"),
       `${JSON.stringify({
-        buildId: "test",
+        buildId,
         entryPoint: "index.js",
         createdAt: new Date(0).toISOString(),
         views,
@@ -80,6 +83,24 @@ describe("createNextHandler", () => {
         ...(mode === "production" && { buildId: "test" }),
       });
       expect(fetch).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it.each([null, 42, true, {}, [], "", " "])(
+    "rejects malformed build ID %j before priming or fetching",
+    async (buildId) => {
+      const projectRoot = await makeProject({}, buildId);
+      vi.spyOn(process, "cwd").mockReturnValue(projectRoot);
+      const prime = vi.fn();
+      const fetch = vi.fn();
+      const server = { __primeViews: prime, fetch } as unknown as MCPServer;
+      const { GET } = createNextHandler(server);
+
+      await expect(
+        GET(new Request("http://localhost/api/mcp"))
+      ).rejects.toThrow(/Invalid mcp-use build manifest/);
+      expect(prime).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
     }
   );
 
