@@ -30,6 +30,7 @@ const BUILD_MANIFEST_NAME = "manifest.json";
  */
 interface ListenableServer {
   basePath?: unknown;
+  __setInspectorPath?(path: string | undefined): void;
   host?: unknown;
   port?: unknown;
   app: {
@@ -249,6 +250,7 @@ async function startWithInspector(
     }
     await next();
   });
+  server.__setInspectorPath?.(`${basePath === "/" ? "" : basePath}/inspector`);
   return server.listen(port, { host });
 }
 

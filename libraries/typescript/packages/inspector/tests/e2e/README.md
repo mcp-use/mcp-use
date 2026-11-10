@@ -12,6 +12,16 @@ npx playwright install
 
 ## Running Tests
 
+### Landing-page Inspector links
+
+After building the TypeScript workspace with `pnpm build`, run:
+
+```bash
+TEST_SERVER_MODE=builtin-dev pnpm exec playwright test tests/e2e/landing-inspector.test.ts --workers=1 --reporter=line
+```
+
+This suite starts its own CLI listeners and checks built-in and custom landing pages, dev and production Inspector mounts, and hosted fallbacks when no Inspector is mounted. `TEST_SERVER_MODE=builtin-dev` disables the standalone Inspector web server; no conformance server or model credentials are needed.
+
 ### Automated Test Matrix (Recommended)
 
 These commands automatically build and start the conformance server before running tests.

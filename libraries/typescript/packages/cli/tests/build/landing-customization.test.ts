@@ -40,6 +40,7 @@ import {
   useResourceList,
   useServerInfo,
   useToolList,
+  useInstallTargets,
 } from "mcp-use/landing";
 import "./landing.css";
 
@@ -48,6 +49,7 @@ export default function Landing() {
   const tools = useToolList();
   const prompts = usePromptList();
   const resources = useResourceList();
+  const install = useInstallTargets();
   const [clicks, setClicks] = useState(0);
   return <main data-testid="custom-landing" className="custom-landing bg-[#0d1e2f]">
     <h1>{title ?? name}</h1>
@@ -56,6 +58,7 @@ export default function Landing() {
     <p data-testid="tools">{tools.map((tool) => tool.name).join(",")}</p>
     <p data-testid="prompts">{prompts.map((prompt) => prompt.name).join(",")}</p>
     <p data-testid="resources">{resources.map((resource) => resource.uri).join(",")}</p>
+    <a data-testid="inspector-link" href={install.inspector.url} target="_blank" rel="noopener noreferrer">Open in Inspector</a>
     <button onClick={() => setClicks((count) => count + 1)}>Clicks: {clicks}</button>
   </main>;
 }
@@ -246,7 +249,8 @@ function htmlRequest(
 async function startDev(
   cwd: string,
   mcpDir?: string,
-  lines: string[] = []
+  lines: string[] = [],
+  inspector = false
 ): Promise<string> {
   const log = vi
     .spyOn(console, "log")
@@ -258,7 +262,7 @@ async function startDev(
     cwd,
     port: await getFreePort(),
     ...(mcpDir !== undefined && { mcpDir }),
-    inspector: false,
+    inspector,
     open: false,
     signal: controller.signal,
   });
@@ -286,6 +290,24 @@ async function startDev(
 }
 
 describe("CLI landing.tsx", () => {
+  it("passes the mounted Inspector URL through custom landing hooks", async () => {
+    const cwd = copyFixture("landing-inspector");
+    cleanups.push(() => removeDir(cwd));
+    writeRichServer(cwd);
+    writeLanding(cwd);
+    const url = await startDev(cwd, undefined, [], true);
+    const html = await (await htmlRequest(url)).text();
+    const link = html
+      .match(/data-testid="inspector-link" href="([^"]+)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+    expect(link).toBeDefined();
+    expect(new URL(link!).pathname).toBe("/mcp/inspector");
+    expect(new URL(link!).searchParams.get("autoConnect")).toBe(url);
+    const shell = await fetch(link!);
+    expect(shell.status).toBe(200);
+    expect(await shell.text()).toContain("inspector.js");
+  });
+
   it("switches between the default and custom HTML on live file creation and removal", async () => {
     const cwd = copyFixture("landing-live-discovery");
     cleanups.push(() => removeDir(cwd));
@@ -658,83 +680,102 @@ export default function Resources() {
     expect(pageCss).toMatch(/#0b1621|rgb\(11,\s*22,\s*33\)/);
   }, 60_000);
 
-  it("builds, starts, and serves the custom page, CSS, and public assets", async () => {
-    const cwd = copyFixture("landing-build-start");
-    cleanups.push(() => removeDir(cwd));
-    const previousAssetsUrl = process.env["MCP_ASSETS_URL"];
-    delete process.env["MCP_ASSETS_URL"];
-    cleanups.push(() => {
-      if (previousAssetsUrl === undefined) {
-        delete process.env["MCP_ASSETS_URL"];
-      } else {
-        process.env["MCP_ASSETS_URL"] = previousAssetsUrl;
-      }
-    });
-    writeRichServer(cwd);
-    writeLanding(cwd);
-    mkdirSync(join(cwd, "public"), { recursive: true });
-    writeFileSync(join(cwd, "public", "landing-test.txt"), "public asset\n");
+  it.each([false, true])(
+    "builds, starts, and serves the custom page with Inspector enabled: %s",
+    async (withInspector) => {
+      const cwd = copyFixture("landing-build-start");
+      cleanups.push(() => removeDir(cwd));
+      const previousAssetsUrl = process.env["MCP_ASSETS_URL"];
+      delete process.env["MCP_ASSETS_URL"];
+      cleanups.push(() => {
+        if (previousAssetsUrl === undefined) {
+          delete process.env["MCP_ASSETS_URL"];
+        } else {
+          process.env["MCP_ASSETS_URL"] = previousAssetsUrl;
+        }
+      });
+      writeRichServer(cwd);
+      writeLanding(cwd);
+      mkdirSync(join(cwd, "public"), { recursive: true });
+      writeFileSync(join(cwd, "public", "landing-test.txt"), "public asset\n");
 
-    await runBuild({ cwd });
-    const started = await runStart({
-      cwd,
-      port: await getFreePort(),
-      host: "127.0.0.1",
-    });
-    cleanups.push(() => started.close());
+      await runBuild({ cwd });
+      const started = await runStart({
+        cwd,
+        port: await getFreePort(),
+        host: "127.0.0.1",
+        withInspector,
+      });
+      cleanups.push(() => started.close());
 
-    const response = await htmlRequest(started.url);
-    expect(response.status).toBe(200);
-    const html = await response.text();
-    expect(html).toContain('data-testid="custom-landing"');
-    expect(html).toContain('id="mcp-use-landing-data"');
-    expect(testIdText(html, "endpoint")).toBe(started.url);
-    expect(testIdText(html, "identity")).toBe(
-      "fixture-basic 1.0.0 A custom landing fixture."
-    );
-    expect(testIdText(html, "tools")).toBe("add");
-    expect(testIdText(html, "prompts")).toBe("plan");
-    expect(testIdText(html, "resources")).toBe("docs://fixture");
-    expect(html).toContain("<h1>Fixture Custom</h1>");
-    const script =
-      /<script[^>]+type="module"[^>]+src="([^"]+)"/.exec(html)?.[1] ??
-      /<script[^>]+src="([^"]+)"[^>]+type="module"/.exec(html)?.[1];
-    expect(script).toBeDefined();
-    const scriptResponse = await fetch(new URL(script!, started.url));
-    expect(scriptResponse.status).toBe(200);
-    expect(scriptResponse.headers.get("content-type")).toMatch(/javascript/);
-    expect(await scriptResponse.text()).toContain("mcp-use-landing-data");
+      const response = await htmlRequest(started.url);
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('data-testid="custom-landing"');
+      expect(html).toContain('id="mcp-use-landing-data"');
+      expect(testIdText(html, "endpoint")).toBe(started.url);
+      expect(testIdText(html, "identity")).toBe(
+        "fixture-basic 1.0.0 A custom landing fixture."
+      );
+      expect(testIdText(html, "tools")).toBe("add");
+      expect(testIdText(html, "prompts")).toBe("plan");
+      expect(testIdText(html, "resources")).toBe("docs://fixture");
+      expect(html).toContain("<h1>Fixture Custom</h1>");
+      const link = html
+        .match(/data-testid="inspector-link" href="([^"]+)"/)?.[1]
+        ?.replaceAll("&amp;", "&");
+      expect(link).toBeDefined();
+      const target = new URL(link!);
+      expect(target.origin).toBe(
+        withInspector
+          ? new URL(started.url).origin
+          : "https://inspector.manufact.com"
+      );
+      expect(target.searchParams.get("autoConnect")).toBe(started.url);
+      const shell = await fetch(`${started.url}/inspector`);
+      expect(shell.status).toBe(withInspector ? 200 : 404);
+      if (withInspector) expect(await shell.text()).toContain("inspector.js");
+      const script =
+        /<script[^>]+type="module"[^>]+src="([^"]+)"/.exec(html)?.[1] ??
+        /<script[^>]+src="([^"]+)"[^>]+type="module"/.exec(html)?.[1];
+      expect(script).toBeDefined();
+      const scriptResponse = await fetch(new URL(script!, started.url));
+      expect(scriptResponse.status).toBe(200);
+      expect(scriptResponse.headers.get("content-type")).toMatch(/javascript/);
+      expect(await scriptResponse.text()).toContain("mcp-use-landing-data");
 
-    const css = /<link[^>]+href="([^"]+\.css)"/.exec(html)?.[1];
-    expect(css).toBeDefined();
-    const cssResponse = await fetch(new URL(css!, started.url));
-    expect(cssResponse.status).toBe(200);
-    const cssText = await cssResponse.text();
-    expect(cssText).toMatch(/#0b1621|rgb\(11,\s*22,\s*33\)/);
-    // The managed Tailwind stylesheet is bundled with the page's own CSS.
-    expect(cssText).toContain("#0d1e2f");
+      const css = /<link[^>]+href="([^"]+\.css)"/.exec(html)?.[1];
+      expect(css).toBeDefined();
+      const cssResponse = await fetch(new URL(css!, started.url));
+      expect(cssResponse.status).toBe(200);
+      const cssText = await cssResponse.text();
+      expect(cssText).toMatch(/#0b1621|rgb\(11,\s*22,\s*33\)/);
+      // The managed Tailwind stylesheet is bundled with the page's own CSS.
+      expect(cssText).toContain("#0d1e2f");
 
-    process.env["MCP_ASSETS_URL"] = "https://cdn.example.test/landing-bucket";
-    const cdnHtml = await (await htmlRequest(started.url)).text();
-    expect(cdnHtml).toContain(
-      `https://cdn.example.test/landing-bucket${new URL(script!).pathname}`
-    );
-    expect(cdnHtml).toContain(
-      `https://cdn.example.test/landing-bucket${new URL(css!).pathname}`
-    );
-    delete process.env["MCP_ASSETS_URL"];
+      process.env["MCP_ASSETS_URL"] = "https://cdn.example.test/landing-bucket";
+      const cdnHtml = await (await htmlRequest(started.url)).text();
+      expect(cdnHtml).toContain(
+        `https://cdn.example.test/landing-bucket${new URL(script!).pathname}`
+      );
+      expect(cdnHtml).toContain(
+        `https://cdn.example.test/landing-bucket${new URL(css!).pathname}`
+      );
+      delete process.env["MCP_ASSETS_URL"];
 
-    const publicUrl = new URL(started.url);
-    publicUrl.pathname += "/_mcp-use/public/landing-test.txt";
-    const publicResponse = await fetch(publicUrl);
-    expect(publicResponse.status).toBe(200);
-    expect(await publicResponse.text()).toBe("public asset\n");
-    expect(
-      (await mcpRequest(started.url, "tools/list"))["result"]
-    ).toMatchObject({
-      tools: [expect.objectContaining({ name: "add" })],
-    });
-  }, 90_000);
+      const publicUrl = new URL(started.url);
+      publicUrl.pathname += "/_mcp-use/public/landing-test.txt";
+      const publicResponse = await fetch(publicUrl);
+      expect(publicResponse.status).toBe(200);
+      expect(await publicResponse.text()).toBe("public asset\n");
+      expect(
+        (await mcpRequest(started.url, "tools/list"))["result"]
+      ).toMatchObject({
+        tools: [expect.objectContaining({ name: "add" })],
+      });
+    },
+    90_000
+  );
 
   it("builds a custom landing under --mcp-dir and resolves distinct MCP URLs", async () => {
     const cwd = copyFixture("landing-mcp-dir-build");

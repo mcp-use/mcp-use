@@ -32,6 +32,9 @@ export interface LandingServerInfo {
   /** Absolute URL of the MCP endpoint, resolved from the incoming request. */
   url: string;
 
+  /** Request-resolved URL of the Inspector when the runtime mounted one. */
+  inspectorUrl?: string;
+
   /** The server's configured website, when present. */
   websiteUrl?: string;
 
@@ -99,7 +102,8 @@ function readLandingList<K extends LandingDataKey>(
  * Read the server identity and request-resolved URLs in `landing.tsx`.
  *
  * @returns The server's name, title, version, description, MCP endpoint URL,
- * public-asset prefix, website, and favicon.
+ * public-asset prefix, website, favicon, and `inspectorUrl` when the runtime
+ * mounted an Inspector.
  * @throws When called outside a component rendered by `landing.tsx`.
  *
  * @example
@@ -164,8 +168,10 @@ export function useResourceList(): readonly LandingPageResource[] {
  * `landing.tsx`.
  *
  * Same as {@link getInstallTargets} with the server's `title` (falling back
- * to its protocol `name`) and request-resolved MCP endpoint `url`, so the
- * client entries match the ones the built-in landing page creates.
+ * to its protocol `name`), request-resolved MCP endpoint `url`, and optional
+ * runtime-supplied `inspectorUrl`. When an Inspector is mounted, its URL is
+ * used; otherwise the Inspector link uses the hosted fallback. The client
+ * entries match the ones the built-in landing page creates.
  *
  * @returns One install target per client, in display order.
  * @throws When called outside a component rendered by `landing.tsx`.
@@ -181,8 +187,13 @@ export function useResourceList(): readonly LandingPageResource[] {
  * ```
  */
 export function useInstallTargets(): InstallTargets {
-  const { url, name, title } = readLandingData("useInstallTargets").server;
-  return getInstallTargets({ url, name: title ?? name });
+  const { url, name, title, inspectorUrl } =
+    readLandingData("useInstallTargets").server;
+  return getInstallTargets({
+    url,
+    name: title ?? name,
+    ...(inspectorUrl !== undefined && { inspectorUrl }),
+  });
 }
 
 /**

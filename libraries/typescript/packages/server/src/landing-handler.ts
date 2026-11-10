@@ -283,6 +283,7 @@ ${scripts}
  *   built-in page is rendered.
  * @param cache - Rendered custom documents keyed by MCP URL and asset base,
  *   reused unless the registration is in dev mode.
+ * @param inspectorPath - Path of an Inspector mounted by the runtime, when available.
  * @returns HTML response, with an empty body for HEAD.
  *
  * @internal
@@ -299,12 +300,21 @@ export async function createLandingPageResponse(
   prompts: Iterable<{ definition: LandingPagePrompt }>,
   resources: Iterable<{ definition: LandingPageResource }>,
   registration?: LandingPageRegistration,
-  cache?: Map<string, Promise<string>>
+  cache?: Map<string, Promise<string>>,
+  inspectorPath?: string
 ): Promise<Response> {
   const origin = resolveServerOrigin(request);
   const url = new URL(basePath, `${origin}/`).href;
   const assetsBase = resolveAssetsBase(request);
   const basePrefix = basePath === "/" ? "" : basePath;
+  const inspectorUrl =
+    inspectorPath === undefined
+      ? undefined
+      : new URL(inspectorPath, `${origin}/`);
+  if (inspectorUrl !== undefined) {
+    inspectorUrl.searchParams.set("autoConnect", url);
+    inspectorUrl.searchParams.set("tab", "chat");
+  }
   const server: LandingServerInfo = {
     name: config.name,
     ...(config.title !== undefined && { title: config.title }),
@@ -313,6 +323,7 @@ export async function createLandingPageResponse(
       description: config.description,
     }),
     url,
+    ...(inspectorUrl !== undefined && { inspectorUrl: inspectorUrl.href }),
     ...(branding.websiteUrl !== undefined && {
       websiteUrl: branding.websiteUrl,
     }),

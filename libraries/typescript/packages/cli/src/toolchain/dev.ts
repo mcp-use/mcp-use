@@ -164,6 +164,7 @@ interface ServerLike {
   fetch(request: Request): Response | Promise<Response>;
   __setEventBus(bus: ServerEventBus): void;
   __setRequestLogPrefix(prefix: string | undefined): void;
+  __setInspectorPath?(path: string | undefined): void;
   __mount(): void;
   /** URL path prefix the MCP endpoint is mounted at (default `"/mcp"`). */
   readonly basePath?: string;
@@ -883,6 +884,11 @@ export async function runDev(options: DevOptions): Promise<void> {
     server.__setRequestLogPrefix(
       inspectorHandler === undefined ? undefined : "[server]"
     );
+    server.__setInspectorPath?.(
+      inspectorHandler === undefined
+        ? undefined
+        : pathUnderBase(basePath, "inspector")
+    );
     server.__mount();
     currentHandler = devLandingHandler(
       server,
@@ -929,6 +935,11 @@ export async function runDev(options: DevOptions): Promise<void> {
           server.__setEventBus(eventBus);
           server.__setRequestLogPrefix(
             inspectorHandler === undefined ? undefined : "[server]"
+          );
+          server.__setInspectorPath?.(
+            inspectorHandler === undefined
+              ? undefined
+              : pathUnderBase(server.basePath ?? "/mcp", "inspector")
           );
           server.__mount();
 
