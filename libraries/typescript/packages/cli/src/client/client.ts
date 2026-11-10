@@ -419,22 +419,15 @@ async function callTool(
   return 0;
 }
 
+type ToolResult = Awaited<ReturnType<MCPConnection["callTool"]>>;
+
 // Keeps each text block's leading whitespace (indented code frames, stack
 // traces) and drops only trailing whitespace, so blocks print one per line.
-function toolErrorText(result: { content?: unknown }): string {
-  if (!Array.isArray(result.content)) return "";
-  return result.content
-    .flatMap((block: unknown) =>
-      typeof block === "object" &&
-      block !== null &&
-      "type" in block &&
-      block.type === "text" &&
-      "text" in block &&
-      typeof block.text === "string" &&
-      block.text.trim() !== ""
-        ? [block.text.trimEnd()]
-        : []
-    )
+function toolErrorText(result: ToolResult): string {
+  return (result.content ?? [])
+    .filter((block) => block.type === "text")
+    .map((block) => block.text.trimEnd())
+    .filter((text) => text.trim() !== "")
     .join("\n");
 }
 
