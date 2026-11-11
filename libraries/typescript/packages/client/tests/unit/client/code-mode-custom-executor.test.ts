@@ -81,6 +81,63 @@ describe("codeMode with a custom executor function", () => {
     });
   });
 
+  it.each([
+    ["names", { name: "lookup", server: "billing" }],
+    [
+      "descriptions",
+      {
+        name: "lookup",
+        server: "billing",
+        description: "Retrieve invoice records by customer",
+      },
+    ],
+    [
+      "full",
+      {
+        name: "lookup",
+        server: "billing",
+        description: "Retrieve invoice records by customer",
+        input_schema: { type: "object", properties: {} },
+      },
+    ],
+  ] as const)(
+    "finds a description match with %s detail and returns only its fields",
+    async (detailLevel, expected) => {
+      const client = new MCPClient(
+        {},
+        { codeMode: { enabled: true, executor: async () => ok(null) } }
+      );
+      client.sessions.billing = {
+        connector: {
+          tools: [
+            {
+              name: "lookup",
+              description: "Retrieve invoice records by customer",
+              inputSchema: { type: "object", properties: {} },
+            },
+            {
+              name: "archive",
+              description: "Store completed reports",
+              inputSchema: { type: "object", properties: {} },
+            },
+          ],
+        },
+      } as never;
+      client.activeSessions.push("billing");
+
+      await expect(client.searchTools("invoice", detailLevel)).resolves.toEqual(
+        {
+          meta: {
+            total_tools: 2,
+            namespaces: ["billing"],
+            result_count: 1,
+          },
+          results: [expected],
+        }
+      );
+    }
+  );
+
   it("close() runs cleanup on the custom function executor", async () => {
     const client = new MCPClient(
       {},
