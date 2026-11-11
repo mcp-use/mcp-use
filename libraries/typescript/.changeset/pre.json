@@ -12,6 +12,7 @@
   },
   "changesets": [
     "propagated-48690594a149ddc2",
-    "sanitize-url-ipv6-support"
+    "sanitize-url-ipv6-support",
+    "scaffold-reject-unknown-options"
   ]
 }

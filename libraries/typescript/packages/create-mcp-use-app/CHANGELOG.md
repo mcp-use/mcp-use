@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.1.2-canary.0
+
+### Patch Changes
+
+- ee726fb: Reject unknown options and extra project names before scaffolding an app.
+
 ## 2.1.1
 
 ### Patch Changes
