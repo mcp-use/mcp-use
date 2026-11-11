@@ -11,8 +11,11 @@
     "@mcp-use/tunnel": "0.2.2"
   },
   "changesets": [
+    "browser-client-oauth-proxy-fetch",
+    "code-mode-console-logs",
     "node-bridge-binary-body",
     "propagated-48690594a149ddc2",
+    "propagated-7cd41a857ed610a1",
     "sanitize-url-ipv6-support",
     "scaffold-reject-unknown-options"
   ]
