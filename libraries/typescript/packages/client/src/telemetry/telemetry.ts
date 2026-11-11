@@ -64,8 +64,8 @@ function isBrowser(): boolean {
 /**
  * Only browsers read telemetry settings from `localStorage`; server runtimes
  * use env vars and the storage installed by their entry. Check for a browser
- * before touching the global: Node 25 defines `localStorage` as a getter that
- * warns on any read, `typeof` included, unless started with
+ * before touching the global: on Node 25, reading a property of `localStorage`
+ * (such as `getItem`) prints a warning unless Node runs with
  * `--localstorage-file`.
  */
 function isLocalStorageFunctional(): boolean {

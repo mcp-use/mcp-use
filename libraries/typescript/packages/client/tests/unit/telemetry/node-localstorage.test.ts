@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Node 25 defines `globalThis.localStorage` as a getter that prints a warning
-// on any read (`typeof` included) unless Node runs with `--localstorage-file`.
+// On Node 25, reading a property of `globalThis.localStorage` (such as
+// `getItem`) prints a warning unless Node runs with `--localstorage-file`.
 // Stand in for it with a getter that counts reads, so this runs on any Node.
 describe("telemetry in Node", () => {
   let reads: number;
