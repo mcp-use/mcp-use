@@ -6,9 +6,25 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.4" description="November 2026">
+  ## CLI analytics & view caching
+  Canary release adding server analytics and explicit feedback commands, fixing production view cache identity, and linking landing pages to an available Inspector.
+
+- **New** (@mcp-use/cli): discover the live server analytics schema with `mcp-use analytics catalog` and run scoped, read-only SQL with `analytics query`. Select a time window and branch, bound result rows, and receive column metadata and structured errors. Install the bundled `manufact-analytics` skill with `mcp-use skills install` (`#3047`)
+- **New** (@mcp-use/cli): submit a quoted report with `mcp-use feedback send <message>`, without signing in. Explicit reports return a receipt, time out after 10 seconds, and work independently of passive usage analytics (`#3047`)
+- **Enhancement** (@mcp-use/cli): collect anonymous command-usage events with a random installation ID, allowlisted command names, and version/platform metadata. Argument values are omitted; CI runs are filtered, and `MCP_USE_ANONYMIZED_TELEMETRY=false` or `DO_NOT_TRACK=1` disables capture (`#3047`)
+- **Fix** (@mcp-use/cli): human-readable output from `mcp-use client <server> tools call` includes the tool's error text, preserving indentation. JSON output is unchanged (`#3067`)
+- **Fix** (@mcp-use/cli): serve shared view imports in dev when no landing page exists, including custom `--views-dir` and `--mcp-dir` layouts. Normalize URL-encoded paths while preserving reserved-route exclusions (`#3045`)
+- **Fix** (server, @mcp-use/cli): production view resource URIs include the build ID, giving each new build a fresh host cache key while all replicas share the same URI. Tool metadata, results, registered resources, and OAuth view access use the same versioned URI; development URIs remain unversioned (`#3069`)
+- **Fix** (server, @mcp-use/cli): built-in and custom landing pages open the Inspector mounted by `mcp-use dev` or `mcp-use start --with-inspector`. Plain servers and runs without an Inspector keep the hosted fallback. `getInstallTargets()` accepts an explicit `inspectorUrl` override (`#3064`)
+- **Documentation**: document analytics and feedback in the [CLI reference](/typescript/api-reference/cli-reference), build-versioned view URIs in the [migration guide](/typescript/server/migration), and mounted Inspector links in the [landing-page guide](/typescript/server/landing-page)
+- **Update**: Updated @mcp-use/cli to v5.1.0
+- **Update**: Updated @mcp-use/inspector to v20.3.29; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.12.3" description="November 2026">
   ## Manufact Cloud CLI
-  Canary release updating the bundled CLI to v5 with new Cloud workflows, alongside server and agent fixes.
+  Release updating the bundled CLI to v5 with new Cloud workflows, alongside server and agent fixes.
 
 - **New** (@mcp-use/cli): sign in with device authorization, link a project to a Cloud server and organization, and deploy from GitHub, local source, or an external MCP endpoint. Deployments wait for a running state by default; `--no-wait` returns immediately (`#3027`, `#3026`, `#3030`)
 - **New** (@mcp-use/cli): manage servers, environment variables, deployments, domains, GitHub connections, organizations, team members, alerts, and publishing checklists from the CLI (`#3031`, `#3032`, `#3033`)
@@ -17,6 +33,7 @@ rss: true
 - **Fix** (server): run `resources/read` middleware, observers, and usage telemetry for view resources. View reads expose `ctx.view`; on mixed-auth servers they may reach middleware before sign-in (`#2849`)
 - **Fix** (@mcp-use/agent): preserve Gemini thought signatures when replaying tool calls, preventing Gemini 3 requests from failing after a tool call (`#2718`)
 - **Update**: Updated @mcp-use/cli to v5.0.0
+- **Update**: Updated @mcp-use/inspector to v20.3.28; see the [Inspector changelog](/inspector/changelog)
 - **Documentation**: update the [CLI reference](/typescript/api-reference/cli-reference) and [deployment guide](/typescript/server/deployment/mcp-use) for the Cloud commands (`#3034`)
 </Update>
 

@@ -86,6 +86,7 @@ Cloud projects:
   deployments  Inspect and manage deployments
   env          Manage environment variables
   logs         Read build and runtime logs
+  analytics    Discover and query server analytics
   domains      Manage server domains
   github       Manage GitHub App access
   alerts       Manage alert rules
@@ -99,6 +100,7 @@ Account:
 
 Tools:
   client       Connect to and invoke MCP servers
+  feedback     Send CLI feedback to Manufact
   screenshot   Capture an MCP Apps view
   skills       Install version-matched coding agent skills
   help         Show help for a command
@@ -188,7 +190,17 @@ export async function main(
   options: CliMainOptions = { frameworkVersion: "unknown" }
 ): Promise<number> {
   if (argv[0] === "help") {
-    return main([...argv.slice(1), "--help"], options);
+    const args = argv.slice(1);
+    // Keep help before the delimiter for commands accepting literal text.
+    const separator = ["feedback", "analytics"].includes(args[0] ?? "")
+      ? args.indexOf("--", 2)
+      : -1;
+    return main(
+      separator < 0
+        ? [...args, "--help"]
+        : [...args.slice(0, separator), "--help", ...args.slice(separator)],
+      options
+    );
   }
   if (argv.length === 1 && ["--version", "-v"].includes(argv[0] ?? "")) {
     console.log(options.frameworkVersion);
@@ -209,6 +221,17 @@ export async function main(
 
   const command = argv[0];
   const commandArgs = stripForwardingSeparator(argv.slice(1));
+  if (command === "analytics") {
+    const { runAnalytics } = await import("../cloud/analytics/index.js");
+    // SQL may start with a -- comment; preserve its literal delimiter.
+    return runAnalytics(argv.slice(argv[1] === "--" ? 2 : 1));
+  }
+  if (command === "feedback") {
+    const { runFeedback } = await import("../feedback.js");
+    // Preserve the message's -- delimiter; only remove a forwarding separator
+    // immediately after the command name (e.g. feedback -- send ...).
+    return runFeedback(argv.slice(argv[1] === "--" ? 2 : 1));
+  }
   if (command === "login") {
     const { runLogin } = await import("../cloud/auth/login.js");
     return runLogin(commandArgs);

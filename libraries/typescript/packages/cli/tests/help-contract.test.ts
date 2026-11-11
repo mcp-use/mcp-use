@@ -8,6 +8,17 @@ const SIGNED_IN = { MCP_USE_API_KEY: "test_key" };
 
 describe("offline help contract", () => {
   test.for([
+    ["analytics", ["analytics", "--help"]],
+    ["analytics catalog", ["analytics", "catalog", "--help"]],
+    ["analytics query", ["analytics", "query", "-h"]],
+    ["analytics query", ["help", "analytics", "query"]],
+    [
+      "analytics query",
+      ["help", "analytics", "query", "--", "-- comment\nSELECT 1"],
+    ],
+    ["feedback", ["feedback", "--help"]],
+    ["feedback send", ["feedback", "send", "--help"]],
+    ["feedback send", ["help", "feedback", "send"]],
     ["login", ["login", "--help"]],
     ["logout", ["logout", "--help"]],
     ["whoami", ["whoami", "-h"]],
@@ -77,6 +88,8 @@ describe("offline help contract", () => {
       "build",
       "start",
       "typecheck",
+      "feedback",
+      "analytics",
       "client",
       "screenshot",
       "login",

@@ -1,5 +1,49 @@
 # mcp-use
 
+## 2.12.4-canary.4
+
+### Patch Changes
+
+- 98a1850: Link the landing page to the server's Inspector only when the CLI has mounted it. Pass its request-resolved URL through landing data and the optional `inspectorUrl` input to `getInstallTargets()`, keeping the hosted Inspector fallback for plain servers, `dev --no-inspector`, and `start` without `--with-inspector`. Mounted links prefill the MCP endpoint and open the Chat tab.
+- Updated dependencies [98a1850]
+  - @mcp-use/cli@5.1.0-canary.4
+
+## 2.12.4-canary.3
+
+### Patch Changes
+
+- 3860a16: Automatically version production view resource URIs with the build ID, keeping tool metadata, tool results, registered resources, and OAuth view access consistent. Every replica of a build shares the same URI, and a new build gets a fresh host cache key. Development view URIs remain unversioned.
+- Updated dependencies [3860a16]
+  - @mcp-use/cli@5.1.0-canary.3
+
+## 2.12.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [a610070]
+  - @mcp-use/cli@5.1.0-canary.2
+
+## 2.12.4-canary.1
+
+### Patch Changes
+
+- a22376b: Add `mcp-use feedback send` for explicit CLI reports to PostHog, with a single positional message, anonymous identity, JSON receipts, bounded delivery, and actionable errors. Keep report contents separate from passive usage analytics and document the command for people and coding agents.
+- 3169325: Add `mcp-use analytics catalog` and `analytics query` for live schema discovery and scoped read-only ClickHouse SQL through Manufact Cloud. Include time and branch selection, bounded results, JSON metadata, and a bundled `manufact-analytics` skill with SQL and interpretation guidance.
+- 4859469: Track anonymous CLI adoption and command usage in PostHog with a persistent random installation ID, allowlisted command names, version/platform metadata, and CI filtering. Honor MCP_USE_ANONYMIZED_TELEMETRY=false and DO_NOT_TRACK=1, omit argument values, and keep capture failures silent and bounded.
+- Updated dependencies [a22376b]
+- Updated dependencies [3169325]
+- Updated dependencies [4859469]
+  - @mcp-use/cli@5.1.0-canary.1
+
+## 2.12.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f1da1fa]
+- Updated dependencies
+  - @mcp-use/cli@5.0.1-canary.0
+  - @mcp-use/inspector@20.3.29-canary.0
+
 ## 2.12.3
 
 ### Patch Changes

@@ -57,12 +57,12 @@ export interface ChatGPTInstallTarget {
   steps: readonly string[];
 }
 
-/** Manufact Inspector target: the hosted inspector, connected to the server. */
+/** Manufact Inspector target: a mounted Inspector or the hosted fallback. */
 export interface InspectorInstallTarget {
   /** Tool name, suitable as a tab or button label. */
   label: "Manufact Inspector";
 
-  /** Hosted inspector URL that connects to the server and opens its chat. */
+  /** Inspector URL supplied by the runtime, or the hosted URL with this server prefilled. */
   url: string;
 }
 
@@ -70,6 +70,9 @@ export interface InspectorInstallTarget {
 export interface InstallTargetServer {
   /** Absolute URL of the MCP endpoint. */
   url: string;
+
+  /** URL of an available Inspector; omission uses the hosted Manufact Inspector. */
+  inspectorUrl?: string;
 
   /**
    * Server name. Clients store it lowercased, with characters other than
@@ -101,7 +104,7 @@ export interface InstallTargets {
   /** ChatGPT setup steps. */
   chatgpt: ChatGPTInstallTarget;
 
-  /** Hosted Manufact Inspector link. */
+  /** Mounted Inspector link when supplied, otherwise hosted Manufact Inspector. */
   inspector: InspectorInstallTarget;
 }
 
@@ -204,6 +207,8 @@ function getChatGPTSteps(url: string): readonly string[] {
  *
  * Runs in Node, edge runtimes and browsers. Values are not HTML-escaped:
  * JSX escapes them, but HTML built as a string must.
+ * A supplied `inspectorUrl` is used as-is; otherwise the Inspector target is
+ * hosted. Inspector availability is never inferred from the endpoint hostname.
  *
  * @param server - Endpoint URL and name of the server to install.
  * @returns One install target per client, in display order.
@@ -236,7 +241,7 @@ export function getInstallTargets(server: InstallTargetServer): InstallTargets {
     chatgpt: { label: "ChatGPT", steps: getChatGPTSteps(url) },
     inspector: {
       label: "Manufact Inspector",
-      url: getManufactInspectorUrl(url),
+      url: server.inspectorUrl ?? getManufactInspectorUrl(url),
     },
   };
 }

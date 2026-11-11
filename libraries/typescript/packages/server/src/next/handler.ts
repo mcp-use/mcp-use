@@ -41,7 +41,10 @@ function isViewManifestEntry(value: unknown): value is ViewManifestEntry {
   );
 }
 
-function parseBuildManifest(raw: string, manifestPath: string): ViewsManifest {
+function parseBuildManifest(
+  raw: string,
+  manifestPath: string
+): { views: ViewsManifest; buildId?: string } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -59,11 +62,19 @@ function parseBuildManifest(raw: string, manifestPath: string): ViewsManifest {
     typeof parsed.views !== "object" ||
     parsed.views === null ||
     Array.isArray(parsed.views) ||
-    !Object.values(parsed.views).every(isViewManifestEntry)
+    !Object.values(parsed.views).every(isViewManifestEntry) ||
+    ("buildId" in parsed &&
+      (typeof parsed.buildId !== "string" || parsed.buildId.trim() === ""))
   ) {
     throw new Error(`Invalid mcp-use build manifest at ${manifestPath}.`);
   }
-  return parsed.views as ViewsManifest;
+  return {
+    views: parsed.views as ViewsManifest,
+    ...("buildId" in parsed &&
+      typeof parsed.buildId === "string" && {
+        buildId: parsed.buildId,
+      }),
+  };
 }
 
 /**
@@ -119,8 +130,11 @@ export function createNextHandler<TUser>(
       }
       throw error;
     }
-    server.__primeViews(parseBuildManifest(raw, manifestPath), {
+    const manifest = parseBuildManifest(raw, manifestPath);
+    server.__primeViews(manifest.views, {
       projectRoot,
+      ...(process.env["NODE_ENV"] !== "development" &&
+        manifest.buildId !== undefined && { buildId: manifest.buildId }),
     });
     return async (request) => server.fetch(request);
   };

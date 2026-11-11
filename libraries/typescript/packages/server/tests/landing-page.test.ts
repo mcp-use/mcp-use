@@ -209,6 +209,51 @@ describe("generateLandingPage", () => {
 });
 
 describe("MCPServer landing page routing", () => {
+  it("keeps the hosted fallback for a plain localhost server without an Inspector", async () => {
+    const server = track(new MCPServer({ name: "plain", version: "1.0.0" }));
+    const html = await (
+      await server.fetch(htmlRequest("http://localhost:3000/mcp"))
+    ).text();
+    const link = html
+      .match(/id="inspector-link" href="([^"]+)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+    expect(link).toBe(
+      "https://inspector.manufact.com/inspector?autoConnect=http%3A%2F%2Flocalhost%3A3000%2Fmcp&tab=chat"
+    );
+    expect(
+      (await server.fetch(htmlRequest("http://localhost:3000/mcp/inspector")))
+        .status
+    ).toBe(404);
+  });
+
+  it.each(["/", "/api/mcp"])(
+    "resolves a mounted Inspector at %s from the request origin",
+    async (basePath) => {
+      const server = track(
+        new MCPServer({ name: "mounted", version: "1.0.0", basePath })
+      );
+      const inspectorPath = `${basePath === "/" ? "" : basePath}/inspector`;
+      server.__setInspectorPath(inspectorPath);
+      for (const origin of [
+        "http://localhost:3000",
+        "https://public.example.test",
+      ]) {
+        const endpoint = `${origin}${basePath}`;
+        const html = await (await server.fetch(htmlRequest(endpoint))).text();
+        const link = html
+          .match(/id="inspector-link" href="([^"]+)"/)?.[1]
+          ?.replaceAll("&amp;", "&");
+        expect(link).toBeDefined();
+        const target = new URL(link!);
+        expect(`${target.origin}${target.pathname}`).toBe(
+          `${origin}${inspectorPath}`
+        );
+        expect(target.searchParams.get("autoConnect")).toBe(endpoint);
+        expect(target.searchParams.get("tab")).toBe("chat");
+      }
+    }
+  );
+
   it("renders a custom shell with serialized data and caches by URL and asset base", async () => {
     const originalAssetsUrl = process.env["MCP_ASSETS_URL"];
     const server = track(

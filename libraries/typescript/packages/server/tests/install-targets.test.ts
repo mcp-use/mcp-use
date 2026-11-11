@@ -68,6 +68,49 @@ describe("getInstallTargets", () => {
     ]);
   });
 
+  it("does not infer Inspector availability from a loopback hostname", () => {
+    for (const url of [
+      "http://localhost:3000/mcp",
+      "http://127.0.0.1:3000/mcp",
+      "http://127.0.0.2:3000/mcp",
+      "http://[::1]:3000/mcp",
+      "http://app.localhost:3000/mcp/",
+    ]) {
+      const target = new URL(
+        getInstallTargets({ url, name: "local" }).inspector.url
+      );
+      expect(target.origin).toBe("https://inspector.manufact.com");
+      expect(target.searchParams.get("autoConnect")).toBe(url);
+    }
+  });
+
+  it("uses an explicit Inspector URL without changing the MCP install URLs", () => {
+    const url = "http://localhost:3000/mcp?token=required";
+    const inspectorUrl =
+      "http://localhost:3000/custom-inspector?autoConnect=" +
+      encodeURIComponent(url) +
+      "&tab=chat";
+    const targets = getInstallTargets({ url, name: "local", inspectorUrl });
+    expect(targets.inspector.url).toBe(inspectorUrl);
+    expect(targets.claudeCode.command).toContain(url);
+    expect(
+      JSON.parse(
+        Buffer.from(cursorConfig(targets.cursor.deeplink), "base64").toString(
+          "utf8"
+        )
+      )
+    ).toEqual({ url });
+  });
+
+  it("keeps the hosted Inspector link for a non-loopback server", () => {
+    expect(
+      getInstallTargets({ url: "https://acme.com/mcp", name: "acme" }).inspector
+        .url
+    ).toBe(
+      "https://inspector.manufact.com/inspector?autoConnect=https%3A%2F%2Facme.com%2Fmcp&tab=chat"
+    );
+  });
+
   it("sanitizes non-ASCII server names into the config key", () => {
     const targets = getInstallTargets({
       url: "https://example.com/mcp",

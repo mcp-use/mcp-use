@@ -191,6 +191,40 @@ export interface paths {
         patch: operations["patchApiV1ServersById"];
         trace?: never;
     };
+    "/api/v1/servers/{id}/analytics/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Analytics catalog for this server: relations and columns, measures (with approximation bounds and SQL per relation), dimensions, segments, limits, plan retention and worked examples. Requires server:read. */
+        get: operations["getApiV1ServersByIdAnalyticsCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/servers/{id}/analytics/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Read-only ClickHouse SQL over this server's analytics relations (see the catalog). One SELECT per request; tenancy and plan retention are enforced inside ClickHouse. At most 2 SQL requests run at once per organization: a third waits up to 2.5 s, then answers 429 with details. Requires server:read. */
+        post: operations["postApiV1ServersByIdAnalyticsSql"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/servers/{id}/source": {
         parameters: {
             query?: never;
@@ -2325,6 +2359,545 @@ export interface operations {
                         /** @description Stable application error code, when available. */
                         code?: string;
                         details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServersByIdAnalyticsCatalog: {
+        parameters: {
+            query?: {
+                branch?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        catalogVersion: string;
+                        /** @constant */
+                        dialect: "clickhouse";
+                        relations: {
+                            /** @enum {string} */
+                            name: "events" | "metrics_hourly" | "metrics_daily" | "sessions_daily" | "sessions_hourly" | "clients_daily" | "tool_health_daily" | "tool_interactions" | "actors_hourly" | "actors_daily";
+                            description: string;
+                            grain: string;
+                            timeColumn: string;
+                            ttlDays: number;
+                            rowBudget: number | null;
+                            columns: {
+                                name: string;
+                                type: string;
+                                kind: string;
+                                description: string;
+                            }[];
+                        }[];
+                        measures: {
+                            /**
+                             * @description Measure. ≈ = approximate (sketch). events (count): Events (requests); tool_calls (count): tools/call events; errors (count): Error events: transport errors plus failed tool results; error_rate (ratio): errors / events (0..1); transport_errors (count): HTTP/transport errors, excluding neutral lifecycle signals; tool_result_errors (count): tools/call results with isError; tool_outcome_events (count): Events with a known tool outcome (tool_call_success not NULL); tool_result_error_rate (ratio): tool_result_errors / tool_outcome_events (0..1); neutral_events (count): Expected capability signals (optional SSE 405, protocol probe); success_events (count): Successful events; avg_duration_ms (ms): Mean duration_ms over events with a duration; min_duration_ms (ms): Minimum duration_ms; max_duration_ms (ms): Maximum duration_ms; p50_duration_ms (ms, ≈): p50 of duration_ms (t-digest); p90_duration_ms (ms, ≈): p90 of duration_ms (t-digest); p95_duration_ms (ms, ≈): p95 of duration_ms (t-digest); p99_duration_ms (ms, ≈): p99 of duration_ms (t-digest); sessions (count, ≈): Distinct sessions (interaction_id); actors (count, ≈): Distinct actors; verified_actors (count, ≈): Distinct actors identified by conversation, token or account; approximate_actors (count, ≈): Distinct IP-derived actors; output_tokens (tokens): Sum of estimated output tokens; token_events (count): Events with an output token estimate; avg_request_bytes (bytes): Mean request body bytes; avg_response_bytes (bytes): Mean response body bytes; sessions_with_tool (count): Distinct sessions with at least one matching tools/call (exact, tool index); active_interactions_5m (count): Distinct sessions with an event in the last 5 minutes (exact, raw); first_seen (timestamp): First event time; last_seen (timestamp): Last event time
+                             * @enum {string}
+                             */
+                            name: "events" | "tool_calls" | "errors" | "error_rate" | "transport_errors" | "tool_result_errors" | "tool_outcome_events" | "tool_result_error_rate" | "neutral_events" | "success_events" | "avg_duration_ms" | "min_duration_ms" | "max_duration_ms" | "p50_duration_ms" | "p90_duration_ms" | "p95_duration_ms" | "p99_duration_ms" | "sessions" | "actors" | "verified_actors" | "approximate_actors" | "output_tokens" | "token_events" | "avg_request_bytes" | "avg_response_bytes" | "sessions_with_tool" | "active_interactions_5m" | "first_seen" | "last_seen";
+                            description: string;
+                            /** @enum {string} */
+                            unit: "count" | "ratio" | "ms" | "tokens" | "bytes" | "timestamp";
+                            type: string;
+                            errorBound: string | null;
+                            /** @enum {string} */
+                            accuracy: "exact" | "approx";
+                            sources: ("events" | "metrics_hourly" | "metrics_daily" | "sessions_daily" | "sessions_hourly" | "clients_daily" | "tool_health_daily" | "tool_interactions" | "actors_hourly" | "actors_daily")[];
+                            sql: {
+                                [key: string]: string;
+                            };
+                        }[];
+                        dimensions: {
+                            /**
+                             * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): Session (interaction) id: one conversation or connection; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
+                             * @enum {string}
+                             */
+                            name: "mcp_method" | "method_family" | "resource" | "health_resource" | "resource_name" | "resource_type" | "tool" | "client_name" | "client_version" | "protocol_version" | "country" | "subdomain" | "http_method" | "status" | "status_code" | "error_code" | "transport_error_kind" | "transport_mode" | "auth_method" | "actor_source" | "actor_trust" | "traffic_class" | "actor_id" | "interaction_id" | "error_reason" | "deployment_id";
+                            description: string;
+                            type: string;
+                            rawOnly: boolean;
+                            sources: ("events" | "metrics_hourly" | "metrics_daily" | "sessions_daily" | "sessions_hourly" | "clients_daily" | "tool_health_daily" | "tool_interactions" | "actors_hourly" | "actors_daily")[];
+                        }[];
+                        segments: {
+                            /**
+                             * @description Traffic segment (ANDed; default mcp_traffic). mcp_traffic: Parsed MCP requests (the default): excludes non-MCP HTTP and 'unknown'; method_allowlist: tools/*, resources/*, prompts/*, notifications/*, logging/*, sampling/*, completion/*, elicitation/* and initialize; non_discovery: method_allowlist without discovery (*\/list) and subscription bookkeeping; all: Every event, including non-MCP HTTP (the timeline card)
+                             * @enum {string}
+                             */
+                            name: "mcp_traffic" | "method_allowlist" | "non_discovery" | "all";
+                            description: string;
+                            default: boolean;
+                        }[];
+                        branches: {
+                            branch: string;
+                            subdomain: string;
+                        }[];
+                        /** @description API limits; admission: per-org pools */
+                        limits: {
+                            [key: string]: number | string | {
+                                [key: string]: {
+                                    [key: string]: number;
+                                };
+                            };
+                        };
+                        retention: {
+                            days: number | "unlimited";
+                            floor: string;
+                        };
+                        rawWindowHintDays: number | null;
+                        freshness: {
+                            maxIngestedAt: string | null;
+                            /** @description Now minus maxIngestedAt, at response time */
+                            lagSeconds: number | null;
+                            /** @description When maxIngestedAt was read (cached up to 10 minutes) */
+                            asOf: string;
+                        } | null;
+                        notes: string[];
+                        examples: {
+                            question: string;
+                            metricsQuery: {
+                                /** @description Half-open UTC window [from, to), to <= now; the start is clamped to the plan's retention. */
+                                window: {
+                                    /** @enum {string} */
+                                    preset: "1h" | "24h" | "7d" | "30d" | "90d";
+                                } | {
+                                    /** Format: date-time */
+                                    from: string;
+                                    /** Format: date-time */
+                                    to: string;
+                                };
+                                measures: ("events" | "tool_calls" | "errors" | "error_rate" | "transport_errors" | "tool_result_errors" | "tool_outcome_events" | "tool_result_error_rate" | "neutral_events" | "success_events" | "avg_duration_ms" | "min_duration_ms" | "max_duration_ms" | "p50_duration_ms" | "p90_duration_ms" | "p95_duration_ms" | "p99_duration_ms" | "sessions" | "actors" | "verified_actors" | "approximate_actors" | "output_tokens" | "token_events" | "avg_request_bytes" | "avg_response_bytes" | "sessions_with_tool" | "active_interactions_5m" | "first_seen" | "last_seen")[];
+                                dimensions?: ("mcp_method" | "method_family" | "resource" | "health_resource" | "resource_name" | "resource_type" | "tool" | "client_name" | "client_version" | "protocol_version" | "country" | "subdomain" | "http_method" | "status" | "status_code" | "error_code" | "transport_error_kind" | "transport_mode" | "auth_method" | "actor_source" | "actor_trust" | "traffic_class" | "actor_id" | "interaction_id" | "error_reason" | "deployment_id")[];
+                                /**
+                                 * @description Bucket size; omit for totals. auto: the finest of hour/day/week/month with at most 240 buckets. Past 1500 buckets (or minute over 6h) the next coarser size is served (meta.granularity). Weeks start on Monday.
+                                 * @enum {string}
+                                 */
+                                granularity?: "minute" | "hour" | "day" | "week" | "month" | "auto";
+                                filters?: {
+                                    /**
+                                     * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): Session (interaction) id: one conversation or connection; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
+                                     * @enum {string}
+                                     */
+                                    dimension: "mcp_method" | "method_family" | "resource" | "health_resource" | "resource_name" | "resource_type" | "tool" | "client_name" | "client_version" | "protocol_version" | "country" | "subdomain" | "http_method" | "status" | "status_code" | "error_code" | "transport_error_kind" | "transport_mode" | "auth_method" | "actor_source" | "actor_trust" | "traffic_class" | "actor_id" | "interaction_id" | "error_reason" | "deployment_id";
+                                    /** @enum {string} */
+                                    op: "eq" | "neq" | "in" | "not_in" | "like";
+                                    values: string[];
+                                }[];
+                                segments?: ("mcp_traffic" | "method_allowlist" | "non_discovery" | "all")[];
+                                /** @description Include Manufact's own clients (default false; forced by an eq/in client_name filter). */
+                                includeInternal?: boolean;
+                                /** @description Sessions using these tools */
+                                sessionTools?: string[];
+                                /** @description Preview branch; omit for all environments. */
+                                branch?: string;
+                                /** @constant */
+                                compare?: "previous_period";
+                                topN?: {
+                                    /**
+                                     * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): Session (interaction) id: one conversation or connection; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
+                                     * @enum {string}
+                                     */
+                                    dimension: "mcp_method" | "method_family" | "resource" | "health_resource" | "resource_name" | "resource_type" | "tool" | "client_name" | "client_version" | "protocol_version" | "country" | "subdomain" | "http_method" | "status" | "status_code" | "error_code" | "transport_error_kind" | "transport_mode" | "auth_method" | "actor_source" | "actor_trust" | "traffic_class" | "actor_id" | "interaction_id" | "error_reason" | "deployment_id";
+                                    n: number;
+                                    otherLabel?: string;
+                                };
+                                orderBy?: {
+                                    field: string;
+                                    /** @enum {string} */
+                                    dir: "asc" | "desc";
+                                }[];
+                                limit?: number;
+                                zeroFill?: boolean;
+                                /**
+                                 * @description exact: raw events, within the raw budget
+                                 * @enum {string}
+                                 */
+                                accuracy?: "auto" | "exact";
+                            } | null;
+                            sql: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description ANALYTICS_QUERY_INVALID / ANALYTICS_SQL_REJECTED / VALIDATION_ERROR */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description ANALYTICS_QUERY_TIMEOUT: timed out or cancelled */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description ANALYTICS_RESULT_TOO_LARGE */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description ANALYTICS_QUERY_BUDGET (see details) / ANALYTICS_TIME_RANGE_UNAVAILABLE */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description ANALYTICS_QUERY_RATE_LIMIT (honour Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description ANALYTICS_UNAVAILABLE (retry once) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ServersByIdAnalyticsSql: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description One ClickHouse SELECT (or UNION) over the analytics relations: events: Raw gateway events, one row per request. Drill-down only: each query may read at most 20M rows (about one day of the busiest server). Use the rollups for aggregates. metrics_hourly: Hourly cube of every event ingredient (100 days). Additive columns are sums: use sum(events), never count(). Sketch columns need their -Merge function. metrics_daily: Daily cube of every event ingredient (400 days), same columns as metrics_hourly. sessions_daily: Narrow daily rollup for headline sessions and actors by client, country and branch. Segments map to traffic_class. sessions_hourly: Narrow hourly rollup for headline sessions and actors by client and branch (100 days, no country). Prefer it to metrics_hourly for windows up to 2 days. clients_daily: Narrow daily rollup for headline sessions, actors and latency by client, client and protocol version and branch (no country). The narrowest daily relation for headline numbers. tool_health_daily: Narrow daily rollup for per-tool and per-client health and tokens: error classes, latency digests and output tokens by method, resource and client. tool_interactions: Exact tool index: one row per (server, tool, hour, interaction). Answers 'sessions that used tool X' exactly at any window: uniqExact(interaction_id). actors_hourly: Account or token actor activity on tools/call events, by client, tool and branch. Full-period user rankings use sums and merged session sketches. actors_daily: Account or token actor activity on tools/call events, by client, tool and branch. Full-period user rankings use sums and merged session sketches. */
+                    sql: string;
+                    /** @description Default 7d; bound as {from} and {to}. */
+                    timeRange?: {
+                        /** @enum {string} */
+                        preset: "1h" | "24h" | "7d" | "30d" | "90d";
+                    } | {
+                        /** Format: date-time */
+                        from: string;
+                        /** Format: date-time */
+                        to: string;
+                    };
+                    branch?: string;
+                    includeInternal?: boolean;
+                    maxRows?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        queryId: string;
+                        columns: {
+                            name: string;
+                            type: string;
+                        }[];
+                        /** @description JSONCompact rows; 64-bit integers are strings. */
+                        rows: unknown[][];
+                        truncated: boolean;
+                        statistics: {
+                            elapsedMs: number;
+                            rowsRead: number;
+                            bytesRead: number;
+                        };
+                        meta: {
+                            catalogVersion: string;
+                            retentionFloor: string;
+                            /** @enum {string} */
+                            admissionClass: "light" | "heavy";
+                            rawWindowHintDays: number | null;
+                            freshness: {
+                                maxIngestedAt: string | null;
+                                /** @description Now minus maxIngestedAt, at response time */
+                                lagSeconds: number | null;
+                                /** @description When maxIngestedAt was read (cached up to 10 minutes) */
+                                asOf: string;
+                            } | null;
+                        };
+                    };
+                };
+            };
+            /** @description ANALYTICS_QUERY_INVALID / ANALYTICS_SQL_REJECTED / VALIDATION_ERROR */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description ANALYTICS_QUERY_TIMEOUT: timed out or cancelled */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description ANALYTICS_RESULT_TOO_LARGE */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description ANALYTICS_QUERY_BUDGET (see details) / ANALYTICS_TIME_RANGE_UNAVAILABLE */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description ANALYTICS_QUERY_RATE_LIMIT (honour Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
+                    };
+                };
+            };
+            /** @description ANALYTICS_UNAVAILABLE (retry once) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        code: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        status?: number;
+                        queryId?: string;
+                        hint?: string;
                     };
                 };
             };

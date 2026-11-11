@@ -6,10 +6,11 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   Client,
   StreamableHTTPClientTransport,
@@ -17,6 +18,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runDev } from "../../src/toolchain/index.js";
+import type { DevOptions } from "../../src/toolchain/dev.js";
 import {
   bindBasicToolToView,
   copyFixture,
@@ -96,7 +98,8 @@ async function startDev(
   cwd: string,
   port: number,
   host?: string,
-  inspector?: boolean
+  inspector?: boolean,
+  directories: Pick<DevOptions, "viewsDir" | "mcpDir"> = {}
 ): Promise<DevHandle> {
   const lines: string[] = [];
   const logSpy = vi
@@ -116,6 +119,7 @@ async function startDev(
     port,
     ...(host !== undefined && { host }),
     ...(inspector !== undefined && { inspector }),
+    ...directories,
     signal: controller.signal,
   });
   // Surface startup failures instead of hanging in waitFor.
@@ -490,6 +494,17 @@ describe("runDev", () => {
       autoConnectUrl: `${origin}/api/mcp`,
       logPrefix: "[inspector]",
     });
+    const html = await (
+      await fetch(`${origin}/api/mcp`, { headers: { accept: "text/html" } })
+    ).text();
+    const link = html
+      .match(/id="inspector-link" href="([^"]+)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+    expect(link).toBeDefined();
+    expect(new URL(link!).pathname).toBe("/api/mcp/inspector");
+    expect(new URL(link!).searchParams.get("autoConnect")).toBe(
+      `${origin}/api/mcp`
+    );
   });
 
   it("serves the built-in Inspector without a project dependency", async () => {
@@ -507,6 +522,21 @@ describe("runDev", () => {
     expect(dev.logs.join("\n")).not.toContain(
       "Built-in Inspector is unavailable"
     );
+    const html = await (
+      await fetch(dev.url, { headers: { accept: "text/html" } })
+    ).text();
+    const link = html
+      .match(/id="inspector-link" href="([^"]+)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+    expect(link).toBeDefined();
+    const target = new URL(link!);
+    expect(target.origin).toBe(new URL(dev.url).origin);
+    expect(target.pathname).toBe("/mcp/inspector");
+    expect(target.searchParams.get("autoConnect")).toBe(dev.url);
+    expect(target.searchParams.get("tab")).toBe("chat");
+    const shell = await fetch(target);
+    expect(shell.status).toBe(200);
+    expect(await shell.text()).toContain("inspector.js");
   });
 
   it("refuses to start when the project's Inspector has no mountInspector export", async () => {
@@ -535,6 +565,15 @@ describe("runDev", () => {
     expect((await fetch(`${dev.url}/inspector`)).status).toBe(404);
     expect(dev.logs.join("\n")).not.toContain("Inspector is not installed");
     expect(dev.logs.some((line) => line.includes("➜ Inspector:"))).toBe(false);
+    const html = await (
+      await fetch(dev.url, { headers: { accept: "text/html" } })
+    ).text();
+    const link = html
+      .match(/id="inspector-link" href="([^"]+)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+    expect(link).toBeDefined();
+    expect(new URL(link!).origin).toBe("https://inspector.manufact.com");
+    expect(new URL(link!).searchParams.get("autoConnect")).toBe(dev.url);
   });
 
   it("creates a missing root mcp-env.d.ts", async () => {
@@ -1060,6 +1099,191 @@ async function rawGetBody(
 }
 
 describe("runDev (views)", () => {
+  it.each([
+    { reserved: "inspector", encodedReserved: "%69nspector", basePath: "/mcp" },
+    { reserved: "_mcp-use", encodedReserved: "%5fmcp-use", basePath: "/mcp" },
+    { reserved: "_mcp-use", encodedReserved: "%5fmcp-use", basePath: "/" },
+  ])(
+    "keeps raw and encoded $reserved URLs out of Vite with base $basePath",
+    async ({ reserved, encodedReserved, basePath }) => {
+      const cwd = copyFixture("dev-encoded-reserved", "views");
+      cleanups.push(() => removeDir(cwd));
+      const viewsDir = basePath === "/" ? "_mcp-use" : "mcp";
+      renameSync(join(cwd, "views"), join(cwd, viewsDir));
+      const entry = join(cwd, "src/index.ts");
+      writeFileSync(
+        entry,
+        readFileSync(entry, "utf8").replace(
+          'name: "fixture-views",',
+          `name: "fixture-views", basePath: ${JSON.stringify(basePath)},`
+        )
+      );
+      const basePrefix = basePath === "/" ? "" : basePath;
+      const reservedDir = join(cwd, basePrefix, reserved);
+      mkdirSync(reservedDir, { recursive: true });
+      writeFileSync(
+        join(reservedDir, "routing-probe.ts"),
+        'export const value = "reserved source";'
+      );
+      const dev = await startDev(cwd, await getFreePort(), undefined, false, {
+        viewsDir,
+      });
+      cleanups.push(dev.stop);
+      const base = new URL(dev.url).origin;
+      const view = await fetch(
+        `${base}${basePath === "/" ? "/@vite/client" : "/mcp/product-search-result/view.tsx"}`
+      );
+      expect(view.status).toBe(200);
+      await view.text();
+
+      for (const prefix of [
+        `${basePrefix}/${reserved}`,
+        `${basePrefix}/${encodedReserved}`,
+        ...(basePath === "/mcp" ? [`/%6dcp/${reserved}`] : []),
+      ]) {
+        const response = await fetch(`${base}${prefix}/routing-probe.ts`);
+        expect(response.status, prefix).toBe(404);
+        await response.text();
+      }
+    }
+  );
+
+  it.each(
+    [
+      { label: "default views", viewsDir: "views", directories: {} },
+      {
+        label: "custom viewsDir",
+        viewsDir: "src/views",
+        directories: { viewsDir: "src/views" },
+      },
+      {
+        label: "custom mcpDir",
+        viewsDir: "src/mcp/views",
+        directories: { mcpDir: "src/mcp" },
+      },
+      {
+        label: "encoded viewsDir",
+        viewsDir: "src/my views café %",
+        directories: { viewsDir: "src/my views café %" },
+      },
+      {
+        label: "encoded shared import",
+        viewsDir: "src/views",
+        directories: { viewsDir: "src/views" },
+        sharedFileName: "shared greeting café %.ts",
+      },
+      {
+        label: "root viewsDir",
+        viewsDir: ".",
+        directories: { viewsDir: "." },
+      },
+    ].flatMap((configuration) =>
+      [false, true].map((landing) => ({ ...configuration, landing }))
+    )
+  )(
+    "serves shared imports with $label and landing=$landing",
+    async ({
+      viewsDir,
+      directories,
+      landing,
+      sharedFileName = "shared.ts",
+    }) => {
+      const cwd = copyFixture("dev-shared-import", "views");
+      cleanups.push(() => removeDir(cwd));
+      const sourceRoot = join(cwd, directories.mcpDir ?? ".");
+      if (directories.mcpDir !== undefined) {
+        mkdirSync(sourceRoot, { recursive: true });
+        renameSync(join(cwd, "src/index.ts"), join(sourceRoot, "index.ts"));
+      }
+      if (viewsDir === ".") {
+        for (const name of ["product-search-result", "orphan-preview"]) {
+          renameSync(join(cwd, "views", name), join(cwd, name));
+        }
+        rmSync(join(cwd, "views"), { recursive: true });
+      } else if (viewsDir !== "views") {
+        renameSync(join(cwd, "views"), join(cwd, viewsDir));
+      }
+      const sharedPath = join(cwd, "src", sharedFileName);
+      writeFileSync(sharedPath, 'export const greeting = "shared greeting";');
+      writeFileSync(
+        join(cwd, "unreferenced.ts"),
+        'export const value = "private";'
+      );
+      const viewDir = join(cwd, viewsDir, "product-search-result");
+      const sharedImport = relative(viewDir, sharedPath).split("\\").join("/");
+      writeFileSync(
+        join(viewDir, "view.tsx"),
+        `import { greeting } from ${JSON.stringify(sharedImport)};
+         export default function View() { return <main>{greeting}</main>; }`
+      );
+      if (landing) {
+        writeFileSync(
+          join(sourceRoot, "landing.tsx"),
+          "export default function Landing() { return <main>Landing</main>; }"
+        );
+      }
+      if (viewsDir === ".") {
+        writeFileSync(
+          join(cwd, "vite.config.ts"),
+          `export default { plugins: [{
+            name: "observe-vite-routing",
+            configureServer(server) {
+              server.middlewares.use((_req, res, next) => {
+                res.setHeader("x-vite-module", "true");
+                next();
+              });
+            },
+          }] };`
+        );
+      }
+
+      const dev = await startDev(
+        cwd,
+        await getFreePort(),
+        undefined,
+        false,
+        directories
+      );
+      cleanups.push(dev.stop);
+      const base = new URL(dev.url).origin;
+      // A root views directory must not send unrelated requests through Vite.
+      const unreferenced = await fetch(`${base}/unreferenced.ts`);
+      expect(unreferenced.status).toBe(404);
+      expect(unreferenced.headers.get("x-vite-module")).toBeNull();
+      await unreferenced.text();
+      const malformed = await fetch(`${base}/src/bad%ZZ.ts`);
+      expect(malformed.status).toBe(404);
+      await malformed.text();
+      // Match browser dependency discovery: virtual entry -> view -> shared.
+      const virtual = await fetch(
+        `${base}/@id/__x00__virtual:mcp-use/views/product-search-result`
+      );
+      expect(virtual.status).toBe(200);
+      await virtual.text();
+      const view = await fetch(
+        `${base}${encodeURI(`/${viewsDir}/product-search-result/view.tsx`)}`
+      );
+      expect(view.status).toBe(200);
+      if (viewsDir === ".") {
+        expect(view.headers.get("x-vite-module")).toBe("true");
+      }
+      expect(await view.text()).toMatch(/from ["']\/src\/shared/);
+      const shared = await fetch(
+        `${base}${encodeURI(`/src/${sharedFileName}`)}`
+      );
+      expect(shared.status).toBe(200);
+      expect(await shared.text()).toContain("shared greeting");
+
+      const missingModule = await fetch(`${base}/src/not-a-module.ts`);
+      expect(missingModule.status).toBe(404);
+      await missingModule.text();
+      expect(await listToolNames(dev.url)).toContain("search-products");
+      const info = await fetch(`${base}/mcp/inspector/api/dev/info`);
+      expect(info.status).toBe(200);
+      expect(await info.json()).toMatchObject({ fromCli: true });
+    }
+  );
+
   it("serves Vite modules through a public sandbox hostname", async () => {
     process.env["MCP_URL"] = "https://sandbox.example.com/mcp";
     const cwd = copyFixture("dev-views", "views");

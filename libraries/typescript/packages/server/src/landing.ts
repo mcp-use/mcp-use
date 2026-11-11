@@ -319,6 +319,9 @@ export interface LandingPageOptions {
   /** Absolute public URL of the MCP endpoint. */
   url: string;
 
+  /** URL of an available Inspector; omission uses the hosted Manufact Inspector. */
+  inspectorUrl?: string;
+
   /** Optional server description. */
   description?: string;
 
@@ -369,7 +372,13 @@ export function generateLandingPage(options: LandingPageOptions): string {
     iconType,
   } = options;
   const name = title ?? protocolName;
-  const install = getInstallTargets({ url, name });
+  const install = getInstallTargets({
+    url,
+    name,
+    ...(options.inspectorUrl !== undefined && {
+      inspectorUrl: options.inspectorUrl,
+    }),
+  });
   const { chatUrl, readyUrl } = getPublicChatUrls(url);
   // Each step is "Heading: instruction"; the page bolds the heading.
   const chatgptStepsHtml = install.chatgpt.steps

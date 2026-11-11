@@ -18,9 +18,32 @@ test("skills install writes the bundled Cloud skill for all supported agents and
   expect(result.stderr).toBe("");
   expect(result.json).toMatchObject({
     path: cli.cwd,
-    skills: expect.arrayContaining(["manufact-cloud", "mcp-apps-builder"]),
+    skills: expect.arrayContaining([
+      "manufact-cloud",
+      "manufact-analytics",
+      "mcp-apps-builder",
+    ]),
   });
   for (const agent of [".cursor", ".claude", ".agents"]) {
+    expect(
+      await readFile(
+        join(cli.cwd, agent, "skills", "manufact-analytics", "SKILL.md"),
+        "utf8"
+      )
+    ).toContain("name: manufact-analytics");
+    expect(
+      await readFile(
+        join(
+          cli.cwd,
+          agent,
+          "skills",
+          "manufact-analytics",
+          "references",
+          "queries.md"
+        ),
+        "utf8"
+      )
+    ).toContain("uniqCombined64Merge");
     const source = await readFile(
       join(cli.cwd, agent, "skills", "manufact-cloud", "SKILL.md"),
       "utf8"

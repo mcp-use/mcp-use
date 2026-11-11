@@ -14,10 +14,12 @@ export const UI_META_KEY = "ui" as const;
 export const UI_RESOURCE_URI_META_KEY = "ui/resourceUri" as const;
 
 /**
- * Build the stable `ui://` resource URI for a view name.
+ * Build a view resource URI, versioned when a production build ID is supplied.
  *
  * @param viewName - View directory / registry key.
+ * @param buildId - Immutable production build ID; omit for unversioned URIs.
  */
-export function viewResourceUri(viewName: string): string {
-  return `${UI_RESOURCE_URI_PREFIX}${viewName}.html`;
+export function viewResourceUri(viewName: string, buildId?: string): string {
+  const suffix = buildId === undefined ? "" : `-${buildId}`;
+  return `${UI_RESOURCE_URI_PREFIX}${viewName}${suffix}.html`;
 }
