@@ -682,7 +682,7 @@ describe("client OAuth browser UX", () => {
 
     expect(mocks.question).toHaveBeenCalledOnce();
     expect(mocks.question).toHaveBeenCalledWith(
-      "This server requires OAuth. Press Enter to open your browser.",
+      "This server requires OAuth. Press Enter to open your browser.\n",
       { signal: expect.any(AbortSignal) }
     );
     expect(mocks.openBrowser).toHaveBeenCalledWith(AUTHORIZATION_LAUNCHER_URL);

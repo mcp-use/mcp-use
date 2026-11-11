@@ -688,17 +688,19 @@ async function promptToOpenBrowser(
     output: process.stderr,
   });
   try {
+    // End the prompt with a newline: SDK logs print while it waits, and
+    // would otherwise continue on the prompt line.
     await prompt.question(
-      "This server requires OAuth. Press Enter to open your browser.",
+      "This server requires OAuth. Press Enter to open your browser.\n",
       { signal }
     );
     if (!signal.aborted) openBrowser(url);
   } catch {
-    // Aborted: the connection already succeeded or failed, so end the prompt
-    // line before the result. Otherwise stdin failed: fall back to the URL.
-    process.stderr.write(
-      signal.aborted ? "\n" : `\nOpen this URL to authenticate:\n${url}\n`
-    );
+    // Aborted means the connection already settled. Otherwise stdin failed,
+    // so fall back to printing the URL.
+    if (!signal.aborted) {
+      process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
+    }
   } finally {
     prompt.close();
   }
