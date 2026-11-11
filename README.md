@@ -319,7 +319,7 @@ Ship to [Manufact](https://manufact.com) and get observability, analytics, evals
 npm run deploy
 ```
 
-Prefer to run it yourself? Follow the [self-hosting guide →](https://docs.mcp-use.com/typescript/server/deployment/runtime-patterns).
+Prefer to run it yourself? Follow the [self-hosting guide →](https://docs.mcp-use.com/typescript/server/deployment/self-hosted).
 
 ## How mcp-use compares
 
