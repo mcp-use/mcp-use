@@ -53,7 +53,7 @@ function isOAuthClientProvider(
  * });
  * ```
  *
- * @see {@link MCPSession} for session management
+ * @see {@link MCPConnection} for connection methods
  */
 export abstract class BaseMCPClient {
   /**
@@ -271,7 +271,7 @@ export abstract class BaseMCPClient {
    * Creates a connector from server configuration.
    *
    * This abstract method must be implemented by platform-specific subclasses
-   * to create the appropriate connector type (Stdio, HTTP, WebSocket, etc.)
+   * to create the appropriate connector type (stdio or HTTP)
    * based on the server configuration and runtime environment.
    *
    * @param serverConfig - Server configuration object
@@ -307,7 +307,7 @@ export abstract class BaseMCPClient {
    *
    * @param serverName - The name of the server as defined in the client configuration
    * @param autoInitialize - Whether to automatically initialize the session (default: true)
-   * @returns A promise that resolves to the created MCPSession instance
+   * @returns A promise that resolves to the created MCPConnection instance (also exported as MCPSession).
    * @throws If the server is not found in the configuration
    *
    * @example
@@ -435,6 +435,7 @@ export abstract class BaseMCPClient {
    * the negotiated protocol version and normalized server metadata.
    *
    * @param serverName - The configured server name.
+   * @returns A ready MCPConnection for calling tools and accessing server resources.
    */
   public async connect(serverName: string): Promise<MCPConnection> {
     return this.createSession(serverName);

@@ -82,7 +82,7 @@ export default server;`);
       );
       await write(
         "src/views/card/view.tsx",
-        'import "./style.css"; export default function Card() { return <div>Built card</div>; }'
+        'import "./style.css"; export const viewConfig = {displayModes: ["inline", "fullscreen"], preferredDisplayMode: "fullscreen"}; export default function Card() { return <div>Built card</div>; }'
       );
       await write("src/views/card/style.css", "div { color: purple; }");
       await write("public/logo.svg", "<svg>embedded logo</svg>");
@@ -156,7 +156,9 @@ async function rpc(method, params = {}) {
     ? text.split("\\n").find(line => line.startsWith("data:")).slice(5) : text);
 }
 const config = await (await request("/mcp/config")).json();
-const view = await rpc("resources/read", {uri:"ui://views/card.html"});
+const tools = await rpc("tools/list");
+const uri = tools.result.tools[0]._meta.ui.resourceUri;
+const view = await rpc("resources/read", {uri});
 const html = view.result.contents[0].text;
 const urls = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
   .map(match => match[1]).filter(url => url.includes("/_mcp-use/views/"));
@@ -166,12 +168,18 @@ const assets = await Promise.all(urls.map(async url => {
 }));
 const skill = await rpc("resources/read", {uri:"skill://review/SKILL.md"});
 const logo = await (await request("/mcp/_mcp-use/public/logo.svg")).text();
-console.log(JSON.stringify({config, assets, skill, logo}));
+console.log(JSON.stringify({config, assets, skill, logo, view, uri}));
 `,
         ],
         { cwd: root }
       );
       const result = JSON.parse(stdout.trim().split("\n").at(-1)!);
+      expect(result.uri).toMatch(/^ui:\/\/views\/card-[0-9a-f]{16}\.html$/);
+      expect(result.view.result.contents[0].uri).toBe(result.uri);
+      expect(result.view.result.contents[0]._meta["openai/ui"]).toEqual({
+        availableDisplayModes: ["inline", "fullscreen"],
+        preferredDisplayMode: "fullscreen",
+      });
       expect(result.config).toEqual({
         name: "configured-name",
         virtualValue: "build-only",

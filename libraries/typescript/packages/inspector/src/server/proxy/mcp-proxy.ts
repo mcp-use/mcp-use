@@ -7,14 +7,14 @@
  * @module mcp-proxy
  */
 
-import type { Context, Hono, Next } from "hono";
+import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
-  inspectorRateLimitResponse,
+  inspectorApiRateLimit,
 } from "../rate-limit.js";
 // ponytail: vendored from mcp-use/src/server/middleware/mcp-proxy.ts — keep in sync manually.
 import { isSafeProxyTarget } from "./oauth-proxy.js";
@@ -138,16 +138,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     });
-  const rateLimit = async (c: Context, next: Next) => {
-    try {
-      // RateLimiterMemory prefixes and stringifies keys. The Hono request
-      // wrapper therefore maps every request to one mounted-instance budget.
-      await rateLimiter.consume(c.req as unknown as string);
-    } catch (error) {
-      return inspectorRateLimitResponse(c, error);
-    }
-    return next();
-  };
+  const rateLimit = inspectorApiRateLimit(rateLimiter);
 
   // CRITICAL: Enable CORS and expose all headers for FastMCP session management
   // The Mcp-Session-Id header MUST be exposed for the browser to read it
@@ -253,7 +244,8 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 
       // Copy relevant headers, stripping proxy/infrastructure headers that would
       // confuse the target (e.g. X-Forwarded-Host from our own chain causes the
-      // gateway to resolve the wrong hostname and return 404).
+      // gateway to resolve the wrong hostname). DevSpace routing headers belong
+      // to this Inspector hop too, not to the upstream MCP server.
       const requestHeaders = c.req.header();
       for (const [key, value] of Object.entries(requestHeaders)) {
         const lowerKey = key.toLowerCase();
@@ -262,6 +254,8 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           !lowerKey.startsWith("x-target-") &&
           !lowerKey.startsWith("x-mcp-") &&
           !lowerKey.startsWith("x-forwarded-") &&
+          !lowerKey.startsWith("x-dev-") &&
+          !lowerKey.startsWith("x-devspace-") &&
           !lowerKey.startsWith("cf-") &&
           lowerKey !== "x-original-host" &&
           lowerKey !== "host" &&
@@ -301,10 +295,11 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           headers,
           body: currentBody,
           redirect: "manual",
+          signal: c.req.raw.signal,
         });
         const location = response.headers.get("location");
         if (!(response.status >= 300 && response.status < 400 && location)) {
-          return proxyResponse(response);
+          return await proxyResponse(response);
         }
         if (redirectCount >= MAX_REDIRECTS) {
           return c.json({ error: "Too many upstream redirects" }, 502);
@@ -339,6 +334,26 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
+
+      // The client disconnected before the upstream responded, so the abort
+      // we now propagate to the outbound fetch rejects here. That is the
+      // expected shutdown path, and nothing is left to read a body.
+      //
+      // fetch rejects with signal.reason verbatim, and the reason is not
+      // ours to choose. The Express adapter aborts with no argument, so
+      // there it is a DOMException named AbortError, but @hono/node-server
+      // aborts with a plain string, so an Error test alone would miss every
+      // disconnect on the standalone inspector. Accept the reason itself,
+      // and keep the name arm for the serialized-reason path where identity
+      // does not hold.
+      const { signal } = c.req.raw;
+      if (
+        signal.aborted &&
+        (error === signal.reason ||
+          (error instanceof Error && error.name === "AbortError"))
+      ) {
+        return new Response(null, { status: 499 });
+      }
 
       // Get targetUrl for better error logging
       const targetUrl = c.req.header("X-Target-URL");

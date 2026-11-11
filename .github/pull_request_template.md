@@ -1,5 +1,13 @@
 # Pull Request Description
 
+## Linked issue (required for contributors)
+
+Closes #<!-- Replace with an existing issue number, for example: Closes #123 -->
+
+## AI assistance and contributor responsibility
+
+Disclose any material AI assistance, including tools and what they helped produce, or state that none was used. Confirm that you reviewed and understand the changes and can respond to review feedback.
+
 ## Where did you find this issue?
 
 Describe how you encountered the problem. Include a link or reproduction when available.
@@ -79,6 +87,14 @@ Ensure all of the following have been completed:
 # Use the appropriate language syntax (python, typescript, bash, etc.)
 ```
 
+## Before / After Video or Screenshots
+
+> Required if this PR changes the Inspector (`@mcp-use/inspector`). Attach a video recording or screenshots.
+
+**Before:**
+
+**After:**
+
 ## Documentation Updates
 
 * List any documentation files that were updated
@@ -87,6 +103,7 @@ Ensure all of the following have been completed:
 ## Testing
 
 Describe how you tested these changes:
+- Exact commands or manual steps and their results, including anything not tested and why
 - Unit tests added/modified
 - Integration tests added/modified
 - Manual testing performed
@@ -95,7 +112,3 @@ Describe how you tested these changes:
 ## Backwards Compatibility
 
 Explain whether these changes are backwards compatible. If not, describe what users will need to do to adapt to these changes.
-
-## Related Issues
-
-Closes #[issue_number]

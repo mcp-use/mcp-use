@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_PKG = join(__dirname, "..");
-const FIXTURE = join(SERVER_PKG, "../cli/tests/cli/fixtures/views");
+const FIXTURE = join(SERVER_PKG, "../cli/tests/build/fixtures/views");
 const WORK = "/tmp/mcp-env-url-csp-test";
 const BUILD_DIR = join(WORK, ".mcp-use/build");
 
@@ -265,13 +265,30 @@ async function main() {
     const allHave = (cat) =>
       hasExactDomain(csp?.[cat], "https://supabase.co") &&
       hasExactDomain(csp?.[cat], "https://api.example.com");
-    log("CSP_URLS shortcut (all four categories)", {
+    log("CSP_URLS shortcut (connect + resource only)", {
       pass:
         allHave("connectDomains") &&
         allHave("resourceDomains") &&
-        allHave("frameDomains") &&
-        allHave("baseUriDomains"),
+        (csp?.frameDomains ?? []).length === 0 &&
+        (csp?.baseUriDomains ?? []).length === 0,
       csp,
+    });
+  }
+
+  {
+    clearEnv();
+    process.env.CSP_URLS = "https://supabase.co";
+    process.env.CSP_FRAME_DOMAINS = "https://embed.example.com";
+    process.env.CSP_BASE_URI_DOMAINS = "https://base.example.com";
+    const { csp } = await readView(handler);
+    log("Explicit CSP_FRAME_DOMAINS / CSP_BASE_URI_DOMAINS", {
+      pass:
+        csp?.frameDomains?.length === 1 &&
+        hasExactDomain(csp?.frameDomains, "https://embed.example.com") &&
+        csp?.baseUriDomains?.length === 1 &&
+        hasExactDomain(csp?.baseUriDomains, "https://base.example.com"),
+      frameDomains: csp?.frameDomains,
+      baseUriDomains: csp?.baseUriDomains,
     });
   }
 
@@ -301,9 +318,9 @@ async function main() {
           "https://connect-only.example.com"
         ) &&
         !hasExactDomain(csp?.connectDomains, "https://a.com") &&
-        hasExactDomain(csp?.frameDomains, "https://a.com"),
+        hasExactDomain(csp?.resourceDomains, "https://a.com"),
       connectDomains: csp?.connectDomains,
-      frameDomains: csp?.frameDomains,
+      resourceDomains: csp?.resourceDomains,
     });
   }
 

@@ -233,6 +233,21 @@ function capture(
   void request.then(() => pending.delete(request));
 }
 
+// Crawlers and link unfurlers (Slack, Discord, X, search engines) fetch the
+// landing page to build previews. The user agent itself is never sent.
+const BOT =
+  /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|headless|curl|wget|python-requests|go-http-client/i;
+
+/**
+ * Whether a request's user agent identifies itself as an automated client.
+ * A missing user agent counts as one, since every browser sends it.
+ *
+ * @internal
+ */
+export function isLikelyBot(userAgent: string | null): boolean {
+  return userAgent === null || BOT.test(userAgent);
+}
+
 /** Capture one anonymous, flat SDK usage event. @internal */
 export function recordUsage(
   feature: string,

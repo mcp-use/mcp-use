@@ -356,7 +356,15 @@ function transformSchemaNode(
   for (const [key, child] of Object.entries(object)) {
     if (key === "$ref") continue;
     if (key === "nullable" && typeof child === "boolean") continue;
+    if (isExclusiveBoundKey(key) && typeof child === "boolean") continue;
     siblings[key] = transformSchemaNode(spec, child, resolvingRefs);
+  }
+  // OpenAPI 3.0 marks exclusive bounds with booleans; JSON Schema needs the number.
+  for (const [boundKey, exclusiveKey] of EXCLUSIVE_BOUND_KEYS) {
+    if (object[exclusiveKey] === true && typeof object[boundKey] === "number") {
+      siblings[exclusiveKey] = object[boundKey];
+      delete siblings[boundKey];
+    }
   }
 
   let transformed: Record<string, unknown> = siblings;
@@ -381,6 +389,15 @@ function transformSchemaNode(
     return { anyOf: [transformed, { type: "null" }] };
   }
   return transformed;
+}
+
+const EXCLUSIVE_BOUND_KEYS = [
+  ["minimum", "exclusiveMinimum"],
+  ["maximum", "exclusiveMaximum"],
+] as const;
+
+function isExclusiveBoundKey(key: string): boolean {
+  return key === "exclusiveMinimum" || key === "exclusiveMaximum";
 }
 
 function rewriteSchemaRef(

@@ -40,6 +40,7 @@ import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ChatInputArea } from "./chat/ChatInputArea";
+import type { ChatSkillSelection } from "./chat/SkillContextChips";
 import { ChatLandingForm } from "./chat/ChatLandingForm";
 import { ConfigurationDialog } from "./chat/ConfigurationDialog";
 import { ConfigureEmptyState } from "./chat/ConfigureEmptyState";
@@ -172,6 +173,8 @@ export interface ChatTabProps {
   defaultView?: ChatView;
   /** Pluggable system prompt source. Defaults to localStorage per serverId. */
   systemPromptProvider?: ChatSystemPromptProvider;
+  /** Host-controlled skills shown inside the composer; catalog comes from connection.skills. */
+  skillSelection?: ChatSkillSelection;
   /** Raise ChatHeader above host chrome (cloud embed). */
   elevatedHeader?: boolean;
   /** Host bridge for direct React embeds that cannot use parent postMessage. */
@@ -224,6 +227,7 @@ export function ChatTab({
   onChatTitleGenerated,
   defaultView = "conv",
   systemPromptProvider: externalSystemPromptProvider,
+  skillSelection,
   elevatedHeader,
   bridge,
   lockManagedMode = false,
@@ -279,6 +283,9 @@ export function ChatTab({
   const [activeView, setActiveView] = useState<ChatView>(defaultView);
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
   const skills = connection.skills ?? [];
+  const clientSideSkills = skillSelection
+    ? skills.filter((skill) => skillSelection.enabledUris.has(skill.uri))
+    : skills;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
   // Track position of trigger for removal in textarea
@@ -372,7 +379,7 @@ export function ChatTab({
   const clientSideChat = useChatMessagesClientSide({
     ...chatHookParams,
     systemPrompt: resolvedSystemPrompt,
-    skills,
+    skills: clientSideSkills,
   });
 
   const {
@@ -1582,6 +1589,8 @@ export function ChatTab({
           pendingElicitationRequests={connection.pendingElicitationRequests}
           onApproveElicitation={connection.approveElicitation}
           onRejectElicitation={connection.rejectElicitation}
+          skills={skills}
+          skillSelection={skillSelection}
           systemPromptProvider={effectiveSystemPromptProvider}
         />
         {reconnectBannerNode}
@@ -1738,6 +1747,8 @@ export function ChatTab({
             pendingElicitationRequests={connection.pendingElicitationRequests}
             onApproveElicitation={connection.approveElicitation}
             onRejectElicitation={connection.rejectElicitation}
+            skills={skills}
+            skillSelection={skillSelection}
             systemPromptProvider={effectiveSystemPromptProvider}
           />
         </div>

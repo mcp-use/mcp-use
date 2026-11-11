@@ -6,8 +6,16 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+  existsSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import {
   afterAll,
   afterEach,
@@ -19,9 +27,15 @@ import {
 } from "vitest";
 import { z } from "zod";
 
-import { MCPServer, registerViews } from "../src/index.js";
+import {
+  isInputRequiredResult,
+  MCPServer,
+  registerViews,
+} from "../src/index.js";
 import type { MetaObject } from "../src/index.js";
 import { synthesizeViewDocument } from "../src/views/document.js";
+import { createViewAssetsHandler } from "../src/views/routes.js";
+import type { ExternalViewManifestEntry } from "../src/views/types.js";
 import { buildToolUiMeta } from "../src/views/wire.js";
 
 const UI_CAPABILITIES = {
@@ -72,6 +86,10 @@ function primeViews(server: MCPServer): void {
     "product-search-result": {
       kind: "inline",
       js: 'console.log("product-search-result");',
+      viewConfig: {
+        displayModes: ["inline", "fullscreen"],
+        preferredDisplayMode: "fullscreen",
+      },
       css: ".results { color: red; }",
     },
     "orphan-view": {
@@ -505,6 +523,22 @@ describe("views server core (e2e over HTTP)", () => {
     });
   });
 
+  it("copies the view description to openai/widgetDescription on list and read", async () => {
+    const { resources } = await plainClient.listResources();
+    const view = resources.find(
+      (r) => r.uri === "ui://views/product-search-result.html"
+    );
+    expect(view?._meta?.["openai/widgetDescription"]).toBe(
+      "Product search results grid"
+    );
+    const read = await plainClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(read.contents[0]?._meta?.["openai/widgetDescription"]).toBe(
+      "Product search results grid"
+    );
+  });
+
   it("emits ui meta on resources/read content items for plain clients too", async () => {
     const read = await plainClient.readResource({
       uri: "ui://views/product-search-result.html",
@@ -526,7 +560,27 @@ describe("views server core (e2e over HTTP)", () => {
     });
   });
 
-  it("hashes ui.domain on resources/read for Claude clients", async () => {
+  it("serves frontend display modes on HTML content before app initialization", async () => {
+    const read = await plainClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(read.contents[0]?._meta?.["openai/ui"]).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
+      preferredDisplayMode: "fullscreen",
+    });
+    expect(read.contents[0]?._meta?.["ui"]).toMatchObject({
+      permissions: { clipboardWrite: {} },
+      prefersBorder: true,
+    });
+    const orphan = await plainClient.readResource({
+      uri: "ui://views/orphan-view.html",
+    });
+    expect(orphan.contents[0]?._meta?.["openai/ui"]).toEqual({
+      availableDisplayModes: ["inline", "fullscreen"],
+    });
+  });
+
+  it("hashes the full MCP endpoint on resources/read for Claude clients", async () => {
     const read = await claudeClient.readResource({
       uri: "ui://views/product-search-result.html",
     });
@@ -534,14 +588,14 @@ describe("views server core (e2e over HTTP)", () => {
       | Record<string, unknown>
       | undefined;
     expect(ui?.["domain"]).toBe(
-      "36009c725adb9960af4aebe6278959e8.claudemcpcontent.com"
+      `${createHash("sha256").update(url).digest("hex").slice(0, 32)}.claudemcpcontent.com`
     );
     // Only the domain is rewritten; the rest of _meta.ui is untouched.
     expect(ui?.["permissions"]).toEqual({ clipboardWrite: {} });
     expect(ui?.["prefersBorder"]).toBe(true);
   });
 
-  it("hashes ui.domain on resources/read for Claude clients on the legacy wire", async () => {
+  it("hashes the full MCP endpoint on resources/read for Claude clients on the legacy wire", async () => {
     const read = await legacyClaudeClient.readResource({
       uri: "ui://views/product-search-result.html",
     });
@@ -549,7 +603,7 @@ describe("views server core (e2e over HTTP)", () => {
       | Record<string, unknown>
       | undefined;
     expect(ui?.["domain"]).toBe(
-      "36009c725adb9960af4aebe6278959e8.claudemcpcontent.com"
+      `${createHash("sha256").update(url).digest("hex").slice(0, 32)}.claudemcpcontent.com`
     );
   });
 
@@ -656,6 +710,7 @@ describe("views server core (e2e over HTTP)", () => {
       (r) => r.uri === "ui://views/app-only-view.html"
     );
     expect(appOnly?.description).toBeUndefined();
+    expect(appOnly?._meta).not.toHaveProperty("openai/widgetDescription");
     const ui = appOnly?._meta?.["ui"] as Record<string, unknown> | undefined;
     expect(ui).toMatchObject({
       csp: {
@@ -1022,6 +1077,158 @@ describe("views server core (e2e over HTTP)", () => {
   });
 });
 
+describe("view resource reads through resources/read middleware", () => {
+  const server = new MCPServer({
+    name: "views-middleware-test",
+    version: "1.0.0",
+  });
+  const seenUris: string[] = [];
+  const seenTexts: string[] = [];
+  const seenDomains: unknown[] = [];
+  const seenViews: unknown[] = [];
+  const observed: string[] = [];
+  let url: string;
+  let client: Client;
+  let claudeClient: Client;
+
+  primeViews(server);
+  server.tool(
+    {
+      name: "search-fruits",
+      inputSchema: z.object({}),
+      outputSchema: resultsSchema,
+      view: {
+        name: "product-search-result",
+        description: "Results",
+        domain: "https://views.example.com",
+      },
+    },
+    async () => ({
+      structuredContent: { query: "", items: [] },
+      content: [{ type: "text", text: "Found 0 fruits" }],
+    })
+  );
+  server.resource({ name: "notes", uri: "notes://plain" }, async (uri) => ({
+    contents: [{ uri: uri.href, text: "plain" }],
+  }));
+  server.use("mcp:resources/read", async (ctx, next) => {
+    seenUris.push(ctx.params.uri);
+    seenViews.push(ctx.view);
+    if (ctx.params.uri === "ui://views/orphan-view.html") {
+      throw new Error("Blocked by middleware");
+    }
+    const result = await next();
+    if (isInputRequiredResult(result)) {
+      return result;
+    }
+    return {
+      ...result,
+      contents: result.contents.map((content) => {
+        if ("text" in content) {
+          seenTexts.push(content.text);
+        }
+        const ui = content._meta?.["ui"] as Record<string, unknown> | undefined;
+        seenDomains.push(ui?.["domain"]);
+        return {
+          ...content,
+          _meta: { ...content._meta, "example.com/injected": true },
+        };
+      }),
+    };
+  });
+
+  server.on("mcp:resources/read", (ctx) => {
+    observed.push(`before:${ctx.params.uri}:${ctx.view?.name}`);
+  });
+  server.on("mcp:resources/read:complete", (ctx) => {
+    observed.push(`complete:${ctx.params.uri}:${ctx.view?.name}`);
+  });
+
+  beforeAll(async () => {
+    ({ url } = await server.listen(0));
+    client = new Client(
+      { name: "plain-client", version: "1.0.0" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } }
+    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(url)));
+    claudeClient = new Client(
+      { name: "claude-desktop", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        capabilities: UI_CAPABILITIES,
+      }
+    );
+    await claudeClient.connect(new StreamableHTTPClientTransport(new URL(url)));
+  });
+
+  afterAll(async () => {
+    await client.close();
+    await claudeClient.close();
+    await server.close();
+  });
+
+  it("runs middleware on view reads and returns its modified result", async () => {
+    const read = await client.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    expect(seenUris).toContain("ui://views/product-search-result.html");
+    expect(seenTexts.some((text) => text.includes("<!doctype html>"))).toBe(
+      true
+    );
+    expect(read.contents).toHaveLength(1);
+    expect(read.contents[0]?._meta?.["example.com/injected"]).toBe(true);
+    expect(read.contents[0]?._meta?.["openai/widgetDescription"]).toBe(
+      "Results"
+    );
+  });
+
+  it("passes the Claude-hashed ui.domain to middleware", async () => {
+    seenDomains.length = 0;
+    const read = await claudeClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    const hashed = `${createHash("sha256").update(url).digest("hex").slice(0, 32)}.claudemcpcontent.com`;
+    expect(seenDomains).toEqual([hashed]);
+    const ui = read.contents[0]?._meta?.["ui"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(ui?.["domain"]).toBe(hashed);
+    expect(read.contents[0]?._meta?.["example.com/injected"]).toBe(true);
+  });
+
+  it("passes the authored ui.domain to middleware for other clients", async () => {
+    seenDomains.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    expect(seenDomains).toEqual(["https://views.example.com"]);
+  });
+
+  it("sets ctx.view on view reads only", async () => {
+    seenViews.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    await client.readResource({ uri: "notes://plain" });
+    expect(seenViews).toEqual([{ name: "product-search-result" }, undefined]);
+  });
+
+  it("fires resources/read observers for view reads", async () => {
+    observed.length = 0;
+    await client.readResource({ uri: "ui://views/product-search-result.html" });
+    expect(observed).toEqual([
+      "before:ui://views/product-search-result.html:product-search-result",
+      "complete:ui://views/product-search-result.html:product-search-result",
+    ]);
+  });
+
+  it("lets middleware reject a view read", async () => {
+    seenViews.length = 0;
+    await expect(
+      client.readResource({ uri: "ui://views/orphan-view.html" })
+    ).rejects.toThrow("Blocked by middleware");
+    expect(seenUris).toContain("ui://views/orphan-view.html");
+    // No tool binds orphan-view, so it is not marked as a tool view.
+    expect(seenViews).toEqual([undefined]);
+  });
+});
+
 describe("views HTTP routes", () => {
   const server = buildViewsServer();
   let baseUrl: string;
@@ -1142,6 +1349,54 @@ describe("views HTTP routes", () => {
       expect(publicFile.headers["access-control-allow-origin"]).toBe("*");
     } finally {
       rmSync(publicPath, { force: true });
+    }
+  });
+});
+
+describe("views bundle asset handler", () => {
+  it("keeps encoded traversal inside the requested view bundle", async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), "mcp-view-assets-"));
+    try {
+      const viewsRoot = join(projectRoot, ".mcp-use/build/views");
+      for (const name of ["a", "b"]) {
+        mkdirSync(join(viewsRoot, name, "assets"), { recursive: true });
+        writeFileSync(join(viewsRoot, name, "assets/entry.js"), "export {};");
+      }
+      mkdirSync(join(viewsRoot, "public"), { recursive: true });
+      writeFileSync(join(viewsRoot, "public/file.txt"), "public");
+      const external: ExternalViewManifestEntry = {
+        kind: "external",
+        entry: "assets/entry.js",
+        css: [],
+      };
+      const handler = createViewAssetsHandler(
+        "/mcp",
+        new Map([
+          ["a", external],
+          ["b", external],
+        ]),
+        { projectRoot }
+      );
+      if (handler === undefined) {
+        throw new Error("expected a view assets handler");
+      }
+      const get = (path: string) =>
+        handler(
+          new Request(`https://server.example.test/mcp/_mcp-use/views/${path}`)
+        );
+
+      expect((await get("a/assets/entry.js")).status).toBe(200);
+      // `%2f` survives URL parsing, so only the handler's own decoding and
+      // segment checks keep requests inside `.mcp-use/build/views/<name>/`.
+      for (const path of [
+        "a/..%2fb%2fassets%2fentry.js",
+        "a/assets%2f..%2f..%2fpublic%2ffile.txt",
+        "a%2f..%2fb/assets/entry.js",
+      ]) {
+        expect((await get(path)).status).toBe(404);
+      }
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
     }
   });
 });
@@ -1647,7 +1902,7 @@ describe("views env URL / CSP (e2e)", () => {
     expect(csp?.resourceDomains).not.toContain("https://server.example.com");
   });
 
-  it("applies CSP_URLS to all four categories before MCP auto-append", async () => {
+  it("applies CSP_URLS to connect and resource domains before MCP auto-append", async () => {
     process.env.MCP_URL = "https://server.example.com";
     process.env.CSP_URLS = "https://platform.example.com";
     delete process.env.MCP_ASSETS_URL;
@@ -1687,7 +1942,7 @@ describe("views env URL / CSP (e2e)", () => {
     expect(viewCsp?.connectDomains).toContain("https://server.example.com");
     expect(viewCsp?.resourceDomains?.[0]).toBe("https://platform.example.com");
     expect(viewCsp?.resourceDomains).toContain("https://server.example.com");
-    expect(viewCsp?.frameDomains).toEqual(["https://platform.example.com"]);
-    expect(viewCsp?.baseUriDomains).toEqual(["https://platform.example.com"]);
+    expect(viewCsp?.frameDomains).toEqual([]);
+    expect(viewCsp?.baseUriDomains).toEqual([]);
   });
 });

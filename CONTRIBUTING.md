@@ -10,6 +10,7 @@ Thank you for your interest in contributing to mcp-use! This document provides g
 
 - [Code of Conduct](#code-of-conduct)
 - [Ways to Contribute](#ways-to-contribute)
+- [Contribution Requirements](#contribution-requirements)
 - [Repository Structure](#repository-structure)
 - [Python Development](#python-development)
 - [TypeScript Development](#typescript-development)
@@ -30,6 +31,13 @@ We welcome all kinds of contributions! Here are some ways you can help:
 - **Improve documentation**: Fix typos, clarify explanations, or add examples
 
 If you have any questions or need guidance, join our [Discord](https://discord.gg/XkNkSkMz3V), we're super happy to help!
+
+## Contribution Requirements
+
+- Start with an existing GitHub issue, or open one describing the problem and its reproduction or proposed change. Wait for maintainer feedback before investing in an implementation; an issue or discussion is not a promise that a PR will be accepted.
+- Every PR from a contributor who is not a repository maintainer or admin, including documentation and small fixes, must link a GitHub issue in this repository. Put `Closes #123` in the PR description or ask a maintainer to link it in the Development sidebar. PRs without a linked issue are automatically closed; after linking an issue, ask a maintainer to reopen the PR.
+- Search for existing issues and PRs first. Keep the change focused, explain why it is needed, and include concrete test results and any limitations.
+- You are responsible for understanding and maintaining everything you submit. Disclose material AI assistance and follow the [AI contribution policy](./AI_POLICY.md).
 
 ## Repository Structure
 
@@ -289,6 +297,15 @@ pnpm --filter mcp-use test:run
 pnpm --filter @mcp-use/agent test:integration:agent
 ```
 
+#### Writing and reviewing tests
+
+Tests should check behaviour callers can observe, not implementation details. Two contributor skills in [`.claude/skills/`](.claude/skills/) spell out how; coding agents load them automatically, and people can read them as guides:
+
+- [`writing-tests`](.claude/skills/writing-tests/SKILL.md): the rules, the workflow, and how to test `@mcp-use/cli` commands against a local fake of Manufact Cloud ([`tests/helpers/`](libraries/typescript/packages/cli/tests/helpers/)).
+- [`reviewing-tests`](.claude/skills/reviewing-tests/SKILL.md): a step-by-step check that breaks the code under test, confirms each test fails, and reports each test as keep, rewrite or delete.
+
+The root [`skills/`](skills/) folder is different: it holds the skills we ship to mcp-use users.
+
 ### Changesets
 
 **All TypeScript changes require a changeset** describing what changed. This is enforced in CI for PRs to `main`.
@@ -307,6 +324,25 @@ You'll be prompted to:
 
 Commit the generated `.changeset/*.md` file with your changes.
 
+### Hosted Inspector releases
+
+Railway follows `main` for production Inspector and `canary` for dev, with
+**Wait for CI** enabled on both native GitHub triggers. Leave the Railway
+`VERSION` variable unset: the Dockerfile installs the exact version in the
+commit's `package.json`, and copying that manifest invalidates the install cache.
+Production rejects prerelease versions on `main`, retaining the previous stable
+deployment until the exit-prerelease commit publishes a stable version.
+
+The canary release workflow versions and builds packages locally, publishes to
+npm, verifies the packed artifacts and dist-tags, and creates tags and release
+notes before pushing the version commit. That final `GITHUB_TOKEN` push does not
+start recursive Actions runs; the published artifacts have already passed the
+release workflow's verification before Railway can see the new version commit.
+Main and canary releases share a concurrency queue so publication cannot overlap
+with the stable release's canary reset. A canary run stops before publishing if
+its source commit has already been superseded; the final push never overwrites
+concurrent branch updates.
+
 ### TypeScript Coding Standards
 
 - Use TypeScript strict mode
@@ -319,7 +355,14 @@ Commit the generated `.changeset/*.md` file with your changes.
 
 ## Pull Request Process
 
-### 1. Create a Branch
+> [!NOTE]
+> Before you start, search [open pull requests](https://github.com/mcp-use/mcp-use/pulls) for the issue you want to work on. If a PR for that issue is already open, don't open a new one. Help on the existing PR instead: review it, test it, leave suggestions, or offer commits to the author.
+>
+> If the existing PR has gone inactive and the author doesn't respond to a comment, ask a maintainer on the PR or in [Discord](https://discord.gg/XkNkSkMz3V) before taking it over.
+
+### 1. Link an Issue and Create a Branch
+
+Discuss the work in a GitHub issue first, and wait for maintainer feedback. Include `Closes #123` in the PR description, replacing `123` with the issue number. Repository maintainers and admins are exempt from the automatic linked issue requirement.
 
 ```bash
 # Create a feature branch from main
@@ -384,6 +427,7 @@ Create a Pull Request on GitHub with:
 - Clear title and description
 - Link to related issues (use "Closes #123")
 - Screenshots/recordings for UI changes
+- **A before and after video for Inspector or Agent fixes.** If your PR fixes something in the Inspector (`@mcp-use/inspector`) or the Agent (`@mcp-use/agent` or Python's `MCPAgent`), attach a video showing the broken behavior before your change and the fixed behavior after. For Agent fixes, a terminal recording is fine.
 
 ### CI Checks
 

@@ -95,7 +95,9 @@ describe("published CLI boundaries", () => {
       "dev",
       "build",
       "typecheck",
-      "identity",
+      "login",
+      "logout",
+      "whoami",
       "organizations",
       "servers",
       "deployments",
@@ -122,6 +124,19 @@ describe("published CLI boundaries", () => {
 
   it("keeps the unpacked framework artifact below five MiB", async () => {
     expect(await directoryBytes(DIST)).toBeLessThanOrEqual(5 * 1024 * 1024);
+  });
+
+  it("shares private buffered-response state across every server integration", async () => {
+    const shared = new URL("internal/buffered-response.js", DIST).href;
+    for (const entry of [
+      "index.js",
+      "index-node.js",
+      "node-bridge.js",
+      "vite/index.js",
+    ]) {
+      const graph = await buildStaticGraph(new URL(entry, DIST));
+      expect(graph.files.has(shared), entry).toBe(true);
+    }
   });
 
   it("keeps skill discovery in the CLI without a runtime dependency", async () => {
@@ -203,6 +218,14 @@ async function buildStaticGraph(entry: URL): Promise<ModuleGraph> {
     for (const specifier of specifiers.static) {
       if (specifier.startsWith(".")) {
         await visit(new URL(specifier, file));
+      } else if (specifier === "#mcp-use-buffered-response") {
+        // Count the shared private runtime module in each actual static graph.
+        await visit(
+          new URL(
+            packageJson.imports[specifier],
+            new URL("../../", import.meta.url)
+          )
+        );
       } else {
         graph.staticPackages.add(specifier);
       }

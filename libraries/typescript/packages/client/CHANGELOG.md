@@ -1,5 +1,150 @@
 # @mcp-use/client
 
+## 2.4.5
+
+### Patch Changes
+
+- e4ff892: Close Node OAuth loopback connections after callbacks, cancellation, and timeout without truncating the callback response.
+- e4ff892: Fix `useMcp().authTokens.expires_at` moving later on every reconnect for opaque (non-JWT) tokens. The expiry was recomputed as now plus `expires_in` each time stored tokens were read, so a token that was 50 minutes into a 1-hour lifetime was reported as valid for another hour. The absolute expiry is now saved alongside the tokens when they are received and reused on later reads. JWT tokens still use their `exp` claim.
+
+## 2.4.5-canary.1
+
+### Patch Changes
+
+- d1999a0: Fix `useMcp().authTokens.expires_at` moving later on every reconnect for opaque (non-JWT) tokens. The expiry was recomputed as now plus `expires_in` each time stored tokens were read, so a token that was 50 minutes into a 1-hour lifetime was reported as valid for another hour. The absolute expiry is now saved alongside the tokens when they are received and reused on later reads. JWT tokens still use their `exp` claim.
+
+## 2.4.5-canary.0
+
+### Patch Changes
+
+- e6e0e39: Close Node OAuth loopback connections after callbacks, cancellation, and timeout without truncating the callback response.
+
+## 2.4.4
+
+### Patch Changes
+
+- 96b6aa5: Send `Mcp-Param-*` headers for tool parameters annotated with `x-mcp-header` when calling tools from a browser. The SDK only mirrors these parameters outside browsers, so browser clients such as the Inspector sent the value in the request body only and servers requiring the header rejected the call.
+- 96b6aa5: Validate discovered OAuth metadata with the official SDK before classifying an anonymous MCP connection as mixed auth. Root metadata for a different resource no longer causes public endpoints to appear to require authentication.
+
+  Reject cached OAuth credentials with a missing, empty, or mismatched issuer stamp rather than adopting them for a newly discovered issuer.
+
+## 2.4.4-canary.1
+
+### Patch Changes
+
+- 9ab2723: Validate discovered OAuth metadata with the official SDK before classifying an anonymous MCP connection as mixed auth. Root metadata for a different resource no longer causes public endpoints to appear to require authentication.
+
+  Reject cached OAuth credentials with a missing, empty, or mismatched issuer stamp rather than adopting them for a newly discovered issuer.
+
+## 2.4.4-canary.0
+
+### Patch Changes
+
+- b2f55fc: Send `Mcp-Param-*` headers for tool parameters annotated with `x-mcp-header` when calling tools from a browser. The SDK only mirrors these parameters outside browsers, so browser clients such as the Inspector sent the value in the request body only and servers requiring the header rejected the call.
+
+## 2.4.3
+
+### Patch Changes
+
+- aa78231: Correct API reference comments. In `@mcp-use/client`, stdio `env` does not inherit the parent process environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, and several examples referenced fields and connectors that do not exist. In `mcp-use`, legacy stateless GET, DELETE, and HEAD requests are documented as returning `204`, the `withMcpUse` defaults match the build, and the `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` entry points now appear in the generated API reference.
+
+## 2.4.3-canary.0
+
+### Patch Changes
+
+- c64b4d4: Correct API reference comments. In `@mcp-use/client`, stdio `env` does not inherit the parent process environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, and several examples referenced fields and connectors that do not exist. In `mcp-use`, legacy stateless GET, DELETE, and HEAD requests are documented as returning `204`, the `withMcpUse` defaults match the build, and the `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` entry points now appear in the generated API reference.
+
+## 2.4.2
+
+### Patch Changes
+
+- 6bf3a79: Implement `listTools` and protocol metadata on `CodeModeConnector`
+
+## 2.4.2-canary.0
+
+### Patch Changes
+
+- b3990f0: Implement `listTools` and protocol metadata on `CodeModeConnector`
+
+## 2.4.1
+
+### Patch Changes
+
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 2.4.1-canary.0
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+## 2.4.0
+
+### Minor Changes
+
+- cdf2cc6: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+### Patch Changes
+
+- cdf2cc6: Decode base64 MCP App HTML resources as UTF-8 so non-ASCII text renders correctly in React views.
+- cdf2cc6: Document that `proxyOAuthRequests` also routes UserInfo requests through the OAuth proxy.
+
+## 2.4.0-canary.2
+
+### Patch Changes
+
+- 63b923e: Document that `proxyOAuthRequests` also routes UserInfo requests through the OAuth proxy.
+
+## 2.4.0-canary.1
+
+### Minor Changes
+
+- 604b130: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+## 2.3.5-canary.0
+
+### Patch Changes
+
+- 19a3d94: Decode base64 MCP App HTML resources as UTF-8 so non-ASCII text renders correctly in React views.
+
+## 2.3.4
+
+### Patch Changes
+
+- 7d71ef7: `BrowserMCPClient` now expands the `capabilities.views` shorthand into the `io.modelcontextprotocol/ui` extension and forwards `roots` and `defaultRequestOptions` to the connector, matching the Node client.
+- 7d71ef7: `getOAuthTokenExpiry` now reads the JWT `exp` claim when the token payload contains the Base64URL characters `-` or `_`. These tokens previously fell back to `expires_in`, so nothing changes for providers that return `expires_in`. The `authTokens.expires_at` docs now say milliseconds, matching the value `useMcp` has always returned.
+- 7d71ef7: Views no longer stay pending forever when the host cancels the tool call that rendered them. When `ui/notifications/tool-cancelled` arrives before a result, `useToolContext()` now switches to `status: "error"` with a new `ToolCancelledError` (exported from `mcp-use/react`) that carries the host's `reason`. Views that already render `error.message` show the cancellation without changes. Check `error instanceof ToolCancelledError` to show a "Cancelled" state or a retry. A cancellation that arrives after a result is still ignored.
+
+  `ToolContextError` is now `ToolError | ToolCancelledError`. Narrow with `instanceof ToolError` before reading `error.result`.
+
+  `ViewRenderer` no longer sends `tool-cancelled` when a tool call made by the view fails. That failure already rejects the view's call, and the notification refers to the tool call that rendered the view.
+
+## 2.3.4-canary.2
+
+### Patch Changes
+
+- 1a5dbe5: `getOAuthTokenExpiry` now reads the JWT `exp` claim when the token payload contains the Base64URL characters `-` or `_`. These tokens previously fell back to `expires_in`, so nothing changes for providers that return `expires_in`. The `authTokens.expires_at` docs now say milliseconds, matching the value `useMcp` has always returned.
+
+## 2.3.4-canary.1
+
+### Patch Changes
+
+- a294830: `BrowserMCPClient` now expands the `capabilities.views` shorthand into the `io.modelcontextprotocol/ui` extension and forwards `roots` and `defaultRequestOptions` to the connector, matching the Node client.
+
+## 2.3.4-canary.0
+
+### Patch Changes
+
+- a7f5b34: Views no longer stay pending forever when the host cancels the tool call that rendered them. When `ui/notifications/tool-cancelled` arrives before a result, `useToolContext()` now switches to `status: "error"` with a new `ToolCancelledError` (exported from `mcp-use/react`) that carries the host's `reason`. Views that already render `error.message` show the cancellation without changes. Check `error instanceof ToolCancelledError` to show a "Cancelled" state or a retry. A cancellation that arrives after a result is still ignored.
+
+  `ToolContextError` is now `ToolError | ToolCancelledError`. Narrow with `instanceof ToolError` before reading `error.result`.
+
+  `ViewRenderer` no longer sends `tool-cancelled` when a tool call made by the view fails. That failure already rejects the view's call, and the notification refers to the tool call that rendered the view.
+
 ## 2.3.3
 
 ### Patch Changes

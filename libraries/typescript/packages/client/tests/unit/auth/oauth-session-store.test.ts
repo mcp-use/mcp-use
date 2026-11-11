@@ -5,7 +5,7 @@
  *   pnpm --filter mcp-use test:unit -- tests/unit/auth/session-store.test.ts
  */
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   OAuthSessionStore,
   type OAuthSessionStoreOptions,
@@ -97,6 +97,7 @@ describe("OAuthSessionStore", () => {
       const tokens = {
         access_token: "opaque-token",
         refresh_token: "refresh-1",
+        issuer: "https://auth.example.com",
       };
       kv.set(session.getKey("tokens"), JSON.stringify(tokens));
 
@@ -128,12 +129,40 @@ describe("OAuthSessionStore", () => {
       expect(kv.get(session.getKey("last_auth_url"))).toBeNull();
       expect(kv.get(session.getKey("last_auth_callback_url"))).toBeNull();
     });
+
+    describe("expiry", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("pins expires_in to an absolute expiry when saved", async () => {
+        const { session } = createStore();
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+
+        await session.saveTokens({
+          access_token: "abc",
+          expires_in: 3600,
+          issuer: "https://auth.example.com",
+        });
+
+        // Reading later must not restart the token's lifetime.
+        vi.setSystemTime(new Date("2026-01-01T00:50:00Z"));
+        expect(await session.tokens()).toMatchObject({
+          mcp_use_expires_at: Date.parse("2026-01-01T01:00:00Z"),
+        });
+      });
+    });
   });
 
   describe("clientInformation()", () => {
     it("returns stored info when redirect_uris is empty (server omitted it)", async () => {
       const { session, kv } = createStore();
-      const info = { client_id: "abc", redirect_uris: [] };
+      const info = {
+        client_id: "abc",
+        redirect_uris: [],
+        issuer: "https://auth.example.com",
+      };
       kv.set(session.getKey("client_info"), JSON.stringify(info));
 
       const result = await session.clientInformation();
@@ -147,7 +176,10 @@ describe("OAuthSessionStore", () => {
       });
       kv.set(
         session.getKey("client_info"),
-        JSON.stringify({ client_id: "legacy-browser-client" })
+        JSON.stringify({
+          client_id: "legacy-browser-client",
+          issuer: "https://auth.example.com",
+        })
       );
       kv.set(
         session.getKey("tokens"),
@@ -165,7 +197,10 @@ describe("OAuthSessionStore", () => {
         allowClientSecret: false,
       });
 
-      await session.saveClientInformation({ client_id: "new-browser-client" });
+      await session.saveClientInformation({
+        client_id: "new-browser-client",
+        issuer: "https://auth.example.com",
+      });
 
       expect(await session.clientInformation()).toMatchObject({
         client_id: "new-browser-client",
@@ -186,6 +221,7 @@ describe("OAuthSessionStore", () => {
         JSON.stringify({
           client_id: "poisoned-browser-client",
           redirect_uris: [session.redirectUrl],
+          issuer: "https://auth.example.com",
         })
       );
       kv.set(
@@ -211,6 +247,7 @@ describe("OAuthSessionStore", () => {
       const info = {
         client_id: "abc",
         redirect_uris: [session.redirectUrl, "https://other.example.com/cb"],
+        issuer: "https://auth.example.com",
       };
       kv.set(session.getKey("client_info"), JSON.stringify(info));
 
@@ -223,6 +260,7 @@ describe("OAuthSessionStore", () => {
       const info = {
         client_id: "abc",
         redirect_uris: ["https://different.example.com/oauth/callback"],
+        issuer: "https://auth.example.com",
       };
       kv.set(session.getKey("client_info"), JSON.stringify(info));
       kv.set(session.getKey("tokens"), JSON.stringify({ access_token: "x" }));
@@ -442,8 +480,8 @@ describe("OAuthSessionStore", () => {
       const issuerA = { issuer: "https://issuer-a.example.com" };
       const issuerB = { issuer: "https://issuer-b.example.com" };
 
-      await session.saveTokens({ access_token: "a" }, issuerA);
-      await session.saveTokens({ access_token: "b" }, issuerB);
+      await session.saveTokens({ access_token: "a", ...issuerA }, issuerA);
+      await session.saveTokens({ access_token: "b", ...issuerB }, issuerB);
 
       expect((await session.tokens(issuerA))?.access_token).toBe("a");
       expect((await session.tokens(issuerB))?.access_token).toBe("b");
@@ -496,7 +534,11 @@ describe("OAuthSessionStore", () => {
       });
       kv.set(
         session.getKey("client_info"),
-        JSON.stringify({ client_id: "legacy", client_secret: "secret" })
+        JSON.stringify({
+          client_id: "legacy",
+          client_secret: "secret",
+          issuer: "https://auth.example.com",
+        })
       );
       kv.set(
         session.getKey("tokens"),
@@ -527,6 +569,7 @@ describe("OAuthSessionStore", () => {
       await session.saveClientInformation({
         client_id: "confidential-client",
         client_secret: "secret",
+        issuer: "https://auth.example.com",
       });
 
       expect((await session.clientInformation())?.client_secret).toBe("secret");

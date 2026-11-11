@@ -5,7 +5,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { cn } from "@/client/lib/utils";
-import type { Prompt } from "@mcp-use/client/react";
+import type { Prompt, Skill } from "@mcp-use/client/react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
 import type { ElicitResult } from "@mcp-use/client/react";
@@ -19,6 +19,10 @@ import type { ToolInfo } from "./ToolSelector";
 import type { LLMConfig, MessageAttachment } from "./types";
 import { FloatingChatElicitation } from "./FloatingChatElicitation";
 import { SystemPromptButton } from "./SystemPromptButton";
+import {
+  SkillContextChips,
+  type ChatSkillSelection,
+} from "./SkillContextChips";
 import type { ChatSystemPromptProvider } from "./system-prompt/types";
 
 interface ChatInputAreaProps {
@@ -75,6 +79,8 @@ interface ChatInputAreaProps {
   onRejectElicitation?: (requestId: string, error?: string) => void;
   /** Pluggable system prompt source (localStorage or host API). */
   systemPromptProvider?: ChatSystemPromptProvider;
+  skills?: Skill[];
+  skillSelection?: ChatSkillSelection;
 }
 
 export function ChatInputArea({
@@ -115,8 +121,15 @@ export function ChatInputArea({
   onApproveElicitation,
   onRejectElicitation,
   systemPromptProvider,
+  skills = [],
+  skillSelection,
 }: ChatInputAreaProps) {
   const isFullscreen = variant === "fullscreen";
+  const hasSkillSelection =
+    !isFullscreen && skills.length > 0 && !!skillSelection;
+  const contextRows =
+    Number(hasSkillSelection) +
+    Number(!isFullscreen && promptResults.length > 0);
   const canSend =
     inputValue.trim() || promptResults.length > 0 || attachments.length > 0;
   const hasPendingElicitation = (pendingElicitationRequests?.length ?? 0) > 0;
@@ -190,6 +203,13 @@ export function ChatInputArea({
         )}
         {!isFullscreen && (
           <>
+            {hasSkillSelection && skillSelection && (
+              <SkillContextChips
+                skills={skills}
+                {...skillSelection}
+                disabled={!isConnected || isLoading || skillSelection.disabled}
+              />
+            )}
             <PromptsDropdown
               isOpen={promptsDropdownOpen}
               prompts={prompts}
@@ -200,6 +220,7 @@ export function ChatInputArea({
             <PromptResultsList
               promptResults={promptResults}
               onDeletePromptResult={onDeletePromptResult}
+              offsetForSkills={hasSkillSelection}
             />
           </>
         )}
@@ -211,10 +232,12 @@ export function ChatInputArea({
           isLoading={isLoading}
           textareaRef={textareaRef}
           attachments={attachments}
+          contextRows={contextRows}
           placeholder="Ask a question or request an action..."
           className={cn(
             "bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
-            !isFullscreen && promptResults.length > 0 && "pt-16"
+            !isFullscreen && contextRows === 1 && "pt-16",
+            !isFullscreen && contextRows === 2 && "pt-24"
           )}
           showAttachButton={!isFullscreen}
           tools={isFullscreen ? undefined : tools}

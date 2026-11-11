@@ -1,5 +1,454 @@
 # @mcp-use/inspector
 
+## 20.3.29
+
+### Patch Changes
+
+- 654523d: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.29-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.28
+
+### Patch Changes
+
+- 8e566cb: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- 30784bc: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.28-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.28-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.27
+
+### Patch Changes
+
+- 7f9027f: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.27-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.26
+
+### Patch Changes
+
+- f76d773: Export the existing SkillsTab component and its props from the client entry point so applications can embed the Inspector skills browser.
+
+  Build the client entry for browsers so Skills frontmatter parsing does not require Node.js built-ins.
+
+  Keep the chat header height consistent when embedded with the title and actions hidden, so the conversation tabs stay vertically centered.
+
+  Expose optional controlled skill selection inside the shared chat composer, alongside the existing system prompt control.
+
+  Respect controlled selections for client-side skill discovery while keeping every advertised skill available in the composer picker.
+
+## 20.3.26-canary.0
+
+### Patch Changes
+
+- f76d773: Export the existing SkillsTab component and its props from the client entry point so applications can embed the Inspector skills browser.
+
+  Build the client entry for browsers so Skills frontmatter parsing does not require Node.js built-ins.
+
+  Keep the chat header height consistent when embedded with the title and actions hidden, so the conversation tabs stay vertically centered.
+
+  Expose optional controlled skill selection inside the shared chat composer, alongside the existing system prompt control.
+
+  Respect controlled selections for client-side skill discovery while keeping every advertised skill available in the composer picker.
+
+## 20.3.25
+
+### Patch Changes
+
+- 5a6f679: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 5a6f679: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 1589353: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+
+## 20.3.25-canary.2
+
+### Patch Changes
+
+- 9ac5e82: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+
+## 20.3.25-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.25-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.24
+
+### Patch Changes
+
+- 5426c95: Docker builds now default to the exact version in package.json, reject dist-tags and unpublished versions, and start the installed mcp-inspect binary directly while preserving PORT support. Native Railway deployments reject prerelease versions from main. Publish and verify canary packages before pushing their version commit, replacing the custom Railway deployment action.
+
+## 20.3.24-canary.0
+
+### Patch Changes
+
+- d71db35: Docker builds now default to the exact version in package.json, reject dist-tags and unpublished versions, and start the installed mcp-inspect binary directly while preserving PORT support. Native Railway deployments reject prerelease versions from main. Publish and verify canary packages before pushing their version commit, replacing the custom Railway deployment action.
+
+## 20.3.23
+
+### Patch Changes
+
+- b89b9d4: Keep the chat mesh gradient visible while opening or closing history by redrawing the WebGL canvas immediately after resizing it.
+- 5be7650: Rebuild bundled workspace code and synchronize published internal package metadata.
+- e7450b5: Strip DevSpace routing headers before forwarding MCP requests so the Inspector proxy can reach hosted MCP servers without routing them using the Inspector's hostname.
+- 0ead84c: Show the thinking indicator between completed tool calls while the assistant request remains active, including after tool errors. Keep it hidden during active tools and text output.
+
+## 20.3.23-canary.3
+
+### Patch Changes
+
+- b89b9d4: Keep the chat mesh gradient visible while opening or closing history by redrawing the WebGL canvas immediately after resizing it.
+
+## 20.3.23-canary.2
+
+### Patch Changes
+
+- e7450b5: Strip DevSpace routing headers before forwarding MCP requests so the Inspector proxy can reach hosted MCP servers without routing them using the Inspector's hostname.
+
+## 20.3.23-canary.1
+
+### Patch Changes
+
+- 0ead84c: Show the thinking indicator between completed tool calls while the assistant request remains active, including after tool errors. Keep it hidden during active tools and text output.
+
+## 20.3.23-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22
+
+### Patch Changes
+
+- e4ff892: Fix tool calls timing out after 10 seconds for servers added from the dashboard. The Connect form pre-filled Request Timeout with 10000 and Maximum Total Timeout with 60000, and since tool calls started honoring saved timeouts those values capped every call. Both fields now start blank, which means the default 10-minute request timeout and no overall limit, as the form's help text says. Servers added since that change keep the saved 10000 / 60000 values; clear both fields in the server's connection settings to go back to the defaults.
+- e4ff892: ChatGPT install steps on the landing page, in `getInstallTargets()` and in the inspector's tunnel panel follow ChatGPT's Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab.
+- e4ff892: Display streamed provider errors and explain responses that exhaust the output limit without producing content instead of silently showing an empty chat turn.
+- e4ff892: fix(inspector): OAuth BFF metadata responses are always JSON with `nosniff`, so a caller-chosen upstream body can no longer render as a page on the Inspector origin; proxy and OAuth rate limits are per caller (client IP) under a process-wide ceiling instead of one shared bucket. A local Inspector or `mcp-use dev`, where requests carry no `X-Forwarded-For`, is limited only by the process-wide ceiling
+- e4ff892: Rebuild bundled workspace code and synchronize published internal package metadata.
+- e4ff892: Rebuild bundled workspace code and synchronize published internal package metadata.
+- e4ff892: Rebuild bundled workspace code and synchronize published internal package metadata.
+- e4ff892: Rebuild bundled workspace code and synchronize published internal package metadata.
+- e4ff892: Rebuild bundled workspace code and synchronize published internal package metadata.
+- e4ff892: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.9
+
+### Patch Changes
+
+- 6d4d220: fix(inspector): OAuth BFF metadata responses are always JSON with `nosniff`, so a caller-chosen upstream body can no longer render as a page on the Inspector origin; proxy and OAuth rate limits are per caller (client IP) under a process-wide ceiling instead of one shared bucket. A local Inspector or `mcp-use dev`, where requests carry no `X-Forwarded-For`, is limited only by the process-wide ceiling
+
+## 20.3.22-canary.8
+
+### Patch Changes
+
+- 8e8c70d: Fix tool calls timing out after 10 seconds for servers added from the dashboard. The Connect form pre-filled Request Timeout with 10000 and Maximum Total Timeout with 60000, and since tool calls started honoring saved timeouts those values capped every call. Both fields now start blank, which means the default 10-minute request timeout and no overall limit, as the form's help text says. Servers added since that change keep the saved 10000 / 60000 values; clear both fields in the server's connection settings to go back to the defaults.
+
+## 20.3.22-canary.7
+
+### Patch Changes
+
+- 52d8d99: ChatGPT install steps on the landing page, in `getInstallTargets()` and in the inspector's tunnel panel follow ChatGPT's Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab.
+
+## 20.3.22-canary.6
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.5
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.4
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.22-canary.1
+
+### Patch Changes
+
+- 2a05af2: Display streamed provider errors and explain responses that exhaust the output limit without producing content instead of silently showing an empty chat turn.
+
+## 20.3.22-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.21
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- 96b6aa5: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 96b6aa5: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 96b6aa5: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.21-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.21-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.21-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20
+
+### Patch Changes
+
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+- aa78231: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.20-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.19
+
+### Patch Changes
+
+- b49c5f0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.19-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.18
+
+### Patch Changes
+
+- ad6ce34: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.18-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17
+
+### Patch Changes
+
+- 6bf3a79: Apply saved Inspector timeout settings to tool calls, preserve cleared timeouts when reopening or renaming a connection, and explain what blank timeout fields mean.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.17-canary.1
+
+### Patch Changes
+
+- 53dcb47: Apply saved Inspector timeout settings to tool calls, preserve cleared timeouts when reopening or renaming a connection, and explain what blank timeout fields mean.
+
+## 20.3.17-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- 24bf7b0: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 24bf7b0: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.16-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.15
+
+### Patch Changes
+
+- 8dc3750: Fix chat input text overlapping with the bottom toolbar when typing multi-line messages
+- 8dc3750: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.15-canary.1
+
+### Patch Changes
+
+- f3d4ae7: Fix chat input text overlapping with the bottom toolbar when typing multi-line messages
+
+## 20.3.15-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14
+
+### Patch Changes
+
+- cdf2cc6: Release the upstream stream when an Express client disconnects mid-response. The Express adapter's proxy loop had no abort wiring, so a client that went away during a long-lived SSE response left the loop writing to a dead socket and the upstream connection open until it ended on its own.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+## 20.3.14-canary.5
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.4
+
+### Patch Changes
+
+- 604b130: Expose optional reactive OAuth UserInfo on `useMcp` and `useMcpServer`, plus an explicit `getUserInfo()` method. Allow the Inspector OAuth proxy to fetch only metadata-bound UserInfo endpoints with GET.
+
+## 20.3.14-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.14-canary.0
+
+### Patch Changes
+
+- ee1c64b: Release the upstream stream when an Express client disconnects mid-response. The Express adapter's proxy loop had no abort wiring, so a client that went away during a long-lived SSE response left the loop writing to a dead socket and the upstream connection open until it ended on its own.
+
+## 20.3.13
+
+### Patch Changes
+
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 7d71ef7: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.13-canary.3
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.13-canary.2
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.13-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.13-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.12
 
 ### Patch Changes

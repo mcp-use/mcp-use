@@ -167,7 +167,25 @@ export type OAuthAuth<TUser> = {
   expiresAt: number;
   /** Resource audience the access token authorizes, when supplied. */
   resource?: URL;
+  /**
+   * The upstream identity provider's token for the signed-in user, when the
+   * server is an OAuth proxy (see `oauthProxy` in `mcp-use/oauth`). Use it to
+   * call the upstream API, for example GitHub, as the user. `accessToken`
+   * stays the proxy's own token. Do not return this value to the client, and
+   * do not put it in tool results, views, or `_meta`.
+   */
+  upstream?: OAuthUpstreamToken;
 };
+
+/** Upstream identity-provider token that an OAuth proxy holds for a user. */
+export interface OAuthUpstreamToken {
+  /** Bearer token for the upstream API. */
+  accessToken: string;
+  /** Scopes the upstream provider granted. */
+  scopes: string[];
+  /** Upstream token expiry as Unix time in seconds, when the provider gives one. */
+  expiresAt?: number;
+}
 
 type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
   /** Aborted when the client cancels the request or the connection drops. */
@@ -534,6 +552,17 @@ export function toRequestContext<TEnv extends Env = Env>(
   } as RequestContext<never, false, TEnv>;
 }
 
+function isOAuthUpstreamToken(value: unknown): value is OAuthUpstreamToken {
+  if (value === null || typeof value !== "object") return false;
+  const token = value as Record<string, unknown>;
+  return (
+    typeof token["accessToken"] === "string" &&
+    Array.isArray(token["scopes"]) &&
+    token["scopes"].every((scope) => typeof scope === "string") &&
+    (token["expiresAt"] === undefined || typeof token["expiresAt"] === "number")
+  );
+}
+
 /** @internal Projects mapped OAuth auth information into callback context. */
 export function toAuthenticatedRequestContext<TUser, TEnv extends Env = Env>(
   ctx: ServerContext
@@ -550,6 +579,15 @@ export function toAuthenticatedRequestContext<TUser, TEnv extends Env = Env>(
       ...(authInfo.clientId.length > 0 && { clientId: authInfo.clientId }),
       expiresAt: authInfo.expiresAt,
       ...(authInfo.resource !== undefined && { resource: authInfo.resource }),
+      ...(isOAuthUpstreamToken(authInfo.extra.upstream) && {
+        upstream: {
+          accessToken: authInfo.extra.upstream.accessToken,
+          scopes: [...authInfo.extra.upstream.scopes],
+          ...(authInfo.extra.upstream.expiresAt !== undefined && {
+            expiresAt: authInfo.extra.upstream.expiresAt,
+          }),
+        },
+      }),
     },
   });
 }

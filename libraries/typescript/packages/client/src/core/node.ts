@@ -85,7 +85,10 @@ export type CodeExecutorType = "vm" | "e2b";
 export interface VMExecutorOptions {
   /** Maximum execution time in milliseconds. Default: 30000 (30 seconds) */
   timeoutMs?: number;
-  /** Memory limit in megabytes. Default: undefined (no limit) */
+  /**
+   * Reserved for a memory limit in megabytes. The VM executor currently
+   * accepts but does not enforce this value, so execution has no memory limit.
+   */
   memoryLimitMb?: number;
 }
 
@@ -190,7 +193,7 @@ export type {
  * The MCPClient class provides a complete MCP client implementation for Node.js
  * environments, extending the runtime-neutral `BaseMCPClient` with platform-specific capabilities:
  *
- * - **All Connector Types**: Supports Stdio, HTTP, and WebSocket connectors
+ * - **All Connector Types**: Supports stdio and streamable HTTP connectors
  * - **Code Execution Mode**: Execute code dynamically using VM or E2B sandboxes
  * - **File System Operations**: Load and save configurations from/to files
  * - **Sampling & Elicitation**: Handle advanced MCP protocol features
@@ -200,8 +203,8 @@ export type {
  * ```typescript
  * // Basic usage with config file
  * const client = new MCPClient('./mcp-config.json');
- * const session = await client.createSession('my-server');
- * const tools = await session.listTools();
+ * const connection = await client.connect('my-server');
+ * const tools = await connection.listTools();
  * ```
  *
  * @example
@@ -231,7 +234,7 @@ export type {
  * const result = await client.executeCode('console.log("Hello!")');
  * ```
  *
- * @see {@link MCPSession} for session management
+ * @see {@link MCPConnection} for connection methods
  */
 export class MCPClient extends BaseMCPClient {
   /**
@@ -261,7 +264,7 @@ export class MCPClient extends BaseMCPClient {
    * ```typescript
    * if (client.codeMode) {
    *   const result = await client.executeCode('return 2 + 2');
-   *   console.log(result.output); // "4"
+   *   console.log(result.result); // 4
    * }
    * ```
    */
@@ -609,11 +612,12 @@ export class MCPClient extends BaseMCPClient {
    *
    * This method is only available when code mode is enabled. It executes the
    * provided code in an isolated environment (VM or E2B sandbox) and returns
-   * the results including stdout, stderr, and return value.
+   * the return value, captured console output, any error message, and the
+   * execution time.
    *
    * @param code - JavaScript/TypeScript code to execute
    * @param timeout - Optional execution timeout in milliseconds
-   * @returns Execution result with output, errors, and return value
+   * @returns Execution result with `result`, `logs`, `error`, and `execution_time`
    * @throws If code mode is not enabled
    *
    * @example
@@ -625,17 +629,16 @@ export class MCPClient extends BaseMCPClient {
    *   return 2 + 2;
    * `);
    *
-   * console.log(result.stdout);      // "Hello, world!\n"
-   * console.log(result.returnValue); // 4
+   * console.log(result.logs);   // ["Hello, world!"]
+   * console.log(result.result); // 4
    * ```
    *
    * @example
    * ```typescript
-   * // With timeout
-   * try {
-   *   const result = await client.executeCode('while(true) {}', 1000);
-   * } catch (error) {
-   *   console.log('Execution timed out');
+   * // With timeout: errors are reported in the result, not thrown
+   * const result = await client.executeCode('while(true) {}', 1000);
+   * if (result.error) {
+   *   console.log(result.error); // "Script execution timed out"
    * }
    * ```
    *
@@ -673,7 +676,7 @@ export class MCPClient extends BaseMCPClient {
    *
    * // Search for all tools
    * const allTools = await client.searchTools();
-   * console.log(`Found ${allTools.tools.length} tools`);
+   * console.log(`Found ${allTools.results.length} tools`);
    *
    * // Search for specific tools
    * const fileTools = await client.searchTools('file', 'descriptions');

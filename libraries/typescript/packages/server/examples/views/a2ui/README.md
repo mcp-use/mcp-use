@@ -64,9 +64,9 @@ pnpm --filter mcp-use-example-a2ui typecheck
 pnpm --filter mcp-use-example-a2ui build
 ```
 
-References: [A2UI React renderer](https://github.com/a2ui-project/a2ui/tree/main/renderers/react),
+References: [A2UI React renderer](https://github.com/a2ui-project/a2ui/tree/main/typescript/renderers/react),
 [A2UI inside MCP Apps](https://a2ui.org/guides/a2ui-in-mcp-apps/).
 
 The A2UI renderer uses Zod 3, as required by its peer dependencies. MCP tool
-schemas import the `zod-v4` alias (Zod 4.4.3) for the SDK's Standard JSON Schema
+schemas import the `zod-v4` alias (Zod 4.6.6) for the SDK's Standard JSON Schema
 contract. Both dependencies are confined to this private example.

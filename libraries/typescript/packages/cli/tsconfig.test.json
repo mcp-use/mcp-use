@@ -13,7 +13,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    "tests/cli/.tmp",
-    "tests/cli/fixtures"
+    "tests/build/.tmp",
+    "tests/build/fixtures"
   ]
 }

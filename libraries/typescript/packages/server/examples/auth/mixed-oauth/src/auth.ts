@@ -22,7 +22,7 @@ export interface CreateDemoAuthOptions {
  * Create the in-memory authorization server used by the demo.
  *
  * @param options - Local issuer and MCP resource URLs.
- * @returns A Better Auth instance with DCR, PKCE, anonymous login, and consent.
+ * @returns A Better Auth instance with DCR, PKCE, consent, and resource-bound tokens.
  */
 export function createDemoAuth({ origin, resource }: CreateDemoAuthOptions) {
   return betterAuth({
@@ -43,7 +43,8 @@ export function createDemoAuth({ origin, resource }: CreateDemoAuthOptions) {
         clientRegistrationAllowedScopes: [...demoScopes],
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
-        validAudiences: [resource],
+        resources: [resource],
+        clientRegistrationDefaultResources: [resource],
         customAccessTokenClaims: ({ user }) => ({
           name: user?.name,
           is_anonymous: user?.isAnonymous ?? false,

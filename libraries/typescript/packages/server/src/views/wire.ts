@@ -10,6 +10,7 @@ import {
 import { buildMergedResourceCsp, type BuildCspOptions } from "./csp-env.js";
 import {
   hasExplicitAssetsBase,
+  normalizeViewDomain,
   originFromAssetsBase,
   resolveAssetsBase,
   resolveServerOrigin,
@@ -30,14 +31,16 @@ import {
  * definition's top-level `visibility` field.
  * @param existingMetadata - Optional author-supplied definition metadata. Other
  * keys pass through, while framework-owned resource URI and visibility keys
- * are derived exclusively from `viewName` and `visibility`.
+ * are derived exclusively from `viewName`, `buildId`, and `visibility`.
+ * @param buildId - Immutable production build ID; omit in development.
  * @returns Wire metadata for the tool listing, or `undefined` when there is
  * nothing to emit.
  */
 export function buildToolUiMeta(
   viewName: string | undefined,
   visibility: "model" | "app" | undefined,
-  existingMetadata?: MetaObject
+  existingMetadata?: MetaObject,
+  buildId?: string
 ): MetaObject | undefined {
   if (
     viewName === undefined &&
@@ -56,7 +59,7 @@ export function buildToolUiMeta(
   const ui: MetaObject = existingUiIsObject ? { ...existingUi } : {};
 
   if (viewName !== undefined) {
-    const resourceUri = viewResourceUri(viewName);
+    const resourceUri = viewResourceUri(viewName, buildId);
     ui["resourceUri"] = resourceUri;
     meta[UI_RESOURCE_URI_META_KEY] = resourceUri;
   } else {
@@ -96,12 +99,14 @@ export function buildToolUiMeta(
  * never enters model context.
  *
  * @param viewName - Bound view directory / registry key.
+ * @param buildId - Immutable production build ID; omit in development.
  * @returns Nested and legacy resource-URI wire keys.
  */
 export function buildToolResultUiMeta(
-  viewName: string
+  viewName: string,
+  buildId?: string
 ): Record<string, unknown> {
-  const resourceUri = viewResourceUri(viewName);
+  const resourceUri = viewResourceUri(viewName, buildId);
   return {
     [UI_META_KEY]: { resourceUri },
     [UI_RESOURCE_URI_META_KEY]: resourceUri,
@@ -147,7 +152,8 @@ function resolveCspOptions(
 }
 
 /**
- * Resource `_meta.ui` for a primed view.
+ * Resource metadata for a primed view, including `_meta.ui` and the
+ * OpenAI widget-description and display-mode extensions.
  *
  * Emits `csp` by merging author `view.csp`, env (`CSP_URLS` / `CSP_*_DOMAINS`),
  * and MCP auto-append (`MCP_URL` → connect; assets origin → resource).
@@ -164,13 +170,28 @@ export function buildResourceUiMeta(
     ui["permissions"] = authorFacts.permissions;
   }
   if (authorFacts?.domain !== undefined) {
-    ui["domain"] = authorFacts.domain;
+    ui["domain"] = normalizeViewDomain(authorFacts.domain);
   }
   if (authorFacts?.prefersBorder !== undefined) {
     ui["prefersBorder"] = authorFacts.prefersBorder;
   }
 
-  return { [UI_META_KEY]: ui };
+  return {
+    [UI_META_KEY]: ui,
+    ...(authorFacts?.description !== undefined && {
+      "openai/widgetDescription": authorFacts.description,
+    }),
+    ...(authorFacts?.displayModes !== undefined && {
+      "openai/ui": {
+        availableDisplayModes: authorFacts.displayModes.filter(
+          (mode) => mode === "inline" || mode === "fullscreen"
+        ),
+        ...(authorFacts.preferredDisplayMode !== undefined && {
+          preferredDisplayMode: authorFacts.preferredDisplayMode,
+        }),
+      },
+    }),
+  };
 }
 
 /**

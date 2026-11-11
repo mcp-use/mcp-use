@@ -64,6 +64,7 @@ export function SystemPromptButton({
     <button
       type="button"
       data-testid="chat-system-prompt-button"
+      aria-label={isCustomized ? "Custom system prompt" : "System Prompt"}
       onClick={() => setOpen(true)}
       disabled={disabled}
       className={

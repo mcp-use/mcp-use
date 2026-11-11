@@ -29,8 +29,9 @@
       "project": ["src/**/*.ts", "tests/**/*.ts"]
     },
     "packages/cli": {
-      "entry": ["tests/**/*.{mjs,ts,tsx}"],
+      "entry": ["tests/**/*.{mjs,ts,tsx}", "scripts/generate-cloud-client.mjs"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{mjs,ts,tsx}"],
+      "ignore": ["src/cloud/api/generated/**"],
       "ignoreDependencies": ["@types/react-dom", "mcp-use", "react-dom"]
     },
     "packages/client": {

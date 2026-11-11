@@ -72,10 +72,14 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
         response_types_supported: ["code"],
       },
     });
-    await provider.saveClientInformation({ client_id: "legacy-client" });
+    await provider.saveClientInformation({
+      client_id: "legacy-client",
+      issuer: "https://server-a.example.com",
+    });
     await provider.saveTokens({
       access_token: "existing-token",
       token_type: "Bearer",
+      issuer: "https://server-a.example.com",
     });
     globalFetchSpy.mockResolvedValueOnce(
       new Response(null, {
@@ -117,10 +121,14 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     };
     const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
     await provider.saveDiscoveryState(staleDiscovery);
-    await provider.saveClientInformation({ client_id: "existing-client" });
+    await provider.saveClientInformation({
+      client_id: "existing-client",
+      issuer: "https://server-a.example.com",
+    });
     await provider.saveTokens({
       access_token: "existing-token",
       token_type: "Bearer",
+      issuer: "https://server-a.example.com",
     });
     globalFetchSpy.mockResolvedValueOnce(
       new Response(null, {

@@ -62,8 +62,7 @@ export function getPublicBaseUrl(): string {
  * Root-relative paths (starting with `/`) are resolved against the injected
  * {@link McpUseViewConfig.publicBase}. Absolute `http(s):` and `data:` URLs
  * pass through unchanged. Fully-relative paths (no leading slash) are returned
- * as-is. Not part of the public API — public assets are consumed through the
- * {@link Image} component.
+ * as-is. Internal resolver shared by {@link Image} and model context authoring.
  *
  * @param path - Author path, typically root-relative from the `public/` folder
  *   (e.g. `/fruits/apple.png`).

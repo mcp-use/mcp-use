@@ -146,7 +146,23 @@ export type MiddlewareContext<
   ? MiddlewareContextCommon<TEnv> & {
       method: M;
       params: McpMiddlewareOperationMap[M]["params"];
-    }
+    } & (M extends "resources/read"
+        ? {
+            /**
+             * The tool view being read, set only when the resource is a tool
+             * view. Set by the server, so unlike `params` it does not depend on
+             * what the client sent.
+             *
+             * On a `mixedAuth` server, hosts read tool views before sign-in, so
+             * a view read can arrive with `auth` undefined. Let these through
+             * before requiring `auth`.
+             */
+            view?: {
+              /** View name, as set by `view.name` on the tool. */
+              name: string;
+            };
+          }
+        : unknown)
   : never;
 
 /** Preferred explicit name for the method-correlated middleware context. */
@@ -337,7 +353,18 @@ export type ReadonlyMiddlewareContext<
         readonly session?: Readonly<{ sessionId: string }>;
         readonly auth?: Readonly<AuthInfo>;
         readonly state: ReadonlyMap<string, unknown>;
-      }
+      } & (M extends "resources/read"
+        ? {
+            /**
+             * The tool view being read, set only for tool view reads. May
+             * arrive with `auth` undefined on a `mixedAuth` server.
+             */
+            readonly view?: Readonly<{
+              /** View name, as set by `view.name` on the tool. */
+              name: string;
+            }>;
+          }
+        : unknown)
     : never
   : never;
 
@@ -494,6 +521,8 @@ export function freezeMiddlewareContext<
       session: Object.freeze({ ...ctx.session }),
     }),
     ...(ctx.auth !== undefined && { auth: ctx.auth }),
+    ...("view" in ctx &&
+      ctx.view !== undefined && { view: Object.freeze({ ...ctx.view }) }),
     state: new Map(ctx.state),
   }) as unknown as ReadonlyMiddlewareContext<M, TEnv>;
 }

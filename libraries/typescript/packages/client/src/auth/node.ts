@@ -6,7 +6,7 @@ import type {
   OAuthDiscoveryState,
   OAuthTokens,
 } from "@modelcontextprotocol/client";
-import { createServer as createNetServer } from "node:net";
+import { createServer as createNetServer, type Socket } from "node:net";
 import { createServer as createHttpServer, type Server } from "node:http";
 import { FileKVStore } from "./storage-file.js";
 import type { KVStore } from "./storage.js";
@@ -511,29 +511,40 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     }
   }
 
-  private stopLoopback(): void {
+  private stopLoopback(callbackSocket?: Socket): void {
     if (this.pendingTimer) {
       clearTimeout(this.pendingTimer);
       this.pendingTimer = null;
     }
     if (this.server) {
-      this.server.close();
+      const server = this.server;
       this.server = null;
+      server.close();
+      // Let the terminal response close gracefully before force-closing other
+      // connections, including preconnections that never sent an HTTP request.
+      if (callbackSocket && !callbackSocket.destroyed) {
+        callbackSocket.once("close", () => server.closeAllConnections());
+      } else {
+        server.closeAllConnections();
+      }
     }
     this.authorizationUrl = null;
   }
 
-  private resolvePending(response: NodeOAuthAuthorizationResponse): void {
+  private resolvePending(
+    response: NodeOAuthAuthorizationResponse,
+    callbackSocket?: Socket
+  ): void {
     const p = this.pending;
     this.pending = null;
-    this.stopLoopback();
+    this.stopLoopback(callbackSocket);
     p?.resolve(response);
   }
 
-  private rejectPending(err: Error): void {
+  private rejectPending(err: Error, callbackSocket?: Socket): void {
     const p = this.pending;
     this.pending = null;
-    this.stopLoopback();
+    this.stopLoopback(callbackSocket);
     p?.reject(err);
   }
 
@@ -541,6 +552,8 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     rawUrl: string,
     res: import("node:http").ServerResponse
   ): void {
+    const callbackSocket = res.socket ?? undefined;
+    res.setHeader("connection", "close");
     const url = new URL(rawUrl, `http://127.0.0.1:${this.port}`);
 
     if (url.pathname === "/authorize") {
@@ -573,7 +586,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       res.statusCode = 400;
       res.setHeader("content-type", "text/html; charset=utf-8");
       res.end(FAILURE_HTML(err, errDesc));
-      this.rejectPending(new OAuthFlowError(err, errDesc));
+      this.rejectPending(new OAuthFlowError(err, errDesc), callbackSocket);
       return;
     }
 
@@ -587,7 +600,10 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     res.statusCode = 200;
     res.setHeader("content-type", "text/html; charset=utf-8");
     res.end(SUCCESS_HTML);
-    this.resolvePending({ code, ...(iss !== undefined ? { iss } : {}) });
+    this.resolvePending(
+      { code, ...(iss !== undefined ? { iss } : {}) },
+      callbackSocket
+    );
   }
 }
 

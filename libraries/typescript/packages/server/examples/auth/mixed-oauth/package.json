@@ -15,13 +15,13 @@
     "check-flow": "node scripts/check-flow.mjs"
   },
   "dependencies": {
-    "@better-auth/oauth-provider": "^1.6.2",
-    "better-auth": "^1.6.2",
-    "hono": "^4.13.5",
+    "@better-auth/oauth-provider": "^1.7.6",
+    "better-auth": "^1.7.6",
+    "hono": "^4.13.7",
     "mcp-use": "workspace:*",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",

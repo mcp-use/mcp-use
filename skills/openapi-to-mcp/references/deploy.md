@@ -76,20 +76,19 @@ The Manufact dashboard surfaces:
 
 Tail logs while you test the deployed server. If a tool call fails in production but worked locally, 9 times out of 10 it's a missing or stale env var.
 
-## Install in ChatGPT (as a custom MCP connector)
+## Install in ChatGPT (as a custom MCP server)
 
-1. `chatgpt.com` → **Settings** → **Apps** → **Advanced**.
-2. Enable Developer mode if not already on.
-3. **Create app** → fill Name, Description, and **MCP Server URL** (the `https://...run.mcp-use.com/mcp` URL from the deploy).
-4. **Authentication**: if the MCP server is public (no MCP-level auth — the upstream API auth happens server-side via env vars), pick **No Auth**. The default OAuth option will fail with "MCP server does not implement OAuth" because your server is using env-var auth, not MCP OAuth.
-5. Tick the consent checkbox, create the app.
-6. Open a new chat: "Use the <app-name> app to call list_pets." If ChatGPT doesn't pick the app up automatically, click the **+** menu next to the input and select it explicitly.
+1. `chatgpt.com` → **Plugins** → **Add** → **Add Custom MCP Server**.
+2. Fill in the **MCP Server URL** (the `https://...run.mcp-use.com/mcp` URL from the deploy) and the other fields the form asks for.
+3. **Authentication**: if the MCP server is public (no MCP-level auth — the upstream API auth happens server-side via env vars), pick **No Auth**. The default OAuth option will fail with "MCP server does not implement OAuth" because your server is using env-var auth, not MCP OAuth.
+4. Confirm and add the server.
+5. Open a new chat: "Use the <app-name> app to call list_pets." If ChatGPT doesn't pick the app up automatically, click the **+** menu next to the input and select it explicitly.
 
-Verify: the tool chip shows the call, the args, and a green check. The LLM summarizes the result. If you see CSP errors, this server has no widgets so CSP shouldn't matter — but if you do see them, check that Developer mode's "Enforce CSP" toggle matches your spec.
+Verify: the tool chip shows the call, the args, and a green check. The LLM summarizes the result. This server has no widgets, so CSP errors shouldn't appear.
 
 ## Install in Claude
 
-`claude.ai` → **Settings** → **Connectors** → **Add custom connector**. Same URL, same "No Auth" choice. Claude doesn't have the developer-mode toggle; the connector is immediately usable in any chat after you turn it on.
+`claude.ai` → **Settings** → **Connectors** → **Add custom connector**. Same URL, same "No Auth" choice. The connector is usable in any chat after you turn it on.
 
 ## Iteration after deploy
 

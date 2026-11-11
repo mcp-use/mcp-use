@@ -139,7 +139,7 @@ function scaffold() {
   };
   run(...commands[pm], workDir);
 
-  for (const file of ["package.json", "index.ts"]) {
+  for (const file of ["package.json", "index.ts", "landing.tsx"]) {
     if (!existsSync(path.join(appDir, file))) {
       fail(`Scaffolded project is missing ${file}`);
     }

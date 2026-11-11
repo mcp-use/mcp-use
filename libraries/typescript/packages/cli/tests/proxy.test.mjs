@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 const execFileAsync = promisify(execFile);
+const cliEnv = { ...process.env, MCP_USE_ANONYMIZED_TELEMETRY: "false" };
 
 test("runs the standalone prebuilt CLI with its own version", async () => {
   const cliPackage = JSON.parse(
@@ -16,7 +17,7 @@ test("runs the standalone prebuilt CLI with its own version", async () => {
   const { stdout, stderr } = await execFileAsync(
     process.execPath,
     [fileURLToPath(new URL("../dist/bin.js", import.meta.url)), "--version"],
-    { cwd: fileURLToPath(new URL("..", import.meta.url)) }
+    { cwd: fileURLToPath(new URL("..", import.meta.url)), env: cliEnv }
   );
 
   assert.equal(stderr, "");
@@ -42,7 +43,10 @@ test("runs the mcp-use compatibility bin with the framework version", async () =
       fileURLToPath(new URL("../../server/dist/bin.js", import.meta.url)),
       "--version",
     ],
-    { cwd: fileURLToPath(new URL("../../server", import.meta.url)) }
+    {
+      cwd: fileURLToPath(new URL("../../server", import.meta.url)),
+      env: cliEnv,
+    }
   );
 
   assert.equal(stderr, "");
@@ -55,6 +59,9 @@ test(
   async (t) => {
     const cliRoot = fileURLToPath(new URL("..", import.meta.url));
     const serverRoot = fileURLToPath(new URL("../../server", import.meta.url));
+    const inspectorRoot = fileURLToPath(
+      new URL("../../inspector", import.meta.url)
+    );
     const scratch = await mkdtemp(join(tmpdir(), "mcp-use-cli-bin-"));
     const artifacts = join(scratch, "artifacts");
     const consumer = join(scratch, "consumer");
@@ -76,6 +83,7 @@ test(
     };
     const cliTarball = await pack(cliRoot);
     const serverTarball = await pack(serverRoot);
+    const inspectorTarball = await pack(inspectorRoot);
     await execFileAsync(
       "npm",
       [
@@ -86,6 +94,7 @@ test(
         "--no-fund",
         cliTarball,
         serverTarball,
+        inspectorTarball,
       ],
       { cwd: consumer }
     );
@@ -110,11 +119,12 @@ test(
     );
     const linked = await execFileAsync(npmBin, ["--version"], {
       cwd: consumer,
+      env: cliEnv,
     });
     const collided = await execFileAsync(
       process.execPath,
       [installedCliBin, "--version"],
-      { cwd: consumer }
+      { cwd: consumer, env: cliEnv }
     );
 
     assert.notEqual(cliPackage.version, serverPackage.version);

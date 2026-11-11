@@ -52,6 +52,11 @@ export const examples = [
     portableOutput: ".output",
   }),
   local("public-landing", { tools: ["greet"], landing: true }),
+  local("landing-page", {
+    tools: ["get-forecast", "get-alerts", "convert-units"],
+    prompts: ["plan-trip"],
+    landing: true,
+  }),
   local("events", {
     tools: ["ping", "recent-events"],
     resources: ["events://observations"],
@@ -85,6 +90,8 @@ export const examples = [
   external("auth/clerk"),
   external("auth/convex"),
   external("auth/keycloak"),
+  external("auth/oauth-proxy-firebase"),
+  external("auth/oauth-proxy-github"),
   external("auth/supabase"),
   external("auth/workos"),
   external("daytona"),

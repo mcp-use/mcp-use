@@ -193,17 +193,9 @@ export function MeshGradientCanvas({
     let lastNow = performance.now();
     let raf = 0;
 
-    const resize = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.width = Math.floor(wrap.clientWidth * dpr);
-      canvas.height = Math.floor(wrap.clientHeight * dpr);
-      gl.viewport(0, 0, canvas.width, canvas.height);
-    };
-
-    const draw = (now: number) => {
+    const renderFrame = (now: number) => {
       if (document.hidden) {
         lastNow = now;
-        raf = requestAnimationFrame(draw);
         return;
       }
       const {
@@ -230,7 +222,24 @@ export function MeshGradientCanvas({
       gl.uniform1f(uGrainMixer, currentGrainMixer);
       gl.uniform1f(uGrainOverlay, currentGrainOverlay);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
+    };
+
+    const draw = (now: number) => {
+      renderFrame(now);
       raf = requestAnimationFrame(draw);
+    };
+
+    const resize = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const width = Math.floor(wrap.clientWidth * dpr);
+      const height = Math.floor(wrap.clientHeight * dpr);
+      if (canvas.width === width && canvas.height === height) return;
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      // ResizeObserver runs after animation frames. Resizing clears the canvas,
+      // so repaint before the browser presents this frame.
+      renderFrame(performance.now());
     };
 
     resize();

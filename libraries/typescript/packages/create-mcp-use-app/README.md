@@ -39,6 +39,7 @@ Create a new MCP application in seconds:
 ```bash
 npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
+npm run dev
 ```
 
 That's it! Your MCP server is running at `http://localhost:3000` with the inspector automatically opened in your browser.
@@ -59,7 +60,7 @@ my-mcp-server/
 ├── mcp-env.d.ts                          # Managed view typing bridge
 ├── public/                               # Static assets
 └── views/                                # Included by the mcp-apps template
-    └── product-search-result/
+    └── my-view/
         └── view.tsx                      # React view entry point
 ```
 
@@ -109,7 +110,7 @@ npx create-mcp-use-app my-project
 ```bash
 # Use a specific template
 npx create-mcp-use-app my-project --template mcp-apps
-npx create-mcp-use-app my-project --template mcp-ui
+npx create-mcp-use-app my-project --template mcp-server
 
 # Use a GitHub repository as a template
 npx create-mcp-use-app my-project --template owner/repo
@@ -159,16 +160,14 @@ The mcp-apps template includes:
 
 Ideal for building MCP servers that integrate with OpenAI's Apps SDK.
 
-### MCP-UI Template
+### Blank Template
 
-The mcp-ui template includes:
+The `blank` template includes:
 
-- MCP server setup focused on MCP-UI resources
-- Interactive UI components example
-- Kanban board widget demonstration
-- Clean, focused setup for UI-first applications
+- An `MCPServer` with no tools, resources, or prompts registered
+- Development and production scripts
 
-Best for building MCP servers with rich interactive UI components.
+Ideal for starting from an empty server and adding your own tools.
 
 ### GitHub Repository Templates
 
@@ -244,7 +243,7 @@ This will:
 npm run build
 ```
 
-Creates an optimized build in the `dist/` directory.
+Creates an optimized build in the `.mcp-use/build/` directory.
 
 ### Start Production Server
 
@@ -345,7 +344,9 @@ import { MCPAgent } from "@mcp-use/agent/langchain";
 import { ChatOpenAI } from "@langchain/openai";
 
 const client = new MCPClient({
-  url: "http://localhost:3000/mcp",
+  mcpServers: {
+    local: { url: "http://localhost:3000/mcp" },
+  },
 });
 
 const agent = new MCPAgent({
@@ -362,22 +363,11 @@ const result = await agent.run("Use my MCP tools");
 
 ### Environment Variables
 
-The created project includes a `.env.example` file:
+`mcp-use dev` and `mcp-use start` load a `.env` file from the project root if one exists. The server listens on `PORT` (default `3000`) and binds to `HOST` (default `127.0.0.1`):
 
 ```bash
-# Server Configuration
 PORT=3000
-NODE_ENV=development
-
-# Observability (optional)
-LANGFUSE_PUBLIC_KEY=your_public_key
-LANGFUSE_SECRET_KEY=your_secret_key
-```
-
-Copy to `.env` and configure as needed:
-
-```bash
-cp .env.example .env
+HOST=127.0.0.1
 ```
 
 ### TypeScript Configuration
@@ -387,13 +377,18 @@ The `tsconfig.json` is pre-configured for MCP development:
 ```json
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
+    "target": "ES2024",
     "jsx": "react-jsx",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
     "strict": true,
     "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "noEmit": true,
+    "noUncheckedSideEffectImports": true
   }
 }
 ```
@@ -405,49 +400,74 @@ The `tsconfig.json` is pre-configured for MCP development:
 ### Creating a Tool
 
 ```typescript
-server.tool("search_database", {
-  description: "Search for records in the database",
-  parameters: z.object({
-    query: z.string().describe("Search query"),
-    limit: z.number().optional().default(10),
-  }),
-  execute: async ({ query, limit }) => {
+server.tool(
+  {
+    name: "search_database",
+    description: "Search for records in the database",
+    inputSchema: z.object({
+      query: z.string().describe("Search query"),
+      limit: z.number().optional().default(10),
+    }),
+  },
+  async ({ query, limit }) => {
     // Your tool logic here
     const results = await db.search(query, limit);
-    return { results };
-  },
-});
+    return {
+      content: [{ type: "text", text: JSON.stringify(results) }],
+    };
+  }
+);
 ```
 
 ### Creating a Resource
 
 ```typescript
-server.resource("user_profile", {
-  description: "Current user profile data",
-  uri: "user://profile",
-  mimeType: "application/json",
-  fetch: async () => {
-    const profile = await getUserProfile();
-    return JSON.stringify(profile);
+server.resource(
+  {
+    name: "user_profile",
+    uri: "user://profile",
+    description: "Current user profile data",
+    mimeType: "application/json",
   },
-});
+  async (uri) => {
+    const profile = await getUserProfile();
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(profile),
+        },
+      ],
+    };
+  }
+);
 ```
 
 ### Creating a Prompt
 
 ```typescript
-server.prompt("code_review", {
-  description: "Review code for best practices",
-  arguments: [
-    { name: "code", description: "Code to review", required: true },
-    { name: "language", description: "Programming language", required: false },
-  ],
-  render: async ({ code, language }) => {
-    return `Please review this ${
-      language || ""
-    } code for best practices:\n\n${code}`;
+server.prompt(
+  {
+    name: "code_review",
+    description: "Review code for best practices",
+    schema: z.object({
+      code: z.string().describe("Code to review"),
+      language: z.string().optional().describe("Programming language"),
+    }),
   },
-});
+  async ({ code, language }) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Please review this ${language ?? ""} code for best practices:\n\n${code}`,
+        },
+      },
+    ],
+  })
+);
 ```
 
 ---

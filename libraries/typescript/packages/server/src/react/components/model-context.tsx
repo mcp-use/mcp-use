@@ -66,11 +66,12 @@ export function ModelContext({ content, children }: ModelContextProps) {
   useEffect(() => {
     if (hasContent) {
       store.setNode({ id, parentId, content });
-    }
-    return () => {
+    } else {
       store.removeNode(id);
-    };
+    }
   }, [store, id, parentId, content, hasContent]);
+
+  useEffect(() => () => store.removeNode(id), [store, id]);
 
   if (children === undefined || children === null) {
     return null;

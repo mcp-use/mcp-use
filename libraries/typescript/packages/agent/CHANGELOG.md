@@ -1,5 +1,231 @@
 # @mcp-use/agent
 
+## 2.0.26
+
+### Patch Changes
+
+- 5467242: Gemini tool calls now keep the `thoughtSignature` the model returns and send it back on the next turn of the tool loop. Gemini 3 models reject a replayed function call without its signature, so any agent or inspector chat that called a tool failed on the following request with a 400.
+
+## 2.0.26-canary.0
+
+### Patch Changes
+
+- 5467242: Gemini tool calls now keep the `thoughtSignature` the model returns and send it back on the next turn of the tool loop. Gemini 3 models reject a replayed function call without its signature, so any agent or inspector chat that called a tool failed on the following request with a 400.
+
+## 2.0.25
+
+### Patch Changes
+
+- e4ff892: `MCPAgent.stream()` now returns, and saves to conversation memory, only the final turn's text, the same as `run()`. Text the model wrote before calling a tool used to be glued onto the answer, for example `Let me check the files.The folder has a.ts.`. If the run is aborted after the model asks for a tool but before the tool runs, `stream()` now returns an empty answer, as `run()` does, instead of that preamble.
+- e4ff892: Fix OpenAI Responses streaming never emitting tool-call args events
+
+  `response.function_call_arguments.delta` and `...done` carry `item_id`, not
+  `call_id`, so the buffer lookup never matched and neither `tool-call-args-delta`
+  nor `tool-call-ready` was emitted. `MCPAgent.stream()` and `streamEvents()` now
+  report AgentSteps for tool calls made through the OpenAI Responses provider.
+
+- e4ff892: Fix `RemoteAgent.run` rejecting successful responses whose body has no `error` field. Error messages from a body with `error` or `status: "error"` now show the error (object errors as JSON) instead of `[object Object]`, without repeating the "Remote agent execution failed:" prefix. Remove the "failed to initialize" check, which could never match.
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+  - @mcp-use/client@2.4.5
+
+## 2.0.25-canary.4
+
+### Patch Changes
+
+- Updated dependencies [d1999a0]
+  - @mcp-use/client@2.4.5-canary.1
+
+## 2.0.25-canary.3
+
+### Patch Changes
+
+- 2d7c986: Fix `RemoteAgent.run` rejecting successful responses whose body has no `error` field. Error messages from a body with `error` or `status: "error"` now show the error (object errors as JSON) instead of `[object Object]`, without repeating the "Remote agent execution failed:" prefix. Remove the "failed to initialize" check, which could never match.
+
+## 2.0.25-canary.2
+
+### Patch Changes
+
+- Updated dependencies [e6e0e39]
+  - @mcp-use/client@2.4.5-canary.0
+
+## 2.0.25-canary.1
+
+### Patch Changes
+
+- de53e6f: `MCPAgent.stream()` now returns, and saves to conversation memory, only the final turn's text, the same as `run()`. Text the model wrote before calling a tool used to be glued onto the answer, for example `Let me check the files.The folder has a.ts.`. If the run is aborted after the model asks for a tool but before the tool runs, `stream()` now returns an empty answer, as `run()` does, instead of that preamble.
+
+## 2.0.25-canary.0
+
+### Patch Changes
+
+- 91f70c0: Fix OpenAI Responses streaming never emitting tool-call args events
+
+  `response.function_call_arguments.delta` and `...done` carry `item_id`, not
+  `call_id`, so the buffer lookup never matched and neither `tool-call-args-delta`
+  nor `tool-call-ready` was emitted. `MCPAgent.stream()` and `streamEvents()` now
+  report AgentSteps for tool calls made through the OpenAI Responses provider.
+
+## 2.0.24
+
+### Patch Changes
+
+- Updated dependencies [96b6aa5]
+- Updated dependencies [96b6aa5]
+  - @mcp-use/client@2.4.4
+
+## 2.0.24-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9ab2723]
+  - @mcp-use/client@2.4.4-canary.1
+
+## 2.0.24-canary.0
+
+### Patch Changes
+
+- Updated dependencies [b2f55fc]
+  - @mcp-use/client@2.4.4-canary.0
+
+## 2.0.23
+
+### Patch Changes
+
+- aa78231: Fall back to `"[no content]"` when tool result content is an empty string in Anthropic provider, preventing HTTP 400 Bad Request errors from the Anthropic Messages API.
+- Updated dependencies [aa78231]
+  - @mcp-use/client@2.4.3
+
+## 2.0.23-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c64b4d4]
+  - @mcp-use/client@2.4.3-canary.0
+
+## 2.0.23-canary.0
+
+### Patch Changes
+
+- bd6ee70: Fall back to `"[no content]"` when tool result content is an empty string in Anthropic provider, preventing HTTP 400 Bad Request errors from the Anthropic Messages API.
+
+## 2.0.22
+
+### Patch Changes
+
+- Updated dependencies [6bf3a79]
+  - @mcp-use/client@2.4.2
+
+## 2.0.22-canary.0
+
+### Patch Changes
+
+- Updated dependencies [b3990f0]
+  - @mcp-use/client@2.4.2-canary.0
+
+## 2.0.21
+
+### Patch Changes
+
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+- Updated dependencies [24bf7b0]
+  - @mcp-use/client@2.4.1
+
+## 2.0.21-canary.0
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+- Updated dependencies [df6440c]
+  - @mcp-use/client@2.4.1-canary.0
+
+## 2.0.20
+
+### Patch Changes
+
+- cdf2cc6: Wrap array-valued Gemini tool results in an object so function responses satisfy the provider's request schema in streaming and non-streaming calls.
+- cdf2cc6: `runToolLoopNonStreaming` now stops dispatching remaining tool calls in a turn when the `signal` is aborted, matching the cancellation behavior of `runToolLoop`.
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+  - @mcp-use/client@2.4.0
+
+## 2.0.20-canary.4
+
+### Patch Changes
+
+- Updated dependencies [63b923e]
+  - @mcp-use/client@2.4.0-canary.2
+
+## 2.0.20-canary.3
+
+### Patch Changes
+
+- Updated dependencies [604b130]
+  - @mcp-use/client@2.4.0-canary.1
+
+## 2.0.20-canary.2
+
+### Patch Changes
+
+- 0d19df7: Wrap array-valued Gemini tool results in an object so function responses satisfy the provider's request schema in streaming and non-streaming calls.
+
+## 2.0.20-canary.1
+
+### Patch Changes
+
+- b24607b: `runToolLoopNonStreaming` now stops dispatching remaining tool calls in a turn when the `signal` is aborted, matching the cancellation behavior of `runToolLoop`.
+
+## 2.0.20-canary.0
+
+### Patch Changes
+
+- Updated dependencies [19a3d94]
+  - @mcp-use/client@2.3.5-canary.0
+
+## 2.0.19
+
+### Patch Changes
+
+- 7d71ef7: The `RunOptions.messages` docs now state that only the native local agent supports it. The LangChain agent (`@mcp-use/agent/langchain`) ignores `messages`; pass prior messages through `externalHistory` instead.
+- Updated dependencies [7d71ef7]
+- Updated dependencies [7d71ef7]
+- Updated dependencies [7d71ef7]
+  - @mcp-use/client@2.3.4
+
+## 2.0.19-canary.3
+
+### Patch Changes
+
+- Updated dependencies [1a5dbe5]
+  - @mcp-use/client@2.3.4-canary.2
+
+## 2.0.19-canary.2
+
+### Patch Changes
+
+- aa20eef: The `RunOptions.messages` docs now state that only the native local agent supports it. The LangChain agent (`@mcp-use/agent/langchain`) ignores `messages`; pass prior messages through `externalHistory` instead.
+
+## 2.0.19-canary.1
+
+### Patch Changes
+
+- Updated dependencies [a294830]
+  - @mcp-use/client@2.3.4-canary.1
+
+## 2.0.19-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a7f5b34]
+  - @mcp-use/client@2.3.4-canary.0
+
 ## 2.0.18
 
 ### Patch Changes

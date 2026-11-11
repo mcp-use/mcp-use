@@ -1,0 +1,108 @@
+---
+title: "Overview"
+description: "Build stateless TypeScript MCP servers with tools, resources, prompts, authentication, and MCP App views."
+icon: "list-start"
+---
+
+Use the mcp-use TypeScript server framework to expose tools, resources, prompts, or interactive MCP App views. Start with the [quickstart](/v1/typescript/getting-started/quickstart), or see the [v1 migration guide](/v2/typescript/server/migration).
+
+## Create a server
+
+```ts
+import { MCPServer } from "mcp-use";
+
+const server = new MCPServer({
+  name: "inventory-server",
+  version: "1.0.0",
+  description: "Look up products and inventory",
+  basePath: "/mcp",
+});
+
+export default server;
+```
+
+`server.fetch` is the Web-standard deployment handler. `server.listen()` uses the same application for local Node serving. The protocol runtime is stateless: registrations are replayed into a fresh SDK server for each request, so register everything before the first request.
+
+## Register a tool
+
+Schemas implement Standard Schema; Zod 4 is the documented example.
+
+```ts
+import { z } from "zod";
+
+export const getTime = server.tool(
+  {
+    name: "get-time",
+    description: "Return the current server time",
+    inputSchema: z.object({}),
+    outputSchema: z.object({ timestamp: z.string() }),
+  },
+  async () => {
+    const data = { timestamp: new Date().toISOString() };
+    return {
+      content: [{ type: "text", text: data.timestamp }],
+      structuredContent: data,
+    };
+  },
+);
+```
+
+Prefer raw MCP result envelopes. Deprecated response helpers remain available for migration, but new tools with `outputSchema` should return matching `structuredContent` and model-visible `content`.
+
+## Add an MCP App view
+
+Put the component at `views/<name>/view.tsx`, bind exactly one tool with `view: { name }`, and declare its `outputSchema`. The view reads pending, error, and ready states through `useToolContext()`.
+
+```tsx
+import { useToolContext } from "mcp-use/react";
+
+export default function InventoryView() {
+  const view = useToolContext<"show-inventory">();
+  if (view.status === "pending") return <p>Loading…</p>;
+  if (view.status === "error") return <p>{view.error.message}</p>;
+  return <pre>{JSON.stringify(view.toolOutput, null, 2)}</pre>;
+}
+```
+
+See [MCP Apps](/v1/typescript/mcp-apps) for binding, assets, CSP, and host hooks.
+
+## Develop locally
+
+```bash
+npm run dev
+```
+
+The default scaffold serves MCP at `http://localhost:3000/mcp` and opens the Inspector at `http://localhost:3000/mcp/inspector`. Successful server reloads swap the handler used by subsequent requests; view edits use Vite hot module replacement.
+
+<CardGroup cols={2}>
+  <Card title="Tools" icon="wrench" href="/v1/typescript/server/tools">
+    Define typed model actions.
+  </Card>
+  <Card
+    title="Resources"
+    icon="folder-open"
+    href="/v1/typescript/server/resources"
+  >
+    Expose readable URI content.
+  </Card>
+  <Card title="Prompts" icon="message-square" href="/v1/typescript/server/prompts">
+    Publish reusable prompt templates.
+  </Card>
+  <Card
+    title="Authentication"
+    icon="shield"
+    href="/v1/typescript/server/authentication/index"
+  >
+    Protect the MCP endpoint.
+  </Card>
+  <Card title="OpenAPI" icon="file-code" href="/v1/typescript/server/openapi">
+    Generate tools from an API document.
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/v1/typescript/server/deployment/mcp-use"
+  >
+    Build and deploy the server.
+  </Card>
+</CardGroup>

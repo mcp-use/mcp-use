@@ -1,5 +1,886 @@
 # mcp-use
 
+## 2.12.4
+
+### Patch Changes
+
+- 654523d: Add `mcp-use feedback send` for explicit CLI reports to PostHog, with a single positional message, anonymous identity, JSON receipts, bounded delivery, and actionable errors. Keep report contents separate from passive usage analytics and document the command for people and coding agents.
+- 654523d: Add `mcp-use analytics catalog` and `analytics query` for live schema discovery and scoped read-only ClickHouse SQL through Manufact Cloud. Include time and branch selection, bounded results, JSON metadata, and a bundled `manufact-analytics` skill with SQL and interpretation guidance.
+- 654523d: Track anonymous CLI adoption and command usage in PostHog with a persistent random installation ID, allowlisted command names, version/platform metadata, and CI filtering. Honor MCP_USE_ANONYMIZED_TELEMETRY=false and DO_NOT_TRACK=1, omit argument values, and keep capture failures silent and bounded.
+- 654523d: Link the landing page to the server's Inspector only when the CLI has mounted it. Pass its request-resolved URL through landing data and the optional `inspectorUrl` input to `getInstallTargets()`, keeping the hosted Inspector fallback for plain servers, `dev --no-inspector`, and `start` without `--with-inspector`. Mounted links prefill the MCP endpoint and open the Chat tab.
+- 654523d: Automatically version production view resource URIs with the build ID, keeping tool metadata, tool results, registered resources, and OAuth view access consistent. Every replica of a build shares the same URI, and a new build gets a fresh host cache key. Development view URIs remain unversioned.
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+  - @mcp-use/cli@5.1.0
+  - @mcp-use/inspector@20.3.29
+
+## 2.12.4-canary.4
+
+### Patch Changes
+
+- 98a1850: Link the landing page to the server's Inspector only when the CLI has mounted it. Pass its request-resolved URL through landing data and the optional `inspectorUrl` input to `getInstallTargets()`, keeping the hosted Inspector fallback for plain servers, `dev --no-inspector`, and `start` without `--with-inspector`. Mounted links prefill the MCP endpoint and open the Chat tab.
+- Updated dependencies [98a1850]
+  - @mcp-use/cli@5.1.0-canary.4
+
+## 2.12.4-canary.3
+
+### Patch Changes
+
+- 3860a16: Automatically version production view resource URIs with the build ID, keeping tool metadata, tool results, registered resources, and OAuth view access consistent. Every replica of a build shares the same URI, and a new build gets a fresh host cache key. Development view URIs remain unversioned.
+- Updated dependencies [3860a16]
+  - @mcp-use/cli@5.1.0-canary.3
+
+## 2.12.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [a610070]
+  - @mcp-use/cli@5.1.0-canary.2
+
+## 2.12.4-canary.1
+
+### Patch Changes
+
+- a22376b: Add `mcp-use feedback send` for explicit CLI reports to PostHog, with a single positional message, anonymous identity, JSON receipts, bounded delivery, and actionable errors. Keep report contents separate from passive usage analytics and document the command for people and coding agents.
+- 3169325: Add `mcp-use analytics catalog` and `analytics query` for live schema discovery and scoped read-only ClickHouse SQL through Manufact Cloud. Include time and branch selection, bounded results, JSON metadata, and a bundled `manufact-analytics` skill with SQL and interpretation guidance.
+- 4859469: Track anonymous CLI adoption and command usage in PostHog with a persistent random installation ID, allowlisted command names, version/platform metadata, and CI filtering. Honor MCP_USE_ANONYMIZED_TELEMETRY=false and DO_NOT_TRACK=1, omit argument values, and keep capture failures silent and bounded.
+- Updated dependencies [a22376b]
+- Updated dependencies [3169325]
+- Updated dependencies [4859469]
+  - @mcp-use/cli@5.1.0-canary.1
+
+## 2.12.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f1da1fa]
+- Updated dependencies
+  - @mcp-use/cli@5.0.1-canary.0
+  - @mcp-use/inspector@20.3.29-canary.0
+
+## 2.12.3
+
+### Patch Changes
+
+- d57fa5e: Rewrite the Manufact Cloud CLI for agents with typed requests, consistent JSON results and errors, framework-independent deployment, project links in .manufact, scoped environment variables, and Cloud management commands. Install the version-matched Manufact Cloud skill with skills install. Update the framework's bundled CLI without changing its server APIs.
+- e16c952: Run `resources/read` middleware, observers, and usage telemetry for view resources (`ui://views/<name>.html`). View reads previously skipped the middleware chain, so access checks and result changes in `server.use("mcp:resources/read", ...)` did not apply to them. View reads now set `ctx.view` (`{ name }`) on the `resources/read` context. On `mixedAuth` servers, hosts read views before sign-in, so `resources/read` middleware can now see a view read with `ctx.auth` undefined; check `ctx.view` before requiring `ctx.auth`.
+- Updated dependencies [b97451e]
+- Updated dependencies [a9b6557]
+- Updated dependencies [715874b]
+- Updated dependencies [9be9d1f]
+- Updated dependencies [4c747f7]
+- Updated dependencies [d57fa5e]
+- Updated dependencies [b085554]
+- Updated dependencies [680943b]
+- Updated dependencies [ae8c4b8]
+- Updated dependencies [8e566cb]
+- Updated dependencies
+- Updated dependencies [30784bc]
+  - @mcp-use/cli@5.0.0
+  - @mcp-use/inspector@20.3.28
+
+## 2.12.3-canary.2
+
+### Patch Changes
+
+- d57fa5e: Rewrite the Manufact Cloud CLI for agents with typed requests, consistent JSON results and errors, framework-independent deployment, project links in .manufact, scoped environment variables, and Cloud management commands. Install the version-matched Manufact Cloud skill with skills install. Update the framework's bundled CLI without changing its server APIs.
+- Updated dependencies [b97451e]
+- Updated dependencies [a9b6557]
+- Updated dependencies [715874b]
+- Updated dependencies [9be9d1f]
+- Updated dependencies [4c747f7]
+- Updated dependencies [d57fa5e]
+- Updated dependencies [b085554]
+- Updated dependencies [680943b]
+- Updated dependencies [ae8c4b8]
+  - @mcp-use/cli@5.0.0-canary.1
+
+## 2.12.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.28-canary.1
+
+## 2.12.3-canary.0
+
+### Patch Changes
+
+- e16c952: Run `resources/read` middleware, observers, and usage telemetry for view resources (`ui://views/<name>.html`). View reads previously skipped the middleware chain, so access checks and result changes in `server.use("mcp:resources/read", ...)` did not apply to them. View reads now set `ctx.view` (`{ name }`) on the `resources/read` context. On `mixedAuth` servers, hosts read views before sign-in, so `resources/read` middleware can now see a view read with `ctx.auth` undefined; check `ctx.view` before requiring `ctx.auth`.
+- Updated dependencies
+  - @mcp-use/cli@4.5.6-canary.0
+  - @mcp-use/inspector@20.3.28-canary.0
+
+## 2.12.2
+
+### Patch Changes
+
+- 7f9027f: `CSP_URLS` now only adds domains to a view's `connectDomains` and `resourceDomains`. It no longer fills `frameDomains` or `baseUriDomains`, which ChatGPT app review reads as a request to embed third-party iframes. Set `CSP_FRAME_DOMAINS` or `CSP_BASE_URI_DOMAINS`, or a view's `csp`, to declare those explicitly.
+- Updated dependencies [7f9027f]
+  - @mcp-use/cli@4.5.5
+  - @mcp-use/inspector@20.3.27
+
+## 2.12.2-canary.0
+
+### Patch Changes
+
+- d4919dd: `CSP_URLS` now only adds domains to a view's `connectDomains` and `resourceDomains`. It no longer fills `frameDomains` or `baseUriDomains`, which ChatGPT app review reads as a request to embed third-party iframes. Set `CSP_FRAME_DOMAINS` or `CSP_BASE_URI_DOMAINS`, or a view's `csp`, to declare those explicitly.
+- Updated dependencies
+  - @mcp-use/cli@4.5.5-canary.0
+  - @mcp-use/inspector@20.3.27-canary.0
+
+## 2.12.1
+
+### Patch Changes
+
+- Updated dependencies [f76d773]
+- Updated dependencies [3b3910c]
+  - @mcp-use/inspector@20.3.26
+  - @mcp-use/cli@4.5.4
+
+## 2.12.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f76d773]
+- Updated dependencies
+  - @mcp-use/inspector@20.3.26-canary.0
+  - @mcp-use/cli@4.5.4-canary.0
+
+## 2.12.0
+
+### Minor Changes
+
+- 5a6f679: Separate View UI origins from MCP endpoint identity. Normalize HTTP(S) `view.domain` values to origins for ChatGPT and derive Claude resource domains from the full public MCP endpoint, including its path, using existing `MCP_URL` or request URL configuration. Preserve computed Claude domains and host defaults. Document migration, metadata precedence, proxy limitations, and nested-frame CSP in the SDK guide and repository agent skills.
+
+### Patch Changes
+
+- 5a6f679: Record anonymous landing page views in the SDK's usage telemetry. Each sampled HTML `GET` to the MCP endpoint sends a `landing.viewed` event that says whether the page is built-in or custom, whether it was served by a dev server, whether the page is public, and whether the user agent looks automated (a crawler, link unfurler, HTTP library, or missing user agent). The user agent itself is never sent. `MCP_USE_ANONYMIZED_TELEMETRY=false` turns it off along with the other usage events.
+- 1589353: Require Vite 8.1.6 or newer within Vite 8 for the optional Vite integration peer, so older versions affected by development-server file access and launch-editor vulnerabilities no longer satisfy the supported range.
+- 1589353: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+- Updated dependencies [5a6f679]
+- Updated dependencies [5a6f679]
+- Updated dependencies [1589353]
+  - @mcp-use/inspector@20.3.25
+  - @mcp-use/cli@4.5.3
+
+## 2.12.0-canary.3
+
+### Patch Changes
+
+- d0068bc: Require Vite 8.1.6 or newer within Vite 8 for the optional Vite integration peer, so older versions affected by development-server file access and launch-editor vulnerabilities no longer satisfy the supported range.
+
+## 2.12.0-canary.2
+
+### Patch Changes
+
+- 9ac5e82: Upgrade Vite to 8.1.6 to fix development-server file access and bundled launch-editor vulnerabilities. Refresh patched transitive dependencies, including follow-redirects and markdown-it.
+- Updated dependencies [9ac5e82]
+  - @mcp-use/cli@4.5.3-canary.1
+  - @mcp-use/inspector@20.3.25-canary.2
+
+## 2.12.0-canary.1
+
+### Minor Changes
+
+- 6c2eeca: Separate View UI origins from MCP endpoint identity. Normalize HTTP(S) `view.domain` values to origins for ChatGPT and derive Claude resource domains from the full public MCP endpoint, including its path, using existing `MCP_URL` or request URL configuration. Preserve computed Claude domains and host defaults. Document migration, metadata precedence, proxy limitations, and nested-frame CSP in the SDK guide and repository agent skills.
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.25-canary.1
+
+## 2.11.3-canary.0
+
+### Patch Changes
+
+- 77b394e: Record anonymous landing page views in the SDK's usage telemetry. Each sampled HTML `GET` to the MCP endpoint sends a `landing.viewed` event that says whether the page is built-in or custom, whether it was served by a dev server, whether the page is public, and whether the user agent looks automated (a crawler, link unfurler, HTTP library, or missing user agent). The user agent itself is never sent. `MCP_USE_ANONYMIZED_TELEMETRY=false` turns it off along with the other usage events.
+- Updated dependencies
+  - @mcp-use/cli@4.5.3-canary.0
+  - @mcp-use/inspector@20.3.25-canary.0
+
+## 2.11.2
+
+### Patch Changes
+
+- Updated dependencies [5426c95]
+- Updated dependencies [5426c95]
+  - @mcp-use/inspector@20.3.24
+  - @mcp-use/cli@4.5.2
+
+## 2.11.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d71db35]
+- Updated dependencies
+  - @mcp-use/inspector@20.3.24-canary.0
+  - @mcp-use/cli@4.5.2-canary.0
+
+## 2.11.1
+
+### Patch Changes
+
+- Updated dependencies [b89b9d4]
+- Updated dependencies [5be7650]
+- Updated dependencies [e7450b5]
+- Updated dependencies [8db9382]
+- Updated dependencies [0ead84c]
+  - @mcp-use/inspector@20.3.23
+  - @mcp-use/cli@4.5.1
+
+## 2.11.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [b89b9d4]
+  - @mcp-use/inspector@20.3.23-canary.3
+
+## 2.11.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [e7450b5]
+  - @mcp-use/inspector@20.3.23-canary.2
+
+## 2.11.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [0ead84c]
+  - @mcp-use/inspector@20.3.23-canary.1
+
+## 2.11.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [8db9382]
+  - @mcp-use/cli@4.5.1-canary.1
+
+## 2.11.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [68c9e91]
+- Updated dependencies
+  - @mcp-use/cli@4.5.1-canary.0
+  - @mcp-use/inspector@20.3.23-canary.0
+
+## 2.11.0
+
+### Minor Changes
+
+- e4ff892: Customize the page a browser sees at the MCP URL with a `landing.tsx` in the MCP root. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`), and `mcp-use start` serves the built page. The page renders on the server and hydrates in the browser. Without `landing.tsx`, the built-in page is served as before.
+  - `mcp-use/landing` adds React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`, with the `LandingServerInfo`, `InstallTargets` and per-client target types. Server info always ships to the page; each list ships only when a module in the `landing.tsx` import graph imports its hook, and a list hook without its data throws an error that says to import it.
+  - `getInstallTargets({ url, name })` returns the Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and Manufact Inspector install links and commands, keyed by client, for use outside the server such as on a docs site. The built-in page now builds its links with it.
+  - `landing.tsx` can `export const metadata` (`LandingMetadata`: `title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags. Missing fields keep the server defaults.
+  - Tailwind classes work in `landing.tsx` with no CSS file, and CSS imports are bundled. In dev, edits use Fast Refresh, creating or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` for the page's assets.
+  - Every `create-mcp-use-app` template now includes a Tailwind-styled `landing.tsx` similar to the built-in page. The `blank` and `mcp-server` templates add `react`, `react-dom`, `@types/react` and `@types/react-dom`, and every template's `tsconfig.json` typechecks `landing.tsx`.
+
+### Patch Changes
+
+- e4ff892: ChatGPT install steps on the landing page, in `getInstallTargets()` and in the inspector's tunnel panel follow ChatGPT's Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab.
+- e4ff892: Tailwind fixes for `landing.tsx` pages:
+  - The page now sets `data-theme` on `<html>` from the OS color scheme before the first paint and follows OS changes, so `dark:` classes work on the landing page without a theme script. A page that sets `data-theme` itself, for example from a theme toggle, keeps its value.
+  - A page whose CSS imports Tailwind itself (`@import "tailwindcss"`, for `@theme`, `@utility` or a custom `dark` variant) now owns Tailwind: the CLI-managed stylesheet is left out, so only the page's copy is compiled and its `dark` variant is the only one.
+  - In `mcp-use dev`, the page head links the stylesheets the page imports, so server-rendered markup no longer appears unstyled until the page's JavaScript loads.
+
+- e4ff892: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+- Updated dependencies [e4ff892]
+  - @mcp-use/inspector@20.3.22
+  - @mcp-use/cli@4.5.0
+
+## 2.11.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [6d4d220]
+  - @mcp-use/inspector@20.3.22-canary.9
+
+## 2.11.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [8e8c70d]
+  - @mcp-use/inspector@20.3.22-canary.8
+
+## 2.11.0-canary.8
+
+### Patch Changes
+
+- f88a63b: Tailwind fixes for `landing.tsx` pages:
+  - The page now sets `data-theme` on `<html>` from the OS color scheme before the first paint and follows OS changes, so `dark:` classes work on the landing page without a theme script. A page that sets `data-theme` itself, for example from a theme toggle, keeps its value.
+  - A page whose CSS imports Tailwind itself (`@import "tailwindcss"`, for `@theme`, `@utility` or a custom `dark` variant) now owns Tailwind: the CLI-managed stylesheet is left out, so only the page's copy is compiled and its `dark` variant is the only one.
+  - In `mcp-use dev`, the page head links the stylesheets the page imports, so server-rendered markup no longer appears unstyled until the page's JavaScript loads.
+
+- Updated dependencies [f88a63b]
+  - @mcp-use/cli@4.5.0-canary.4
+
+## 2.11.0-canary.7
+
+### Minor Changes
+
+- 52d8d99: Customize the page a browser sees at the MCP URL with a `landing.tsx` in the MCP root. `mcp-use dev` and `mcp-use build` find it (also under `--mcp-dir`), and `mcp-use start` serves the built page. The page renders on the server and hydrates in the browser. Without `landing.tsx`, the built-in page is served as before.
+  - `mcp-use/landing` adds React-free hooks for the page: `useServerInfo()`, `useToolList()`, `usePromptList()`, `useResourceList()` and `useInstallTargets()`, with the `LandingServerInfo`, `InstallTargets` and per-client target types. Server info always ships to the page; each list ships only when a module in the `landing.tsx` import graph imports its hook, and a list hook without its data throws an error that says to import it.
+  - `getInstallTargets({ url, name })` returns the Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT and Manufact Inspector install links and commands, keyed by client, for use outside the server such as on a docs site. The built-in page now builds its links with it.
+  - `landing.tsx` can `export const metadata` (`LandingMetadata`: `title`, `description`, `icon`, `image`) to set the page title, meta description, and Open Graph and Twitter tags. Missing fields keep the server defaults.
+  - Tailwind classes work in `landing.tsx` with no CSS file, and CSS imports are bundled. In dev, edits use Fast Refresh, creating or deleting `landing.tsx` switches pages live, and a broken edit keeps serving the last working page. Builds honor `MCP_ASSETS_URL` for the page's assets.
+  - Every `create-mcp-use-app` template now includes a Tailwind-styled `landing.tsx` similar to the built-in page. The `blank` and `mcp-server` templates add `react`, `react-dom`, `@types/react` and `@types/react-dom`, and every template's `tsconfig.json` typechecks `landing.tsx`.
+
+### Patch Changes
+
+- 52d8d99: ChatGPT install steps on the landing page, in `getInstallTargets()` and in the inspector's tunnel panel follow ChatGPT's Plugins flow (Plugins → Add → Add Custom MCP Server) instead of developer mode and the Connectors tab.
+- Updated dependencies [52d8d99]
+- Updated dependencies [52d8d99]
+  - @mcp-use/inspector@20.3.22-canary.7
+  - @mcp-use/cli@4.5.0-canary.3
+
+## 2.10.2-canary.6
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [7ff7174]
+  - @mcp-use/inspector@20.3.22-canary.6
+  - @mcp-use/cli@4.4.2-canary.2
+
+## 2.10.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.22-canary.5
+
+## 2.10.2-canary.4
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.4.2-canary.1
+  - @mcp-use/inspector@20.3.22-canary.4
+
+## 2.10.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.22-canary.3
+
+## 2.10.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.22-canary.2
+
+## 2.10.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2a05af2]
+  - @mcp-use/inspector@20.3.22-canary.1
+
+## 2.10.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [bea1265]
+- Updated dependencies
+  - @mcp-use/cli@4.4.2-canary.0
+  - @mcp-use/inspector@20.3.22-canary.0
+
+## 2.10.1
+
+### Patch Changes
+
+- 96b6aa5: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 96b6aa5: Copy a tool view's `description` to `_meta["openai/widgetDescription"]` on the view resource, on both `resources/list` and `resources/read`, so ChatGPT gets a widget description without extra config. This restores the v1 behavior.
+- Updated dependencies
+- Updated dependencies [96b6aa5]
+- Updated dependencies [96b6aa5]
+- Updated dependencies [96b6aa5]
+  - @mcp-use/inspector@20.3.21
+  - @mcp-use/cli@4.4.1
+
+## 2.10.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.21-canary.2
+  - @mcp-use/cli@4.4.1-canary.1
+
+## 2.10.1-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.4.1-canary.1
+  - @mcp-use/inspector@20.3.21-canary.1
+
+## 2.10.1-canary.0
+
+### Patch Changes
+
+- 1a34fc7: Copy a tool view's `description` to `_meta["openai/widgetDescription"]` on the view resource, on both `resources/list` and `resources/read`, so ChatGPT gets a widget description without extra config. This restores the v1 behavior.
+- Updated dependencies
+  - @mcp-use/cli@4.4.1-canary.0
+  - @mcp-use/inspector@20.3.21-canary.0
+
+## 2.10.0
+
+### Minor Changes
+
+- aa78231: `mcp-use build` no longer needs the server's runtime secrets. The build evaluates the entry with `MCP_USE_PHASE=build`, and the new `isBuilding()` export of `mcp-use` lets module-scope code skip reading secrets or connecting to a database while building.
+
+  `mcp-use build` also exits when the build finishes. Before, an entry that opened a connection at module scope, such as a Redis client, kept the build process running after it had printed its result. A failed build or dev start also prints the cause of a refused connection, which it used to print as an empty line.
+
+- aa78231: Add `oauthProxy()` to `mcp-use/oauth`: the MCP server becomes its own OAuth authorization server in front of an identity provider without dynamic client registration, such as GitHub (`github()`) or Google (`google()`), or any OAuth 2.0 provider (`upstream()`). Clients present a client ID metadata document or register (DCR), approve a consent page the server owns (it names the server by the host of its URL, for example `mcp.acme.com`), and receive the proxy's own opaque tokens. The `clients` option limits which clients may connect, by metadata document URL or origin, or by a client defined on the server. The upstream client secret and the user's upstream tokens stay on the server, and the tokens and other proxy records are stored encrypted in a shared store (`mcp-use/oauth/storage`: Upstash, Redis, Postgres, Firestore, Cloudflare D1 or Durable Object, and an in-memory store for local development). `redisStorage` takes a connected client or a function that connects one on first use. Tools read the upstream token with `upstreamToken(ctx.auth)` or `ctx.auth.upstream`. When a sign-in or refresh fails, the server log names the cause without token or code values: the provider's own error code and description, the HTTP status and content type, an `iss` that names another issuer, or the network error. When a sign-in fails, the client's `error_description` names the provider's error code. The log also reports refused client metadata documents and stored records encrypted with a secret the server no longer has. Clients that signed in through the 1.x `oauthProxy` still send the provider's client ID and the bare server origin as the resource; while registration is on, the proxy accepts both, so those users approve the consent page once and sign in again without removing the server. Inside `mcp-use build`, where `isBuilding()` is true, `oauthProxy` requires no secret, store, or upstream client credentials, and `upstashStorage` requires no URL or token.
+
+  OAuth providers can now register public HTTP routes from `setup()` with `host.route()`, read the mount mode as `host.mode` and the `listen()` bind address as `host.listenHost`, and compute `oauthMetadata` from the resolved resource URL. OAuth endpoints under the MCP path are never written to trace logs, and `oauthEnvironmentValue` no longer throws on runtimes without `process`.
+
+### Patch Changes
+
+- aa78231: Correct API reference comments. In `@mcp-use/client`, stdio `env` does not inherit the parent process environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, and several examples referenced fields and connectors that do not exist. In `mcp-use`, legacy stateless GET, DELETE, and HEAD requests are documented as returning `204`, the `withMcpUse` defaults match the build, and the `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` entry points now appear in the generated API reference.
+- aa78231: Convert OpenAPI 3.0 boolean `exclusiveMinimum` and `exclusiveMaximum` into JSON Schema numeric bounds so `MCPServer.fromOpenAPI` accepts specs that use them instead of throwing while registering tools.
+- Updated dependencies [aa78231]
+- Updated dependencies [aa78231]
+- Updated dependencies [aa78231]
+- Updated dependencies [aa78231]
+- Updated dependencies [aa78231]
+- Updated dependencies [aa78231]
+- Updated dependencies
+- Updated dependencies [aa78231]
+  - @mcp-use/cli@4.4.0
+  - @mcp-use/inspector@20.3.20
+
+## 2.10.0-canary.4
+
+### Patch Changes
+
+- c64b4d4: Correct API reference comments. In `@mcp-use/client`, stdio `env` does not inherit the parent process environment, `defaultRequestOptions` applies only to the initial tool listing, `VMExecutorOptions.memoryLimitMb` is not enforced, and several examples referenced fields and connectors that do not exist. In `mcp-use`, legacy stateless GET, DELETE, and HEAD requests are documented as returning `204`, the `withMcpUse` defaults match the build, and the `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` entry points now appear in the generated API reference.
+- Updated dependencies
+  - @mcp-use/cli@4.4.0-canary.2
+  - @mcp-use/inspector@20.3.20-canary.3
+
+## 2.10.0-canary.3
+
+### Minor Changes
+
+- 3e9bc30: `mcp-use build` no longer needs the server's runtime secrets. The build evaluates the entry with `MCP_USE_PHASE=build`, and the new `isBuilding()` export of `mcp-use` lets module-scope code skip reading secrets or connecting to a database while building.
+
+  `mcp-use build` also exits when the build finishes. Before, an entry that opened a connection at module scope, such as a Redis client, kept the build process running after it had printed its result. A failed build or dev start also prints the cause of a refused connection, which it used to print as an empty line.
+
+- d6ad3db: Add `oauthProxy()` to `mcp-use/oauth`: the MCP server becomes its own OAuth authorization server in front of an identity provider without dynamic client registration, such as GitHub (`github()`) or Google (`google()`), or any OAuth 2.0 provider (`upstream()`). Clients present a client ID metadata document or register (DCR), approve a consent page the server owns (it names the server by the host of its URL, for example `mcp.acme.com`), and receive the proxy's own opaque tokens. The `clients` option limits which clients may connect, by metadata document URL or origin, or by a client defined on the server. The upstream client secret and the user's upstream tokens stay on the server, and the tokens and other proxy records are stored encrypted in a shared store (`mcp-use/oauth/storage`: Upstash, Redis, Postgres, Firestore, Cloudflare D1 or Durable Object, and an in-memory store for local development). `redisStorage` takes a connected client or a function that connects one on first use. Tools read the upstream token with `upstreamToken(ctx.auth)` or `ctx.auth.upstream`. When a sign-in or refresh fails, the server log names the cause without token or code values: the provider's own error code and description, the HTTP status and content type, an `iss` that names another issuer, or the network error. When a sign-in fails, the client's `error_description` names the provider's error code. The log also reports refused client metadata documents and stored records encrypted with a secret the server no longer has. Clients that signed in through the 1.x `oauthProxy` still send the provider's client ID and the bare server origin as the resource; while registration is on, the proxy accepts both, so those users approve the consent page once and sign in again without removing the server. Inside `mcp-use build`, where `isBuilding()` is true, `oauthProxy` requires no secret, store, or upstream client credentials, and `upstashStorage` requires no URL or token.
+
+  OAuth providers can now register public HTTP routes from `setup()` with `host.route()`, read the mount mode as `host.mode` and the `listen()` bind address as `host.listenHost`, and compute `oauthMetadata` from the resolved resource URL. OAuth endpoints under the MCP path are never written to trace logs, and `oauthEnvironmentValue` no longer throws on runtimes without `process`.
+
+### Patch Changes
+
+- Updated dependencies [3e9bc30]
+- Updated dependencies [3e9bc30]
+- Updated dependencies
+  - @mcp-use/cli@4.4.0-canary.1
+  - @mcp-use/inspector@20.3.20-canary.2
+
+## 2.9.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.20-canary.1
+
+## 2.9.1-canary.1
+
+### Patch Changes
+
+- 3591976: Convert OpenAPI 3.0 boolean `exclusiveMinimum` and `exclusiveMaximum` into JSON Schema numeric bounds so `MCPServer.fromOpenAPI` accepts specs that use them instead of throwing while registering tools.
+
+## 2.9.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [884521e]
+  - @mcp-use/inspector@20.3.20-canary.0
+  - @mcp-use/cli@4.4.0-canary.0
+
+## 2.9.0
+
+### Minor Changes
+
+- b49c5f0: Add typed `server.mentions({ name, search })` registration for composer mention search using official SDK ResourceLink results, generated schemas, and app visibility that preserves descriptor metadata.
+
+### Patch Changes
+
+- Updated dependencies [b49c5f0]
+  - @mcp-use/cli@4.3.3
+  - @mcp-use/inspector@20.3.19
+
+## 2.9.0-canary.0
+
+### Minor Changes
+
+- 5a91ac3: Add typed `server.mentions({ name, search })` registration for composer mention search using official SDK ResourceLink results, generated schemas, and app visibility that preserves descriptor metadata.
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/cli@4.3.3-canary.0
+  - @mcp-use/inspector@20.3.19-canary.0
+
+## 2.8.2
+
+### Patch Changes
+
+- Updated dependencies [ad6ce34]
+  - @mcp-use/cli@4.3.2
+  - @mcp-use/inspector@20.3.18
+
+## 2.8.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/cli@4.3.2-canary.0
+  - @mcp-use/inspector@20.3.18-canary.0
+
+## 2.8.1
+
+### Patch Changes
+
+- 6bf3a79: Prevent request logging from buffering SSE responses so tool progress and log notifications reach clients before tool completion. SSE response bodies are skipped at every logging level, including trace, while finite JSON outcome logging is preserved.
+- 6bf3a79: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies [6bf3a79]
+- Updated dependencies [6bf3a79]
+- Updated dependencies [6bf3a79]
+- Updated dependencies [6bf3a79]
+- Updated dependencies [6bf3a79]
+  - @mcp-use/cli@4.3.1
+  - @mcp-use/inspector@20.3.17
+
+## 2.8.1-canary.4
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.3.1-canary.3
+  - @mcp-use/inspector@20.3.17-canary.2
+
+## 2.8.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [45bc353]
+  - @mcp-use/cli@4.3.1-canary.2
+
+## 2.8.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4d93a2e]
+  - @mcp-use/cli@4.3.1-canary.1
+
+## 2.8.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [53dcb47]
+  - @mcp-use/inspector@20.3.17-canary.1
+
+## 2.8.1-canary.0
+
+### Patch Changes
+
+- 8749db8: Prevent request logging from buffering SSE responses so tool progress and log notifications reach clients before tool completion. SSE response bodies are skipped at every logging level, including trace, while finite JSON outcome logging is preserved.
+- Updated dependencies
+  - @mcp-use/cli@4.3.1-canary.0
+  - @mcp-use/inspector@20.3.17-canary.0
+
+## 2.8.0
+
+### Minor Changes
+
+- 24bf7b0: Add `useDeepLink` to `mcp-use/react` to read initial and subsequent ChatGPT deep-link URLs through the existing MCP App connection.
+- 24bf7b0: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+- 24bf7b0: Add server.settings registration for native ChatGPT plugin settings with typed primitive fields, optional layout, validated read/update tools, request context callbacks, and per-request capability advertisement. Applications retain persistence and authorization responsibilities.
+- 24bf7b0: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+- 24bf7b0: Add top-level tool icons to `tools/list`, including proxied tools and public-relative icon assets. Demonstrate themed entrypoint icons in Bookshop and document the tool, entrypoint, and server branding fields.
+- 24bf7b0: Add typed global, thread, and file entrypoints on tool.view, including launch-contract validation and preserved OpenAI tool metadata.
+
+### Patch Changes
+
+- 24bf7b0: Coordinate model context contributions through immutable send snapshots, preserve description order, and correctly handle coalesced operations, synchronous widget failures, retries, and disposal without changing existing transport defaults. Keep newer operation waiters separate from older write failures, compare Unicode object keys deterministically, fence test resets, and preserve attachment generation identity without retaining removed keys.
+- 24bf7b0: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+- Updated dependencies [24bf7b0]
+- Updated dependencies [24bf7b0]
+- Updated dependencies [24bf7b0]
+- Updated dependencies
+- Updated dependencies [24bf7b0]
+- Updated dependencies [24bf7b0]
+  - @mcp-use/cli@4.3.0
+  - @mcp-use/inspector@20.3.16
+
+## 2.8.0-canary.1
+
+### Patch Changes
+
+- df6440c: Update the official MCP client, core, and server SDKs to 2.3.1 and MCP Apps to 2.0.3. Preserve the server response-detection patch and update the legacy SDK used by agent test servers to 1.32.1.
+
+  The upstream HTTP and OAuth helpers now restrict redirects. On Node, only same-origin redirects that preserve the request method are followed. Browsers reject all redirects by default, including same-origin redirects. Configure endpoints with their final URL; mcp-use's HTTP connector does not expose the upstream `redirectPolicy` option. Existing issuer-bound OAuth storage and standard error causes remain supported.
+
+- Updated dependencies [df6440c]
+- Updated dependencies
+  - @mcp-use/cli@4.3.0-canary.1
+  - @mcp-use/inspector@20.3.16-canary.1
+
+## 2.8.0-canary.0
+
+### Minor Changes
+
+- 7f55b34: Add `useDeepLink` to `mcp-use/react` to read initial and subsequent ChatGPT deep-link URLs through the existing MCP App connection.
+- ef495f6: Activate native delivery only for committed hook consumers, limit image inputs to 10 MiB of decoded bytes, and keep development diagnostics free of content-derived hashes and duplicate HMR forwarding.
+
+  Add useModelContext for keyed native text, image, resource-link, and embedded-resource attachments, with automatic activation and internal capability checks. Named content types expose friendly presentation on both input and restored output; image inputs accept public-asset source paths or native base64 bytes, and text thumbnails share Image's public-path resolution. Pending image preparation is cancelled by replacement, removal, or clear without restoring stale evidence. Definite delivery failures retain selection for the next valid mutation, while uncertain writes remain blocked without a public retry control. Legacy-only views retain their transport; native activation preserves visible projections and rejects unsafe handoff from model-visible widget persistence.
+
+  Pre-bundle the model-context schema dependency during view development so cold iframe startup does not trigger a full reload.
+
+- 319614f: Add server.settings registration for native ChatGPT plugin settings with typed primitive fields, optional layout, validated read/update tools, request context callbacks, and per-request capability advertisement. Applications retain persistence and authorization responsibilities.
+- ab53ccd: Capture the frontend named viewConfig export in development and production view manifests. Emit supported display modes and the optional initial ChatGPT display preference on served HTML resource metadata, with preference validation. OpenAI resource metadata advertises the inline/fullscreen subset while MCP Apps capabilities preserve support for other hosts, including pip.
+- cdcfd7c: Add top-level tool icons to `tools/list`, including proxied tools and public-relative icon assets. Demonstrate themed entrypoint icons in Bookshop and document the tool, entrypoint, and server branding fields.
+- 7eee612: Add typed global, thread, and file entrypoints on tool.view, including launch-contract validation and preserved OpenAI tool metadata.
+
+### Patch Changes
+
+- bec3491: Coordinate model context contributions through immutable send snapshots, preserve description order, and correctly handle coalesced operations, synchronous widget failures, retries, and disposal without changing existing transport defaults. Keep newer operation waiters separate from older write failures, compare Unicode object keys deterministically, fence test resets, and preserve attachment generation identity without retaining removed keys.
+- Updated dependencies [ef495f6]
+- Updated dependencies [ab53ccd]
+- Updated dependencies
+  - @mcp-use/cli@4.3.0-canary.0
+  - @mcp-use/inspector@20.3.16-canary.0
+
+## 2.7.3
+
+### Patch Changes
+
+- 8dc3750: Upgrade Hono to a patched release to address dependency security advisories.
+- Updated dependencies [8dc3750]
+- Updated dependencies [8dc3750]
+- Updated dependencies [8dc3750]
+- Updated dependencies [8dc3750]
+  - @mcp-use/cli@4.2.1
+  - @mcp-use/inspector@20.3.15
+
+## 2.7.3-canary.3
+
+### Patch Changes
+
+- 2ab9dc5: Upgrade Hono to a patched release to address dependency security advisories.
+
+## 2.7.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [f44450c]
+  - @mcp-use/cli@4.2.1-canary.1
+
+## 2.7.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [f3d4ae7]
+  - @mcp-use/inspector@20.3.15-canary.1
+
+## 2.7.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [0e240fc]
+- Updated dependencies
+  - @mcp-use/cli@4.2.1-canary.0
+  - @mcp-use/inspector@20.3.15-canary.0
+
+## 2.7.2
+
+### Patch Changes
+
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Rebuild bundled workspace code and synchronize published internal package metadata.
+- cdf2cc6: Forward downstream cancellation signals to proxied prompt requests.
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+- Updated dependencies [cdf2cc6]
+  - @mcp-use/cli@4.2.0
+  - @mcp-use/inspector@20.3.14
+
+## 2.7.2-canary.9
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.14-canary.5
+  - @mcp-use/cli@4.2.0-canary.4
+
+## 2.7.2-canary.8
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+- Updated dependencies [604b130]
+  - @mcp-use/cli@4.2.0-canary.4
+  - @mcp-use/inspector@20.3.14-canary.4
+
+## 2.7.2-canary.7
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.14-canary.3
+
+## 2.7.2-canary.6
+
+### Patch Changes
+
+- 77802c8: Updated dependency `vitest` to `4.1.11`.
+
+## 2.7.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.14-canary.2
+
+## 2.7.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [cc3ec31]
+  - @mcp-use/cli@4.2.0-canary.3
+
+## 2.7.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [edf4bb4]
+  - @mcp-use/cli@4.1.18-canary.2
+
+## 2.7.2-canary.2
+
+### Patch Changes
+
+- 03bb362: Forward downstream cancellation signals to proxied prompt requests.
+
+## 2.7.2-canary.1
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.1.18-canary.1
+  - @mcp-use/inspector@20.3.14-canary.1
+
+## 2.7.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [ee1c64b]
+- Updated dependencies
+  - @mcp-use/inspector@20.3.14-canary.0
+  - @mcp-use/cli@4.1.18-canary.0
+
+## 2.7.1
+
+### Patch Changes
+
+- 7d71ef7: Views no longer stay pending forever when the host cancels the tool call that rendered them. When `ui/notifications/tool-cancelled` arrives before a result, `useToolContext()` now switches to `status: "error"` with a new `ToolCancelledError` (exported from `mcp-use/react`) that carries the host's `reason`. Views that already render `error.message` show the cancellation without changes. Check `error instanceof ToolCancelledError` to show a "Cancelled" state or a retry. A cancellation that arrives after a result is still ignored.
+
+  `ToolContextError` is now `ToolError | ToolCancelledError`. Narrow with `instanceof ToolError` before reading `error.result`.
+
+  `ViewRenderer` no longer sends `tool-cancelled` when a tool call made by the view fails. That failure already rejects the view's call, and the notification refers to the tool call that rendered the view.
+
+- Updated dependencies [7d71ef7]
+- Updated dependencies [7d71ef7]
+- Updated dependencies [7d71ef7]
+- Updated dependencies [7d71ef7]
+- Updated dependencies
+  - @mcp-use/cli@4.1.17
+  - @mcp-use/inspector@20.3.13
+
+## 2.7.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.13-canary.3
+  - @mcp-use/cli@4.1.17-canary.0
+
+## 2.7.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.13-canary.2
+
+## 2.7.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.13-canary.1
+  - @mcp-use/cli@4.1.17-canary.0
+
+## 2.7.1-canary.0
+
+### Patch Changes
+
+- a7f5b34: Views no longer stay pending forever when the host cancels the tool call that rendered them. When `ui/notifications/tool-cancelled` arrives before a result, `useToolContext()` now switches to `status: "error"` with a new `ToolCancelledError` (exported from `mcp-use/react`) that carries the host's `reason`. Views that already render `error.message` show the cancellation without changes. Check `error instanceof ToolCancelledError` to show a "Cancelled" state or a retry. A cancellation that arrives after a result is still ignored.
+
+  `ToolContextError` is now `ToolError | ToolCancelledError`. Narrow with `instanceof ToolError` before reading `error.result`.
+
+  `ViewRenderer` no longer sends `tool-cancelled` when a tool call made by the view fails. That failure already rejects the view's call, and the notification refers to the tool call that rendered the view.
+
+- Updated dependencies
+  - @mcp-use/cli@4.1.17-canary.0
+  - @mcp-use/inspector@20.3.13-canary.0
+
 ## 2.7.0
 
 ### Minor Changes

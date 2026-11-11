@@ -10,8 +10,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { resolveHost, resolvePort } from "./args.js";
-import { isInspectorRequest } from "../cli/inspector-route.js";
-import { loadProjectEnv } from "../cli/next-compat.js";
+import { isInspectorRequest } from "../toolchain/inspector-route.js";
+import { loadProjectEnv } from "../toolchain/next-compat.js";
 import type { FetchHandler } from "../fetch-app.js";
 
 /*
@@ -30,6 +30,7 @@ const BUILD_MANIFEST_NAME = "manifest.json";
  */
 interface ListenableServer {
   basePath?: unknown;
+  __setInspectorPath?(path: string | undefined): void;
   host?: unknown;
   port?: unknown;
   app: {
@@ -249,6 +250,7 @@ async function startWithInspector(
     }
     await next();
   });
+  server.__setInspectorPath?.(`${basePath === "/" ? "" : basePath}/inspector`);
   return server.listen(port, { host });
 }
 

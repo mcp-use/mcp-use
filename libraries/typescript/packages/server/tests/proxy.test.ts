@@ -27,6 +27,14 @@ function buildUpstream(label: string): MCPServer {
     {
       name: "greet",
       description: `Greet through ${label}`,
+      icons: [
+        {
+          src: `https://example.test/${label}.svg`,
+          mimeType: "image/svg+xml",
+          sizes: ["20x20"],
+          theme: "dark",
+        },
+      ],
       inputSchema: z.object({ name: z.string().describe("Person to greet") }),
       outputSchema: z.object({ greeting: z.string() }),
       annotations: { readOnlyHint: true },
@@ -131,6 +139,14 @@ describe("MCPServer.proxy", () => {
     ]);
     expect(tools.find((tool) => tool.name === "alpha_greet")).toMatchObject({
       description: "Greet through alpha",
+      icons: [
+        {
+          src: "https://example.test/alpha.svg",
+          mimeType: "image/svg+xml",
+          sizes: ["20x20"],
+          theme: "dark",
+        },
+      ],
       annotations: { readOnlyHint: true },
       inputSchema: {
         type: "object",
@@ -504,6 +520,56 @@ describe("MCPServer.proxy", () => {
     releaseFirstProgress?.();
     await call;
     expect(forwarded).toEqual([1, 2]);
+  });
+
+  it("forwards downstream cancellation to proxied prompts", async () => {
+    let mountedPrompt:
+      | ((params: Record<string, unknown>, ctx: unknown) => Promise<unknown>)
+      | undefined;
+    let getPromptCalls = 0;
+    const host: ProxyMountHost = {
+      isStarted: () => false,
+      hasTool: () => false,
+      hasResource: () => false,
+      hasPrompt: () => false,
+      registerTool: () => {
+        throw new Error("unexpected tool registration");
+      },
+      registerResource: () => {
+        throw new Error("unexpected resource registration");
+      },
+      registerPrompt: (_definition, callback) => {
+        mountedPrompt = callback as unknown as typeof mountedPrompt;
+      },
+      trackOwner: () => {},
+    };
+    const connection: ProxyConnection = {
+      info: { server: { name: "prompts" } },
+      supports: (capability) => capability === "prompts",
+      async listTools() {
+        return [];
+      },
+      async callTool() {
+        return { content: [] };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return { prompts: [{ name: "summarize" }] };
+      },
+      async getPrompt(_name, _args, options) {
+        getPromptCalls += 1;
+        expect(options?.signal).toBe(signal);
+        return { messages: [] };
+      },
+    };
+    const signal = new AbortController().signal;
+
+    await mountProxyConnection(host, connection);
+    expect(mountedPrompt).toBeDefined();
+    await mountedPrompt?.({}, { signal });
+    expect(getPromptCalls).toBe(1);
   });
 
   it("preserves upstream resource annotations and _meta", async () => {

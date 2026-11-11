@@ -87,6 +87,54 @@ export function resolveServerOrigin(request: Request): string {
 }
 
 /**
+ * Resolve the public MCP endpoint used for Claude's sandbox identity.
+ * An origin-only `MCP_URL` uses `basePath`; a URL with a path is already an
+ * endpoint and is kept verbatim. Otherwise use the request path and query
+ * with the forwarded/request origin. Asset URLs never identify the endpoint.
+ *
+ * @internal
+ */
+export function resolveMcpEndpoint(
+  request: Request | undefined,
+  basePath: string
+): string | undefined {
+  const mcpUrl = readEnv("MCP_URL");
+  if (mcpUrl !== undefined) {
+    try {
+      const url = new URL(mcpUrl);
+      if (url.protocol === "https:" || url.protocol === "http:") {
+        return url.pathname !== "/" || url.search !== ""
+          ? mcpUrl
+          : `${stripTrailingSlashes(mcpUrl)}${basePath}`;
+      }
+    } catch {
+      // Match server-origin resolution's fallback for malformed MCP_URL.
+    }
+  }
+  if (request === undefined) return undefined;
+  const url = new URL(request.url);
+  return `${resolveRequestOriginFromHeaders(request)}${url.pathname}${url.search}`;
+}
+
+/**
+ * Normalize an authored HTTP(S) view URL to an origin, without changing
+ * legacy host-specific domain strings. This is not host submission validation.
+ *
+ * @internal
+ */
+export function normalizeViewDomain(domain: string): string {
+  try {
+    const url = new URL(domain);
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      return url.origin;
+    }
+  } catch {
+    // Preserve legacy host-specific strings, including computed Claude domains.
+  }
+  return domain;
+}
+
+/**
  * Extract the origin from an assets URL prefix (origin + optional path).
  */
 export function originFromAssetsBase(assetsBase: string): string {

@@ -1,16 +1,17 @@
 FROM node:22-alpine
 
-# Specify the version variable (defaults to latest)
-ARG VERSION=latest
+# Docker Hub may select an explicit release; native Git builds use package.json.
+ARG VERSION
+ARG RAILWAY_GIT_BRANCH
 
 WORKDIR /app
 
-# Cache bust by checking the latest version from npm
-# This layer will be invalidated when a new version is published
-RUN npm view @mcp-use/inspector version
-
-# Install the inspector package from npm
-RUN npm install -g @mcp-use/inspector@${VERSION}
+# Copying the manifest invalidates the install layer when the version changes.
+# Never fall back to a dist-tag: an unpublished version must fail the build.
+COPY package.json ./package.json
+RUN INSPECTOR_VERSION="${VERSION:-$(node -p 'require("./package.json").version')}" \
+    && node -e 'const [version, branch] = process.argv.slice(1); if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) || (branch === "main" && version.includes("-"))) throw new Error("Expected an exact published version; main requires a stable release")' "$INSPECTOR_VERSION" "$RAILWAY_GIT_BRANCH" \
+    && npm install -g "@mcp-use/inspector@${INSPECTOR_VERSION}"
 
 # Set production environment
 ENV NODE_ENV=production
@@ -22,4 +23,4 @@ EXPOSE 8080
 
 # Start the inspector. Shell form so ${PORT:-8080} expands; exec keeps the
 # node process as PID 1 for signal handling.
-CMD ["sh", "-c", "exec npx @mcp-use/inspector --port \"${PORT:-8080}\" --no-open"]
+CMD ["sh", "-c", "exec mcp-inspect --port \"${PORT:-8080}\" --no-open"]

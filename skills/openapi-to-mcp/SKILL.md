@@ -194,7 +194,7 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 server.listen(PORT);
 ```
 
-**Transport must be streamable HTTP, not stdio.** mcp-use's `server.listen(port)` sets up the streamable-HTTP transport at `/mcp` — that's the right choice for every server this skill generates. Don't substitute stdio. Stdio servers can't be deployed to Manufact / mcp-use cloud (cloud needs an HTTP endpoint to route traffic to), can't be tested with the online inspector, can't be installed as a custom connector in ChatGPT or Claude (both connect over HTTPS), and can't be hit with the curl tests in `references/testing.md`. Stdio is for local CLI-tool MCP servers, which is not what we're building here.
+**Transport must be streamable HTTP, not stdio.** mcp-use's `server.listen(port)` sets up the streamable-HTTP transport at `/mcp` — that's the right choice for every server this skill generates. Don't substitute stdio. Stdio servers can't be deployed to Manufact / mcp-use cloud (cloud needs an HTTP endpoint to route traffic to), can't be tested with the online inspector, can't be added as a custom MCP server in ChatGPT or a custom connector in Claude (both connect over HTTPS), and can't be hit with the curl tests in `references/testing.md`. Stdio is for local CLI-tool MCP servers, which is not what we're building here.
 
 Full templates for each file in `references/code-templates.md`.
 
@@ -287,7 +287,7 @@ Read these when the relevant step lands. Each file is a focused deep-dive — do
 - `references/code-templates.md` — Copy-ready skeletons for `index.ts`, `src/client.ts`, `src/auth.ts`, `src/operations.ts`, `src/schema.ts`, `scripts/load-spec.ts`, `.env.example`, and `tsconfig.json`. Each is annotated.
 - `references/auth.md` — The four common auth schemes (apiKey, http bearer, http basic, OAuth2 bearer) and how each becomes a header. Includes the OAuth-with-refresh-token pattern.
 - `references/testing.md` — Inspector recipe, the `.mcp-use` stale-cache trap, how to force-invoke a tool, what to check in tool responses, common 4xx/5xx debugging.
-- `references/deploy.md` — `mcp-use deploy`, GitHub setup, env vars in the Manufact dashboard, branch deploys, observability tabs, and how to install the deployed URL as a custom MCP connector in ChatGPT or Claude.
+- `references/deploy.md` — `mcp-use deploy`, GitHub setup, env vars in the Manufact dashboard, branch deploys, observability tabs, and how to add the deployed URL as a custom MCP server in ChatGPT or a custom connector in Claude.
 
 ## Trigger words and aliases
 

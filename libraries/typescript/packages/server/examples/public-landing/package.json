@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": { "dev": "mcp-use dev", "build": "mcp-use build", "start": "mcp-use start", "typecheck": "tsc --noEmit", "verify": "node ../verify-examples.mjs --example=public-landing" },
-  "dependencies": { "mcp-use": "workspace:*", "zod": "^4.4.3" },
+  "dependencies": { "mcp-use": "workspace:*", "zod": "^4.6.6" },
   "devDependencies": { "@types/node": "^22.20.0", "typescript": "^7.0.2" }
 }

@@ -15,6 +15,13 @@ Each server exposes only the `get-user-info` tool. It never issues, proxies, or
 forwards access tokens. For public deployments, set `MCP_URL` to the server
 origin (for example, `https://mcp.example.com`), not the `/mcp` endpoint.
 
+The [GitHub OAuth proxy](./oauth-proxy-github/) example works differently: the
+server is its own authorization server in front of GitHub, issues its own
+tokens, and keeps the user's GitHub token on the server. The
+[Firebase OAuth proxy](./oauth-proxy-firebase/) example does the same in front
+of Firebase Authentication: the user signs in with Firebase in a pop-up on the
+consent page, and tools read Firestore with the user's Firebase ID token.
+
 OAuth protects the browser landing page at `/mcp` by default. These examples
 set `publicLandingPage: true` so people can open the HTML connection guide
 without a bearer token. This exception applies only to GET and HEAD requests

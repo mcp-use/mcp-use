@@ -1,0 +1,89 @@
+name: Require a linked issue
+
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: require-linked-issue-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  require-linked-issue:
+    runs-on: ubuntu-latest
+    steps:
+      # This privileged workflow reads API metadata only; never check out PR code.
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number });
+            if (pr.state !== 'open') return;
+
+            // Check the PR author, not the actor who triggered or reran the job.
+            // GitHub maps the maintain role to the legacy "write" permission,
+            // so use role_name to distinguish maintainers from other writers.
+            const { data: access } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner, repo, username: pr.user.login,
+            });
+            if (access.permission === 'admin' || access.role_name === 'maintain') {
+              core.info('PR author is a repository admin or maintainer; skipping the issue check.');
+              return;
+            }
+
+            // Rerunning the original job must not close a PR reopened by a maintainer.
+            const events = await github.paginate(github.rest.issues.listEvents, {
+              owner, repo, issue_number: pull_number, per_page: 100,
+            });
+            if (events.some(event => event.event === 'reopened')) return;
+
+            const result = await github.graphql(`query($owner: String!, $repo: String!, $number: Int!) {
+              repository(owner: $owner, name: $repo) {
+                pullRequest(number: $number) {
+                  closingIssuesReferences(first: 100) {
+                    nodes { repository { nameWithOwner } }
+                  }
+                }
+              }
+            }`, { owner, repo, number: pull_number });
+            const linked = result.repository.pullRequest.closingIssuesReferences.nodes;
+            if (linked.some(issue => issue.repository.nameWithOwner.toLowerCase() === `${owner}/${repo}`.toLowerCase())) return;
+
+            // Keywords are not recognized by GitHub on non-default base branches,
+            // and a newly opened PR's links may not have been indexed yet. Verify
+            // an explicit same-repository closing reference against the API.
+            const body = (pr.body || '').replace(/<!--[\s\S]*?-->/g, '');
+            const reference = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*#(\d+)\b/gi;
+            for (const match of body.matchAll(reference)) {
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner, repo, issue_number: Number(match[1]),
+                });
+                if (!issue.pull_request) return;
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+
+            // Re-read state and body to reduce races with an author's immediate edit.
+            const { data: latest } = await github.rest.pulls.get({ owner, repo, pull_number });
+            if (latest.state !== 'open' || latest.body !== pr.body) {
+              core.notice('PR changed during validation; leaving it for manual review.');
+              return;
+            }
+            const marker = '<!-- require-linked-issue -->';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pull_number, per_page: 100,
+            });
+            if (!comments.some(comment => comment.user?.login === 'github-actions[bot]' && comment.body?.includes(marker))) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pull_number,
+                body: `${marker}\nThanks for contributing! We discuss changes in an issue before reviewing code. This PR does not link an issue in this repository, so it is being closed. Please find or open an issue, discuss the proposed change with a maintainer, then add \`Closes #123\` to this PR description with the correct issue number and ask a maintainer to reopen it. See [CONTRIBUTING.md](https://github.com/${owner}/${repo}/blob/HEAD/CONTRIBUTING.md) for details.`,
+              });
+            }
+            await github.rest.pulls.update({ owner, repo, pull_number, state: 'closed' });

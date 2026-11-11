@@ -8,6 +8,7 @@ const loader = fileURLToPath(
   new URL("./module-trace-loader.mjs", import.meta.url)
 );
 const entry = fileURLToPath(new URL("../../dist/index.js", import.meta.url));
+const landingEntry = new URL("../../dist/landing.js", import.meta.url).href;
 
 interface Resolution {
   url: string;
@@ -43,23 +44,47 @@ describe("runtime package boundaries", () => {
     );
     expectForbiddenRuntimeModules(resolutions);
   });
+
+  it("runs mcp-use/landing without React or Node builtins under workerd conditions", async () => {
+    // A docs site imports install targets with no React renderer or Node.
+    const script = `const { getInstallTargets } = await import(${JSON.stringify(landingEntry)});
+console.log(getInstallTargets({ url: "https://例え.test/mcp", name: "acme" }).cursor.deeplink);`;
+    const { resolutions, stdout } = await traceRun([
+      "--conditions=workerd",
+      "--input-type=module",
+      "--eval",
+      script,
+    ]);
+
+    expect(stdout).toMatch(/^cursor:\/\/anysphere\.cursor-deeplink\//);
+    expect(builtinResolutions(resolutions)).toEqual([]);
+    expect(resolutions.filter(({ url }) => /\/react/.test(url))).toEqual([]);
+    expectForbiddenRuntimeModules(resolutions);
+  });
 });
 
 async function traceImport(extraArgs: string[]): Promise<Resolution[]> {
-  const { stderr } = await execFileAsync(
+  return (await traceRun([...extraArgs, entry])).resolutions;
+}
+
+async function traceRun(
+  args: string[]
+): Promise<{ resolutions: Resolution[]; stdout: string }> {
+  const { stderr, stdout } = await execFileAsync(
     process.execPath,
-    [...extraArgs, "--experimental-loader", loader, entry],
+    ["--experimental-loader", loader, ...args],
     {
       env: { ...process.env, NODE_NO_WARNINGS: "1" },
       maxBuffer: 10 * 1024 * 1024,
     }
   );
-  return stderr
+  const resolutions = stderr
     .split("\n")
     .filter((line) => line.startsWith("MCP_USE_RESOLVE "))
     .map(
       (line) => JSON.parse(line.slice("MCP_USE_RESOLVE ".length)) as Resolution
     );
+  return { resolutions, stdout };
 }
 
 function builtinResolutions(resolutions: Resolution[]): Resolution[] {

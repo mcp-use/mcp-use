@@ -1,0 +1,126 @@
+---
+title: "Inspector chat components"
+description: "Client-side React components exported by the Inspector package."
+icon: "messages-square"
+---
+
+The Inspector exports chat UI components from `@mcp-use/inspector/client` for applications that want to embed the Inspector chat experience in their own React UI.
+
+The `/client` entry intentionally keeps its React and UI runtime dependencies external. Applications importing it must declare the optional peers they use; ordinary `mcp-use` projects do not install this UI graph because the standalone Inspector already bundles it.
+
+Use `ChatTab` when you want the full chat surface. Use lower-level components such as `MessageList` only when you need to own the surrounding layout.
+
+## `ChatTab`
+
+`ChatTab` renders the Inspector chat UI for one connected MCP server.
+
+```tsx
+import { ChatTab } from "@mcp-use/inspector/client";
+
+<ChatTab
+  connection={connection}
+  isConnected={isConnected}
+  prompts={prompts}
+  serverId={serverId}
+  callPrompt={callPrompt}
+  readResource={readResource}
+  hideTitle
+  hideModelBadge
+  hideServerUrl
+  clearButtonLabel="Start over"
+  clearButtonHideShortcut
+  clearButtonVariant="ghost"
+/>;
+```
+
+### Props
+
+| Prop                      | Type                                               | Description                                                       |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------------------------------- |
+| `connection`              | `unknown`                                          | Active MCP connection object used by the chat UI.                 |
+| `isConnected`             | `boolean`                                          | Whether the MCP server is connected.                              |
+| `prompts`                 | `unknown[]`                                        | Prompts available to the chat UI.                                 |
+| `serverId`                | `string`                                           | Stable server identifier for chat state and widget rendering.     |
+| `callPrompt`              | `function`                                         | Function used to execute an MCP prompt.                           |
+| `readResource`            | `function`                                         | Function used to read an MCP resource.                            |
+| `hideTitle`               | `boolean`                                          | Hides the chat header title.                                      |
+| `hideModelBadge`          | `boolean`                                          | Hides the selected model badge in the landing state.              |
+| `hideServerUrl`           | `boolean`                                          | Hides the MCP server URL shown in the landing state.              |
+| `clearButtonLabel`        | `string`                                           | Custom label for the clear or new-chat button.                    |
+| `clearButtonHideIcon`     | `boolean`                                          | Hides the clear or new-chat button icon.                          |
+| `clearButtonHideShortcut` | `boolean`                                          | Hides the keyboard shortcut hint on the clear or new-chat button. |
+| `clearButtonVariant`      | `"default" \| "secondary" \| "ghost" \| "outline"` | Visual variant for the clear or new-chat button.                  |
+| `hideToolSelector`        | `boolean`                                          | Hides the tool selector in the chat input.                        |
+| `streamProtocol`          | `"sse" \| "data-stream"`                           | Streaming response protocol. Defaults to Inspector SSE behavior.  |
+| `credentials`             | `RequestCredentials`                               | Fetch credentials used by chat streaming requests.                |
+| `extraHeaders`            | `Record<string, string>`                           | Additional headers sent on every streaming `POST`.                |
+| `body`                    | `(messages) => unknown`                            | Custom streaming request body builder.                            |
+| `skillSelection`          | `ChatSkillSelection`                               | Optional controlled skill selection rendered inside the input.    |
+| `systemPromptProvider`    | `ChatSystemPromptProvider`                         | Controlled system prompt and save callback for the input toolbar. |
+
+### Controlled skills and system prompt
+
+Pass `skillSelection` to show the native Add skills picker and removable skill chips inside the composer. The picker uses the complete `connection.skills` catalog, so deselected skills remain available to re-enable.
+
+```tsx
+import { useState } from "react";
+import {
+  ChatTab,
+  type ChatSkillSelection,
+  type ChatTabProps,
+} from "@mcp-use/inspector/client";
+
+function EmbeddedChat(props: ChatTabProps) {
+  const [enabledUris, setEnabledUris] = useState<Set<string>>(() => new Set());
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const skillSelection: ChatSkillSelection = {
+    enabledUris,
+    onChange: setEnabledUris,
+    maxSelected: 8,
+  };
+
+  return (
+    <ChatTab
+      {...props}
+      skillSelection={skillSelection}
+      systemPromptProvider={{
+        prompt,
+        savePrompt: async (value) => setPrompt(value),
+      }}
+    />
+  );
+}
+```
+
+`ChatSkillSelection` is exported from `@mcp-use/inspector/client`:
+
+| Field         | Type                          | Description                                                                              |
+| ------------- | ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `enabledUris` | `ReadonlySet<string>`         | Selected URIs from `connection.skills`. Replace the set when selection changes.          |
+| `onChange`    | `(uris: Set<string>) => void` | Receives the next selected set when the picker or a removal button is used.              |
+| `disabled`    | `boolean`                     | Optionally disables selection controls. Loading or disconnected chat also disables them. |
+| `maxSelected` | `number`                      | Maximum number the picker allows selecting. Defaults to `8`.                             |
+
+For client-side chat, only selected skills are advertised to the model and available through the skill-reading tools for the next turn. An empty set disables all skills. Omitting `skillSelection` keeps automatic discovery of every advertised skill and hides the selection UI. Server-side chat keeps its request body host-owned: use `body` to include the selected URIs in the shape expected by your backend.
+
+`systemPromptProvider` uses the existing compact System Prompt control in the input toolbar. Its `prompt` and `savePrompt` fields can read and persist your application’s chat settings; optional `isLoading`, `isSaving`, and `disabled` fields describe the provider state. Without a provider, Inspector uses its local system-prompt storage.
+
+## Lower-level components
+
+Use lower-level exports when `ChatTab` owns too much UI for your application.
+
+```tsx
+import { MessageList } from "@mcp-use/inspector/client";
+
+<MessageList
+  messages={messages}
+  isLoading={isLoading}
+  serverId={connection.url}
+  serverBaseUrl={connection.url}
+  tools={connection.tools}
+  readResource={readResource}
+  sendMessage={(text) => sendMessage(text, [])}
+/>;
+```
+
+When rendering widgets inside messages, pass `serverBaseUrl` from the MCP connection URL so widget resources resolve against the correct server origin.

@@ -1,5 +1,9 @@
 /**
- * OAuth resource-server helpers and provider configuration for mcp-use.
+ * OAuth resource-server helpers and provider configuration for mcp-use, and
+ * {@link oauthProxy}, which makes the MCP server its own authorization server
+ * in front of an identity provider without dynamic client registration, such
+ * as GitHub or Google. Storage adapters for the proxy are in
+ * `mcp-use/oauth/storage`.
  *
  * @packageDocumentation
  */
@@ -31,7 +35,30 @@ export {
   oauthCustomProvider,
   type CustomOAuthProviderOptions,
   type OAuthExtra,
+  type OAuthMetadataSource,
+  type OAuthProviderRouteHandler,
   type OAuthProvider,
   type OAuthProviderHost,
   type OAuthResourceOptions,
 } from "./provider.js";
+export {
+  github,
+  google,
+  memoryStorage,
+  oauthProxy,
+  upstream,
+  upstreamToken,
+  type ConsentPageProps,
+  type GitHubUpstreamOptions,
+  type GoogleUpstreamOptions,
+  type OAuthProxyClient,
+  type OAuthProxyConsentOptions,
+  type OAuthProxyOptions,
+  type OAuthProxyProvider,
+  type OAuthProxyStorage,
+  type RedirectUpstream,
+  type Upstream,
+  type UpstreamOptions,
+  type UpstreamTokenSet,
+  type UpstreamUser,
+} from "./proxy/index.js";

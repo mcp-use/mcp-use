@@ -471,8 +471,13 @@ export function Layout({ children }: LayoutProps) {
         : storedConfig;
 
       if (config.url !== selectedServerId) {
+        if (connections.some((connection) => connection.id === config.url)) {
+          toast.error("A connection with this URL already exists");
+          return;
+        }
         removeConnection(selectedServerId);
         addServer(config.url, toMcpServerConfig(config));
+        saveStoredConnectionConfig(config.url, config);
       } else if (
         currentConnection &&
         isAliasOnlyConnectionUpdate(currentConnection, config)

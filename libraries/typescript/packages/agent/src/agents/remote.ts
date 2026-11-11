@@ -343,24 +343,12 @@ export class RemoteAgent {
 
       // Check for error responses (even with 200 status)
       if (typeof result === "object" && result !== null) {
-        // Check for actual error conditions (not just presence of error field)
-        if (result.status === "error" || result.error !== null) {
-          const errorMsg = result.error ?? String(result);
-          logger.error(`❌ Remote agent execution failed: ${errorMsg}`);
-          throw new Error(`Remote agent execution failed: ${errorMsg}`);
-        }
-
-        // Check if the response indicates agent initialization failure
-        if (String(result).includes("failed to initialize")) {
-          logger.error(`❌ Agent initialization failed: ${result}`);
+        if (result.status === "error" || result.error != null) {
+          // The catch below logs this and adds the "Remote agent execution failed:" prefix
           throw new Error(
-            "Agent initialization failed on remote server. " +
-              "This usually indicates:\n" +
-              "• Invalid agent configuration (LLM model, system prompt)\n" +
-              "• Missing or invalid MCP server configurations\n" +
-              "• Network connectivity issues with MCP servers\n" +
-              "• Missing environment variables or credentials\n" +
-              `Raw error: ${result}`
+            typeof result.error === "string"
+              ? result.error
+              : JSON.stringify(result.error ?? result)
           );
         }
       }

@@ -2,6 +2,8 @@
  * Unit tests for the WebSocket tunnel lifecycle.
  */
 import { mkdtempSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -223,5 +225,43 @@ describe("createTunnelManager", () => {
     );
     expect(unsupportedSocket?.closeCode).toBe(1003);
     await third.stop();
+  });
+
+  it("keeps the relay connection when a cancel arrives after the request finished", async () => {
+    const local = createServer((_request, response) => response.end("ok"));
+    await new Promise<void>((resolve) => local.listen(0, "127.0.0.1", resolve));
+    const { port } = local.address() as AddressInfo;
+    const tunnel = createTunnelManager(stateFilePath);
+    const requestId = "123e4567-e89b-42d3-a456-426614174000";
+
+    try {
+      await tunnel.start(port);
+      const socket = MockWebSocket.instances[0];
+      socket?.receive(
+        JSON.stringify({
+          type: "request-start",
+          requestId,
+          method: "GET",
+          path: "/",
+          headers: {},
+        })
+      );
+      socket?.receive(JSON.stringify({ type: "request-end", requestId }));
+      await vi.waitFor(() => {
+        expect(socket?.sent.map((data) => JSON.parse(data).type)).toContain(
+          "response-end"
+        );
+      });
+
+      // The relay cancels when the public client disconnects. That can cross
+      // the tunnel's response-end, so the request is already gone locally.
+      socket?.receive(JSON.stringify({ type: "cancel", requestId }));
+
+      expect(socket?.closeCode).toBeUndefined();
+      expect(MockWebSocket.instances).toHaveLength(1);
+    } finally {
+      await tunnel.stop();
+      await new Promise<void>((resolve) => local.close(() => resolve()));
+    }
   });
 });

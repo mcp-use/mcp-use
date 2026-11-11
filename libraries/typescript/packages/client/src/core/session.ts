@@ -122,7 +122,8 @@ export interface MCPConnectionInfo {
 export class MCPConnection {
   /**
    * The underlying connector managing the transport layer.
-   * This is the Stdio, HTTP, or WebSocket connector handling actual communication.
+   * This is the stdio or HTTP connector for a server, or the in-process
+   * connector that backs code mode.
    */
   readonly connector: BaseConnector;
 
@@ -135,12 +136,12 @@ export class MCPConnection {
   /**
    * Creates a new MCP session.
    *
-   * @param connector - The connector to use for communication (Stdio, HTTP, WebSocket)
+   * @param connector - The connector to use for communication (stdio, HTTP, or code mode)
    * @param autoConnect - Whether to automatically connect during initialization (default: true)
    *
    * @example
    * ```typescript
-   * const connector = new HttpConnector({ url: 'http://localhost:3000/mcp' });
+   * const connector = new HttpConnector('http://localhost:3000/mcp');
    * const session = new MCPSession(connector);
    * await session.initialize(); // Auto-connects and initializes
    * ```
@@ -161,9 +162,11 @@ export class MCPConnection {
   /**
    * Establishes the connection to the MCP server.
    *
-   * This method starts the underlying transport (spawns process for Stdio,
-   * opens WebSocket, etc.) but does not perform the MCP initialization
-   * handshake. Call {@link initialize} after connecting.
+   * For stdio and HTTP connectors, this method starts the underlying
+   * transport (spawns the process for stdio, opens the HTTP transport) and
+   * performs the MCP initialization handshake through the SDK client. Call
+   * {@link initialize} afterwards to cache the server's capabilities, server
+   * info, and tools.
    *
    * @returns Promise that resolves when connected
    *
@@ -203,9 +206,10 @@ export class MCPConnection {
   /**
    * Initializes the MCP session with the server.
    *
-   * This method performs the MCP initialization handshake, exchanging
-   * capabilities and metadata with the server. If `autoConnect` is true
-   * and the session is not yet connected, it will connect first.
+   * This method caches the capabilities, server info, and tools negotiated
+   * during {@link connect}. If `autoConnect` is true and the session is not
+   * yet connected, it connects first, which performs the MCP initialization
+   * handshake.
    *
    * After initialization, you can list and call tools, read resources, etc.
    *

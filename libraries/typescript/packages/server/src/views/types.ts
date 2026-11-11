@@ -1,3 +1,5 @@
+import type { ViewConfig } from "../react/runtime/view-config.js";
+import type { DisplayMode } from "../react/types/host-types.js";
 import type {
   McpUiResourceCsp,
   McpUiResourcePermissions,
@@ -29,12 +31,21 @@ export interface ViewResourceFacts {
   /** Sandbox permissions the view needs → `_meta.ui.permissions`. */
   permissions?: UiPermissions;
   /**
-   * Dedicated origin hint for hosts that render views on a separate domain →
-   * `_meta.ui.domain`.
+   * Dedicated UI origin for ChatGPT and other hosts → `_meta.ui.domain`.
+   * Use an HTTPS origin such as `https://app.example.com`. HTTP(S) URL values
+   * are normalized to their origin for compatibility with older configs.
+   * On Claude resource reads, the framework instead hashes the full public
+   * MCP endpoint resolved from `MCP_URL` (origin + server `basePath`, or a full
+   * endpoint URL) or the forwarded/request URL. Omit to use the host default.
+   * Do not overwrite the generated domain in response middleware.
    */
   domain?: string;
   /** Ask the host to draw a border around the view → `_meta.ui.prefersBorder`. */
   prefersBorder?: boolean;
+  /** Supported modes extracted from the frontend named `viewConfig` export. */
+  displayModes?: readonly DisplayMode[];
+  /** Initial ChatGPT display preference extracted from frontend config. */
+  preferredDisplayMode?: "inline" | "fullscreen";
 }
 
 /**
@@ -46,6 +57,8 @@ export interface ViewResourceFacts {
 export interface InlineViewManifestEntry {
   /** Discriminant for the embedded bundle shape. */
   kind: "inline";
+  /** Static frontend configuration captured by build tooling. */
+  viewConfig?: ViewConfig | undefined;
   /**
    * Minified ES module source embedded in the generated view document's
    * `<script type="module">` element.
@@ -69,6 +82,8 @@ export interface InlineViewManifestEntry {
 export interface ExternalViewManifestEntry {
   /** Discriminant for the external-module shape. */
   kind: "external";
+  /** Static frontend configuration captured by build tooling. */
+  viewConfig?: ViewConfig | undefined;
   /**
    * Module entry path. Dev: origin-absolute Vite URL (`/…`). Production:
    * view-relative path under `.mcp-use/build/views/<name>/` (`assets/…`).
@@ -119,6 +134,8 @@ export interface EmbeddedViewAssets {
 export interface ViewRegistrationOptions {
   /** Whether view URLs target a development module server. */
   dev?: boolean;
+  /** Production build identifier shared by all replicas; ignored in dev. */
+  buildId?: string;
   /** Source project used by filesystem-backed assets. */
   projectRoot?: string;
   /** Bundled assets used instead of filesystem reads, including on misses. */

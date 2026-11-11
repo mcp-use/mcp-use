@@ -8,7 +8,11 @@ export type {
 } from "./types.js";
 export { synthesizeViewDocument } from "./document.js";
 export { resolveAssetsBase } from "./origin.js";
-export { createViewPublicHandler, createViewAssetsHandler } from "./routes.js";
+export {
+  createLandingAssetsHandler,
+  createViewPublicHandler,
+  createViewAssetsHandler,
+} from "./routes.js";
 export {
   buildResourceUiMeta,
   buildToolResultUiMeta,

@@ -412,7 +412,18 @@ export function useChatMessages({
             )
           );
         };
-        const finalizeParts = () => {
+        const finalizeParts = (finishReason?: unknown) => {
+          if (
+            finishReason === "length" &&
+            !parts.some(
+              (part) => part.type === "tool-invocation" || part.text?.trim()
+            )
+          ) {
+            const message =
+              "The model returned no response and reported an output token limit. Try again, choose another model, or check the MCP tool schemas.";
+            recordTrace({ type: "error", message });
+            throw new Error(message);
+          }
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMessageId
@@ -672,7 +683,7 @@ export function useChatMessages({
                       recordTrace({ type: "usage", usage, raw: val });
                     }
                     recordTrace({ type: "done", raw: val });
-                    finalizeParts();
+                    finalizeParts(envelope?.finishReason);
                     break;
                   }
                   case "3": {
@@ -760,7 +771,7 @@ export function useChatMessages({
                     recordTrace({ type: "usage", usage, raw: event });
                   }
                   recordTrace({ type: "done", raw: event });
-                  finalizeParts();
+                  finalizeParts(event.finishReason);
                 } else if (event.type === "usage") {
                   const usage = inspectorTokenUsageFromUnknown(
                     event.usage ?? event
@@ -778,10 +789,7 @@ export function useChatMessages({
                 }
               }
             } catch (parseError) {
-              if (
-                parseError instanceof Error &&
-                parseError.message !== "Streaming error"
-              ) {
+              if (parseError instanceof SyntaxError) {
                 console.error(
                   "Failed to parse streaming event:",
                   parseError,

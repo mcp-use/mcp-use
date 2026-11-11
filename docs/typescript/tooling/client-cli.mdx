@@ -81,9 +81,15 @@ Use `--no-open` to authenticate without launching a browser:
 npx mcp-use client connect prod https://mcp.example.com/mcp --no-open
 ```
 
-With `--no-open` or non-interactive human output, the CLI never prompts or opens a browser. It prints a state-free local loopback launcher URL and continues waiting for the callback. Open that local URL yourself; it redirects to the provider without putting the provider URL or OAuth state in terminal output.
+With `--no-open` or non-interactive human output, the CLI never prompts or opens
+a browser. It prints a state-free local loopback launcher URL and continues
+waiting for the callback. Open that local URL yourself; it redirects to the
+provider without putting the provider URL or OAuth state in terminal output.
 
-Under `--json`, the CLI never prints the authorization URL or OAuth state and never waits for consent. If fresh authorization is required, it exits with `oauth_interaction_required` and provides an interactive retry command in `error.details.nextSteps`.
+Under `--json`, the CLI never prints the authorization URL or OAuth state and
+never waits for consent. If fresh authorization is required, it exits with
+`oauth_interaction_required` and provides an interactive retry command in
+`error.details.nextSteps`.
 
 Use `--no-oauth` for a public server or when an authorization challenge should fail instead of starting OAuth. Repeated `-H` or `--header` options add static request headers.
 
@@ -104,7 +110,9 @@ npx mcp-use client prod auth logout
 `auth login` starts OAuth for a saved server. `auth logout` removes OAuth
 material but keeps the saved server and its non-OAuth connection metadata.
 
-Connection URLs are stored exactly for transport use, but CLI results redact URL userinfo, query values, and fragments so signed URLs and embedded credentials are not copied into logs.
+Connection URLs are stored exactly for transport use, but CLI results redact URL
+userinfo, query values, and fragments so signed URLs and embedded credentials
+are not copied into logs.
 
 ## Call tools
 
@@ -183,6 +191,6 @@ npx mcp-use client dev tools call get-weather city=Tokyo --json | jq '.content'
 - `protocol_mismatch`: reconnect with `--protocol auto`, or choose the protocol
   mode the server supports.
 - An OAuth command waits without opening a browser: open the authorization URL printed to stderr, then complete authorization before the configured timeout.
-- A tool returns an error: under `--json`, inspect `error.details` for the original MCP tool result.
+- A tool returns an error: the human-readable output prints the tool's text content after the error message. Under `--json`, inspect `error.details` for the original MCP tool result.
 
 For exhaustive command shapes, flags, and storage details, use the [CLI reference](/typescript/api-reference/cli-reference#client).
