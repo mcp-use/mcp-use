@@ -7,7 +7,11 @@ import type {
   ServerConfig,
 } from "./config.js";
 import { shouldAutoProvisionOAuth } from "./config.js";
-import { completeOAuthFlow, isUnauthorized } from "../auth/flow.js";
+import {
+  completeOAuthFlow,
+  isUnauthorized,
+  scopeOAuthFetch,
+} from "../auth/flow.js";
 import { logger } from "../utils/logging.js";
 import { MCPSession } from "./session.js";
 import type { MCPConnection } from "./session.js";
@@ -398,7 +402,9 @@ export abstract class BaseMCPClient {
       logger.info(
         `[MCPClient] Unauthorized connecting to '${serverName}'; completing OAuth…`
       );
-      await completeOAuthFlow(oauthProvider, httpConfig.url);
+      await completeOAuthFlow(oauthProvider, httpConfig.url, {
+        fetchFn: scopeOAuthFetch(oauthProvider, httpConfig.fetch),
+      });
       session = await openSession();
     }
 
