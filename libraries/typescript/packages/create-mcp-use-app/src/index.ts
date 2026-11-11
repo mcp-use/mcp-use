@@ -31,6 +31,7 @@ import {
   runPackageManager,
   updateIndexTs,
   updatePackageJson,
+  validateProjectName,
 } from "./utils.js";
 import {
   getDefaultDistTag,
@@ -684,8 +685,9 @@ async function promptForProjectName(): Promise<string> {
         }
         return undefined;
       }
-      if (!/^[a-zA-Z0-9-_]+$/.test(value)) {
-        return "Project name can only contain letters, numbers, hyphens, and underscores";
+      const nameError = validateProjectName(value);
+      if (nameError) {
+        return nameError;
       }
       if (existsSync(join(process.cwd(), value))) {
         return `Directory "${value}" already exists! Please choose a different name.`;
@@ -822,15 +824,11 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   } else {
-    if (
-      trimmedProjectName.includes("..") ||
-      trimmedProjectName.includes("/") ||
-      trimmedProjectName.includes("\\")
-    ) {
-      console.error(
-        ansi.red('❌ Project name cannot contain path separators or ".."')
-      );
-      console.error(ansi.yellow('   Use simple names like "my-mcp-server"'));
+    // Same rule as the interactive prompt. It also rules out path separators
+    // and "..", so the project always lands in a direct child directory.
+    const nameError = validateProjectName(trimmedProjectName);
+    if (nameError) {
+      console.error(ansi.red(`❌ ${nameError}`));
       process.exit(1);
     }
 
