@@ -75,28 +75,21 @@ function parseCli(argv: string[]): {
       version: { type: "boolean", short: "V" },
     },
     allowPositionals: true,
-    strict: false,
+    allowNegative: true,
+    strict: true,
   });
 
-  const install = argv.includes("--install")
-    ? true
-    : argv.includes("--no-install")
-      ? false
-      : (values.install as boolean | undefined);
-
-  const skills = argv.includes("--skills")
-    ? true
-    : argv.includes("--no-skills")
-      ? false
-      : (values.skills as boolean | undefined);
+  if (positionals.length > 1) {
+    throw new Error(`Unexpected extra argument: ${positionals[1]}`);
+  }
 
   return {
     projectName: positionals[0],
     options: {
       template: values.template as string | undefined,
       listTemplates: values["list-templates"] as boolean | undefined,
-      install,
-      skills,
+      install: values.install as boolean | undefined,
+      skills: values.skills as boolean | undefined,
       dev: values.dev as boolean | undefined,
       sdkVersion: values["sdk-version"] as string | undefined,
       npm: values.npm as boolean | undefined,
