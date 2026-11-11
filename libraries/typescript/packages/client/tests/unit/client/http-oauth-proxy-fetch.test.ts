@@ -8,6 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserOAuthClientProvider } from "../../../src/auth/browser.js";
+import { BrowserMCPClient } from "../../../src/core/browser.js";
 import { HttpConnector } from "../../../src/transport/http.js";
 import { installMemoryLocalStorage } from "../../helpers/memory-local-storage.js";
 
@@ -56,6 +57,80 @@ describe("HttpConnector OAuth proxy fetch", () => {
       oauthProxyUrl: OAUTH_PROXY_URL,
     });
   }
+
+  it("routes 401-triggered discovery through oauthProxyUrl when creating a browser session", async () => {
+    const authorizationServer = "https://auth.example.com";
+    const authorizationMetadataUrl = `${authorizationServer}/.well-known/oauth-authorization-server`;
+    const requests: string[] = [];
+    const proxiedMetadata: string[] = [];
+    const json = (body: unknown) =>
+      new Response(JSON.stringify(body), {
+        headers: { "content-type": "application/json" },
+      });
+    const fetchFn: typeof fetch = async (input) => {
+      const url = requestUrl(input);
+      requests.push(url);
+      if (url === MCP_URL) {
+        return new Response(null, {
+          status: 401,
+          headers: {
+            "www-authenticate": `Bearer resource_metadata="${METADATA_URL}"`,
+          },
+        });
+      }
+      if (url.startsWith(`${OAUTH_PROXY_URL}/metadata?`)) {
+        const target = new URL(url).searchParams.get("url");
+        if (target === METADATA_URL) {
+          proxiedMetadata.push(target);
+          return json({
+            resource: MCP_URL,
+            authorization_servers: [authorizationServer],
+          });
+        }
+        if (target === authorizationMetadataUrl) {
+          proxiedMetadata.push(target);
+          return json({
+            issuer: authorizationServer,
+            authorization_endpoint: `${authorizationServer}/authorize`,
+            token_endpoint: `${authorizationServer}/token`,
+            response_types_supported: ["code"],
+            code_challenge_methods_supported: ["S256"],
+          });
+        }
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    };
+    const client = new BrowserMCPClient({
+      mcpServers: {
+        demo: {
+          url: MCP_URL,
+          fetch: fetchFn,
+          protocolNegotiation: "legacy",
+          oauth: {
+            oauthProxyUrl: OAUTH_PROXY_URL,
+            callbackUrl: "https://app.example.com/oauth/callback",
+            staticClientInfo: { client_id: "browser-session-test" },
+            preventAutoAuth: true,
+          },
+        },
+      },
+    });
+
+    try {
+      // Discovery must reach the expected sign-in boundary, without opening
+      // a popup or accepting an unrelated discovery/fixture failure.
+      await expect(client.createSession("demo")).rejects.toMatchObject({
+        code: 401,
+      });
+      expect(proxiedMetadata).toEqual(
+        expect.arrayContaining([METADATA_URL, authorizationMetadataUrl])
+      );
+      expect(requests).not.toContain(METADATA_URL);
+      expect(requests).not.toContain(authorizationMetadataUrl);
+    } finally {
+      await client.closeAllSessions();
+    }
+  });
 
   it("routes OAuth discovery through the provider's oauthProxyUrl", async () => {
     const { urls, fetchFn } = recordingFetch();
