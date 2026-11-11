@@ -12,11 +12,15 @@
   },
   "changesets": [
     "browser-client-oauth-proxy-fetch",
+    "cli-client-import-after-install",
+    "client-telemetry-node-localstorage",
     "code-mode-console-logs",
     "node-bridge-binary-body",
+    "propagated-2c8681317c3e3a9e",
     "propagated-48690594a149ddc2",
     "propagated-7cd41a857ed610a1",
     "sanitize-url-ipv6-support",
-    "scaffold-reject-unknown-options"
+    "scaffold-reject-unknown-options",
+    "server-usage-node-localstorage"
   ]
 }

@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 5.1.1-canary.1
+
+### Patch Changes
+
+- c4c27e0: Load `@mcp-use/client` right after `mcp-use client` or `mcp-use screenshot` auto-installs it. On Node 24 and 25 the first run installed the package but still reported `@mcp-use/client is not installed`, because Node cached the failed lookup from the import that triggered the install. The CLI now finds the installed copy with `module.findPackageJSON` and imports its entry file. The CLI also no longer replaces `globalThis.localStorage` at startup and before loading the client; the client and server stop reading it in Node instead.
+
 ## 5.1.1-canary.0
 
 ### Patch Changes

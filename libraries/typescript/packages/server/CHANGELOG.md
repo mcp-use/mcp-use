@@ -1,5 +1,15 @@
 # mcp-use
 
+## 2.12.5-canary.3
+
+### Patch Changes
+
+- c4c27e0: Stop the server's usage telemetry from reading `globalThis.localStorage`. On Node 25 the opt-out check printed `Warning: --localstorage-file was provided without a valid path` on a server's first request. Turn telemetry off with `MCP_USE_ANONYMIZED_TELEMETRY=false`; the server no longer reads that setting from `localStorage`.
+- Updated dependencies [c4c27e0]
+- Updated dependencies
+  - @mcp-use/cli@5.1.1-canary.1
+  - @mcp-use/inspector@20.3.30-canary.2
+
 ## 2.12.5-canary.2
 
 ### Patch Changes
