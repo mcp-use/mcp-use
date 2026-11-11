@@ -45,6 +45,33 @@ describe("CodeExecutor", () => {
     expect(result.result).toBe("ok");
   });
 
+  it("logs the cause chain of a caught error", async () => {
+    const result = await executor.execute(`
+      const root = new Error("connect ECONNREFUSED");
+      const err = new TypeError("fetch failed", { cause: root });
+      const loop = new Error("loop");
+      loop.cause = loop;
+      console.error(err);
+      console.error({ error: err });
+      console.error(new Error("wrapped", { cause: { code: 42 } }));
+      console.error(loop);
+      return "ok";
+    `);
+    expect(result.result).toBe("ok");
+    expect(result.logs).toEqual([
+      "[ERROR] TypeError: fetch failed (cause: Error: connect ECONNREFUSED)",
+      `[ERROR] ${JSON.stringify(
+        {
+          error: "TypeError: fetch failed (cause: Error: connect ECONNREFUSED)",
+        },
+        null,
+        2
+      )}`,
+      `[ERROR] Error: wrapped (cause: ${JSON.stringify({ code: 42 }, null, 2)})`,
+      `[ERROR] Error: loop${" (cause: Error: loop".repeat(5)}${")".repeat(5)}`,
+    ]);
+  });
+
   it("logs values JSON cannot represent without aborting the run", async () => {
     const result = await executor.execute(`
       const value = { id: 1n };

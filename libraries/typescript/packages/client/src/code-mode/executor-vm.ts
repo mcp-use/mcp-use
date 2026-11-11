@@ -87,10 +87,8 @@ function formatLogArgument(arg: unknown): string {
   try {
     if (typeof arg !== "object" || arg === null) return String(arg);
     // An error's message and stack are not enumerable, so JSON.stringify gives
-    // "{}". `instanceof Error` is false for errors created in the VM context.
-    if (Object.prototype.toString.call(arg) === "[object Error]") {
-      return String(arg);
-    }
+    // "{}".
+    if (isErrorObject(arg)) return formatError(arg);
     return JSON.stringify(arg, jsonLogReplacer(), 2);
   } catch {
     // A getter, toJSON or toString defined by the executed code threw.
@@ -100,6 +98,33 @@ function formatLogArgument(arg: unknown): string {
       return "[unserializable value]";
     }
   }
+}
+
+/**
+ * True for errors from any realm. `instanceof Error` is false for errors
+ * created in the VM context.
+ */
+function isErrorObject(value: unknown): value is object {
+  return Object.prototype.toString.call(value) === "[object Error]";
+}
+
+/** Max number of `cause` links followed when formatting an error. */
+const MAX_ERROR_CAUSE_DEPTH = 5;
+
+/**
+ * Format an error as `Error: message`, followed by its `cause` chain, for
+ * example `TypeError: fetch failed (cause: Error: connect ECONNREFUSED)`.
+ * Without the cause, network failures from tool calls give the agent nothing
+ * to act on.
+ */
+function formatError(error: object, depth = 0): string {
+  const text = String(error);
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause === undefined || depth >= MAX_ERROR_CAUSE_DEPTH) return text;
+  const causeText = isErrorObject(cause)
+    ? formatError(cause, depth + 1)
+    : formatLogArgument(cause);
+  return `${text} (cause: ${causeText})`;
 }
 
 /**
@@ -117,9 +142,7 @@ function jsonLogReplacer(): (
   return function (this: unknown, _key: string, value: unknown): unknown {
     if (typeof value === "bigint") return `${value}n`;
     if (typeof value !== "object" || value === null) return value;
-    if (Object.prototype.toString.call(value) === "[object Error]") {
-      return String(value);
-    }
+    if (isErrorObject(value)) return formatError(value);
     // `this` is the object that holds `value`; drop entries that are no
     // longer on the path from the root.
     while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this) {
