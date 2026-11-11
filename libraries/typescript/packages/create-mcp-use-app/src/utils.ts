@@ -63,8 +63,9 @@ export function sanitizePackageName(raw: string): string {
 
 // The project name becomes a directory, and the "To get started" hint prints
 // it as `cd <name>`. Restricting it to characters that never need quoting
-// keeps that hint copy-pasteable in bash, PowerShell and cmd.exe alike.
-const PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+// keeps that hint copy-pasteable in bash, PowerShell and cmd.exe alike. A
+// leading hyphen is rejected too, since `cd -foo` parses it as an option.
+const PROJECT_NAME_PATTERN = /^(?!-)[a-zA-Z0-9_-]+$/;
 
 // Returns an error message for an invalid project name, or undefined when the
 // name is valid. "." (scaffold into the current directory) is handled by the
@@ -77,6 +78,9 @@ export function validateProjectName(name: string): string | undefined {
     .replace(/[^a-zA-Z0-9_-]+/g, "-")
     .replace(/^-+|-+$/g, "");
   const hint = suggestion ? ` Try "${suggestion}".` : "";
+  if (/^-[a-zA-Z0-9_-]*$/.test(name)) {
+    return `Project name cannot start with a hyphen.${hint}`;
+  }
   return `Project name can only contain letters, numbers, hyphens, and underscores.${hint}`;
 }
 

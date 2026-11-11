@@ -35,4 +35,15 @@ describe("validateProjectName", () => {
     );
     expect(validateProjectName("...")).not.toContain("Try");
   });
+
+  it("rejects a leading hyphen, which `cd` would parse as an option", () => {
+    expect(validateProjectName("-foo")).toBe(
+      'Project name cannot start with a hyphen. Try "foo".'
+    );
+    expect(validateProjectName("-")).toBe(
+      "Project name cannot start with a hyphen."
+    );
+    expect(validateProjectName("foo-")).toBeUndefined();
+    expect(validateProjectName("_foo")).toBeUndefined();
+  });
 });
