@@ -818,7 +818,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     }
 
     connectingRef.current = true;
-    connectEpochRef.current += 1;
+    const connectionEpoch = ++connectEpochRef.current;
     userInfoRequestRef.current += 1;
     setUserInfo({ status: "idle" });
     connectAttemptRef.current += 1;
@@ -1156,6 +1156,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             serverInfo,
             url,
             isMounted: () => isMountedRef.current,
+            isCurrent: () => connectEpochRef.current === connectionEpoch,
             setServerInfo,
             addLog,
           });
