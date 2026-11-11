@@ -466,7 +466,16 @@ async function openConnection(
   const { createOAuthProvider, MCPClient, logger } = await loadClientPackage({
     allowInstall: !quiet,
   });
-  if (quiet) logger.level = "silent";
+  if (quiet) {
+    logger.level = "silent";
+  } else if (
+    process.env.MCP_USE_LOG_LEVEL === undefined &&
+    process.env.DEBUG === undefined
+  ) {
+    // SDK info logs ("Authentication required", ...) only add noise next to
+    // the CLI's own output. MCP_USE_LOG_LEVEL or DEBUG opt back in.
+    logger.level = "warn";
+  }
   let rejectOAuthInteraction: ((error: CommandError) => void) | undefined;
   const oauthInteractionRequired =
     quiet && definition.oauth
@@ -688,19 +697,17 @@ async function promptToOpenBrowser(
     output: process.stderr,
   });
   try {
-    // End the prompt with a newline: SDK logs print while it waits, and
-    // would otherwise continue on the prompt line.
     await prompt.question(
-      "This server requires OAuth. Press Enter to open your browser.\n",
+      "This server requires OAuth. Press Enter to open your browser.",
       { signal }
     );
     if (!signal.aborted) openBrowser(url);
   } catch {
-    // Aborted means the connection already settled. Otherwise stdin failed,
-    // so fall back to printing the URL.
-    if (!signal.aborted) {
-      process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
-    }
+    // Aborted: the connection already succeeded or failed, so end the prompt
+    // line before the result. Otherwise stdin failed: fall back to the URL.
+    process.stderr.write(
+      signal.aborted ? "\n" : `\nOpen this URL to authenticate:\n${url}\n`
+    );
   } finally {
     prompt.close();
   }

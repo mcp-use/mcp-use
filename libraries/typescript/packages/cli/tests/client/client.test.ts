@@ -682,7 +682,7 @@ describe("client OAuth browser UX", () => {
 
     expect(mocks.question).toHaveBeenCalledOnce();
     expect(mocks.question).toHaveBeenCalledWith(
-      "This server requires OAuth. Press Enter to open your browser.\n",
+      "This server requires OAuth. Press Enter to open your browser.",
       { signal: expect.any(AbortSignal) }
     );
     expect(mocks.openBrowser).toHaveBeenCalledWith(AUTHORIZATION_LAUNCHER_URL);
@@ -690,6 +690,22 @@ describe("client OAuth browser UX", () => {
       mocks.openBrowser.mock.invocationCallOrder[0]!
     );
     expect(stderr).toBe("");
+  });
+
+  it("hides SDK info logs unless a log level is set in the environment", async () => {
+    vi.stubEnv("MCP_USE_LOG_LEVEL", undefined);
+    vi.stubEnv("DEBUG", undefined);
+    await expect(
+      runClient(["connect", "quiet-logs", "https://mcp.example.com/mcp"])
+    ).resolves.toBe(0);
+    expect(mocks.logger.level).toBe("warn");
+
+    mocks.logger.level = "info";
+    vi.stubEnv("MCP_USE_LOG_LEVEL", "debug");
+    await expect(
+      runClient(["connect", "debug-logs", "https://mcp.example.com/mcp"])
+    ).resolves.toBe(0);
+    expect(mocks.logger.level).toBe("info");
   });
 
   it("returns from the browser callback before Enter so the connection timeout cannot end the prompt", async () => {
