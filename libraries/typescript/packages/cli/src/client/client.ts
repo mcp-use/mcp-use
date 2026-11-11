@@ -475,6 +475,7 @@ async function openConnection(
         })
       : undefined;
   const oauthBase = oauthDirectory(name);
+  const oauthPrompt = new AbortController();
   const authProvider = definition.oauth
     ? await createOAuthProvider(definition.url, {
         baseDir: oauthBase,
@@ -502,8 +503,10 @@ async function openConnection(
             process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
             return;
           }
-          await waitForOAuthEnter();
-          openBrowser(url);
+          // The SDK calls this inside its connection timeout, so it must
+          // return without waiting for the user. --auth-timeout governs the
+          // rest of the sign-in, and the prompt closes once connect settles.
+          void promptToOpenBrowser(url, oauthPrompt.signal);
         },
         // Conditional exports select NodeOAuthOptions at runtime. TypeScript
         // resolves the package's browser-default declaration in this build.
@@ -559,6 +562,8 @@ async function openConnection(
       definition,
       credentials
     );
+  } finally {
+    oauthPrompt.abort();
   }
 }
 
@@ -674,14 +679,25 @@ function resolveBrowserMode(options: {
   return "ask";
 }
 
-async function waitForOAuthEnter(): Promise<void> {
+async function promptToOpenBrowser(
+  url: string,
+  signal: AbortSignal
+): Promise<void> {
   const prompt = createInterface({
     input: process.stdin,
     output: process.stderr,
   });
   try {
     await prompt.question(
-      "This server requires OAuth. Press Enter to open your browser."
+      "This server requires OAuth. Press Enter to open your browser.",
+      { signal }
+    );
+    if (!signal.aborted) openBrowser(url);
+  } catch {
+    // Aborted: the connection already succeeded or failed, so end the prompt
+    // line before the result. Otherwise stdin failed: fall back to the URL.
+    process.stderr.write(
+      signal.aborted ? "\n" : `\nOpen this URL to authenticate:\n${url}\n`
     );
   } finally {
     prompt.close();
