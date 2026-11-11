@@ -129,7 +129,12 @@ beforeEach(async () => {
     createOAuthProvider: async (
       _url: string,
       options: { openBrowser: (url: string) => Promise<void> }
-    ) => ({ options }),
+    ) => ({
+      options,
+      // Like the Node provider: settles when this sign-in attempt ends.
+      getAuthorizationCode: () =>
+        mocks.oauthCompletion ?? new Promise<never>(() => {}),
+    }),
     MCPClient: class {
       constructor(config: {
         mcpServers: Record<string, { authProvider?: unknown }>;
@@ -731,6 +736,26 @@ describe("client OAuth browser UX", () => {
     signIn.resolve();
     await expect(result).resolves.toBe(0);
     expect(mocks.closePrompt).toHaveBeenCalledOnce();
+  });
+
+  it("prompts again when auth login starts OAuth after connecting", async () => {
+    setStdinTty(true);
+    await runClient(["connect", "late-login", "https://mcp.example.com/mcp"]);
+    const signIn = deferred();
+    mocks.oauthCompletion = signIn.promise;
+    mocks.openBrowser.mockImplementation(() => signIn.resolve());
+    connection.authenticate.mockImplementation(async () => {
+      const provider = mocks.config?.mcpServers["late-login"]?.authProvider as {
+        options: { openBrowser: (url: string) => Promise<void> };
+      };
+      await provider.options.openBrowser(AUTHORIZATION_LAUNCHER_URL);
+      await signIn.promise;
+    });
+
+    await expect(runClient(["late-login", "auth", "login"])).resolves.toBe(0);
+
+    expect(mocks.question).toHaveBeenCalledOnce();
+    expect(mocks.openBrowser).toHaveBeenCalledWith(AUTHORIZATION_LAUNCHER_URL);
   });
 
   it("closes a pending prompt when OAuth fails before Enter", async () => {

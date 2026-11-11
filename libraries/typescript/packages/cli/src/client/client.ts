@@ -484,7 +484,6 @@ async function openConnection(
         })
       : undefined;
   const oauthBase = oauthDirectory(name);
-  const oauthPrompt = new AbortController();
   const authProvider = definition.oauth
     ? await createOAuthProvider(definition.url, {
         baseDir: oauthBase,
@@ -513,9 +512,15 @@ async function openConnection(
             return;
           }
           // The SDK calls this inside its connection timeout, so it must
-          // return without waiting for the user. --auth-timeout governs the
-          // rest of the sign-in, and the prompt closes once connect settles.
-          void promptToOpenBrowser(url, oauthPrompt.signal);
+          // return without waiting for the user; --auth-timeout governs the
+          // rest. Sign-in can also start after connect (auth login, a 401
+          // retry), so the prompt follows this attempt, not the connection.
+          const signIn = (
+            authProvider as unknown as {
+              getAuthorizationCode(): Promise<string>;
+            }
+          ).getAuthorizationCode();
+          void promptToOpenBrowser(url, signIn);
         },
         // Conditional exports select NodeOAuthOptions at runtime. TypeScript
         // resolves the package's browser-default declaration in this build.
@@ -571,8 +576,6 @@ async function openConnection(
       definition,
       credentials
     );
-  } finally {
-    oauthPrompt.abort();
   }
 }
 
@@ -690,8 +693,13 @@ function resolveBrowserMode(options: {
 
 async function promptToOpenBrowser(
   url: string,
-  signal: AbortSignal
+  signIn: Promise<unknown>
 ): Promise<void> {
+  // Close the prompt once this sign-in succeeds, times out or is cancelled.
+  const controller = new AbortController();
+  const { signal } = controller;
+  const abort = () => controller.abort();
+  signIn.then(abort, abort);
   const prompt = createInterface({
     input: process.stdin,
     output: process.stderr,
@@ -703,7 +711,7 @@ async function promptToOpenBrowser(
     );
     if (!signal.aborted) openBrowser(url);
   } catch {
-    // Aborted: the connection already succeeded or failed, so end the prompt
+    // Aborted: the sign-in already succeeded or failed, so end the prompt
     // line before the result. Otherwise stdin failed: fall back to the URL.
     process.stderr.write(
       signal.aborted ? "\n" : `\nOpen this URL to authenticate:\n${url}\n`
