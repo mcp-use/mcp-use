@@ -1,5 +1,23 @@
 # @mcp-use/cli
 
+## 5.1.0
+
+### Minor Changes
+
+- 654523d: Add `mcp-use feedback send` for explicit CLI reports to PostHog, with a single positional message, anonymous identity, JSON receipts, bounded delivery, and actionable errors. Keep report contents separate from passive usage analytics and document the command for people and coding agents.
+- 654523d: Add `mcp-use analytics catalog` and `analytics query` for live schema discovery and scoped read-only ClickHouse SQL through Manufact Cloud. Include time and branch selection, bounded results, JSON metadata, and a bundled `manufact-analytics` skill with SQL and interpretation guidance.
+
+### Patch Changes
+
+- 654523d: Print a failed tool's error text with `mcp-use client <server> tools call`. Before, the text output said only "Tool <name> returned an error." and the reason was visible only with `--json`. JSON output is unchanged.
+- 654523d: Track anonymous CLI adoption and command usage in PostHog with a persistent random installation ID, allowlisted command names, version/platform metadata, and CI filtering. Honor MCP_USE_ANONYMIZED_TELEMETRY=false and DO_NOT_TRACK=1, omit argument values, and keep capture failures silent and bounded.
+- 654523d: Fix dev-server routing for shared view imports when no landing page exists, and respect configured views directories including `--views-dir` and `--mcp-dir`.
+
+  Handle URL-encoded view and shared-module paths consistently, preserve reserved-route exclusions for raw and decoded URLs, and use module-graph routing for views configured at the project root.
+
+- 654523d: Link the landing page to the server's Inspector only when the CLI has mounted it. Pass its request-resolved URL through landing data and the optional `inspectorUrl` input to `getInstallTargets()`, keeping the hosted Inspector fallback for plain servers, `dev --no-inspector`, and `start` without `--with-inspector`. Mounted links prefill the MCP endpoint and open the Chat tab.
+- 654523d: Automatically version production view resource URIs with the build ID, keeping tool metadata, tool results, registered resources, and OAuth view access consistent. Every replica of a build shares the same URI, and a new build gets a fresh host cache key. Development view URIs remain unversioned.
+
 ## 5.1.0-canary.4
 
 ### Patch Changes

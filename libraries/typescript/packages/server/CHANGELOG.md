@@ -1,5 +1,25 @@
 # mcp-use
 
+## 2.12.4
+
+### Patch Changes
+
+- 654523d: Add `mcp-use feedback send` for explicit CLI reports to PostHog, with a single positional message, anonymous identity, JSON receipts, bounded delivery, and actionable errors. Keep report contents separate from passive usage analytics and document the command for people and coding agents.
+- 654523d: Add `mcp-use analytics catalog` and `analytics query` for live schema discovery and scoped read-only ClickHouse SQL through Manufact Cloud. Include time and branch selection, bounded results, JSON metadata, and a bundled `manufact-analytics` skill with SQL and interpretation guidance.
+- 654523d: Track anonymous CLI adoption and command usage in PostHog with a persistent random installation ID, allowlisted command names, version/platform metadata, and CI filtering. Honor MCP_USE_ANONYMIZED_TELEMETRY=false and DO_NOT_TRACK=1, omit argument values, and keep capture failures silent and bounded.
+- 654523d: Link the landing page to the server's Inspector only when the CLI has mounted it. Pass its request-resolved URL through landing data and the optional `inspectorUrl` input to `getInstallTargets()`, keeping the hosted Inspector fallback for plain servers, `dev --no-inspector`, and `start` without `--with-inspector`. Mounted links prefill the MCP endpoint and open the Chat tab.
+- 654523d: Automatically version production view resource URIs with the build ID, keeping tool metadata, tool results, registered resources, and OAuth view access consistent. Every replica of a build shares the same URI, and a new build gets a fresh host cache key. Development view URIs remain unversioned.
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+- Updated dependencies [654523d]
+  - @mcp-use/cli@5.1.0
+  - @mcp-use/inspector@20.3.29
+
 ## 2.12.4-canary.4
 
 ### Patch Changes
