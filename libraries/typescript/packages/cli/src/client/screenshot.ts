@@ -12,6 +12,7 @@ import {
   openDirectConnection,
   openSavedConnection,
   parseMcpArguments,
+  toolErrorMessage,
 } from "./client.js";
 import { CommandError, UsageError } from "../core/errors.js";
 import { printResult, reportError, wantsJson } from "../core/output.js";
@@ -147,7 +148,7 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     if (result.isError === true) {
       throw new CommandError(
         "tool_failed",
-        `Tool ${values.tool} returned an error.`,
+        toolErrorMessage(values.tool, result, json),
         result
       );
     }

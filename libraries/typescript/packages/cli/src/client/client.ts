@@ -404,14 +404,9 @@ async function callTool(
     { timeout }
   );
   if (result.isError === true) {
-    // JSON callers already get the full result in `details`, so only the
-    // text output needs the tool's own explanation added to the message.
-    const reason = json ? "" : toolErrorText(result);
     throw new CommandError(
       "tool_error",
-      reason === ""
-        ? `Tool ${tool} returned an error.`
-        : `Tool ${tool} returned an error:\n${reason}`,
+      toolErrorMessage(tool, result, json),
       result
     );
   }
@@ -420,6 +415,24 @@ async function callTool(
 }
 
 type ToolResult = Awaited<ReturnType<MCPConnection["callTool"]>>;
+
+/**
+ * The message for a tool result with `isError: true`. Human output adds the
+ * tool's text content; JSON callers already get the full result in
+ * `details`, so their message stays short.
+ *
+ * @internal
+ */
+export function toolErrorMessage(
+  tool: string,
+  result: ToolResult,
+  json: boolean
+): string {
+  const reason = json ? "" : toolErrorText(result);
+  return reason === ""
+    ? `Tool ${tool} returned an error.`
+    : `Tool ${tool} returned an error:\n${reason}`;
+}
 
 // Keeps each text block's leading whitespace (indented code frames, stack
 // traces) and drops only trailing whitespace, so blocks print one per line.
