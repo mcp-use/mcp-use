@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 5.1.1-canary.2
+
+### Patch Changes
+
+- 9eba5b3: create-mcp-use-app now applies the same project name rule to the command-line argument as to the interactive prompt: letters, numbers, hyphens and underscores only. A name like `"my app"` is rejected with a suggestion (`my-app`) instead of creating a directory whose `cd` hint breaks when pasted into a shell. `mcp-use build` now prints the output path with one separator style, so Windows shows `.mcp-use\build\index.js` instead of `.mcp-use\build/index.js`.
+
 ## 5.1.1-canary.1
 
 ### Patch Changes
