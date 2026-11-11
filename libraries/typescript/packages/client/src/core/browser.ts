@@ -121,7 +121,7 @@ export class BrowserMCPClient extends BaseMCPClient {
     // Prepare connector options
     const connectorOptions = {
       headers,
-      fetch: configuredFetch ?? globalThis.fetch.bind(globalThis),
+      fetch: configuredFetch,
       authToken,
       authProvider,
       detectMixedAuth,
