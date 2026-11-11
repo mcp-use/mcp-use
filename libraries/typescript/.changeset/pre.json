@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.26",
+    "@mcp-use/cli": "5.1.0",
+    "@mcp-use/client": "2.4.5",
+    "create-mcp-use-app": "2.1.1",
+    "@mcp-use/inspector": "20.3.29",
+    "mcp-use": "2.12.4",
+    "@mcp-use/tunnel": "0.2.2"
+  },
+  "changesets": [
+    "propagated-48690594a149ddc2",
+    "sanitize-url-ipv6-support"
+  ]
+}
