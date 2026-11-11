@@ -30,6 +30,106 @@ describe("deriveOAuthProxyUrl", () => {
 });
 
 describe("startConnectionHealthMonitoring", () => {
+  function monitorConnection(
+    getAuthHeaders?: () => Promise<Record<string, string>>
+  ) {
+    const stateRef = { current: "ready" };
+    const connect = vi.fn();
+    const cleanup = startConnectionHealthMonitoring({
+      url: "https://example.com/mcp",
+      getAuthHeaders,
+      isMountedRef: { current: true },
+      stateRef,
+      autoReconnectRef: { current: true },
+      setState: (state) => {
+        stateRef.current = state;
+      },
+      addLog: vi.fn(),
+      connect,
+      defaultReconnectDelay: 100,
+      healthCheckIntervalMs: 10,
+      healthCheckTimeoutMs: 0,
+    });
+    return { stateRef, connect, cleanup };
+  }
+
+  it("reconnects after a failed health check while monitoring is active", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    const { connect, cleanup } = monitorConnection();
+    await vi.advanceTimersByTimeAsync(110);
+    expect(connect).toHaveBeenCalledOnce();
+    cleanup();
+  });
+
+  it("cancels a queued reconnect when the old connection is cleaned up", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    const { stateRef, connect, cleanup } = monitorConnection();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(stateRef.current).toBe("discovering");
+    cleanup();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it("does not reconnect when a health check fails after cleanup", async () => {
+    vi.useFakeTimers();
+    let failHealthCheck!: (error: Error) => void;
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          failHealthCheck = reject;
+        })
+    );
+    const { stateRef, connect, cleanup } = monitorConnection();
+    await vi.advanceTimersByTimeAsync(10);
+    cleanup();
+    failHealthCheck(new Error("offline"));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stateRef.current).toBe("ready");
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it("clears every reconnect timer when health checks overlap", async () => {
+    vi.useFakeTimers();
+    const failChecks: Array<(error: Error) => void> = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          failChecks.push(reject);
+        })
+    );
+    const { cleanup } = monitorConnection();
+
+    await vi.advanceTimersByTimeAsync(20);
+    expect(failChecks).toHaveLength(2);
+    failChecks[0](new Error("offline"));
+    await Promise.resolve();
+    failChecks[1](new Error("offline"));
+    await Promise.resolve();
+
+    cleanup();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not fetch after cleanup while auth headers are pending", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    let resolveHeaders!: (headers: Record<string, string>) => void;
+    const { cleanup } = monitorConnection(
+      () => new Promise((resolve) => (resolveHeaders = resolve))
+    );
+
+    await vi.advanceTimersByTimeAsync(10);
+    cleanup();
+    resolveHeaders({});
+    await Promise.resolve();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("targets the logical MCP URL through a proxy and stops after HEAD is rejected", async () => {
     vi.useFakeTimers();
     const fetchMock = vi
