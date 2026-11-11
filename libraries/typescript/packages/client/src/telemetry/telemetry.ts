@@ -57,8 +57,20 @@ export function configureTelemetryStorage(storage: TelemetryStorage): void {
   configuredStorage = storage;
 }
 
+function isBrowser(): boolean {
+  return typeof window !== "undefined" && typeof document !== "undefined";
+}
+
+/**
+ * Only browsers read telemetry settings from `localStorage`; server runtimes
+ * use env vars and the storage installed by their entry. Check for a browser
+ * before touching the global: on Node 25, reading a property of `localStorage`
+ * (such as `getItem`) prints a warning unless Node runs with
+ * `--localstorage-file`.
+ */
 function isLocalStorageFunctional(): boolean {
   return (
+    isBrowser() &&
     typeof localStorage !== "undefined" &&
     typeof localStorage.getItem === "function" &&
     typeof localStorage.setItem === "function" &&
@@ -112,7 +124,7 @@ function detectRuntimeEnvironment(): RuntimeEnvironment {
     ) {
       return "edge";
     }
-    if (typeof window !== "undefined" && typeof document !== "undefined") {
+    if (isBrowser()) {
       return "browser";
     }
     if (

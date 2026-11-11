@@ -183,6 +183,28 @@ describe("landing page views", () => {
     }
   });
 
+  it("never reads the localStorage global", async () => {
+    // Node 25 defines `localStorage` as a getter that warns on property reads
+    // unless Node runs with `--localstorage-file`. Count reads instead.
+    let reads = 0;
+    vi.stubGlobal("localStorage", undefined);
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get() {
+        reads++;
+        return { getItem: () => null };
+      },
+    });
+    const { server, events } = await setup(0);
+    try {
+      await server.fetch(landingRequest({ userAgent: BROWSER }));
+      expect(await events()).toHaveLength(1);
+      expect(reads).toBe(0);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("skips HEAD, protocol requests, and views outside the sample", async () => {
     const { server, events } = await setup(0);
     try {

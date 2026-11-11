@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
-  importProjectClientModule,
+  importInstalledClientModule,
   loadClientPackage,
   readClientPeerRange,
 } from "../../src/client/load-client.js";
@@ -22,7 +22,7 @@ describe("loadClientPackage", () => {
   });
 
   it("imports @mcp-use/client from a project root after auto-install", async () => {
-    const mod = await importProjectClientModule(SERVER_PACKAGE_ROOT);
+    const mod = await importInstalledClientModule(SERVER_PACKAGE_ROOT);
     expect(mod.MCPClient).toBeTypeOf("function");
     expect(mod.createOAuthProvider).toBeTypeOf("function");
   });

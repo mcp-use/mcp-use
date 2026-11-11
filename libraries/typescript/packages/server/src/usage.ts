@@ -72,20 +72,17 @@ function canPersistTelemetryIdentity(): boolean {
   return !("Deno" in globalThis);
 }
 
+/**
+ * Servers never run in a browser, so this never reads `localStorage`. On
+ * Node 25 that global warns on any property read unless Node runs with
+ * `--localstorage-file`.
+ */
 function disabled(): boolean {
   if (env("MCP_USE_ANONYMIZED_TELEMETRY") === "false") return true;
-  try {
-    const scope = globalThis as typeof globalThis & {
-      __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean;
-    };
-    return (
-      scope.__MCP_USE_ANONYMIZED_TELEMETRY__ === false ||
-      (typeof localStorage !== "undefined" &&
-        localStorage.getItem("MCP_USE_ANONYMIZED_TELEMETRY") === "false")
-    );
-  } catch {
-    return false;
-  }
+  const scope = globalThis as typeof globalThis & {
+    __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean;
+  };
+  return scope.__MCP_USE_ANONYMIZED_TELEMETRY__ === false;
 }
 
 /** Whether anonymous usage capture is disabled in the current runtime. @internal */
