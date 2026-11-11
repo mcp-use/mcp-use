@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { findPackageJSON } from "node:module";
 import { chmod, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -83,9 +84,11 @@ export async function loadClientPackage(
 
     const installed = await installClientPackage();
     try {
-      return installed.location === "sandbox"
-        ? await importSandboxClientModule()
-        : await importProjectClientModule(installed.projectRoot!);
+      return await importInstalledClientModule(
+        installed.location === "sandbox"
+          ? CLIENT_SDK_DIR
+          : installed.projectRoot!
+      );
     } catch (retryError) {
       if (isClientPackageMissing(retryError)) {
         throw new UsageError(INSTALL_HINT);
@@ -174,51 +177,31 @@ export function readClientPeerRange(): string {
 }
 
 async function importClientModule(): Promise<ClientPackage> {
-  disableBrokenNodeLocalStorage();
   return import("@mcp-use/client");
 }
 
-/** @internal Imported from project `node_modules` after auto-install. */
-export async function importProjectClientModule(
-  projectRoot: string
-): Promise<ClientPackage> {
-  disableBrokenNodeLocalStorage();
-  const parent = pathToFileURL(join(projectRoot, "package.json")).href;
-  const resolved = await import.meta.resolve(CLIENT_PACKAGE, parent);
-  return import(resolved) as Promise<ClientPackage>;
-}
-
-async function importSandboxClientModule(): Promise<ClientPackage> {
-  disableBrokenNodeLocalStorage();
-  const entry = join(
-    CLIENT_SDK_DIR,
-    "node_modules",
-    CLIENT_PACKAGE,
-    "dist",
-    "index.js"
-  );
-  const mod = (await import(pathToFileURL(entry).href)) as ClientPackage;
-  return mod;
-}
-
 /**
- * Node 25 exposes a lazy `localStorage` getter that warns unless the process
- * was started with `--localstorage-file`. The CLI client uses its own encrypted
- * filesystem stores, so the browser global is neither needed nor desirable.
- * Shadow the getter without reading it, which also keeps JSON stderr clean.
+ * @internal Import the copy installed at or above `installRoot`, right after
+ * an auto-install.
+ *
+ * Imports the entry file rather than the package name. The failed
+ * `import("@mcp-use/client")` that triggered the install leaves Node 24 with a
+ * cached miss for the package's `package.json`, so importing the name again in
+ * this process falls back to a nonexistent `index.js`. `findPackageJSON` walks
+ * `node_modules` the way the resolver does (workspace hoisting, symlinks)
+ * without hitting that cache, and throws `ERR_MODULE_NOT_FOUND` when no copy is
+ * installed. The entry path mirrors `exports["."].node.import` in the client's
+ * package.json.
  */
-function disableBrokenNodeLocalStorage(): void {
-  const descriptor = Object.getOwnPropertyDescriptor(
-    globalThis,
-    "localStorage"
+export async function importInstalledClientModule(
+  installRoot: string
+): Promise<ClientPackage> {
+  const manifest = findPackageJSON(
+    CLIENT_PACKAGE,
+    pathToFileURL(join(installRoot, "package.json"))
   );
-  if (descriptor?.get === undefined || descriptor.configurable !== true) return;
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    enumerable: descriptor.enumerable ?? false,
-    value: undefined,
-    writable: true,
-  });
+  const entry = join(dirname(manifest!), "dist", "index.js");
+  return import(pathToFileURL(entry).href) as Promise<ClientPackage>;
 }
 
 function isClientPackageMissing(error: unknown): boolean {
