@@ -11,6 +11,7 @@
     "@mcp-use/tunnel": "0.2.2"
   },
   "changesets": [
+    "node-bridge-binary-body",
     "propagated-48690594a149ddc2",
     "sanitize-url-ipv6-support",
     "scaffold-reject-unknown-options"
