@@ -130,7 +130,7 @@ export interface StdioServerConfig extends BaseServerConfig {
   /** Executable used to start the server. */
   command: string;
   /** Arguments passed to {@link StdioServerConfig.command}. */
-  args: string[];
+  args?: string[];
   /**
    * Environment variables for the server process. The full parent
    * environment is not inherited: the process receives only the MCP SDK's
@@ -361,7 +361,7 @@ export function createConnectorFromConfig(
   // Normalize clientInfo to ensure required fields are present
   const clientInfo = normalizeClientInfo(serverConfig.clientInfo);
 
-  if ("command" in serverConfig && "args" in serverConfig) {
+  if ("command" in serverConfig) {
     throw new Error(
       "Stdio connector is not supported in this environment. " +
         "Stdio connections require Node.js and are only available in the Node.js MCPClient."
