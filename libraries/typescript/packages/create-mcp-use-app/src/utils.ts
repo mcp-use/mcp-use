@@ -61,6 +61,25 @@ export function sanitizePackageName(raw: string): string {
   );
 }
 
+// The project name becomes a directory, and the "To get started" hint prints
+// it as `cd <name>`. Restricting it to characters that never need quoting
+// keeps that hint copy-pasteable in bash, PowerShell and cmd.exe alike.
+const PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+// Returns an error message for an invalid project name, or undefined when the
+// name is valid. "." (scaffold into the current directory) is handled by the
+// caller and is not accepted here.
+export function validateProjectName(name: string): string | undefined {
+  if (PROJECT_NAME_PATTERN.test(name)) {
+    return undefined;
+  }
+  const suggestion = name
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const hint = suggestion ? ` Try "${suggestion}".` : "";
+  return `Project name can only contain letters, numbers, hyphens, and underscores.${hint}`;
+}
+
 // Resolves what to scaffold given a raw user-supplied name.
 // `displayName` is the human-facing label (kept pretty when possible);
 // `packageName` is the npm-safe identifier flowed into package.json AND
