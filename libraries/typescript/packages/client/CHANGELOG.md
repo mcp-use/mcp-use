@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.4.6-canary.1
+
+### Patch Changes
+
+- db11d54: Code mode's VM executor no longer loses error details or fails the run when the executed code logs something. `console.error(e)` and `console.error({ error: e })` on a caught error used to log `{}` for the error and now log `Error: Boom`. An error's `cause` is logged too, for example `TypeError: fetch failed (cause: Error: connect ECONNREFUSED)`. Logging an object with a circular reference or a BigInt used to throw into the executed code and fail it; those values now appear as `"[Circular]"` and `"1n"`. A value whose getters, `toJSON` or `toString` throw no longer fails the run either: it is logged with `String(value)`, or as `[unserializable value]` when that throws too. Other objects are logged as the same pretty-printed JSON as before.
+
 ## 2.4.6-canary.0
 
 ### Patch Changes
