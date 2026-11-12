@@ -809,6 +809,20 @@ export default server;`
     expect(await listToolNames(dev.url)).toEqual(["add"]);
   });
 
+  it("binds and reports a concrete port when port 0 is requested", async () => {
+    const cwd = copyFixture("dev-port");
+    cleanups.push(() => removeDir(cwd));
+
+    const dev = await startDev(cwd, 0);
+    cleanups.push(dev.stop);
+
+    const boundPort = Number(new URL(dev.url).port);
+    expect(boundPort).toBeGreaterThan(0);
+    expect(process.env["PORT"]).toBe(String(boundPort));
+    expect(dev.logs.some((line) => line.includes("is taken"))).toBe(false);
+    expect(await listToolNames(dev.url)).toEqual(["add"]);
+  });
+
   it("probes upward when a wildcard listener already owns the port on loopback", async () => {
     const cwd = copyFixture("dev-port-wildcard");
     cleanups.push(() => removeDir(cwd));
