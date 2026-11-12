@@ -238,12 +238,17 @@ export function useMcpOperations(params: Params) {
   }, [params.addLog, params.onAuthorizationRequired]);
 
   const refreshResourceTemplates = useCallback(async () => {
-    const connection = requireConnection(params, "refresh resource templates");
-    const result = await executeWithAuthorizationSignal(params, () =>
-      connection.listResourceTemplates()
-    );
-    if (params.isMounted()) {
-      params.setResourceTemplates(result.resourceTemplates || []);
+    if (params.stateRef.current !== "ready" || !params.connectionRef.current)
+      return;
+    try {
+      const result = await executeWithAuthorizationSignal(params, () =>
+        params.connectionRef.current!.listResourceTemplates()
+      );
+      if (params.isMounted()) {
+        params.setResourceTemplates(result.resourceTemplates || []);
+      }
+    } catch (error) {
+      params.addLog("warn", "Failed to refresh resource templates:", error);
     }
   }, [params.addLog, params.onAuthorizationRequired]);
 
