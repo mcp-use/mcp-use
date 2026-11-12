@@ -80,7 +80,7 @@ mcp-use dev [options]
 | `--entry <file>`    | MCP server entry file, relative to the project.                          | Auto-detected                  |
 | `--mcp-dir <dir>`   | MCP source directory containing the entry and `views/`.                  | None                           |
 | `--views-dir <dir>` | View directory, relative to the project root.                            | `views/` or `<mcp-dir>/views/` |
-| `--port <port>`     | Server port. Use `0` for an OS-assigned port.                              | `PORT` or `3000`               |
+| `--port <port>`     | Server port.                                                             | `PORT` or `3000`               |
 | `--host <host>`     | Bind address. Use `0.0.0.0` to listen on all interfaces.                 | `HOST` or `127.0.0.1`          |
 | `--no-open`         | Do not open the Inspector automatically.                                 | Opens by default               |
 | `--no-inspector`    | Run without loading the project-local Inspector.                         | Inspector enabled              |
@@ -91,7 +91,6 @@ mcp-use dev [options]
 ```bash
 mcp-use dev
 mcp-use dev --port 8080
-mcp-use dev --port 0
 mcp-use dev --host 127.0.0.1 --no-open
 mcp-use dev --mcp-dir src/mcp
 mcp-use dev --entry src/server.ts --views-dir src/views
@@ -103,8 +102,6 @@ mcp-use dev --tunnel
 
 - The MCP endpoint is served at `/mcp`.
 - Address precedence is `--port` / `--host`, then `PORT` / `HOST`, then the defaults. `dev` does not import the server until after its listener is chosen, so it cannot use a server-configured address.
-- The listener stays bound while Vite and the application initialize. `--port 0` (or `PORT=0`) selects an OS-assigned port; an occupied nonzero port falls back to the next available port. `PORT`, printed URLs, and Inspector all use the selected port.
-- Requests received before initialization finishes return HTTP `503`. If startup fails, the listener is closed and its port is released.
 - The Inspector supplied by `mcp-use` is mounted at `/mcp/inspector` and opens automatically unless `--no-open` is set.
 - Inspector UI, proxy, and OAuth routes remain local-only. A public tunnel exposes the MCP endpoint but returns `404` for `/mcp/inspector`.
 - The command sets `NODE_ENV=development` when it is not already set and sets `PORT` to the chosen listener port before importing the entry.
