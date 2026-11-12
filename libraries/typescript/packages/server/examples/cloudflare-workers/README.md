@@ -49,7 +49,9 @@ https://<worker>.<account>.workers.dev/mcp
 ## OAuth proxy storage
 
 Workers KV cannot provide the atomic read-and-delete required by OAuth
-authorization codes. Bind a D1 database and pass it to `cloudflareStorage`:
+authorization codes. Bind a D1 database and pass it to `cloudflareStorage`.
+The snippet below replaces the `MCPServer` in `worker.ts`; its `fetch` already
+forwards `request`, `env`, and `ctx` to the server.
 
 ```typescript
 import { env } from "cloudflare:workers";
@@ -73,10 +75,21 @@ const server = new MCPServer({
       clientId: env.GITHUB_CLIENT_ID,
       clientSecret: env.GITHUB_CLIENT_SECRET,
     }),
+    secret: env.MCP_USE_OAUTH_SECRET,
     storage,
   }),
 });
 ```
+
+Store the OAuth credentials as Worker secrets:
+
+```bash
+pnpm exec wrangler secret put GITHUB_CLIENT_ID
+pnpm exec wrangler secret put GITHUB_CLIENT_SECRET
+pnpm exec wrangler secret put MCP_USE_OAUTH_SECRET
+```
+
+`MCP_USE_OAUTH_SECRET` must be a stable value of at least 32 characters.
 
 Add the binding to `wrangler.jsonc`:
 
