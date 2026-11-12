@@ -21,7 +21,10 @@ function readEnv(name: string): string | undefined {
   return value !== undefined && value !== "" ? value : undefined;
 }
 
-function parseForwardedHeader(header: string): string | undefined {
+function parseForwardedHeader(
+  header: string,
+  fallbackHost: string
+): string | undefined {
   for (const part of header.split(",")) {
     const params = new Map<string, string>();
     for (const token of part.split(";")) {
@@ -31,10 +34,9 @@ function parseForwardedHeader(header: string): string | undefined {
       }
       params.set(key.toLowerCase(), rest.join("=").replace(/^"|"$/g, ""));
     }
-    const proto = params.get("proto");
-    const host = params.get("host");
-    if (proto !== undefined && host !== undefined) {
-      return `${proto}://${host}`;
+    const proto = params.get("proto")?.toLowerCase();
+    if (proto === "http" || proto === "https") {
+      return `${proto}://${params.get("host") || fallbackHost}`;
     }
   }
   return undefined;
@@ -42,31 +44,34 @@ function parseForwardedHeader(header: string): string | undefined {
 
 /**
  * Resolve origin from forwarded headers or the request URL (no env override).
+ *
+ * A forwarded `http` or `https` protocol is honored on its own, and any other
+ * value is ignored. The host comes from the forwarded host when present, then
+ * `X-Forwarded-Host`, then the request.
  */
 export function resolveRequestOriginFromHeaders(request: Request): string {
+  const requestUrl = new URL(request.url);
+  const fallbackHost =
+    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    requestUrl.host;
+
   const forwarded = request.headers.get("forwarded");
   if (forwarded !== null) {
-    const fromForwarded = parseForwardedHeader(forwarded);
+    const fromForwarded = parseForwardedHeader(forwarded, fallbackHost);
     if (fromForwarded !== undefined) {
       return fromForwarded;
     }
   }
 
   const proto = request.headers.get("x-forwarded-proto");
-  const host = request.headers.get("x-forwarded-host");
-  if (proto !== null && host !== null) {
-    const firstHost = host.split(",")[0]?.trim();
-    const firstProto = proto.split(",")[0]?.trim();
-    if (
-      firstHost !== undefined &&
-      firstProto !== undefined &&
-      firstHost !== ""
-    ) {
-      return `${firstProto}://${firstHost}`;
+  if (proto !== null) {
+    const firstProto = proto.split(",")[0]?.trim().toLowerCase();
+    if (firstProto === "http" || firstProto === "https") {
+      return `${firstProto}://${fallbackHost}`;
     }
   }
 
-  return new URL(request.url).origin;
+  return requestUrl.origin;
 }
 
 /**
