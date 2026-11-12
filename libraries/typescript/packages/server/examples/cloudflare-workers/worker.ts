@@ -43,11 +43,7 @@ export default {
    * needs no Node adapter. Bindings remain available through `env` for tools
    * or OAuth storage that need them.
    */
-  fetch(
-    request: Request,
-    _env: Env,
-    _ctx: ExecutionContext
-  ): Promise<Response> {
-    return server.fetch(request);
+  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return server.fetch(request, env, ctx);
   },
 };
