@@ -1,0 +1,24 @@
+{
+  "name": "mcp-use-example-secure-database",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: Role-based SQLite MCP server with engine-level read-only enforcement and MCP middleware.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "^2.12.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^5.9.0"
+  }
+}
