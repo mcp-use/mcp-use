@@ -732,6 +732,22 @@ describe("MCPServer basePath accessor", () => {
   });
 });
 
+describe("MCPServer resource registration", () => {
+  it("rejects a second resource name for a registered URI", () => {
+    const server = new MCPServer({ name: "res-test", version: "1.0.0" });
+    const read = async (uri: URL) => ({
+      contents: [{ uri: uri.href, text: "x" }],
+    });
+    server.resource({ name: "a", uri: "config://x" }, read);
+    expect(() =>
+      server.resource({ name: "b", uri: "config://x" }, read)
+    ).toThrow('Resource URI "config://x" is already registered by "a"');
+    expect(() =>
+      server.resource({ name: "a", uri: "config://x" }, read)
+    ).not.toThrow();
+  });
+});
+
 describe("MCPServer fetch handler (no network)", () => {
   it("serves MCP through the web-standard handler on a custom basePath", async () => {
     const server = new MCPServer({
