@@ -207,6 +207,7 @@ export class VMCodeExecutor extends BaseCodeExecutor {
     const startTime = Date.now();
     let result: any = null;
     let error: string | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     try {
       // Build execution context (sandbox)
@@ -229,13 +230,20 @@ export class VMCodeExecutor extends BaseCodeExecutor {
         filename: "agent_code.js",
       });
 
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Script execution timed out")),
+          effectiveTimeout
+        );
+      });
+
       // Execute with timeout
       const promise = script.runInNewContext(context, {
         timeout: effectiveTimeout,
         displayErrors: true,
       });
 
-      result = await promise;
+      result = await Promise.race([promise, deadline]);
     } catch (e: any) {
       error = e.message || String(e);
       // Check for timeout error
@@ -252,6 +260,8 @@ export class VMCodeExecutor extends BaseCodeExecutor {
       if (e.stack) {
         logger.debug(`Code execution error stack: ${e.stack}`);
       }
+    } finally {
+      clearTimeout(timer);
     }
 
     const executionTime = (Date.now() - startTime) / 1000;
