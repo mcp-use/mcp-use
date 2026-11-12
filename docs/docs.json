@@ -360,6 +360,7 @@
                         "icon": "rocket",
                         "pages": [
                           "typescript/server/deployment/mcp-use",
+                          "typescript/server/deployment/cloudflare-workers",
                           "typescript/server/deployment/self-hosted"
                         ]
                       },
