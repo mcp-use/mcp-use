@@ -971,6 +971,11 @@ mcp-use screenshot --mcp https://example.com/mcp --tool show-app \
 | `2`  | Invalid arguments.                                          |
 | `1`  | MCP, tool, Inspector, browser, readiness, or write failure. |
 
+If the tool returns an error result, the command exits with `1` and prints
+the tool's text content after the error message. With `--json`, the error
+envelope has code `tool_failed`, and `error.details` holds the original MCP
+tool result.
+
 ## Environment variables
 
 | Variable                    | Used by                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default                             |
