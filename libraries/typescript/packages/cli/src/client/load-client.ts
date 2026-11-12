@@ -100,10 +100,18 @@ async function installClientPackage(): Promise<InstallLocation> {
   const dependency = `${CLIENT_PACKAGE}@${versionSpec}`;
   const projectRoot = await findProjectRoot(process.cwd());
 
-  process.stderr.write(`[mcp-use] installing ${CLIENT_PACKAGE}…\n`);
-
   if (projectRoot !== undefined) {
-    const [command, args] = packageManagerInstallArgs(dependency);
+    // An npx-launched CLI lives in the npm cache, so the project's copy is not
+    // resolvable from here even when it is installed. Resolve it from the
+    // project first and never install over it (issue #3081).
+    if (await projectHasClient(projectRoot)) {
+      return { location: "project", projectRoot };
+    }
+    process.stderr.write(`[mcp-use] installing ${CLIENT_PACKAGE}…\n`);
+    const [command, args] = await packageManagerInstallArgs(
+      dependency,
+      projectRoot
+    );
     const code = await spawnAndWait(command, args, projectRoot);
     if (code !== 0) {
       throw new CommandError(
@@ -114,6 +122,7 @@ async function installClientPackage(): Promise<InstallLocation> {
     return { location: "project", projectRoot };
   }
 
+  process.stderr.write(`[mcp-use] installing ${CLIENT_PACKAGE}…\n`);
   await mkdir(CLIENT_SDK_DIR, { recursive: true, mode: 0o700 });
   await chmod(CLIENT_SDK_DIR, 0o700);
   const manifestPath = join(CLIENT_SDK_DIR, "package.json");
@@ -139,15 +148,73 @@ async function installClientPackage(): Promise<InstallLocation> {
   return { location: "sandbox" };
 }
 
-function packageManagerInstallArgs(dependency: string): [string, string[]] {
+/**
+ * @internal Whether the project itself can resolve `@mcp-use/client` from its
+ * `node_modules`, without falling back to the CLI's own environment.
+ */
+export async function projectHasClient(projectRoot: string): Promise<boolean> {
+  try {
+    const parent = pathToFileURL(join(projectRoot, "package.json")).href;
+    await import.meta.resolve(CLIENT_PACKAGE, parent);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
+
+/** Lockfiles that identify a project's package manager, most specific first. */
+const LOCKFILE_MANAGERS: readonly (readonly [string, PackageManager])[] = [
+  ["pnpm-lock.yaml", "pnpm"],
+  ["bun.lock", "bun"],
+  ["bun.lockb", "bun"],
+  ["yarn.lock", "yarn"],
+  ["package-lock.json", "npm"],
+];
+
+/** @internal The package manager a project's lockfile names, if any. */
+export async function detectProjectPackageManager(
+  projectRoot: string
+): Promise<PackageManager | undefined> {
+  for (const [lockfile, manager] of LOCKFILE_MANAGERS) {
+    if (await pathExists(join(projectRoot, lockfile))) return manager;
+  }
+  return undefined;
+}
+
+function packageManagerFromUserAgent(): PackageManager | undefined {
   const userAgent = process.env["npm_config_user_agent"] ?? "";
-  if (userAgent.startsWith("pnpm/")) {
-    return ["pnpm", ["add", dependency]];
+  if (userAgent.startsWith("pnpm/")) return "pnpm";
+  if (userAgent.startsWith("yarn/")) return "yarn";
+  if (userAgent.startsWith("bun/")) return "bun";
+  if (userAgent.startsWith("npm/")) return "npm";
+  return undefined;
+}
+
+/**
+ * @internal Command that installs `dependency` into `projectRoot`. The
+ * project's lockfile wins over the user agent: `npx` always reports npm even
+ * for a pnpm project (issue #3081).
+ */
+export async function packageManagerInstallArgs(
+  dependency: string,
+  projectRoot?: string
+): Promise<[string, string[]]> {
+  const manager =
+    (projectRoot
+      ? await detectProjectPackageManager(projectRoot)
+      : undefined) ?? packageManagerFromUserAgent();
+  switch (manager) {
+    case "pnpm":
+      return ["pnpm", ["add", dependency]];
+    case "yarn":
+      return ["yarn", ["add", dependency]];
+    case "bun":
+      return ["bun", ["add", dependency]];
+    default:
+      return ["npm", ["install", dependency]];
   }
-  if (userAgent.startsWith("bun/")) {
-    return ["bun", ["add", dependency]];
-  }
-  return ["npm", ["install", dependency]];
 }
 
 /**
