@@ -81,15 +81,19 @@ const server = new MCPServer({
 });
 ```
 
-Store the OAuth credentials as Worker secrets:
+Store the OAuth credentials as Worker secrets for the deployed Worker. For
+`pnpm dev`, put the same values in a git-ignored `.dev.vars` file, because
+`wrangler secret put` does not populate the local runtime:
 
 ```bash
+openssl rand -base64 32
 pnpm exec wrangler secret put GITHUB_CLIENT_ID
 pnpm exec wrangler secret put GITHUB_CLIENT_SECRET
 pnpm exec wrangler secret put MCP_USE_OAUTH_SECRET
 ```
 
-`MCP_USE_OAUTH_SECRET` must be a stable value of at least 32 characters.
+Use the generated random value for `MCP_USE_OAUTH_SECRET`; keep it stable and
+at least 32 characters long.
 
 Add the binding to `wrangler.jsonc`:
 
