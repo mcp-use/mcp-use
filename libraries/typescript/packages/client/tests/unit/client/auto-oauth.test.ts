@@ -13,6 +13,7 @@ import type {
 } from "../../../src/core/config.js";
 import { shouldAutoProvisionOAuth } from "../../../src/core/config.js";
 import * as flow from "../../../src/auth/flow.js";
+import { deferred } from "../../helpers/deferred.js";
 
 vi.mock("../../../src/auth/flow.js", async (importOriginal) => {
   const actual = await importOriginal<typeof flow>();
@@ -212,6 +213,64 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
     );
 
     await expect(client.createSession("demo")).rejects.toThrow("boom");
+    expect(flow.completeOAuthFlow).not.toHaveBeenCalled();
+  });
+
+  it("awaits cleanup of a failed initialization before OAuth completion and retry", async () => {
+    const client = new TestClient({
+      mcpServers: { demo: { url: "https://example.com/mcp" } },
+    });
+    const first = makeConnector(async () => {});
+    const second = makeConnector(async () => {});
+    const unauthorized = Object.assign(new Error("Unauthorized"), {
+      code: 401,
+    });
+    vi.mocked(first.initialize).mockRejectedValueOnce(unauthorized);
+    const cleanupStarted = deferred();
+    const cleanup = deferred();
+    vi.mocked(first.disconnect).mockImplementationOnce(async () => {
+      cleanupStarted.resolve();
+      await cleanup.promise;
+    });
+    client.createConnectorFromConfig
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(second);
+
+    const creating = client.createSession("demo");
+    await cleanupStarted.promise;
+    expect(flow.completeOAuthFlow).not.toHaveBeenCalled();
+    expect(client.createConnectorFromConfig).toHaveBeenCalledOnce();
+    expect(client.activeSessions).toEqual([]);
+
+    cleanup.resolve();
+    const session = await creating;
+    expect(first.disconnect).toHaveBeenCalledOnce();
+    expect(flow.completeOAuthFlow).toHaveBeenCalledOnce();
+    expect(client.createConnectorFromConfig).toHaveBeenCalledTimes(2);
+    expect(client.getSession("demo")).toBe(session);
+    expect(session.connector).toBe(second);
+    expect(second.disconnect).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("preserves the initialization error when cleanup also fails", async () => {
+    const client = new TestClient({
+      mcpServers: { demo: { url: "https://example.com/mcp", oauth: false } },
+    });
+    const connector = makeConnector(async () => {});
+    const initializationError = new Error("initialization failed");
+    vi.mocked(connector.initialize).mockRejectedValueOnce(initializationError);
+    vi.mocked(connector.disconnect).mockRejectedValueOnce(
+      new Error("cleanup failed")
+    );
+    client.createConnectorFromConfig.mockReturnValueOnce(connector);
+
+    await expect(client.createSession("demo")).rejects.toBe(
+      initializationError
+    );
+    expect(connector.disconnect).toHaveBeenCalledOnce();
+    expect(client.getSession("demo")).toBeNull();
+    expect(client.activeSessions).toEqual([]);
     expect(flow.completeOAuthFlow).not.toHaveBeenCalled();
   });
 });
