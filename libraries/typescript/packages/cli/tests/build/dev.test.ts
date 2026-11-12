@@ -793,6 +793,43 @@ export default server;`
     );
   });
 
+  it.each([
+    ["entry", 0],
+    ["entry", 1],
+    ["vite", 0],
+    ["vite", 1],
+  ] as const)(
+    "releases the listener after %s startup fails (port mode %i)",
+    async (stage, mode) => {
+      const cwd = copyFixture(`dev-failed-${stage}`);
+      cleanups.push(() => removeDir(cwd));
+      const failure =
+        'throw Object.assign(new Error("fixture startup failure"), { code: "FIXTURE_STARTUP" });';
+      if (stage === "entry") {
+        writeFileSync(join(cwd, "src", "index.ts"), failure);
+      } else {
+        // A landing page enables the project's Vite config even without views.
+        writeFileSync(join(cwd, "landing.tsx"), "export default () => null;");
+        writeFileSync(join(cwd, "vite.config.ts"), failure);
+      }
+      const requested = mode === 0 ? 0 : await getFreePort();
+      await expect(
+        runDev({
+          cwd,
+          port: requested,
+          host: "127.0.0.1",
+          inspector: false,
+          open: false,
+        })
+      ).rejects.toMatchObject({ code: "FIXTURE_STARTUP" });
+      const selected = Number(process.env["PORT"]);
+      expect(selected).toBeGreaterThan(0);
+      if (requested !== 0) expect(selected).toBe(requested);
+      const replacement = await occupyPort(selected);
+      await new Promise<void>((resolve) => replacement.close(() => resolve()));
+    }
+  );
+
   it("probes upward when the requested port is taken", async () => {
     const cwd = copyFixture("dev-port");
     cleanups.push(() => removeDir(cwd));
