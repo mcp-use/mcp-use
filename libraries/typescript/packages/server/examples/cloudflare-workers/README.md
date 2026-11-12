@@ -52,11 +52,29 @@ Workers KV cannot provide the atomic read-and-delete required by OAuth
 authorization codes. Bind a D1 database and pass it to `cloudflareStorage`:
 
 ```typescript
+import { env } from "cloudflare:workers";
+import { MCPServer } from "mcp-use";
+import { github, oauthProxy } from "mcp-use/oauth";
 import { cloudflareStorage } from "mcp-use/oauth/storage";
 
+const database = env.OAUTH_DB;
+if (!database) throw new Error("Bind OAUTH_DB before enabling oauthProxy");
+
 const storage = cloudflareStorage({
-  d1: env.OAUTH_DB,
+  d1: database,
   table: "mcp_use_oauth",
+});
+
+const server = new MCPServer({
+  name: "workers-example",
+  version: "1.0.0",
+  oauth: oauthProxy({
+    upstream: github({
+      clientId: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+    }),
+    storage,
+  }),
 });
 ```
 
