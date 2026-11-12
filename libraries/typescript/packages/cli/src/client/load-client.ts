@@ -42,12 +42,6 @@ async function findProjectRoot(startDir: string): Promise<string | undefined> {
   }
 }
 
-/** Where `@mcp-use/client` was auto-installed. */
-interface InstallLocation {
-  location: "project" | "sandbox";
-  projectRoot?: string;
-}
-
 interface LoadClientPackageOptions {
   /** Allow installing the optional SDK when it is not already available. */
   allowInstall?: boolean;
@@ -57,65 +51,86 @@ interface LoadClientPackageOptions {
  * Load `@mcp-use/client` on demand so the framework library entry does not
  * pull the client SDK (or legacy v1 transitive deps) into every install.
  *
+ * Looks for an installed copy next to the CLI, then in the project around the
+ * working directory, then in the CLI's private `~/.mcp-use/client-sdk`
+ * directory. When none is found, installs it into that private directory with
+ * npm. It never installs into the user's project: under `npx` the CLI cannot
+ * tell which package manager the project uses, and running the wrong one
+ * corrupts `node_modules` or crashes (mcp-use/mcp-use#3081).
+ *
  * @throws {@link UsageError} When the package is not installed and auto-install
  * fails or the retry import still cannot resolve it.
  */
 export async function loadClientPackage(
   options: LoadClientPackageOptions = {}
 ): Promise<ClientPackage> {
-  try {
-    return await importClientModule();
-  } catch (error) {
-    if (!isClientPackageMissing(error)) throw error;
-    if (options.allowInstall === false) {
-      throw new CommandError(
-        "client_install_required",
-        `${CLIENT_PACKAGE} is required for this command.`,
-        {
-          nextSteps: [
-            {
-              description: "Install the optional client SDK",
-              command: `npm install ${CLIENT_PACKAGE}`,
-            },
-          ],
-        }
-      );
-    }
+  const projectRoot = await findProjectRoot(process.cwd());
+  const installed = await importFirstInstalledClient([
+    projectRoot,
+    CLIENT_SDK_DIR,
+  ]);
+  if (installed !== undefined) return installed;
 
-    const installed = await installClientPackage();
-    try {
-      return await importInstalledClientModule(
-        installed.location === "sandbox"
-          ? CLIENT_SDK_DIR
-          : installed.projectRoot!
-      );
-    } catch (retryError) {
-      if (isClientPackageMissing(retryError)) {
-        throw new UsageError(INSTALL_HINT);
+  if (options.allowInstall === false) {
+    throw new CommandError(
+      "client_install_required",
+      `${CLIENT_PACKAGE} is required for this command.`,
+      {
+        nextSteps: [
+          {
+            description: "Install the optional client SDK",
+            command: `npm install ${CLIENT_PACKAGE}`,
+          },
+        ],
       }
-      throw retryError;
+    );
+  }
+
+  await installClientPackage();
+  try {
+    return await importInstalledClientModule(CLIENT_SDK_DIR);
+  } catch (retryError) {
+    if (isClientPackageMissing(retryError)) {
+      throw new UsageError(INSTALL_HINT);
     }
+    throw retryError;
   }
 }
 
-async function installClientPackage(): Promise<InstallLocation> {
+/**
+ * @internal Import `@mcp-use/client` from next to the CLI, else from the first
+ * of `roots` that has a copy installed at or above it. Returns `undefined`
+ * when no copy is found. Tests pass `importBare` to simulate the CLI running
+ * from outside the project (the `npx` cache), where the bare import misses.
+ */
+export async function importFirstInstalledClient(
+  roots: ReadonlyArray<string | undefined>,
+  importBare: () => Promise<ClientPackage> = importClientModule
+): Promise<ClientPackage | undefined> {
+  try {
+    return await importBare();
+  } catch (error) {
+    if (!isClientPackageMissing(error)) throw error;
+  }
+  for (const root of roots) {
+    if (root === undefined) continue;
+    try {
+      return await importInstalledClientModule(root);
+    } catch (error) {
+      if (!isClientPackageMissing(error)) throw error;
+    }
+  }
+  return undefined;
+}
+
+/** Install `@mcp-use/client` into the CLI's private directory with npm. */
+async function installClientPackage(): Promise<void> {
   const versionSpec = readClientPeerRange();
   const dependency = `${CLIENT_PACKAGE}@${versionSpec}`;
-  const projectRoot = await findProjectRoot(process.cwd());
 
-  process.stderr.write(`[mcp-use] installing ${CLIENT_PACKAGE}…\n`);
-
-  if (projectRoot !== undefined) {
-    const [command, args] = packageManagerInstallArgs(dependency);
-    const code = await spawnAndWait(command, args, projectRoot);
-    if (code !== 0) {
-      throw new CommandError(
-        "client_install_failed",
-        `Failed to install ${CLIENT_PACKAGE}.`
-      );
-    }
-    return { location: "project", projectRoot };
-  }
+  process.stderr.write(
+    `[mcp-use] installing ${CLIENT_PACKAGE} into ${CLIENT_SDK_DIR}…\n`
+  );
 
   await mkdir(CLIENT_SDK_DIR, { recursive: true, mode: 0o700 });
   await chmod(CLIENT_SDK_DIR, 0o700);
@@ -139,18 +154,6 @@ async function installClientPackage(): Promise<InstallLocation> {
       `Failed to install ${CLIENT_PACKAGE}.`
     );
   }
-  return { location: "sandbox" };
-}
-
-function packageManagerInstallArgs(dependency: string): [string, string[]] {
-  const userAgent = process.env["npm_config_user_agent"] ?? "";
-  if (userAgent.startsWith("pnpm/")) {
-    return ["pnpm", ["add", dependency]];
-  }
-  if (userAgent.startsWith("bun/")) {
-    return ["bun", ["add", dependency]];
-  }
-  return ["npm", ["install", dependency]];
 }
 
 /**
