@@ -105,6 +105,7 @@ export const examples = [
     "vercel",
     "A serverless handler example has no local listener; deployment smoke coverage is deferred."
   ),
+  command("cloudflare-workers", "smoke"),
 ];
 
 function local(directory, assertions = {}) {
@@ -132,5 +133,14 @@ function configuration(directory, skippedLiveReason) {
     directory,
     verification: "configuration",
     skippedLiveReason,
+  };
+}
+
+function command(directory, script) {
+  return {
+    id: directory.replaceAll("/", "-"),
+    directory,
+    verification: "command",
+    script,
   };
 }
