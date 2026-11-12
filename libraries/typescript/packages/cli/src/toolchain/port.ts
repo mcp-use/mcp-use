@@ -1,9 +1,8 @@
 /**
- * Port resolution for `mcp-use dev`: `--port`, else `PORT` env, else 3000 — probing
- * upward when the requested port is taken.
+ * Bind the dev listener, trying higher ports when the requested port is taken.
  */
 
-import { connect, createServer } from "node:net";
+import { connect, type Server } from "node:net";
 
 /** How many consecutive ports to probe before giving up. */
 const MAX_PROBES = 100;
@@ -12,12 +11,12 @@ const MAX_PROBES = 100;
 const CONNECT_PROBE_MS = 300;
 
 /**
- * Outcome of {@link resolvePort}.
+ * Outcome of {@link listenOnAvailablePort}.
  *
  * @internal
  */
 interface ResolvedPort {
-  /** The free port to bind. */
+  /** The port owned by the listening server. */
   port: number;
   /** The port that was originally requested (differs when probing moved on). */
   requested: number;
@@ -25,15 +24,20 @@ interface ResolvedPort {
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
-/** Check whether `port` is free to bind on `host`. */
-function isPortFree(port: number, host: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const probe = createServer();
-    probe.unref();
-    probe.once("error", () => resolve(false));
-    probe.listen({ port, host }, () => {
-      probe.close(() => resolve(true));
-    });
+/** Bind the actual listener; failed attempts leave it available for retry. */
+function listen(server: Server, port: number, host: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onError = (error: Error): void => {
+      server.off("listening", onListening);
+      reject(error);
+    };
+    const onListening = (): void => {
+      server.off("error", onError);
+      resolve();
+    };
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen({ port, host });
   });
 }
 
@@ -60,37 +64,64 @@ function canConnect(port: number, host: string): Promise<boolean> {
 /**
  * On loopback binds, a wildcard listener on `*:port` (IPv6) can still accept
  * `localhost` traffic while `127.0.0.1:port` bind-probes succeed — macOS dual-stack.
- * Treat the port as taken when either loopback address already accepts connections.
+ * Check only the other address family after binding, so we never mistake our
+ * own listener for a competing service. `localhost` may resolve to either one.
  */
-async function loopbackPortInUse(port: number): Promise<boolean> {
-  return (
-    (await canConnect(port, "127.0.0.1")) || (await canConnect(port, "::1"))
-  );
+async function otherLoopbackInUse(
+  port: number,
+  family: string
+): Promise<boolean> {
+  return canConnect(port, family === "IPv4" ? "::1" : "127.0.0.1");
 }
 
 /**
- * Resolve the port to bind: take `requested` (already reduced from
- * `--port` / `PORT` / the default by the caller) and probe upward until a
- * free port is found.
+ * Bind and retain the actual dev listener before configuring or importing the
+ * application. Port 0 is assigned by the OS; occupied nonzero ports are retried
+ * upward. No successful listener is released between selection and startup.
  *
+ * @param server - The HTTP server that will serve the application.
  * @param requested - The preferred port.
- * @param host - The host the server will bind (probing binds the same host).
- * @returns The first free port at or above `requested`, plus the original
- * request so callers can log the substitution.
- * @throws If no free port is found within {@link MAX_PROBES} attempts.
+ * @param host - The host the server will bind.
+ * @returns The bound port and the original request for substitution logging.
+ * @throws If binding fails or no suitable port is found in 100 attempts.
  *
  * @internal
  */
-export async function resolvePort(
+export async function listenOnAvailablePort(
+  server: Server,
   requested: number,
   host: string
 ): Promise<ResolvedPort> {
-  for (let port = requested; port < requested + MAX_PROBES; port++) {
-    if (!(await isPortFree(port, host))) continue;
-    if (LOOPBACK_HOSTS.has(host) && (await loopbackPortInUse(port))) continue;
-    return { port, requested };
+  for (let attempt = 0; attempt < MAX_PROBES; attempt++) {
+    const candidate = requested === 0 ? 0 : requested + attempt;
+    if (candidate > 65535) break;
+    try {
+      await listen(server, candidate, host);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      // Reserved ports on Windows can report EACCES rather than EADDRINUSE.
+      if (code === "EADDRINUSE" || code === "EACCES") continue;
+      throw error;
+    }
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("Dev listener did not bind a TCP port.");
+    }
+    if (
+      LOOPBACK_HOSTS.has(host) &&
+      (await otherLoopbackInUse(address.port, address.family))
+    ) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+      continue;
+    }
+    return { port: address.port, requested };
+  }
+  if (requested === 0) {
+    throw new Error(`No free ephemeral port found on ${host}.`);
   }
   throw new Error(
-    `No free port found between ${requested} and ${requested + MAX_PROBES - 1} on ${host}.`
+    `No free port found between ${requested} and ${Math.min(65535, requested + MAX_PROBES - 1)} on ${host}.`
   );
 }
