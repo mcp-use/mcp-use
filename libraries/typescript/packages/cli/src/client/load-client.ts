@@ -72,17 +72,11 @@ export async function loadClientPackage(
   if (installed !== undefined) return installed;
 
   if (options.allowInstall === false) {
+    // No `nextSteps`: the right install command depends on the project's
+    // package manager, which the CLI cannot reliably tell (see above).
     throw new CommandError(
       "client_install_required",
-      `${CLIENT_PACKAGE} is required for this command.`,
-      {
-        nextSteps: [
-          {
-            description: "Install the optional client SDK",
-            command: `npm install ${CLIENT_PACKAGE}`,
-          },
-        ],
-      }
+      `${CLIENT_PACKAGE} is required for this command. Install it in this project with its package manager.`
     );
   }
 
