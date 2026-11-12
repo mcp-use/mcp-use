@@ -13,6 +13,7 @@
   "changesets": [
     "browser-client-oauth-proxy-fetch",
     "cli-client-import-after-install",
+    "cli-client-install-sandbox",
     "cli-oauth-enter-timeout",
     "client-telemetry-node-localstorage",
     "code-mode-console-logs",
