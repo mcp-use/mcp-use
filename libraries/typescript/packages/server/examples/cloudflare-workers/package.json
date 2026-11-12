@@ -1,0 +1,26 @@
+{
+  "name": "mcp-use-example-cloudflare-workers",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: deploy an mcp-use server on Cloudflare Workers.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "smoke": "node --conditions=workerd smoke.ts",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261109.1",
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.159.0"
+  }
+}

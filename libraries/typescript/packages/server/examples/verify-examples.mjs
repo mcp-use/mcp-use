@@ -112,6 +112,13 @@ async function verifyExample(example) {
   );
 
   await runPackageScript(cwd, packageJson, "typecheck", example.id);
+  if (example.verification === "command") {
+    if (!packageJson.scripts?.[example.script]) {
+      throw new Error(`${example.id} must expose a ${example.script} script.`);
+    }
+    await runPackageScript(cwd, packageJson, example.script, example.id);
+    return;
+  }
   if (example.verification === "configuration") {
     await verifyConfigurationContract(cwd, example, packageJson);
     console.log(`  ↳ live check skipped: ${example.skippedLiveReason}`);
