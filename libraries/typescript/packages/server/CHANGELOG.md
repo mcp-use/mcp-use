@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.12.5-canary.7
+
+### Patch Changes
+
+- Updated dependencies [c8f90f5]
+  - @mcp-use/cli@5.1.1-canary.4
+
 ## 2.12.5-canary.6
 
 ### Patch Changes

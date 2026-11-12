@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 5.1.1-canary.4
+
+### Patch Changes
+
+- c8f90f5: Print a failed tool's error text with `mcp-use screenshot`. Before, the text output said only "Tool <name> returned an error." and the reason was visible only with `--json`. JSON output is unchanged.
+
 ## 5.1.1-canary.3
 
 ### Patch Changes
