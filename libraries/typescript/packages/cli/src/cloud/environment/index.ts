@@ -1,6 +1,7 @@
 import { plain, table } from "../../core/format.js";
 import { readFile } from "node:fs/promises";
 
+import { parseEnvFile } from "../env-file.js";
 import { parseCloudArgs, projectServer, stdinText } from "../options.js";
 import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
@@ -209,22 +210,6 @@ function sensitiveAssignment(positionals: string[], value: string) {
     key: positionals[0]!.replace(/=$/, ""),
     value: value.replace(/\r?\n$/, ""),
   };
-}
-
-/** Parse ordinary dotenv assignments; values remain inside the process. */
-export function parseEnvFile(source: string): { key: string; value: string }[] {
-  return source.split(/\r?\n/).flatMap((line) => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) return [];
-    const item = assignment(trimmed.replace(/^export\s+/, ""));
-    if (
-      (item.value.startsWith('"') && item.value.endsWith('"')) ||
-      (item.value.startsWith("'") && item.value.endsWith("'"))
-    )
-      item.value = item.value.slice(1, -1);
-    else item.value = item.value.replace(/\s+#.*$/, "").trimEnd();
-    return [item];
-  });
 }
 
 type Metadata = {

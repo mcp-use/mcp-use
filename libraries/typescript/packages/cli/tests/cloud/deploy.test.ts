@@ -312,6 +312,49 @@ describe("deploy", () => {
     }
   );
 
+  test("--env-file uploads the values Node loads from the same file", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    await writeFile(
+      join(cli.cwd, ".env.production"),
+      "export API_URL=\"https://api.example.com\" # production\nTOKEN='file-secret'\n"
+    );
+    await repository(cli.cwd);
+    await link(cli.cwd);
+    cloud.on("GET", "/api/v1/servers/srv_1", {
+      body: server({
+        id: "srv_1",
+        connectedRepository: { ...CONNECTED_REPOSITORY },
+      }),
+    });
+    cloud.on("GET", "/api/v1/servers/srv_1/env-variables", { body: [] });
+    cloud.on("POST", "/api/v1/servers/srv_1/env-variables", {
+      body: {
+        ...VARIABLE_METADATA,
+        id: "var_1",
+        key: "KEY",
+        branch: null,
+        environments: ["production"],
+      },
+    });
+    cloud.on("POST", "/api/v1/deployments", { body: { id: "dep_1" } });
+    const result = await cli.run(
+      ["deploy", "--env-file", ".env.production", "--no-wait", "--json"],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(
+      cloud
+        .requestsTo("POST", "/api/v1/servers/srv_1/env-variables")
+        .map((request) => [request.body.key, request.body.value])
+    ).toEqual([
+      ["API_URL", "https://api.example.com"],
+      ["TOKEN", "file-secret"],
+    ]);
+  });
+
   test("--branch deploys a preview without repointing the saved production branch, and rotations preserve sensitive", async ({
     cli,
     cloud,
