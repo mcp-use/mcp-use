@@ -25,6 +25,7 @@ export function validateExternalOptions(values: DeployValues): void {
     );
   const flags = [
     "no-github",
+    "dry-run",
     "branch",
     "root-dir",
     "region",
