@@ -10,7 +10,8 @@ describe("server examples workflow security", () => {
       ),
       "utf8"
     );
-    const lines = workflow.split("\n");
+    // Git for Windows checks files out with CRLF line endings by default.
+    const lines = workflow.split(/\r?\n/);
     const permissionsIndex = lines.indexOf("permissions:");
     const jobsIndex = lines.indexOf("jobs:");
 

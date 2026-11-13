@@ -196,7 +196,7 @@ describe("skill discovery", () => {
     })!;
 
     expect(errors).toEqual(
-      expect.arrayContaining([expect.stringMatching(/shipping\/SKILL\.md/)])
+      expect.arrayContaining([expect.stringMatching(/shipping[\\/]SKILL\.md/)])
     );
     expect(snapshot.skills.map((skill) => skill.frontmatter.name)).toEqual([
       "refunds",
