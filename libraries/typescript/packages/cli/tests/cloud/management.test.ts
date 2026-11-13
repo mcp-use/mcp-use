@@ -294,11 +294,12 @@ test("env push uploads the values Node loads from the same file", async ({
   await writeFile(
     join(cli.cwd, ".env"),
     [
-      'API_URL="https://api.example.com" # production',
+      '\uFEFFAPI_URL="https://api.example.com" # production',
       'PRIVATE_KEY="-----BEGIN KEY-----\\nabc\\n-----END KEY-----"',
       'CERT="line one',
-      'line two"',
+      'AAA=inside the quoted value"',
       "NAME = Weather",
+      "export\tMODE=live",
       "",
     ].join("\n")
   );
@@ -318,8 +319,9 @@ test("env push uploads the values Node loads from the same file", async ({
   ).toEqual([
     ["API_URL", "https://api.example.com"],
     ["PRIVATE_KEY", "-----BEGIN KEY-----\nabc\n-----END KEY-----"],
-    ["CERT", "line one\nline two"],
+    ["CERT", "line one\nAAA=inside the quoted value"],
     ["NAME", "Weather"],
+    ["MODE", "live"],
   ]);
 });
 

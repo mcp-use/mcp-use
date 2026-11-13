@@ -493,7 +493,7 @@ Apply variables from an environment file.
 mcp-use env push <file> [options]
 ```
 
-The file is parsed like Node's `process.loadEnvFile`, which `mcp-use dev` and `mcp-use start` use for `.env`, so each variable gets the value it has locally: quotes and inline comments are removed, `\n` expands inside double quotes, and quoted values can span lines. `deploy --env-file` parses files the same way.
+The file is parsed with the same rules as Node's `process.loadEnvFile`, which `mcp-use dev` and `mcp-use start` use for `.env`: quotes and inline comments are removed, `\n` expands inside double quotes, and quoted values can span lines. Values are taken from the file even when the variable is already set in your shell. `deploy --env-file` parses files the same way.
 
 `--environment production|preview|development` selects scope; `--branch` selects a preview override. Set/push support `--phase runtime|build|both`. Use `env set --help` for passing a secret through stdin with `--sensitive`.
 
