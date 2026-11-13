@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.4.6-canary.4
+
+### Patch Changes
+
+- 620471f: `getViewResourceUri()` and `isViewTool()` now also read the deprecated flat `_meta["ui/resourceUri"]` key, so tools from servers that only send that key are detected as MCP Apps views.
+
 ## 2.4.6-canary.3
 
 ### Patch Changes

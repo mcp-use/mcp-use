@@ -17,6 +17,7 @@
     "cli-oauth-enter-timeout",
     "client-telemetry-node-localstorage",
     "code-mode-console-logs",
+    "inspector-view-legacy-resource-uri",
     "node-bridge-binary-body",
     "project-name-validation",
     "propagated-2bb9878a6487d0bd",
@@ -27,6 +28,7 @@
     "scaffold-reject-unknown-options",
     "screenshot-tool-error-text",
     "server-usage-node-localstorage",
-    "stdio-optional-args"
+    "stdio-optional-args",
+    "view-detection-legacy-resource-uri"
   ]
 }
