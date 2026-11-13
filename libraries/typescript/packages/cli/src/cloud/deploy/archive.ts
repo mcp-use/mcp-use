@@ -1,35 +1,17 @@
 import { createReadStream } from "node:fs";
-import { lstat, opendir, readFile } from "node:fs/promises";
+import { lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { createGzip } from "node:zlib";
-import ignore, { type Ignore } from "ignore";
 import { CommandError } from "../../core/errors.js";
+import {
+  comparePaths,
+  MANUFACT_IGNORE_FILE,
+  selectProjectFiles,
+  type ProjectFile,
+  type ProjectFileSelection,
+} from "./files.js";
 
 const MAX_ARCHIVE_BYTES = 80 * 1024 * 1024;
-const EXCLUDED_DIRECTORIES = new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  "build",
-  ".next",
-  ".turbo",
-  ".vercel",
-  ".cache",
-  ".parcel-cache",
-  ".pytest_cache",
-  ".ruff_cache",
-  ".mypy_cache",
-  "__pycache__",
-  ".venv",
-  "venv",
-  "coverage",
-  ".nyc_output",
-  ".output",
-  "out",
-  "target",
-  ".mcp-use",
-  ".manufact",
-]);
 
 /** Validate the compressed upload size before making a multipart request. */
 export function assertManagedArchiveSize(sizeBytes: number): void {
@@ -42,17 +24,59 @@ export function assertManagedArchiveSize(sizeBytes: number): void {
       maxBytes: MAX_ARCHIVE_BYTES,
       nextSteps: [
         {
-          description: "Exclude large generated files and retry",
-          command: "mcp-use deploy --no-github",
+          description:
+            "List the files the upload includes, then exclude large ones in .manufactignore",
+          command: "mcp-use deploy --dry-run",
         },
       ],
     }
   );
 }
 
-/** Build a compressed source archive while respecting project ignore rules. */
-export async function packProject(projectRoot: string): Promise<Buffer> {
-  const ig = await loadGitIgnore(projectRoot);
+/** Format a byte count for people, e.g. `3.1 MB`. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value.toFixed(1)} ${units[unit]}`;
+}
+
+/**
+ * Describe an upload in a few lines: how much it sends and which files the
+ * built-in exclusions left out.
+ */
+export function describeUpload({ archive, selection }: PackedProject): string {
+  const count = selection.files.length;
+  const lines = [
+    `Uploading ${count} ${count === 1 ? "file" : "files"} (${formatBytes(archive.byteLength)} compressed)`,
+  ];
+  const { sensitive, symlinks } = selection.skipped;
+  if (sensitive.length > 0)
+    lines.push(`Skipped credential files: ${sensitive.join(", ")}`);
+  if (symlinks.length > 0)
+    lines.push(`Skipped symbolic links: ${symlinks.join(", ")}`);
+  return lines.join("\n");
+}
+
+/** A packed upload and the selection it was built from. */
+interface PackedProject {
+  archive: Buffer;
+  selection: ProjectFileSelection;
+}
+
+/** Build a compressed source archive of the files `selectProjectFiles` picks. */
+export async function packProject(projectRoot: string): Promise<PackedProject> {
+  const selection = await selectProjectFiles(projectRoot);
+  if (selection.files.length === 0)
+    throw new CommandError(
+      "nothing_to_upload",
+      `No files to upload from ${projectRoot}. Every file is ignored by Git, ${MANUFACT_IGNORE_FILE}, or the built-in exclusions.`
+    );
   const gzip = createGzip();
   const chunks: Buffer[] = [];
   const collecting = (async () => {
@@ -61,7 +85,7 @@ export async function packProject(projectRoot: string): Promise<Buffer> {
     }
   })();
   try {
-    await addDirectoryToArchive(gzip, projectRoot, "", ig);
+    await addFilesToArchive(gzip, projectRoot, selection.files);
     await writeArchiveChunk(gzip, Buffer.alloc(1024));
     gzip.end();
   } catch (error) {
@@ -70,95 +94,61 @@ export async function packProject(projectRoot: string): Promise<Buffer> {
     throw error;
   }
   await collecting;
-  return Buffer.concat(chunks);
+  return { archive: Buffer.concat(chunks), selection };
 }
 
-async function loadGitIgnore(projectRoot: string): Promise<Ignore | undefined> {
-  try {
-    const gitignorePath = join(projectRoot, ".gitignore");
-    const content = await readFile(gitignorePath, "utf8");
-    return ignore({ ignorecase: false }).add(content);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    return undefined;
-  }
-}
-
-async function addDirectoryToArchive(
+/** Write each file under `app/`, preceded by entries for its directories. */
+async function addFilesToArchive(
   gzip: ReturnType<typeof createGzip>,
   projectRoot: string,
-  relativeDirectory: string,
-  ig?: Ignore
+  files: readonly ProjectFile[]
 ): Promise<void> {
-  const directory = await opendir(
-    relativeDirectory === ""
-      ? projectRoot
-      : join(projectRoot, relativeDirectory)
-  );
-  const entries = [];
-  for await (const entry of directory) entries.push(entry);
-  entries.sort((left, right) => left.name.localeCompare(right.name));
+  const directories = new Set<string>();
+  for (const file of files) {
+    const segments = file.path.split("/");
+    for (let depth = 1; depth < segments.length; depth++)
+      directories.add(segments.slice(0, depth).join("/"));
+  }
+  const entries: Array<{ path: string; file?: ProjectFile }> = [
+    ...[...directories].map((path) => ({ path })),
+    ...files.map((file) => ({ path: file.path, file })),
+  ].sort((left, right) => comparePaths(left.path, right.path));
 
-  for (const entry of entries) {
-    const relativePath =
-      relativeDirectory === ""
-        ? entry.name
-        : join(relativeDirectory, entry.name);
-    if (!shouldArchive(relativePath)) continue;
-    const posixPath = relativePath.replaceAll("\\", "/");
-    if (ig !== undefined) {
-      if (entry.isDirectory() && ig.ignores(`${posixPath}/`)) {
-        continue;
-      }
-      if (entry.isFile() && ig.ignores(posixPath)) {
-        continue;
-      }
-    }
-    const absolutePath = join(projectRoot, relativePath);
-    const stats = await lstat(absolutePath);
-    const archivePath = `app/${posixPath}`;
-    const common = {
-      path: archivePath,
-      mode: stats.mode & 0o777,
-      mtime: Math.floor(stats.mtimeMs / 1000),
-    };
-
-    if (stats.isDirectory()) {
-      await writeTarHeader(gzip, { ...common, type: "directory", size: 0 });
-      await addDirectoryToArchive(gzip, projectRoot, relativePath, ig);
-    } else if (stats.isFile()) {
+  for (const { path, file } of entries) {
+    const absolutePath = join(projectRoot, path);
+    if (file === undefined) {
+      const stats = await lstat(absolutePath);
       await writeTarHeader(gzip, {
-        ...common,
-        type: "file",
-        size: stats.size,
+        path: `app/${path}`,
+        mode: stats.mode & 0o777,
+        mtime: Math.floor(stats.mtimeMs / 1000),
+        type: "directory",
+        size: 0,
       });
-      for await (const chunk of createReadStream(absolutePath)) {
-        await writeArchiveChunk(gzip, chunk as Buffer);
-      }
-      await writeTarPadding(gzip, stats.size);
-    } else if (stats.isSymbolicLink()) {
-      // Managed uploads intentionally omit links. A link can escape the project
-      // root or point back into an excluded secret/dependency directory, and
-      // extraction behavior differs between archive runtimes.
       continue;
     }
+    await writeTarHeader(gzip, {
+      path: `app/${path}`,
+      mode: file.mode,
+      mtime: Math.floor(file.mtimeMs / 1000),
+      type: "file",
+      size: file.size,
+    });
+    let written = 0;
+    for await (const chunk of createReadStream(absolutePath, {
+      end: Math.max(0, file.size - 1),
+    })) {
+      if (file.size === 0) break;
+      written += (chunk as Buffer).length;
+      await writeArchiveChunk(gzip, chunk as Buffer);
+    }
+    if (written !== file.size)
+      throw new CommandError(
+        "source_changed",
+        `${path} changed while it was being packed. Retry the deploy.`
+      );
+    await writeTarPadding(gzip, file.size);
   }
-}
-
-function shouldArchive(relativePath: string): boolean {
-  const segments = relativePath.split(/[/\\]/).filter(Boolean);
-  if (segments.some((segment) => EXCLUDED_DIRECTORIES.has(segment))) {
-    return false;
-  }
-  const filename = segments.at(-1) ?? "";
-  if (
-    filename === ".DS_Store" ||
-    filename === "Thumbs.db" ||
-    filename === "desktop.ini"
-  ) {
-    return false;
-  }
-  return !filename.startsWith(".env");
 }
 
 interface TarEntry {

@@ -9,6 +9,7 @@ import {
   packProject,
   appendArchive,
   assertManagedArchiveSize,
+  describeUpload,
 } from "./archive.js";
 import {
   resolveContainedPath,
@@ -70,9 +71,11 @@ export async function deployUpload(
   if (!(await pathExists(sourceRoot)))
     throw new UsageError(`Project directory not found: ${sourceRoot}`);
   validateSourcePath(sourceRoot, values.dockerfile, "--dockerfile");
-  input.onDeploying();
-  const archive = await packProject(cwd);
+  const packed = await packProject(cwd);
+  const { archive } = packed;
+  if (values.json !== true) process.stderr.write(`${describeUpload(packed)}\n`);
   assertManagedArchiveSize(archive.byteLength);
+  input.onDeploying();
   const branch =
     values.branch ??
     input.linkedServer?.connectedRepository?.productionBranch ??

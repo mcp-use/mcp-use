@@ -11,6 +11,7 @@ import { openBrowser } from "../../core/open-browser.js";
 import { loadEnvironment } from "./env.js";
 import { deployGitHub } from "./github.js";
 import { deployUpload } from "./upload.js";
+import { describeUpload, formatBytes, packProject } from "./archive.js";
 import {
   deployExternal,
   validateExternalOptions,
@@ -28,6 +29,7 @@ Waits until the deployment is running by default. Use --no-wait to return its ID
 Sources:
   GitHub (default)       Deploy the current origin and branch
   --no-github            Upload local source without requiring Git or a framework
+  --dry-run              List the files a local upload would send; no auth or network
   --external-url <url>   Register an existing HTTPS MCP endpoint; verifies MCP first
 
 Options:
@@ -53,8 +55,12 @@ Options:
 
 External URLs support --org, --name, --new, --open and --json. They cannot be
 combined with source, build, or environment options. Local state is stored in
-.manufact/project.json. Uploads omit local credentials, .env files, dependencies,
-build output, caches, and symbolic links.
+.manufact/project.json. Uploads send the files Git would track: every ignore
+rule Git applies is honored, or only the project's .gitignore outside a Git
+repository. A .manufactignore in the project excludes more, and its ! patterns
+bring back Git-ignored files. Uploads always omit .env files, private keys
+(*.pem, *.key, *.p12, *.pfx, id_rsa and other SSH keys), dependencies, build
+output, caches, and symbolic links.
 
 Exit codes: 0 success; 1 operation failed; 2 invalid or missing arguments.`;
 
@@ -80,6 +86,7 @@ function parse(argv: readonly string[]): { values: DeployValues; cwd: string } {
         "watch-paths": { type: "string", multiple: true },
         "wait-for-ci": { type: "boolean" },
         "no-github": { type: "boolean" },
+        "dry-run": { type: "boolean" },
         "external-url": { type: "string" },
         "no-wait": { type: "boolean" },
         new: { type: "boolean" },
@@ -130,6 +137,27 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
   }
   return runCommand(argv, HELP, async (output) => {
     const { values, cwd } = parse(argv);
+    if (values["dry-run"]) {
+      const packed = await packProject(cwd);
+      const { files, skipped } = packed.selection;
+      output.result(
+        {
+          dryRun: true,
+          root: cwd,
+          files: files.map(({ path, size }) => ({ path, size })),
+          fileCount: files.length,
+          totalBytes: files.reduce((sum, file) => sum + file.size, 0),
+          archiveBytes: packed.archive.byteLength,
+          skipped,
+        },
+        [
+          ...files.map((file) => `${file.path}  ${formatBytes(file.size)}`),
+          "",
+          describeUpload(packed).replace(/^Uploading/, "Would upload"),
+        ].join("\n")
+      );
+      return;
+    }
     const env = await loadEnvironment(
       cwd,
       values["env-file"],
