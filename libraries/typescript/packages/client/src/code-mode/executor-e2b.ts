@@ -15,11 +15,13 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
   private codeExecSandbox: Sandbox | null = null;
   private SandboxClass: any = null;
   private timeoutMs: number;
+  private configuredTimeoutMs?: number;
 
   constructor(client: MCPClient, options: E2BExecutorOptions) {
     super(client);
     this.e2bApiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? 300000; // Default: 5 minutes
+    this.configuredTimeoutMs = options.timeoutMs;
   }
 
   /**
@@ -183,9 +185,11 @@ global[${escapedSafeServerName}] = global[${escapedServerName}];
    * Tool calls are proxied back to the host via the bridge pattern.
    *
    * @param code - Code to execute
-   * @param timeout - Execution timeout in milliseconds (default: 30000)
+   * @param timeout - Execution timeout in milliseconds (default: the configured
+   *   `timeoutMs`, or 30000 when none is configured)
    */
-  async execute(code: string, timeout = 30000): Promise<ExecutionResult> {
+  async execute(code: string, timeout?: number): Promise<ExecutionResult> {
+    const effectiveTimeout = timeout ?? this.configuredTimeoutMs ?? 30000;
     const startTime = Date.now();
     let result: any = null;
     let error: string | null = null;
@@ -228,7 +232,7 @@ ${shim}
 
       // Execute the file
       const execution = await sandbox.commands.run(`node ${filename}`, {
-        timeoutMs: timeout,
+        timeoutMs: effectiveTimeout,
         onStdout: async (data: string) => {
           // Check for tool calls
           try {

@@ -203,8 +203,8 @@ export class CodeModeConnector extends BaseConnector {
             },
             timeout: {
               type: "number",
-              description: "Execution timeout in milliseconds",
-              default: 30000,
+              description:
+                "Execution timeout in milliseconds. Omit to use the client's configured timeout.",
             },
           },
           required: ["code"],
@@ -364,7 +364,12 @@ export class CodeModeConnector extends BaseConnector {
 
     if (name === "execute_code") {
       const code = args.code as string;
-      const timeout = (args.timeout as number) || 30000;
+      // Leave the timeout unset when the model omits it, so the executor's
+      // configured timeoutMs applies instead of a hardcoded 30s.
+      const timeout =
+        typeof args.timeout === "number" && args.timeout > 0
+          ? args.timeout
+          : undefined;
 
       // We need to access executeCode on the client
       // Since BaseConnector doesn't know about executeCode, we cast client
