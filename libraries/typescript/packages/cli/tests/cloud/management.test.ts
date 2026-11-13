@@ -286,6 +286,43 @@ test("env push reads a dotenv file and sends every assignment without printing v
   ]);
 });
 
+test("env push uploads the values Node loads from the same file", async ({
+  cloud,
+  cli,
+}) => {
+  signIn(cloud);
+  await writeFile(
+    join(cli.cwd, ".env"),
+    [
+      'API_URL="https://api.example.com" # production',
+      'PRIVATE_KEY="-----BEGIN KEY-----\\nabc\\n-----END KEY-----"',
+      'CERT="line one',
+      'line two"',
+      "NAME = Weather",
+      "",
+    ].join("\n")
+  );
+  cloud.on("GET", "/api/v1/servers/srv_1", { body: server({ id: "srv_1" }) });
+  cloud.on("GET", "/api/v1/servers/srv_1/env-variables", { body: [] });
+  cloud.on("POST", "/api/v1/servers/srv_1/env-variables", { body: variable });
+  const result = await cli.run(
+    ["env", "push", ".env", "--server", "srv_1", "--json"],
+    { env: SIGNED_IN }
+  );
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).not.toContain("BEGIN KEY");
+  expect(
+    cloud
+      .requestsTo("POST", "/api/v1/servers/srv_1/env-variables")
+      .map((request) => [request.body.key, request.body.value])
+  ).toEqual([
+    ["API_URL", "https://api.example.com"],
+    ["PRIVATE_KEY", "-----BEGIN KEY-----\nabc\n-----END KEY-----"],
+    ["CERT", "line one\nline two"],
+    ["NAME", "Weather"],
+  ]);
+});
+
 test("env rm preserves a shared variable in its other environments", async ({
   cloud,
   cli,
