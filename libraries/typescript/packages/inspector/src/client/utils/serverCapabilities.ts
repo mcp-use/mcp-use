@@ -70,12 +70,13 @@ type ServerCapabilitySignals = {
 
 function hasViewToolMeta(meta?: Record<string, unknown>): boolean {
   const uri = meta?.ui;
-  return (
+  const hasNested =
     typeof uri === "object" &&
     uri !== null &&
     "resourceUri" in uri &&
-    typeof (uri as { resourceUri?: unknown }).resourceUri === "string"
-  );
+    typeof (uri as { resourceUri?: unknown }).resourceUri === "string";
+  // Deprecated flat key; MCP Apps hosts must still accept it.
+  return hasNested || typeof meta?.["ui/resourceUri"] === "string";
 }
 
 function hasViewMimeType(mimeType?: string): boolean {
