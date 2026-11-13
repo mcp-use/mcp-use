@@ -39,7 +39,7 @@ export function formatBytes(bytes: number): string {
   const units = ["KB", "MB", "GB"];
   let value = bytes / 1024;
   let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
+  while (Number(value.toFixed(1)) >= 1024 && unit < units.length - 1) {
     value /= 1024;
     unit++;
   }
@@ -55,12 +55,17 @@ export function describeUpload({ archive, selection }: PackedProject): string {
   const lines = [
     `Uploading ${count} ${count === 1 ? "file" : "files"} (${formatBytes(archive.byteLength)} compressed)`,
   ];
+  return [...lines, ...describeSkipped(selection)].join("\n");
+}
+
+function describeSkipped(selection: ProjectFileSelection): string[] {
+  const lines: string[] = [];
   const { sensitive, symlinks } = selection.skipped;
   if (sensitive.length > 0)
     lines.push(`Skipped credential files: ${sensitive.join(", ")}`);
   if (symlinks.length > 0)
     lines.push(`Skipped symbolic links: ${symlinks.join(", ")}`);
-  return lines.join("\n");
+  return lines;
 }
 
 /** A packed upload and the selection it was built from. */
@@ -75,7 +80,19 @@ export async function packProject(projectRoot: string): Promise<PackedProject> {
   if (selection.files.length === 0)
     throw new CommandError(
       "nothing_to_upload",
-      `No files to upload from ${projectRoot}. Every file is ignored by Git, ${MANUFACT_IGNORE_FILE}, or the built-in exclusions.`
+      [
+        `No files to upload from ${projectRoot}. Every file is ignored by Git, ${MANUFACT_IGNORE_FILE}, or the built-in exclusions.`,
+        ...describeSkipped(selection),
+      ].join("\n")
+    );
+  // Bun's archive reader currently stops at non-ASCII paths (even in valid
+  // standard tar archives), silently losing every subsequent source file.
+  // Fail before uploading until the managed backend can read those paths.
+  const unsupported = selection.files.filter((file) => !isAscii(file.path));
+  if (unsupported.length > 0)
+    throw new CommandError(
+      "unsupported_archive_path",
+      `The managed backend cannot currently read non-ASCII archive paths: ${unsupported.map((file) => file.path).join(", ")}. Rename these files or exclude them in ${MANUFACT_IGNORE_FILE} before deploying.`
     );
   const gzip = createGzip();
   const chunks: Buffer[] = [];

@@ -28,6 +28,19 @@ export function validateSourcePath(
   resolveContainedPath(sourceRoot, value, option);
 }
 
+/** Validate the same source settings for dry runs and real local uploads. */
+export async function validateUploadSource(
+  cwd: string,
+  rootDir: string | undefined,
+  dockerfile: string | undefined
+): Promise<string> {
+  const sourceRoot = resolveContainedPath(cwd, rootDir ?? ".", "--root-dir");
+  if (!(await pathExists(sourceRoot)))
+    throw new UsageError(`Project directory not found: ${sourceRoot}`);
+  validateSourcePath(sourceRoot, dockerfile, "--dockerfile");
+  return sourceRoot;
+}
+
 /** Read environment-file assignments followed by explicit overrides. */
 export async function loadEnvironment(
   cwd: string,

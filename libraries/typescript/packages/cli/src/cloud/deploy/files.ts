@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
 import { lstat, opendir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import ignore, { type Ignore } from "ignore";
+import { CommandError } from "../../core/errors.js";
 
 const exec = promisify(execFile);
 
@@ -39,9 +40,8 @@ const EXCLUDED_DIRECTORIES = new Set([
 const EXCLUDED_FILENAMES = new Set([".DS_Store", "Thumbs.db", "desktop.ini"]);
 
 /**
- * Credential files never uploaded, whatever the ignore files say: `.env*`,
- * private keys and certificates, keystores, and SSH keys. Skipped files are
- * reported so a missing file is never a mystery.
+ * Credential filename patterns never uploaded, whatever the ignore files say.
+ * This is a filename denylist, not a scan for arbitrary credential contents.
  */
 const SENSITIVE_FILENAMES = [
   /^\.env/,
@@ -110,10 +110,21 @@ export async function selectProjectFiles(
     files: [],
     skipped: { sensitive: [], symlinks: [] },
   };
+  const skippedLinks = new Set<string>();
+  const checkedDirectories = new Map<string, boolean>();
   for (const path of [...candidates].sort(comparePaths)) {
     const kind = classify(path);
     if (kind === "sensitive") selection.skipped.sensitive.push(path);
     if (kind !== "upload") continue;
+    const linkedParent = await symlinkAncestor(
+      projectRoot,
+      path,
+      checkedDirectories
+    );
+    if (linkedParent !== undefined) {
+      skippedLinks.add(linkedParent);
+      continue;
+    }
     let stats;
     try {
       stats = await lstat(join(projectRoot, path));
@@ -126,7 +137,7 @@ export async function selectProjectFiles(
       // A link can escape the project root or point back into an excluded
       // secret or dependency directory, and archive runtimes extract links
       // differently.
-      selection.skipped.symlinks.push(path);
+      skippedLinks.add(path);
       continue;
     }
     if (!stats.isFile()) continue;
@@ -137,7 +148,29 @@ export async function selectProjectFiles(
       mtimeMs: stats.mtimeMs,
     });
   }
+  selection.skipped.symlinks = [...skippedLinks].sort(comparePaths);
   return selection;
+}
+
+/** lstat on a file still follows links in its parents; check parents first. */
+async function symlinkAncestor(
+  root: string,
+  path: string,
+  checked: Map<string, boolean>
+): Promise<string | undefined> {
+  const segments = path.split("/");
+  for (let depth = 1; depth < segments.length; depth++) {
+    const parent = segments.slice(0, depth).join("/");
+    if (!checked.has(parent)) {
+      try {
+        checked.set(parent, (await lstat(join(root, parent))).isSymbolicLink());
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
+      }
+    }
+    if (checked.get(parent)) return parent;
+  }
 }
 
 /** Order paths byte-wise so each directory precedes its contents. */
@@ -189,11 +222,22 @@ async function listGitFiles(
       ["rev-parse", "--is-inside-work-tree"],
       {
         cwd: projectRoot,
+        env: { ...process.env, LC_ALL: "C" },
       }
     );
     if (stdout.trim() !== "true") return undefined;
-  } catch {
-    return undefined;
+  } catch (error) {
+    const failure = error as NodeJS.ErrnoException & { stderr?: string };
+    if (failure.code === "ENOENT") return undefined;
+    if (
+      failure.stderr?.includes("not a git repository (or any") &&
+      !(await hasGitMetadata(projectRoot))
+    )
+      return undefined;
+    throw new CommandError(
+      "git_error",
+      `Cannot determine Git upload exclusions: ${failure.stderr?.trim() || failure.message}`
+    );
   }
   const listing: Listing = {
     included: [],
@@ -218,8 +262,9 @@ async function listGitFiles(
         continue;
       const nested = await listGitFiles(absolute, withIgnored);
       if (nested === undefined) continue;
-      listing.included.push(...nested.included.map((p) => `${path}/${p}`));
-      listing.ignored.push(...nested.ignored.map((p) => `${path}/${p}`));
+      const prefix = path.replace(/\/$/, "");
+      listing.included.push(...nested.included.map((p) => `${prefix}/${p}`));
+      listing.ignored.push(...nested.ignored.map((p) => `${prefix}/${p}`));
       continue;
     }
     listing.included.push(path);
@@ -227,11 +272,30 @@ async function listGitFiles(
   return listing;
 }
 
+/** A broken repository must not be mistaken for a directory outside Git. */
+async function hasGitMetadata(directory: string): Promise<boolean> {
+  for (let current = resolve(directory); ; current = dirname(current)) {
+    try {
+      await lstat(join(current, ".git"));
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    if (dirname(current) === current) return false;
+  }
+}
+
 async function gitPaths(cwd: string, args: string[]): Promise<string[]> {
-  const { stdout } = await exec("git", ["ls-files", "-z", ...args], {
-    cwd,
-    maxBuffer: 256 * 1024 * 1024,
-  });
+  // Pathspec exclusions prune hard-denied trees before Git enumerates their
+  // contents, including when a .manufactignore negation requests ignored files.
+  const excluded = [...EXCLUDED_DIRECTORIES].map(
+    (directory) => `:(glob,exclude)**/${directory}/**`
+  );
+  const { stdout } = await exec(
+    "git",
+    ["ls-files", "-z", ...args, "--", ".", ...excluded],
+    { cwd, maxBuffer: 256 * 1024 * 1024 }
+  );
   return [...new Set(stdout.split("\0").filter(Boolean))];
 }
 

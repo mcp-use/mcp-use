@@ -8,7 +8,7 @@ import { readProjectLink } from "../project/link-file.js";
 import { runCommand } from "../../core/command.js";
 import { CommandError, UsageError } from "../../core/errors.js";
 import { openBrowser } from "../../core/open-browser.js";
-import { loadEnvironment } from "./env.js";
+import { loadEnvironment, validateUploadSource } from "./env.js";
 import { deployGitHub } from "./github.js";
 import { deployUpload } from "./upload.js";
 import { describeUpload, formatBytes, packProject } from "./archive.js";
@@ -58,9 +58,12 @@ combined with source, build, or environment options. Local state is stored in
 .manufact/project.json. Uploads send the files Git would track: every ignore
 rule Git applies is honored, or only the project's .gitignore outside a Git
 repository. A .manufactignore in the project excludes more, and its ! patterns
-bring back Git-ignored files. Uploads always omit .env files, private keys
-(*.pem, *.key, *.p12, *.pfx, id_rsa and other SSH keys), dependencies, build
-output, caches, and symbolic links.
+bring back Git-ignored files. Uploads always omit .env* files, files ending
+in .pem, .key, .p12 or .pfx, and id_rsa, id_dsa, id_ecdsa or id_ed25519
+(including dot-suffixed variants), dependencies, build output, caches, and
+symbolic links. Credential filtering uses filenames, not file contents.
+Non-ASCII upload paths are currently unsupported by the managed backend;
+rename them or exclude them in .manufactignore.
 
 Exit codes: 0 success; 1 operation failed; 2 invalid or missing arguments.`;
 
@@ -138,6 +141,7 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
   return runCommand(argv, HELP, async (output) => {
     const { values, cwd } = parse(argv);
     if (values["dry-run"]) {
+      await validateUploadSource(cwd, values["root-dir"], values.dockerfile);
       const packed = await packProject(cwd);
       const { files, skipped } = packed.selection;
       output.result(

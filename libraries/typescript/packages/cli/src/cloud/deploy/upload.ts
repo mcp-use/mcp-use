@@ -3,19 +3,14 @@ import { readFile } from "node:fs/promises";
 import { cloudApiUrl } from "../cloud-api.js";
 import { writeProjectLink } from "../project/link-file.js";
 import type { operations } from "../api/generated/types.gen.js";
-import { pathExists } from "../../core/fs.js";
-import { UsageError, CommandError } from "../../core/errors.js";
+import { CommandError } from "../../core/errors.js";
 import {
   packProject,
   appendArchive,
   assertManagedArchiveSize,
   describeUpload,
 } from "./archive.js";
-import {
-  resolveContainedPath,
-  validateSourcePath,
-  syncEnvironment,
-} from "./env.js";
+import { validateUploadSource, syncEnvironment } from "./env.js";
 import { syncServerConfiguration } from "./config.js";
 import { serverCreationTimeout, deploymentStartTimeout } from "./errors.js";
 import type { Cloud, DeployInput, StartedDeployment } from "./types.js";
@@ -63,18 +58,15 @@ export async function deployUpload(
   input: DeployInput
 ): Promise<StartedDeployment> {
   const { cloud, cwd, existing, values, env } = input;
-  const sourceRoot = resolveContainedPath(
+  const sourceRoot = await validateUploadSource(
     cwd,
-    values["root-dir"] ?? ".",
-    "--root-dir"
+    values["root-dir"],
+    values.dockerfile
   );
-  if (!(await pathExists(sourceRoot)))
-    throw new UsageError(`Project directory not found: ${sourceRoot}`);
-  validateSourcePath(sourceRoot, values.dockerfile, "--dockerfile");
   const packed = await packProject(cwd);
   const { archive } = packed;
-  if (values.json !== true) process.stderr.write(`${describeUpload(packed)}\n`);
   assertManagedArchiveSize(archive.byteLength);
+  if (values.json !== true) process.stderr.write(`${describeUpload(packed)}\n`);
   input.onDeploying();
   const branch =
     values.branch ??
