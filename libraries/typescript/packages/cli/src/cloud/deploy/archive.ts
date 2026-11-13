@@ -1,6 +1,6 @@
 import { createReadStream } from "node:fs";
 import { lstat, opendir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { createGzip } from "node:zlib";
 import ignore, { type Ignore } from "ignore";
 import { CommandError } from "../../core/errors.js";
@@ -50,9 +50,21 @@ export function assertManagedArchiveSize(sizeBytes: number): void {
   );
 }
 
-/** Build a compressed source archive while respecting project ignore rules. */
+/** A `.gitignore` and the directory its patterns are relative to. */
+interface IgnoreLevel {
+  directory: string;
+  rules: Ignore;
+}
+
+/**
+ * Build a compressed source archive while respecting project ignore rules.
+ *
+ * Like Git, every `.gitignore` applies to the paths below its directory: the
+ * ones in `projectRoot`'s ancestors up to the enclosing repository root, and
+ * the ones in nested directories. A deeper file overrides a shallower one.
+ */
 export async function packProject(projectRoot: string): Promise<Buffer> {
-  const ig = await loadGitIgnore(projectRoot);
+  const ig = await ancestorIgnoreLevels(projectRoot);
   const gzip = createGzip();
   const chunks: Buffer[] = [];
   const collecting = (async () => {
@@ -73,28 +85,85 @@ export async function packProject(projectRoot: string): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-async function loadGitIgnore(projectRoot: string): Promise<Ignore | undefined> {
+async function loadGitIgnore(
+  directory: string
+): Promise<IgnoreLevel | undefined> {
   try {
-    const gitignorePath = join(projectRoot, ".gitignore");
-    const content = await readFile(gitignorePath, "utf8");
-    return ignore({ ignorecase: false }).add(content);
+    const content = await readFile(join(directory, ".gitignore"), "utf8");
+    return { directory, rules: ignore({ ignorecase: false }).add(content) };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT" && code !== "ENOTDIR") throw error;
     return undefined;
   }
+}
+
+/**
+ * Ignore files from the enclosing repository root down to `projectRoot`.
+ * Outside a repository only `projectRoot`'s own `.gitignore` applies.
+ */
+async function ancestorIgnoreLevels(
+  projectRoot: string
+): Promise<IgnoreLevel[]> {
+  const directories = [resolve(projectRoot)];
+  for (let current = directories[0]!; ; ) {
+    if (await exists(join(current, ".git"))) break;
+    const parent = dirname(current);
+    if (parent === current) {
+      directories.splice(1);
+      break;
+    }
+    directories.push(parent);
+    current = parent;
+  }
+  const levels = [];
+  for (const directory of directories.reverse()) {
+    const level = await loadGitIgnore(directory);
+    if (level) levels.push(level);
+  }
+  return levels;
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether the deepest matching rule ignores `absolutePath`. */
+function isIgnored(
+  levels: readonly IgnoreLevel[],
+  absolutePath: string,
+  isDirectory: boolean
+): boolean {
+  let ignored = false;
+  for (const { directory, rules } of levels) {
+    const path = relative(directory, absolutePath).replaceAll("\\", "/");
+    if (path === "" || path.startsWith("..")) continue;
+    const result = rules.test(isDirectory ? `${path}/` : path);
+    if (result.ignored) ignored = true;
+    else if (result.unignored) ignored = false;
+  }
+  return ignored;
 }
 
 async function addDirectoryToArchive(
   gzip: ReturnType<typeof createGzip>,
   projectRoot: string,
   relativeDirectory: string,
-  ig?: Ignore
+  inherited: readonly IgnoreLevel[]
 ): Promise<void> {
-  const directory = await opendir(
+  const directoryPath =
     relativeDirectory === ""
       ? projectRoot
-      : join(projectRoot, relativeDirectory)
-  );
+      : join(projectRoot, relativeDirectory);
+  const own =
+    relativeDirectory === "" ? undefined : await loadGitIgnore(directoryPath);
+  const ig = own ? [...inherited, own] : inherited;
+  const directory = await opendir(directoryPath);
   const entries = [];
   for await (const entry of directory) entries.push(entry);
   entries.sort((left, right) => left.name.localeCompare(right.name));
@@ -106,15 +175,13 @@ async function addDirectoryToArchive(
         : join(relativeDirectory, entry.name);
     if (!shouldArchive(relativePath)) continue;
     const posixPath = relativePath.replaceAll("\\", "/");
-    if (ig !== undefined) {
-      if (entry.isDirectory() && ig.ignores(`${posixPath}/`)) {
-        continue;
-      }
-      if (entry.isFile() && ig.ignores(posixPath)) {
-        continue;
-      }
-    }
     const absolutePath = join(projectRoot, relativePath);
+    if (
+      (entry.isDirectory() || entry.isFile()) &&
+      isIgnored(ig, absolutePath, entry.isDirectory())
+    ) {
+      continue;
+    }
     const stats = await lstat(absolutePath);
     const archivePath = `app/${posixPath}`;
     const common = {
