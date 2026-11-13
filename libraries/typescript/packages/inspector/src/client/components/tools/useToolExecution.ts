@@ -1,4 +1,8 @@
-import { isOAuthInteractionRequired, type Tool } from "@mcp-use/client/react";
+import {
+  getViewResourceUri,
+  isOAuthInteractionRequired,
+  type Tool,
+} from "@mcp-use/client/react";
 import {
   MCPToolExecutionEvent,
   captureInspectorEvent,
@@ -234,7 +238,7 @@ export function useToolExecution({
 
     const toolMeta = ((selectedTool as any)?._meta ||
       (selectedTool as any)?.metadata) as Record<string, unknown> | undefined;
-    const widgetResourceUri = (toolMeta as any)?.ui?.resourceUri;
+    const widgetResourceUri = getViewResourceUri(toolMeta);
     await executeRequest({
       toolName: selectedTool.name,
       args: payloadToSend,
