@@ -205,6 +205,59 @@ describe("deploy", () => {
     expect(cloud.requestsTo("GET", "/api/v1/deployments/dep_1")).toEqual([]);
   });
 
+  test("--no-github applies repository and nested .gitignore files like Git", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    const app = join(cli.cwd, "apps", "weather");
+    await mkdir(join(app, "secrets"), { recursive: true });
+    await mkdir(join(app, "config"), { recursive: true });
+    await exec("git", ["init", "-q"], { cwd: cli.cwd });
+    await writeFile(
+      join(cli.cwd, ".gitignore"),
+      "*.pem\nsecrets/\n!public.pem\n"
+    );
+    await writeFile(join(app, "weather.py"), "print('weather')\n");
+    await writeFile(join(app, "server-key.pem"), "root-ignored-key\n");
+    await writeFile(join(app, "public.pem"), "root-unignored-cert\n");
+    await writeFile(join(app, "secrets", "token.txt"), "root-ignored-dir\n");
+    await writeFile(join(app, "config", ".gitignore"), "credentials.json\n");
+    await writeFile(
+      join(app, "config", "credentials.json"),
+      "nested-ignored\n"
+    );
+    await writeFile(join(app, "config", "app.json"), "{}\n");
+    cloud.on("POST", "/api/v1/servers", {
+      body: { server: { id: "srv_1", slug: "weather" }, deploymentId: "dep_1" },
+    });
+    const result = await cli.run(
+      [
+        "deploy",
+        "apps/weather",
+        "--no-github",
+        "--name",
+        "weather",
+        "--no-wait",
+        "--json",
+      ],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(0);
+    const request = cloud.requestsTo("POST", "/api/v1/servers")[0]!;
+    const boundary =
+      request.headers["content-type"]!.match(/boundary=(.+)$/)![1]!;
+    const start = request.rawBody.indexOf("\r\n\r\n") + 4;
+    const end = request.rawBody.indexOf(`\r\n--${boundary}`, start);
+    const archive = gunzipSync(request.rawBody.subarray(start, end)).toString();
+    expect(archive).toContain("app/weather.py");
+    expect(archive).toContain("app/config/app.json");
+    expect(archive).toContain("root-unignored-cert");
+    expect(archive).not.toContain("root-ignored-key");
+    expect(archive).not.toContain("root-ignored-dir");
+    expect(archive).not.toContain("nested-ignored");
+  });
+
   test("waits by default through pending to running and emits only the final result", async ({
     cli,
     cloud,
