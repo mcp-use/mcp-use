@@ -3,6 +3,9 @@ import { RESOURCE_MIME_TYPE } from "./ext-apps-bridge.js";
 /**
  * Reads the MCP App resource URI from tool metadata.
  *
+ * Checks the nested `_meta.ui.resourceUri` first, then the deprecated flat
+ * `_meta["ui/resourceUri"]` key, which MCP Apps hosts must still accept.
+ *
  * @param toolMeta - Tool `_meta` object.
  * @returns The declared view resource URI, or `null` when none is declared.
  */
@@ -18,7 +21,8 @@ export function getViewResourceUri(
   ) {
     return (uri as { resourceUri: string }).resourceUri;
   }
-  return null;
+  const legacy = toolMeta?.["ui/resourceUri"];
+  return typeof legacy === "string" ? legacy : null;
 }
 
 /**
