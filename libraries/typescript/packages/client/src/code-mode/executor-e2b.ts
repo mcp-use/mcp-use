@@ -98,8 +98,10 @@ global.__callMcpTool = async (server, tool, args) => {
     throw new Error('Tool execution timed out');
 };
 
-// Global search_tools helper
-global.search_tools = async (query, detailLevel = 'full') => {
+// Global search_tools helper. Mirrors BaseCodeExecutor.createSearchToolsFunction:
+// same query fields (name, description, server) and the same
+// { meta, results } shape, so a snippet written for one executor runs on the other.
+global.search_tools = async (query = '', detailLevel = 'full') => {
     const allTools = ${JSON.stringify(
       Object.entries(tools).flatMap(([server, serverTools]) =>
         serverTools.map((tool) => ({
@@ -110,20 +112,32 @@ global.search_tools = async (query, detailLevel = 'full') => {
         }))
       )
     )};
-    
+
+    // Search the full records, then project: the detail level controls which
+    // fields are returned, not which tools match. This is the order the E2B
+    // shim already used, and the one #2728 applies to the VM executor.
+    const q = query.toLowerCase();
     const filtered = allTools.filter(tool => {
         if (!query) return true;
-        const q = query.toLowerCase();
-        return tool.name.toLowerCase().includes(q) || 
-               (tool.description && tool.description.toLowerCase().includes(q));
+        return tool.name.toLowerCase().includes(q) ||
+               (tool.description && tool.description.toLowerCase().includes(q)) ||
+               tool.server.toLowerCase().includes(q);
     });
-    
-    if (detailLevel === 'names') {
-        return filtered.map(t => ({ name: t.name, server: t.server }));
-    } else if (detailLevel === 'descriptions') {
-        return filtered.map(t => ({ name: t.name, server: t.server, description: t.description }));
-    }
-    return filtered;
+
+    const results = detailLevel === 'names'
+        ? filtered.map(t => ({ name: t.name, server: t.server }))
+        : detailLevel === 'descriptions'
+        ? filtered.map(t => ({ name: t.name, server: t.server, description: t.description }))
+        : filtered;
+
+    return {
+        meta: {
+            total_tools: allTools.length,
+            namespaces: Array.from(new Set(allTools.map(t => t.server))).sort(),
+            result_count: results.length,
+        },
+        results,
+    };
 };
 `;
 
