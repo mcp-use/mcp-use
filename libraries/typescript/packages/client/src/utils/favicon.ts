@@ -37,7 +37,8 @@ function subdomainLevels(hostname: string): string[] {
   );
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
+/** Read a blob as a base64 data URL. */
+export function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);
