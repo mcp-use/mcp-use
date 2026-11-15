@@ -348,7 +348,10 @@ describe("deploy", () => {
     expect(
       cloud
         .requestsTo("POST", "/api/v1/servers/srv_1/env-variables")
-        .map((request) => [request.body.key, request.body.value])
+        .map((request) => {
+          const body = request.body as { key: string; value: string };
+          return [body.key, body.value];
+        })
     ).toEqual([
       ["API_URL", "https://api.example.com"],
       ["TOKEN", "file-secret"],

@@ -286,7 +286,7 @@ test("env push reads a dotenv file and sends every assignment without printing v
   ]);
 });
 
-test("env push uploads the values Node loads from the same file", async ({
+test("env push parses quotes, escapes, and multi-line values like Node, and tolerates a BOM and export tabs", async ({
   cloud,
   cli,
 }) => {
@@ -297,7 +297,8 @@ test("env push uploads the values Node loads from the same file", async ({
       '\uFEFFAPI_URL="https://api.example.com" # production',
       'PRIVATE_KEY="-----BEGIN KEY-----\\nabc\\n-----END KEY-----"',
       'CERT="line one',
-      'AAA=inside the quoted value"',
+      "AAA=inside the quoted value",
+      'export\tKEEP=tab inside the quoted value"',
       "NAME = Weather",
       "export\tMODE=live",
       "",
@@ -315,11 +316,17 @@ test("env push uploads the values Node loads from the same file", async ({
   expect(
     cloud
       .requestsTo("POST", "/api/v1/servers/srv_1/env-variables")
-      .map((request) => [request.body.key, request.body.value])
+      .map((request) => {
+        const body = request.body as { key: string; value: string };
+        return [body.key, body.value];
+      })
   ).toEqual([
     ["API_URL", "https://api.example.com"],
     ["PRIVATE_KEY", "-----BEGIN KEY-----\nabc\n-----END KEY-----"],
-    ["CERT", "line one\nAAA=inside the quoted value"],
+    [
+      "CERT",
+      "line one\nAAA=inside the quoted value\nexport\tKEEP=tab inside the quoted value",
+    ],
     ["NAME", "Weather"],
     ["MODE", "live"],
   ]);
