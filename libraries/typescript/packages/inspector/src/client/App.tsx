@@ -25,6 +25,7 @@ import {
   InspectorConnectionStorageProvider,
 } from "./utils/connectionUpdates";
 import { wrapTransportForLegacySampling } from "./utils/samplingProtocol";
+import { getInspectorClientMetadataUrl } from "../shared/oauth-metadata";
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -81,6 +82,7 @@ function App() {
   // `/mcp/inspector`; root-mount `/inspector`). Derived at runtime from
   // `window.__MCP_BASE_PATH__` so a single prebuilt bundle serves any basePath.
   const inspectorBase = getInspectorBase();
+  const callbackUrl = `${window.location.origin}${inspectorBase}/oauth/callback`;
   const isOAuthCallback =
     window.location.pathname.replace(/\/+$/, "") ===
     `${inspectorBase}/oauth/callback`;
@@ -132,7 +134,10 @@ function App() {
           <McpClientProvider
             storageProvider={storageProvider}
             enableRpcLogging={true}
-            defaultCallbackUrl={`${window.location.origin}${inspectorBase}/oauth/callback`}
+            defaultCallbackUrl={callbackUrl}
+            defaultOAuthClientMetadataUrl={getInspectorClientMetadataUrl(
+              callbackUrl
+            )}
             defaultOAuthProxyUrl={oauthProxyUrl}
             defaultAutoProxyFallback={
               proxyAddress ? { enabled: true, proxyAddress } : false
