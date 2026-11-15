@@ -222,11 +222,16 @@ describe("deploy", () => {
     await writeFile(join(app, "server-key.pem"), "root-ignored-key\n");
     await writeFile(join(app, "public.pem"), "root-unignored-cert\n");
     await writeFile(join(app, "secrets", "token.txt"), "root-ignored-dir\n");
-    await writeFile(join(app, "config", ".gitignore"), "credentials.json\n");
+    await writeFile(
+      join(app, "config", ".gitignore"),
+      "credentials.json\n..cache\n!cert.pem\n"
+    );
     await writeFile(
       join(app, "config", "credentials.json"),
       "nested-ignored\n"
     );
+    await writeFile(join(app, "config", "..cache"), "dot-dot-name-ignored\n");
+    await writeFile(join(app, "config", "cert.pem"), "nested-unignored-cert\n");
     await writeFile(join(app, "config", "app.json"), "{}\n");
     cloud.on("POST", "/api/v1/servers", {
       body: { server: { id: "srv_1", slug: "weather" }, deploymentId: "dep_1" },
@@ -253,6 +258,8 @@ describe("deploy", () => {
     expect(archive).toContain("app/weather.py");
     expect(archive).toContain("app/config/app.json");
     expect(archive).toContain("root-unignored-cert");
+    expect(archive).toContain("nested-unignored-cert");
+    expect(archive).not.toContain("dot-dot-name-ignored");
     expect(archive).not.toContain("root-ignored-key");
     expect(archive).not.toContain("root-ignored-dir");
     expect(archive).not.toContain("nested-ignored");

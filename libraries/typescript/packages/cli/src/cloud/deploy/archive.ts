@@ -142,7 +142,7 @@ function isIgnored(
   let ignored = false;
   for (const { directory, rules } of levels) {
     const path = relative(directory, absolutePath).replaceAll("\\", "/");
-    if (path === "" || path.startsWith("..")) continue;
+    if (path === "" || path === ".." || path.startsWith("../")) continue;
     const result = rules.test(isDirectory ? `${path}/` : path);
     if (result.ignored) ignored = true;
     else if (result.unignored) ignored = false;
