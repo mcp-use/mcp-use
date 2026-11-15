@@ -108,7 +108,22 @@ async function supersedingDeployment(
   const list = await cloud.call(
     cloud.client.GET("/api/v1/deployments", {
       params: { query: { serverId: stopped.serverId, limit: 10 } },
-    })
+    }),
+    {
+      timeout: {
+        message: `Cloud timed out while checking whether a newer deployment replaced ${stopped.id}. A deployment of this commit may still be running.`,
+        nextSteps: [
+          {
+            description: "List the server's deployments",
+            command: `mcp-use deployments list --server ${stopped.serverId} --json`,
+          },
+          {
+            description: "Inspect build logs",
+            command: `mcp-use logs ${stopped.id} --build --json`,
+          },
+        ],
+      },
+    }
   );
   const stoppedAt = Date.parse(stopped.createdAt);
   return list.items
