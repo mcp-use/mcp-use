@@ -10,6 +10,23 @@ export interface KVStore {
   set(key: string, value: string): Promise<void> | void;
   remove(key: string): Promise<void> | void;
   keys(): Promise<string[]> | string[];
+  /**
+   * True when `keys()` lists `fileSafeKey` names rather than the keys that
+   * were set, as `FileKVStore` does.
+   *
+   * @internal
+   */
+  readonly listsFileSafeKeys?: boolean;
+}
+
+/**
+ * File name `FileKVStore` uses for `key`. Its `keys()` lists these names, so
+ * callers that match listed keys by prefix must compare this form too.
+ *
+ * @internal
+ */
+export function fileSafeKey(key: string): string {
+  return key.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 type EncryptedEnvelope = {
