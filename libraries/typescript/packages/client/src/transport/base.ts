@@ -1,3 +1,4 @@
+import { ProtocolError } from "@modelcontextprotocol/client";
 import type {
   CallToolResult,
   Client,
@@ -141,6 +142,7 @@ export abstract class BaseConnector {
   protected client: Client | null = null;
   protected connectionManager: ConnectionManager<any> | null = null;
   protected toolsCache: Tool[] | null = null;
+  private toolsCacheNotificationGeneration = 0;
   protected capabilitiesCache: Record<string, unknown> | null = null;
   protected serverInfoCache: MCPServerInfo | null = null;
   protected authorizationCache: MCPAuthorizationInfo | undefined;
@@ -223,6 +225,7 @@ export abstract class BaseConnector {
       return;
     }
     if (method === "notifications/tools/list_changed" && tools) {
+      this.toolsCacheNotificationGeneration++;
       this.toolsCache = [...tools];
     }
     await this.forwardNotification({ method } as Notification);
@@ -293,6 +296,7 @@ export abstract class BaseConnector {
         "[Auto] Refreshing tools cache due to list_changed notification"
       );
       const result = await this.client.listTools();
+      this.toolsCacheNotificationGeneration++;
       this.toolsCache = (result.tools ?? []) as Tool[];
       logger.debug(
         `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
@@ -639,7 +643,7 @@ export abstract class BaseConnector {
   }
 
   /**
-   * Returns the tool list cached during initialization.
+   * Returns the tool list cached during initialization or the latest discovery.
    *
    * @throws When {@link BaseConnector.initialize} has not completed.
    */
@@ -697,12 +701,13 @@ export abstract class BaseConnector {
     if (!this.client) {
       throw new Error("MCP client is not connected");
     }
+    const client = this.client;
 
     // If resetTimeoutOnProgress is enabled but no onprogress callback is provided,
     // add a no-op callback to trigger the SDK to add progressToken to the request.
     // The SDK only adds progressToken when onprogress is present, which is required
     // for the server to send progress notifications that reset the timeout.
-    let enhancedOptions = options ? { ...options } : undefined;
+    const enhancedOptions = options ? { ...options } : undefined;
     if (
       enhancedOptions?.resetTimeoutOnProgress &&
       !enhancedOptions.onprogress
@@ -716,33 +721,60 @@ export abstract class BaseConnector {
       );
     }
 
-    // The SDK mirrors x-mcp-header parameters as Mcp-Param-* headers itself,
-    // except in browsers. Fill that gap from the cached tool definition so a
-    // server that requires the header accepts calls from browser clients.
-    if (this.protocolEra === "modern" && !sdkMirrorsMcpParamHeaders()) {
-      const tool = this.toolsCache?.find((t) => t.name === name);
-      const paramHeaders = tool
-        ? buildMcpParamHeaders(tool.inputSchema, args)
-        : {};
-      if (Object.keys(paramHeaders).length > 0) {
-        enhancedOptions = {
-          ...enhancedOptions,
-          headers: { ...enhancedOptions?.headers, ...paramHeaders },
-        };
+    const mirrorHeaders =
+      this.protocolEra === "modern" && !sdkMirrorsMcpParamHeaders();
+    const send = () => {
+      // Rebuild from caller options on each attempt so renamed or removed
+      // schema annotations cannot leave stale generated headers behind.
+      let requestOptions = enhancedOptions;
+      if (mirrorHeaders) {
+        const tool = this.toolsCache?.find((t) => t.name === name);
+        const paramHeaders = tool
+          ? buildMcpParamHeaders(tool.inputSchema, args)
+          : {};
+        if (Object.keys(paramHeaders).length > 0) {
+          requestOptions = {
+            ...enhancedOptions,
+            headers: { ...enhancedOptions?.headers, ...paramHeaders },
+          };
+        }
       }
-    }
+      return this.executeRequest(() =>
+        client.callTool({ name, arguments: args }, requestOptions)
+      );
+    };
 
     logger.debug(`Calling tool '${name}' with args`, args);
-    const res = await this.executeRequest(() =>
-      this.client!.callTool({ name, arguments: args }, enhancedOptions)
-    );
+    let res: CallToolResult;
+    try {
+      res = await send();
+    } catch (error) {
+      // SEP-2243 HEADER_MISMATCH is rejected before tool execution. Match the
+      // SDK's Node recovery, which is disabled in browser runtimes.
+      if (
+        !mirrorHeaders ||
+        !(error instanceof ProtocolError) ||
+        error.code !== -32020 ||
+        this.client !== client
+      ) {
+        throw error;
+      }
+      await this.listTools({
+        headers: options?.headers,
+        signal: options?.signal,
+        timeout: options?.timeout,
+        maxTotalTimeout: options?.maxTotalTimeout,
+      });
+      if (this.client !== client) throw error;
+      res = await send();
+    }
     logger.debug(`Tool '${name}' returned`, res);
-    return res as CallToolResult;
+    return res;
   }
 
   /**
    * List all available tools from the MCP server.
-   * This method fetches fresh tools from the server, unlike the `tools` getter which returns cached tools.
+   * Fetches fresh tools from the server and updates the `tools` cache.
    *
    * @param options - Optional request options
    * @returns Array of available tools
@@ -751,12 +783,22 @@ export abstract class BaseConnector {
     if (!this.client) {
       throw new Error("MCP client is not connected");
     }
+    const client = this.client;
     logger.debug("[listTools] Fetching fresh tools from server...");
+    const notificationGeneration = this.toolsCacheNotificationGeneration;
     const result = await this.executeRequest(() =>
-      this.client!.listTools(undefined, options)
+      client.listTools(undefined, { ...options, cacheMode: "refresh" })
     );
     // Create a new array to ensure React detects the change (avoid reference equality issues)
     const tools = result.tools ? [...result.tools] : [];
+    // A notification may have already published newer schemas while this
+    // request was in flight. Do not overwrite them with an older response.
+    if (
+      this.client === client &&
+      notificationGeneration === this.toolsCacheNotificationGeneration
+    ) {
+      this.toolsCache = [...tools];
+    }
     logger.debug(
       `[listTools] Returned ${tools.length} tools:`,
       tools.map((t) => t.name)
