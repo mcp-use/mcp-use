@@ -45,8 +45,14 @@ The standard list-change method names are:
 - `notifications/resources/list_changed`
 - `notifications/prompts/list_changed`
 
-The client automatically refreshes its tool cache for tool list changes. Refresh
-resources or prompts when your application needs their updated values.
+The client automatically refreshes its tool cache for tool list changes, so
+calling `listTools()` in a handler is optional. It is useful when the handler
+needs the returned definitions directly. Explicit `listTools()` calls and
+notification refreshes fetch from the server instead of serving SDK-cached
+responses; older in-flight discoveries cannot overwrite newer results or
+repopulate a disconnected connection's cache. See
+[Tool discovery and caching](/typescript/client/tools#tool-discovery-and-caching).
+Refresh resources or prompts when your application needs their updated values.
 
 ## React
 

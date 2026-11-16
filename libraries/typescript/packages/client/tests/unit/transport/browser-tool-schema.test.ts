@@ -9,7 +9,13 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { HttpConnector } from "../../../src/transport/http.js";
 import { deferred } from "../../helpers/deferred.js";
 
-async function fixture(responseCacheStore?: ResponseCacheStore) {
+async function fixture(
+  responseCacheStore?: ResponseCacheStore,
+  {
+    fallbackNotifications = false,
+    initialize = true,
+  }: { fallbackNotifications?: boolean; initialize?: boolean } = {}
+) {
   vi.stubGlobal("window", {});
   vi.stubGlobal("document", {});
   const state = {
@@ -22,6 +28,7 @@ async function fixture(responseCacheStore?: ResponseCacheStore) {
     lists: 0,
     callErrors: [] as number[],
     listError: undefined as number | undefined,
+    outputSchema: false,
     beforeList: undefined as (() => Promise<void>) | undefined,
     notifyToolsChanged: undefined as (() => void) | undefined,
   };
@@ -67,7 +74,10 @@ async function fixture(responseCacheStore?: ResponseCacheStore) {
     if (message.method === "server/discover") {
       reply({
         supportedVersions: ["2026-07-28"],
-        capabilities: { tools: { listChanged: true } },
+        capabilities: {
+          tools: { listChanged: !fallbackNotifications },
+          ...(fallbackNotifications && { resources: { listChanged: true } }),
+        },
         _meta: {
           "io.modelcontextprotocol/serverInfo": {
             name: "rotating-header",
@@ -96,16 +106,24 @@ async function fixture(responseCacheStore?: ResponseCacheStore) {
     } else if (message.method === "tools/list") {
       state.lists++;
       const header = state.header;
+      const listError = state.listError;
       if (state.beforeList) {
         await Promise.race([state.beforeList(), release.promise]);
       }
-      if (state.listError !== undefined) return fail(state.listError);
+      if (listError !== undefined) return fail(listError);
       reply({
         ttlMs: 60000,
         cacheScope: "private",
         tools: [
           {
             name: "write",
+            ...(state.outputSchema && {
+              outputSchema: {
+                type: "object",
+                required: ["version"],
+                properties: { version: { const: header } },
+              },
+            }),
             inputSchema: {
               type: "object",
               required: ["value"],
@@ -137,7 +155,10 @@ async function fixture(responseCacheStore?: ResponseCacheStore) {
       )
         return fail(-32020);
       state.executions++;
-      reply({ content: [{ type: "text", text: "written" }] });
+      reply({
+        content: [{ type: "text", text: "written" }],
+        structuredContent: { version: state.header },
+      });
     } else {
       fail(-32601);
     }
@@ -171,9 +192,11 @@ async function fixture(responseCacheStore?: ResponseCacheStore) {
     }
   });
   await connector.connect();
-  await connector.initialize();
-  await connector.callTool("write", { value: "initial" });
-  expect(state.executions).toBe(1);
+  if (initialize) {
+    await connector.initialize();
+    await connector.callTool("write", { value: "initial" });
+    expect(state.executions).toBe(1);
+  }
   state.executions = 0;
   state.calls.length = 0;
   state.lists = 0;
@@ -411,6 +434,213 @@ describe("browser tool schema recovery over HTTP", () => {
       },
     ]);
     expect(state.lists).toBe(2);
+    expect(state.executions).toBe(1);
+  });
+
+  it.each([
+    ["explicit", "explicit"],
+    ["notification", "explicit"],
+    ["notification", "notification"],
+  ])(
+    "keeps the newer %s/%s discovery when the older request completes last",
+    async (older, newer) => {
+      const { connector, state } = await fixture();
+      state.outputSchema = true;
+      const started = deferred();
+      const gate = deferred();
+      const notifications = [deferred(), deferred()];
+      let completed = 0;
+      connector.onNotification(() => notifications[completed++]?.resolve());
+      state.beforeList = () => {
+        state.beforeList = undefined;
+        started.resolve();
+        return gate.promise;
+      };
+      const oldDiscovery =
+        older === "explicit"
+          ? connector.listTools()
+          : (state.notifyToolsChanged!(), undefined);
+      await started.promise;
+      state.header = "New";
+      if (newer === "explicit") await connector.listTools();
+      else {
+        state.notifyToolsChanged!();
+        await notifications[0].promise;
+      }
+      gate.resolve();
+      if (oldDiscovery) await oldDiscovery;
+      else await notifications[newer === "notification" ? 1 : 0].promise;
+      expect(connector.tools[0].inputSchema.properties).toEqual({
+        value: { type: "string", "x-mcp-header": "New" },
+      });
+      await connector.callTool("write", { value: "current" });
+      expect(state.calls).toEqual([
+        {
+          headers: { "mcp-param-new": "current" },
+          args: { value: "current" },
+        },
+      ]);
+      expect(state.lists).toBe(2);
+      expect(state.executions).toBe(1);
+    }
+  );
+
+  it("does not publish a notification refresh from a disconnected client", async () => {
+    const memory = new InMemoryResponseCacheStore();
+    const started = deferred();
+    const gate = deferred();
+    const notified = deferred();
+    onTestFinished(() => gate.resolve());
+    let pauseWrite = false;
+    const store: ResponseCacheStore = {
+      get: (key) => memory.get(key),
+      delete: (key) => memory.delete(key),
+      evict: (method) => memory.evict(method),
+      clear: () => memory.clear(),
+      set: async (key, entry) => {
+        const stamp = memory.set(key, entry);
+        if (pauseWrite && key.method === "tools/list") {
+          pauseWrite = false;
+          started.resolve();
+          await gate.promise;
+        }
+        return stamp;
+      },
+    };
+    const { connector, state } = await fixture(store);
+    connector.onNotification(() => notified.resolve());
+    state.header = "Retired";
+    pauseWrite = true;
+    state.notifyToolsChanged!();
+    await started.promise;
+    await connector.disconnect();
+    state.header = "Current";
+    await connector.connect();
+    await connector.listTools();
+    gate.resolve();
+    await notified.promise;
+    expect(connector.tools[0].inputSchema.properties).toEqual({
+      value: { type: "string", "x-mcp-header": "Current" },
+    });
+    await connector.callTool("write", { value: "current" });
+    expect(state.calls).toEqual([
+      {
+        headers: { "mcp-param-current": "current" },
+        args: { value: "current" },
+      },
+    ]);
+    expect(state.lists).toBe(2);
+  });
+
+  it("refreshes fallback notifications without waiting for SDK cache eviction", async () => {
+    const memory = new InMemoryResponseCacheStore();
+    const gate = deferred();
+    const notified = deferred();
+    onTestFinished(() => gate.resolve());
+    const store: ResponseCacheStore = {
+      get: (key) => memory.get(key),
+      set: (key, entry) => memory.set(key, entry),
+      delete: async (key) => {
+        await gate.promise;
+        return memory.delete(key);
+      },
+      evict: async (method) => {
+        await gate.promise;
+        return memory.evict(method);
+      },
+      clear: () => memory.clear(),
+    };
+    const { connector, state } = await fixture(store, {
+      fallbackNotifications: true,
+    });
+    connector.onNotification(() => notified.resolve());
+    state.header = "New";
+    state.notifyToolsChanged!();
+    await notified.promise;
+    expect(connector.tools[0].inputSchema.properties).toEqual({
+      value: { type: "string", "x-mcp-header": "New" },
+    });
+    expect(state.lists).toBe(1);
+    await connector.callTool("write", { value: "notified" });
+    expect(state.calls).toEqual([
+      {
+        headers: { "mcp-param-new": "notified" },
+        args: { value: "notified" },
+      },
+    ]);
+  });
+
+  it.each([undefined, -32603])(
+    "keeps a notified schema when initialization finishes with %s",
+    async (listError) => {
+      const { connector, state } = await fixture(undefined, {
+        initialize: false,
+      });
+      const started = deferred();
+      const gate = deferred();
+      const notified = deferred();
+      connector.onNotification(() => notified.resolve());
+      state.listError = listError;
+      state.beforeList = () => {
+        state.beforeList = undefined;
+        started.resolve();
+        return gate.promise;
+      };
+      const initialization = connector.initialize();
+      await started.promise;
+      state.header = "New";
+      state.listError = undefined;
+      state.notifyToolsChanged!();
+      await notified.promise;
+      gate.resolve();
+      await initialization;
+      expect(connector.tools[0]?.inputSchema.properties).toEqual({
+        value: { type: "string", "x-mcp-header": "New" },
+      });
+      await connector.callTool("write", { value: "initialized" });
+      expect(state.calls).toEqual([
+        {
+          headers: { "mcp-param-new": "initialized" },
+          args: { value: "initialized" },
+        },
+      ]);
+      expect(state.lists).toBe(2);
+      expect(state.executions).toBe(1);
+    }
+  );
+
+  it("finishes initialization with an empty cache when the newer notification refresh fails", async () => {
+    const { connector, state } = await fixture(undefined, {
+      initialize: false,
+    });
+    const started = deferred();
+    const gate = deferred();
+    const notified = deferred();
+    connector.onNotification(() => notified.resolve());
+    state.beforeList = () => {
+      state.beforeList = undefined;
+      started.resolve();
+      return gate.promise;
+    };
+    const initialization = connector.initialize();
+    await started.promise;
+    state.header = "New";
+    state.listError = -32603;
+    state.notifyToolsChanged!();
+    await notified.promise;
+    gate.resolve();
+    await initialization;
+    expect(connector.tools).toEqual([]);
+    state.listError = undefined;
+    await connector.listTools();
+    await connector.callTool("write", { value: "recovered" });
+    expect(state.calls).toEqual([
+      {
+        headers: { "mcp-param-new": "recovered" },
+        args: { value: "recovered" },
+      },
+    ]);
+    expect(state.lists).toBe(3);
     expect(state.executions).toBe(1);
   });
 });

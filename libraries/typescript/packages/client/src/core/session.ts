@@ -315,6 +315,8 @@ export class MCPConnection {
 
   /**
    * Get the cached list of tools from the server.
+   * Updated by initialization, tool discovery, and tool-list notifications.
+   * Reading this property does not send a request.
    *
    * @returns Array of available tools
    *
@@ -330,7 +332,10 @@ export class MCPConnection {
 
   /**
    * List all available tools from the MCP server.
-   * This method fetches fresh tools from the server, unlike the `tools` getter which returns cached tools.
+   * Fetches fresh definitions and updates the `tools` cache, including empty
+   * results. An older discovery cannot overwrite a newer discovery or
+   * notification, and a disconnected client cannot update its replacement's
+   * cache. Each call returns its own response even when it is superseded.
    *
    * @param options - Optional request options
    * @returns Array of available tools
@@ -437,6 +442,9 @@ export class MCPConnection {
 
   /**
    * Call a tool on the server.
+   * On modern browser connections, a parameter-header mismatch (-32020)
+   * triggers fresh tool discovery and one retry with rebuilt headers. Other
+   * errors propagate, and changing the connection stops recovery.
    *
    * @param name - Name of the tool to call
    * @param args - Arguments to pass to the tool (defaults to empty object)

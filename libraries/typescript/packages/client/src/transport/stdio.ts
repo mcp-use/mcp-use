@@ -136,12 +136,12 @@ export class StdioConnector extends BaseConnector {
         },
         listChanged: {
           tools: {
-            autoRefresh: true,
-            onChanged: (error, tools) =>
+            autoRefresh: false,
+            onChanged: (error) =>
               void this.handleListChanged(
                 "notifications/tools/list_changed",
                 error,
-                tools
+                client
               ),
           },
           resources: {
@@ -173,7 +173,8 @@ export class StdioConnector extends BaseConnector {
             : {}),
         },
       };
-      this.client = new Client(this.clientInfo, clientOptions);
+      const client = new Client(this.clientInfo, clientOptions);
+      this.client = client;
 
       // Register inbound handlers BEFORE connect() so they are available for the
       // entire connection lifetime (including reverse RPC during/after initialize).

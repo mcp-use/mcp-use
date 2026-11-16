@@ -35,6 +35,29 @@ try {
 }
 ```
 
+## Tool discovery and caching
+
+`conn.tools` reads the cached definitions without sending a request. Call
+`await conn.listTools()` to fetch fresh definitions and update that cache,
+including when the server returns an empty list. If discoveries overlap, an
+older request cannot overwrite a newer discovery or a tool-list notification.
+Results from a connection that has since disconnected cannot update the cache
+of its replacement. Each call still returns the definitions from its own
+response.
+
+The client also refreshes tools automatically when the server sends a
+[`notifications/tools/list_changed` notification](/typescript/client/notifications).
+
+For modern MCP connections in a browser, `callTool()` uses the cached schema to
+generate `Mcp-Param-*` headers from `x-mcp-header` annotations and validate the
+tool's output. If the server rejects those headers with `ProtocolError(-32020)`
+before executing the tool, the client refreshes discovery and retries once with
+headers rebuilt from the new schema. Discovery preserves caller-supplied headers,
+the cancellation signal, and timeout settings; generated `Mcp-Param-*` headers
+on the tool call take precedence over caller-supplied headers with the same name.
+Other errors, failed discovery, and a second header mismatch propagate to the
+caller; changing the connection also stops recovery.
+
 ## Timeouts
 
 Pass MCP request options as the third argument:

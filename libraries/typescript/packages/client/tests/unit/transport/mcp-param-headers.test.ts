@@ -164,7 +164,9 @@ describe("BaseConnector.callTool x-mcp-header mirroring", () => {
 
     expect(callTool).toHaveBeenCalledWith(
       { name: "test_custom_header", arguments: { value: "conformance-e2e" } },
-      { headers: { "Mcp-Param-Conformance-Value": "conformance-e2e" } }
+      expect.objectContaining({
+        headers: { "Mcp-Param-Conformance-Value": "conformance-e2e" },
+      })
     );
   });
 
@@ -178,7 +180,7 @@ describe("BaseConnector.callTool x-mcp-header mirroring", () => {
       { timeout: 5000, headers: { "X-Trace": "abc" } }
     );
 
-    expect(callTool.mock.calls[0][1]).toEqual({
+    expect(callTool.mock.calls[0][1]).toMatchObject({
       timeout: 5000,
       headers: { "X-Trace": "abc", "Mcp-Param-Conformance-Value": "v" },
     });
@@ -201,14 +203,14 @@ describe("BaseConnector.callTool x-mcp-header mirroring", () => {
     expect(callTool.mock.calls[0][1]).toBeUndefined();
   });
 
-  it("leaves options untouched for tools without annotations or not in the cache", async () => {
+  it("adds no headers for tools without annotations or not in the cache", async () => {
     stubBrowser();
     const { connector, callTool } = connectorWithClient("modern");
 
     await connector.callTool("plain", {});
     await connector.callTool("unknown_tool", { value: "v" });
 
-    expect(callTool.mock.calls[0][1]).toBeUndefined();
+    expect(callTool.mock.calls[0][1]?.headers).toBeUndefined();
     expect(callTool.mock.calls[1][1]).toBeUndefined();
   });
 });

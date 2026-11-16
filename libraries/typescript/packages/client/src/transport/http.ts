@@ -403,7 +403,7 @@ export class HttpConnector extends BaseConnector {
     return this.authorizationCache;
   }
 
-  private buildClientOptions(): ClientOptions {
+  private buildClientOptions(getClient: () => Client): ClientOptions {
     return {
       ...(this.opts.clientOptions || {}),
       jsonSchemaValidator:
@@ -416,12 +416,12 @@ export class HttpConnector extends BaseConnector {
       },
       listChanged: {
         tools: {
-          autoRefresh: true,
-          onChanged: (error, tools) =>
+          autoRefresh: false,
+          onChanged: (error) =>
             void this.handleListChanged(
               "notifications/tools/list_changed",
               error,
-              tools
+              getClient()
             ),
         },
         resources: {
@@ -628,12 +628,13 @@ export class HttpConnector extends BaseConnector {
       // Create and connect the client
       // This performs both initialize AND initialized notification
       // Always advertise roots capability - server may query roots/list even if client has no roots
-      const clientOptions = this.buildClientOptions();
+      const clientOptions = this.buildClientOptions(() => client);
       logger.debug(
         `Creating Client with capabilities:`,
         JSON.stringify(clientOptions.capabilities, null, 2)
       );
-      this.client = new Client(this.clientInfo, clientOptions);
+      const client = new Client(this.clientInfo, clientOptions);
+      this.client = client;
 
       // Register inbound handlers BEFORE connect() so they are available for the
       // entire connection lifetime (including reverse RPC during/after initialize).

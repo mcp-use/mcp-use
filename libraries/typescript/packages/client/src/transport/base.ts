@@ -1,6 +1,7 @@
 import { ProtocolError } from "@modelcontextprotocol/client";
 import type {
   CallToolResult,
+  CallToolRequestOptions,
   Client,
   ClientOptions,
   CompleteRequestParams,
@@ -142,7 +143,7 @@ export abstract class BaseConnector {
   protected client: Client | null = null;
   protected connectionManager: ConnectionManager<any> | null = null;
   protected toolsCache: Tool[] | null = null;
-  private toolsCacheNotificationGeneration = 0;
+  private toolsCacheDiscoverySequence = 0;
   protected capabilitiesCache: Record<string, unknown> | null = null;
   protected serverInfoCache: MCPServerInfo | null = null;
   protected authorizationCache: MCPAuthorizationInfo | undefined;
@@ -218,15 +219,15 @@ export abstract class BaseConnector {
       | "notifications/resources/list_changed"
       | "notifications/prompts/list_changed",
     error: Error | null,
-    tools?: Tool[] | null
+    client: Client | null = this.client
   ): Promise<void> {
+    if (this.client !== client) return;
     if (error) {
       logger.warn(`[Auto] ${method} refresh failed:`, error);
       return;
     }
-    if (method === "notifications/tools/list_changed" && tools) {
-      this.toolsCacheNotificationGeneration++;
-      this.toolsCache = [...tools];
+    if (method === "notifications/tools/list_changed") {
+      await this.refreshToolsCache(client);
     }
     await this.forwardNotification({ method } as Notification);
   }
@@ -237,16 +238,18 @@ export abstract class BaseConnector {
    */
   protected setupNotificationHandler(): void {
     if (!this.client) return;
+    const notificationClient = this.client;
 
     // Use fallbackNotificationHandler to catch all notifications
     this.client.fallbackNotificationHandler = async (
       notification: Notification
     ) => {
+      if (this.client !== notificationClient) return;
       // Auto-handle list_changed notifications per MCP spec
       // Clients SHOULD re-fetch the list when receiving these notifications
       switch (notification.method) {
         case "notifications/tools/list_changed":
-          await this.refreshToolsCache();
+          await this.refreshToolsCache(notificationClient);
           break;
         case "notifications/resources/list_changed":
           await this.onResourcesListChanged();
@@ -289,17 +292,17 @@ export abstract class BaseConnector {
   /**
    * Auto-refresh tools cache when server sends tools/list_changed notification
    */
-  protected async refreshToolsCache(): Promise<void> {
-    if (!this.client) return;
+  protected async refreshToolsCache(
+    client: Client | null = this.client
+  ): Promise<void> {
+    if (!client || this.client !== client) return;
     try {
       logger.debug(
         "[Auto] Refreshing tools cache due to list_changed notification"
       );
-      const result = await this.client.listTools();
-      this.toolsCacheNotificationGeneration++;
-      this.toolsCache = (result.tools ?? []) as Tool[];
+      const tools = await this.listTools();
       logger.debug(
-        `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
+        `[Auto] Discovered ${tools.length} tools after list_changed`
       );
     } catch (err) {
       logger.warn("[Auto] Failed to refresh tools cache:", err);
@@ -618,12 +621,21 @@ export abstract class BaseConnector {
 
     // Fetch and cache tools
     // Gracefully handle servers that don't implement tools/list or have no tools
+    const client = this.client;
+    const discoverySequence = ++this.toolsCacheDiscoverySequence;
     try {
       const listToolsRes = await this.executeRequest(() =>
-        this.client!.listTools(undefined, defaultRequestOptions)
+        client.listTools(undefined, defaultRequestOptions)
       );
-      this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
-      logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
+      if (
+        this.client === client &&
+        discoverySequence === this.toolsCacheDiscoverySequence
+      ) {
+        this.toolsCache = [...(listToolsRes.tools ?? [])];
+      }
+      logger.debug(
+        `Fetched ${listToolsRes.tools?.length ?? 0} tools from server`
+      );
     } catch (err: unknown) {
       if (isOAuthInteractionRequired(err)) throw err;
       const error = err as Error & { code?: number };
@@ -634,9 +646,19 @@ export abstract class BaseConnector {
       } else {
         logger.debug("Failed to list tools, assuming empty:", error.message);
       }
-      this.toolsCache = [];
+      if (
+        this.client === client &&
+        discoverySequence === this.toolsCacheDiscoverySequence
+      ) {
+        this.toolsCache = [];
+      }
     }
 
+    // A newer discovery may have superseded initialization and then failed.
+    // Complete initialization without resurrecting its stale tool definitions.
+    if (this.client === client && this.toolsCache === null) {
+      this.toolsCache = [];
+    }
     logger.debug("Server capabilities:", capabilities);
     logger.debug("Server info:", serverInfo);
     return capabilities;
@@ -726,15 +748,18 @@ export abstract class BaseConnector {
     const send = () => {
       // Rebuild from caller options on each attempt so renamed or removed
       // schema annotations cannot leave stale generated headers behind.
-      let requestOptions = enhancedOptions;
+      let requestOptions: CallToolRequestOptions | undefined = enhancedOptions;
       if (mirrorHeaders) {
         const tool = this.toolsCache?.find((t) => t.name === name);
+        // The SDK's response cache can complete writes out of order. Use the
+        // same current definition for browser headers and output validation.
+        if (tool) requestOptions = { ...enhancedOptions, toolDefinition: tool };
         const paramHeaders = tool
           ? buildMcpParamHeaders(tool.inputSchema, args)
           : {};
         if (Object.keys(paramHeaders).length > 0) {
           requestOptions = {
-            ...enhancedOptions,
+            ...requestOptions,
             headers: { ...enhancedOptions?.headers, ...paramHeaders },
           };
         }
@@ -785,17 +810,17 @@ export abstract class BaseConnector {
     }
     const client = this.client;
     logger.debug("[listTools] Fetching fresh tools from server...");
-    const notificationGeneration = this.toolsCacheNotificationGeneration;
+    const discoverySequence = ++this.toolsCacheDiscoverySequence;
     const result = await this.executeRequest(() =>
       client.listTools(undefined, { ...options, cacheMode: "refresh" })
     );
     // Create a new array to ensure React detects the change (avoid reference equality issues)
     const tools = result.tools ? [...result.tools] : [];
-    // A notification may have already published newer schemas while this
-    // request was in flight. Do not overwrite them with an older response.
+    // Explicit and notification-driven discoveries share one ordering. A
+    // response may only publish while it owns the active client's latest request.
     if (
       this.client === client &&
-      notificationGeneration === this.toolsCacheNotificationGeneration
+      discoverySequence === this.toolsCacheDiscoverySequence
     ) {
       this.toolsCache = [...tools];
     }
