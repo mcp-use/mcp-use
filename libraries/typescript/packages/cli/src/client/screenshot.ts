@@ -467,7 +467,12 @@ async function trackFrameSessions(
   const autoAttach = (sessionId: string) =>
     cdp.send(
       "Target.setAutoAttach",
-      { autoAttach: true, waitForDebuggerOnStart: false, flatten: true },
+      {
+        autoAttach: true,
+        waitForDebuggerOnStart: false,
+        flatten: true,
+        filter: [{ type: "iframe", exclude: false }],
+      },
       sessionId
     );
   cdp.onEvent((event) => {

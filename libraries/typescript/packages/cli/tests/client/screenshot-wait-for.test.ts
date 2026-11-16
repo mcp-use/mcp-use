@@ -160,6 +160,17 @@ describe.skipIf(!hasBrowser)("screenshot --wait-for", () => {
     expect(png.subarray(1, 4).toString("latin1")).toBe("PNG");
   }, 30_000);
 
+  it("still finds a selector on the Inspector page", async () => {
+    const output = join(workDirectory, "view.png");
+
+    await expect(
+      runScreenshot(screenshotArgs('body[data-view-ready="true"]', output))
+    ).resolves.toBe(0);
+
+    expect(stderr).toBe("");
+    expect(existsSync(output)).toBe(true);
+  }, 30_000);
+
   it("times out when the selector is in neither the page nor the View", async () => {
     const output = join(workDirectory, "view.png");
 
