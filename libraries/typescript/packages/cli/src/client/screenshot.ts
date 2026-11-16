@@ -26,6 +26,12 @@ interface PreviewHealth {
 interface BrowserHandle {
   cdp: CdpClient;
   sessionId: string;
+  /**
+   * DevTools sessions for the page's out-of-process iframes. The Inspector
+   * serves the View's sandbox from its other loopback origin, so Chrome runs
+   * it in a separate process that the page's own scripts cannot read.
+   */
+  frameSessions: ReadonlySet<string>;
   close(): Promise<void>;
 }
 
@@ -54,7 +60,7 @@ Capture options:
   --device-scale-factor <n>   Pixel density, greater than 0 and at most 4
                               (default: 1)
   --theme <light|dark>        Host theme (default: light)
-  --wait-for <selector>       Wait for a selector before capture
+  --wait-for <selector>       Wait for a selector in the View before capture
   --delay <ms>                Additional delay after readiness (default: 0)
   --timeout <ms>              Tool/browser timeout (default: 30000)
   --inspector <url>           Use an existing Inspector origin
@@ -435,9 +441,11 @@ async function connectBrowser(url: string): Promise<BrowserHandle> {
     targetId: target.targetId,
     flatten: true,
   })) as { sessionId: string };
+  const frameSessions = await trackFrameSessions(cdp, attached.sessionId);
   return {
     cdp,
     sessionId: attached.sessionId,
+    frameSessions,
     async close() {
       await cdp
         .send("Target.closeTarget", { targetId: target.targetId })
@@ -445,6 +453,38 @@ async function connectBrowser(url: string): Promise<BrowserHandle> {
       cdp.close();
     },
   };
+}
+
+/**
+ * Attach to every out-of-process iframe under the page session, including
+ * nested ones, and keep the set of attached sessions current.
+ */
+async function trackFrameSessions(
+  cdp: CdpClient,
+  pageSessionId: string
+): Promise<Set<string>> {
+  const sessions = new Set<string>();
+  const autoAttach = (sessionId: string) =>
+    cdp.send(
+      "Target.setAutoAttach",
+      { autoAttach: true, waitForDebuggerOnStart: false, flatten: true },
+      sessionId
+    );
+  cdp.onEvent((event) => {
+    if (event.method === "Target.attachedToTarget") {
+      const params = event.params as {
+        sessionId: string;
+        targetInfo: { type: string };
+      };
+      if (params.targetInfo.type !== "iframe") return;
+      sessions.add(params.sessionId);
+      autoAttach(params.sessionId).catch(() => {});
+    } else if (event.method === "Target.detachedFromTarget") {
+      sessions.delete((event.params as { sessionId: string }).sessionId);
+    }
+  });
+  await autoAttach(pageSessionId);
+  return sessions;
 }
 
 async function waitForDocument(
@@ -471,7 +511,6 @@ interface ReadyState {
   ready?: boolean;
   error?: string | null;
   errorMessage?: string | null;
-  selector?: boolean;
 }
 
 /**
@@ -502,13 +541,12 @@ async function waitForReady(
   timeout: number
 ): Promise<void> {
   const deadline = Date.now() + timeout;
+  const expression = `(() => ({
+    ready: document.body?.dataset.viewReady === "true",
+    error: document.body?.dataset.viewError || null,
+    errorMessage: document.body?.dataset.viewErrorMessage || null
+  }))()`;
   while (Date.now() < deadline) {
-    const expression = `(() => ({
-      ready: document.body?.dataset.viewReady === "true",
-      error: document.body?.dataset.viewError || null,
-      errorMessage: document.body?.dataset.viewErrorMessage || null,
-      selector: ${JSON.stringify(selector)} === undefined || !!document.querySelector(${JSON.stringify(selector ?? "")})
-    }))()`;
     const response = (await browser.cdp.send(
       "Runtime.evaluate",
       { expression, returnByValue: true },
@@ -517,13 +555,53 @@ async function waitForReady(
     const state = response.result?.value;
     const failure = readyStateFailure(state);
     if (failure) throw failure;
-    if (state?.ready === true && state.selector === true) return;
+    if (
+      state?.ready === true &&
+      (selector === undefined || (await selectorMatches(browser, selector)))
+    ) {
+      return;
+    }
     await sleep(100);
   }
   throw new CommandError(
     "browser_timeout",
     "View did not become ready in time."
   );
+}
+
+/**
+ * Whether `selector` matches in the Inspector page or in the View. The View
+ * is in an out-of-process iframe, with the widget in a same-origin iframe
+ * inside it, so each session searches its document and the same-origin
+ * iframes below it.
+ */
+async function selectorMatches(
+  browser: BrowserHandle,
+  selector: string
+): Promise<boolean> {
+  const expression = `(() => {
+    const selector = ${JSON.stringify(selector)};
+    const search = (doc) => {
+      if (doc.querySelector(selector)) return true;
+      for (const frame of doc.querySelectorAll("iframe")) {
+        let inner = null;
+        try {
+          inner = frame.contentDocument;
+        } catch {}
+        if (inner && search(inner)) return true;
+      }
+      return false;
+    };
+    return search(document);
+  })()`;
+  for (const sessionId of [browser.sessionId, ...browser.frameSessions]) {
+    const response = (await browser.cdp
+      .send("Runtime.evaluate", { expression, returnByValue: true }, sessionId)
+      // A frame can detach between polls; the next poll skips it.
+      .catch(() => undefined)) as { result?: { value?: unknown } } | undefined;
+    if (response?.result?.value === true) return true;
+  }
+  return false;
 }
 
 interface CaptureBounds {
@@ -596,16 +674,27 @@ class CdpClient {
     number,
     { resolve(value: unknown): void; reject(error: Error): void }
   >();
+  readonly #eventListeners: ((event: CdpEvent) => void)[] = [];
 
   private constructor(socket: WebSocket) {
     this.#socket = socket;
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(String(event.data)) as {
         id?: number;
+        method?: string;
+        params?: unknown;
         result?: unknown;
         error?: { message?: string };
       };
-      if (message.id === undefined) return;
+      if (message.id === undefined) {
+        if (message.method === undefined) return;
+        const cdpEvent: CdpEvent = {
+          method: message.method,
+          params: message.params,
+        };
+        for (const listener of this.#eventListeners) listener(cdpEvent);
+        return;
+      }
       const pending = this.#pending.get(message.id);
       if (pending === undefined) return;
       this.#pending.delete(message.id);
@@ -659,9 +748,19 @@ class CdpClient {
     });
   }
 
+  /** Receive every DevTools event, from any session. */
+  onEvent(listener: (event: CdpEvent) => void): void {
+    this.#eventListeners.push(listener);
+  }
+
   close(): void {
     this.#socket.close();
   }
+}
+
+interface CdpEvent {
+  method: string;
+  params: unknown;
 }
 
 // Windows install locations as [environment variable, path under it]. The
