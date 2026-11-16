@@ -485,11 +485,12 @@ describe("browser tool schema recovery over HTTP", () => {
     }
   );
 
-  it("does not publish a notification refresh from a disconnected client", async () => {
+  it("keeps the reconnected cache when an earlier notification discovery completes", async () => {
     const memory = new InMemoryResponseCacheStore();
     const started = deferred();
     const gate = deferred();
     const notified = deferred();
+    const observedSchemas: unknown[] = [];
     onTestFinished(() => gate.resolve());
     let pauseWrite = false;
     const store: ResponseCacheStore = {
@@ -508,7 +509,11 @@ describe("browser tool schema recovery over HTTP", () => {
       },
     };
     const { connector, state } = await fixture(store);
-    connector.onNotification(() => notified.resolve());
+    connector.onNotification((notification) => {
+      if (notification.method !== "notifications/tools/list_changed") return;
+      observedSchemas.push(connector.tools[0]?.inputSchema.properties);
+      notified.resolve();
+    });
     state.header = "Retired";
     pauseWrite = true;
     state.notifyToolsChanged!();
@@ -518,7 +523,12 @@ describe("browser tool schema recovery over HTTP", () => {
     await connector.connect();
     await connector.listTools();
     gate.resolve();
+    // The event was received before disconnect. Its callback is a completion
+    // barrier and must observe the current cache, even though it is forwarded.
     await notified.promise;
+    expect(observedSchemas).toEqual([
+      { value: { type: "string", "x-mcp-header": "Current" } },
+    ]);
     expect(connector.tools[0].inputSchema.properties).toEqual({
       value: { type: "string", "x-mcp-header": "Current" },
     });

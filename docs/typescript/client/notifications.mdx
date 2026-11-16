@@ -32,9 +32,9 @@ You can also register a handler on a connection:
 ```typescript
 const connection = await client.connect("demo");
 
-connection.on("notification", async (notification) => {
+connection.on("notification", (notification) => {
   if (notification.method === "notifications/tools/list_changed") {
-    await connection.listTools();
+    console.log("Current tools:", connection.tools);
   }
 });
 ```
@@ -45,10 +45,12 @@ The standard list-change method names are:
 - `notifications/resources/list_changed`
 - `notifications/prompts/list_changed`
 
-The client automatically refreshes its tool cache for tool list changes, so
-calling `listTools()` in a handler is optional. It is useful when the handler
-needs the returned definitions directly. Explicit `listTools()` calls and
-notification refreshes fetch from the server instead of serving SDK-cached
+The client attempts to refresh its tool cache before forwarding tool list
+changes to handlers. Read `connection.tools` in the handler to use the current
+cached definitions without sending another request. The cache may still contain
+earlier definitions if the automatic refresh fails. An explicit `listTools()`
+call sends another request. Both explicit discovery and notification refreshes
+fetch from the server instead of serving SDK-cached
 responses; older in-flight discoveries cannot overwrite newer results or
 repopulate a disconnected connection's cache. See
 [Tool discovery and caching](/typescript/client/tools#tool-discovery-and-caching).

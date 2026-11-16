@@ -52,8 +52,8 @@ For modern MCP connections in a browser, `callTool()` uses the cached schema to
 generate `Mcp-Param-*` headers from `x-mcp-header` annotations and validate the
 tool's output. If the server rejects those headers with `ProtocolError(-32020)`
 before executing the tool, the client refreshes discovery and retries once with
-headers rebuilt from the new schema. Discovery preserves caller-supplied headers,
-the cancellation signal, and timeout settings; generated `Mcp-Param-*` headers
+headers rebuilt from the new schema. Discovery forwards the caller's `headers`,
+`signal`, `timeout`, and `maxTotalTimeout` options. Generated `Mcp-Param-*` headers
 on the tool call take precedence over caller-supplied headers with the same name.
 Other errors, failed discovery, and a second header mismatch propagate to the
 caller; changing the connection also stops recovery.
