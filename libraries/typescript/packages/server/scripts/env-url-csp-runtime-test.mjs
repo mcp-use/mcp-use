@@ -269,8 +269,8 @@ async function main() {
       pass:
         allHave("connectDomains") &&
         allHave("resourceDomains") &&
-        (csp?.frameDomains ?? []).length === 0 &&
-        (csp?.baseUriDomains ?? []).length === 0,
+        !Object.hasOwn(csp, "frameDomains") &&
+        !Object.hasOwn(csp, "baseUriDomains"),
       csp,
     });
   }
