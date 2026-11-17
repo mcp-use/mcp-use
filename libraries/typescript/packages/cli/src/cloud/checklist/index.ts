@@ -24,6 +24,22 @@ function shouldFail(
   );
 }
 
+/** Errors worth retrying while polling: the run keeps going on Cloud. */
+const TRANSIENT = new Set([
+  "cloud_unreachable",
+  "cloud_timeout",
+  "rate_limited",
+  "cloud_api_error",
+]);
+/** Consecutive failed polls tolerated before giving up. */
+const MAX_POLL_RETRIES = 6;
+const MAX_BACKOFF_MS = 30_000;
+
+/** Exponential backoff with full jitter: random in [0, min(cap, base * 2^n)]. */
+function backoff(base: number, attempt: number): number {
+  return Math.random() * Math.min(MAX_BACKOFF_MS, base * 2 ** attempt);
+}
+
 const USAGE =
   "mcp-use checklist <run|list|get <run-id>|cancel <run-id>> [options]";
 
@@ -166,6 +182,12 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
         );
         if (values["no-wait"] !== true) {
           const started = Date.now();
+          const configured = process.env["MCP_USE_POLL_INTERVAL_MS"];
+          const interval =
+            configured === undefined
+              ? 2000
+              : Math.max(0, Number(configured) || 0);
+          let failures = 0;
           while (["pending", "running"].includes(run.status)) {
             if (Date.now() - started > 30 * 60 * 1000)
               throw new CommandError(
@@ -179,13 +201,19 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
                   },
                 ]
               );
-            const configured = process.env["MCP_USE_POLL_INTERVAL_MS"];
-            await delay(
-              configured === undefined
-                ? 2000
-                : Math.max(0, Number(configured) || 0)
-            );
-            run = await get(run.id);
+            await delay(failures ? backoff(interval, failures) : interval);
+            try {
+              run = await get(run.id);
+              failures = 0;
+            } catch (error) {
+              // A failed status read doesn't affect the run; keep polling.
+              if (
+                !(error instanceof CommandError) ||
+                !TRANSIENT.has(error.code) ||
+                ++failures > MAX_POLL_RETRIES
+              )
+                throw error;
+            }
           }
         }
       }

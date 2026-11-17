@@ -374,6 +374,86 @@ for (const { name, failOn, run, exitCode } of [
   });
 }
 
+test("checklist run keeps polling through dropped connections and server errors", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+    status: 201,
+    body: { id: "run_1", status: "pending" },
+  });
+  const replies = [
+    { reset: true },
+    { status: 503, body: { message: "Service Unavailable" } },
+    { status: 429, body: { message: "Too many requests" } },
+    { body: { id: "run_1", status: "running" } },
+    { reset: true },
+    { body: { id: "run_1", status: "completed", checks: [PASS] } },
+  ];
+  let polls = 0;
+  cloud.onUndocumented(
+    "GET",
+    "/api/v1/server-audits/srv_1/audits/run_1",
+    () => replies[polls++]!
+  );
+  const result = await cli.run(
+    ["checklist", "run", "--fail-on", "failed", ...SCOPE],
+    { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+  );
+  expect(result.exitCode).toBe(0);
+  expect(result.json).toMatchObject({ id: "run_1", status: "completed" });
+  expect(
+    cloud.requestsTo("GET", "/api/v1/server-audits/srv_1/audits/run_1")
+  ).toHaveLength(6);
+});
+
+test("checklist run gives up after repeated poll failures", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+    status: 201,
+    body: { id: "run_1", status: "pending" },
+  });
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    reset: true,
+  });
+  const result = await cli.run(["checklist", "run", ...SCOPE], {
+    env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" },
+  });
+  expect(result.exitCode).toBe(1);
+  expect(result.json).toMatchObject({ error: { code: "cloud_unreachable" } });
+  // One first attempt plus six retries.
+  expect(
+    cloud.requestsTo("GET", "/api/v1/server-audits/srv_1/audits/run_1")
+  ).toHaveLength(7);
+});
+
+test("checklist run stops polling on an error that retrying can't fix", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+    status: 201,
+    body: { id: "run_1", status: "pending" },
+  });
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    status: 401,
+    body: { message: "Unauthorized" },
+  });
+  const result = await cli.run(["checklist", "run", ...SCOPE], {
+    env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" },
+  });
+  expect(result.exitCode).toBe(1);
+  expect(result.json).toMatchObject({ error: { code: "not_authenticated" } });
+  expect(
+    cloud.requestsTo("GET", "/api/v1/server-audits/srv_1/audits/run_1")
+  ).toHaveLength(1);
+});
+
 test("checklist run rejects an unknown --fail-on and --fail-on with --no-wait", async ({
   cloud,
   cli,
