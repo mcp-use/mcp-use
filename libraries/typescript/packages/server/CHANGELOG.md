@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.12.5
+
+### Patch Changes
+
+- 6e08b9d: Omit `frameDomains` and `baseUriDomains` from view CSP metadata when their merged lists are empty, including explicitly configured empty arrays.
+
 ## 2.12.4
 
 ### Patch Changes
