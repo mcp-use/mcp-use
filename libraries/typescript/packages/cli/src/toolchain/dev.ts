@@ -454,7 +454,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     resolvePreferredPort(options.port),
     host
   );
-  if (port !== requested) {
+  if (requested !== 0 && port !== requested) {
     console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
   }
   process.env["PORT"] = String(port);

@@ -57,6 +57,20 @@ function canConnect(port: number, host: string): Promise<boolean> {
   });
 }
 
+/** Ask the OS for a free port on `host` by binding port 0 and reading it back. */
+function osAssignedPort(host: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.unref();
+    probe.once("error", reject);
+    probe.listen({ port: 0, host }, () => {
+      const address = probe.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
 /**
  * On loopback binds, a wildcard listener on `*:port` (IPv6) can still accept
  * `localhost` traffic while `127.0.0.1:port` bind-probes succeed — macOS dual-stack.
@@ -73,6 +87,10 @@ async function loopbackPortInUse(port: number): Promise<boolean> {
  * `--port` / `PORT` / the default by the caller) and probe upward until a
  * free port is found.
  *
+ * A `requested` of `0` asks for an ephemeral port: the OS picks one, and the
+ * concrete port is returned so callers print, export, and bind a connectable
+ * port rather than `:0`.
+ *
  * @param requested - The preferred port.
  * @param host - The host the server will bind (probing binds the same host).
  * @returns The first free port at or above `requested`, plus the original
@@ -85,6 +103,14 @@ export async function resolvePort(
   requested: number,
   host: string
 ): Promise<ResolvedPort> {
+  if (requested === 0) {
+    for (let attempt = 0; attempt < MAX_PROBES; attempt++) {
+      const port = await osAssignedPort(host);
+      if (LOOPBACK_HOSTS.has(host) && (await loopbackPortInUse(port))) continue;
+      return { port, requested };
+    }
+    throw new Error(`No free ephemeral port found on ${host}.`);
+  }
   for (let port = requested; port < requested + MAX_PROBES; port++) {
     if (!(await isPortFree(port, host))) continue;
     if (LOOPBACK_HOSTS.has(host) && (await loopbackPortInUse(port))) continue;
