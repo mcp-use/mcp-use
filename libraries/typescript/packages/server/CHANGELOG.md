@@ -1,5 +1,13 @@
 # mcp-use
 
+## 2.12.6-canary.0
+
+### Patch Changes
+
+- Release pending canary improvements on top of the 2.12.5 CSP hotfix.
+- Updated dependencies [136c9e3]
+  - @mcp-use/inspector@20.3.30-canary.5
+
 ## 2.12.5
 
 ### Patch Changes

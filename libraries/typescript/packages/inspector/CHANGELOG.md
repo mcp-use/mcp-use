@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.30-canary.5
+
+### Patch Changes
+
+- 136c9e3: Update Playwright to 1.65.1 so Inspector E2E browser installation supports Ubuntu 26.04 runners.
+
 ## 20.3.30-canary.4
 
 ### Patch Changes

@@ -12,11 +12,13 @@
   },
   "changesets": [
     "browser-client-oauth-proxy-fetch",
+    "canary-baseline-after-csp-hotfix",
     "cli-client-import-after-install",
     "cli-client-install-sandbox",
     "cli-oauth-enter-timeout",
     "client-telemetry-node-localstorage",
     "code-mode-console-logs",
+    "inspector-playwright-ubuntu-26",
     "inspector-view-legacy-resource-uri",
     "node-bridge-binary-body",
     "project-name-validation",
