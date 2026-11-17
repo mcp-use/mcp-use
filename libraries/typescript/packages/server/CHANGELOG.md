@@ -1,5 +1,27 @@
 # mcp-use
 
+## 2.12.6
+
+### Patch Changes
+
+- 4b2e49e: Release pending canary improvements on top of the 2.12.5 CSP hotfix.
+- 4b2e49e: Keep binary request bodies intact under Node. `toWebRequest` decoded every request body as UTF-8 text, so bytes that aren't valid UTF-8, such as a file uploaded to a custom route, reached the handler replaced with U+FFFD. This affected `listen()`, `mcp-use start`, `mcp-use dev`, and `toNodeHandler`/`toWebRequest` from `mcp-use/node`. The body is now passed on as the bytes that were received.
+- 4b2e49e: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 4b2e49e: Stop the server's usage telemetry from reading `globalThis.localStorage`. On Node 25 the opt-out check printed `Warning: --localstorage-file was provided without a valid path` on a server's first request. Turn telemetry off with `MCP_USE_ANONYMIZED_TELEMETRY=false`; the server no longer reads that setting from `localStorage`.
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+  - @mcp-use/cli@5.1.1
+  - @mcp-use/inspector@20.3.30
+
 ## 2.12.6-canary.0
 
 ### Patch Changes
