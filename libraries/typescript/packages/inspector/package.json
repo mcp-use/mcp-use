@@ -156,7 +156,7 @@
     "@hono/node-server": "^2.0.5",
     "@mcp-use/agent": "workspace:*",
     "@mcp-use/client": "workspace:*",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/vite": "^4.2.0",
     "@types/express": "^5.0.6",
     "@vitejs/plugin-react": "^6.0.0",
