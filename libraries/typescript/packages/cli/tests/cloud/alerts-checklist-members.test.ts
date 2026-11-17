@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
 import { test } from "../helpers/cli-test.js";
@@ -373,6 +373,52 @@ for (const { name, failOn, run, exitCode } of [
     expect(result.json).toMatchObject({ id: "run_1", status: run.status });
   });
 }
+
+test("checklist run --json-file prints the readable report and writes the JSON result", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+    status: 201,
+    body: { id: "run_1", status: "pending" },
+  });
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    body: {
+      id: "run_1",
+      status: "completed",
+      isReadyForChatgpt: false,
+      checks: [PASS, { ...ERROR, message: "Missing schema" }],
+    },
+  });
+  const result = await cli.run(
+    [
+      "checklist",
+      "run",
+      "--server",
+      "weather",
+      "--fail-on",
+      "failed",
+      "--json-file",
+      "result.json",
+    ],
+    { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+  );
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toContain("1 passed · 1 failed");
+  expect(result.stdout).toContain("      Missing schema");
+  expect(
+    JSON.parse(await readFile(join(cli.cwd, "result.json"), "utf8"))
+  ).toMatchObject({
+    id: "run_1",
+    status: "completed",
+    isReadyForChatgpt: false,
+    checks: [
+      { checkId: "connection", status: "pass" },
+      { checkId: "schema", status: "fail", message: "Missing schema" },
+    ],
+  });
+});
 
 test("checklist run keeps polling through dropped connections and server errors", async ({
   cloud,

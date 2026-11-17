@@ -381,11 +381,16 @@ const pages: Record<string, Page> = {
             "--fail-on <level>",
             "Exit 1 on failed checks or warnings: none, failed, warnings (default: none)",
           ],
+          [
+            "--json-file <path>",
+            "Also write the --json result to a file; the readable report still prints",
+          ],
           ["--verbose", "Show every check and full finding details"],
         ],
         examples: [
           "mcp-use checklist run --no-wait",
           "mcp-use checklist run --fail-on failed",
+          "mcp-use checklist run --fail-on failed --json-file checklist.json",
         ],
       },
       list: {

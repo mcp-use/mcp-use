@@ -1,4 +1,5 @@
 import { age, elapsed, table } from "../../core/format.js";
+import { writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { cloudHelp } from "../help.js";
 import { parseCommandArgs, runCommand } from "../../core/command.js";
@@ -69,6 +70,7 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
           ? {
               "no-wait": { type: "boolean" as const },
               "fail-on": { type: "string" as const },
+              "json-file": { type: "string" as const },
             }
           : {}),
         ...(command === "list"
@@ -232,6 +234,9 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
         }),
       };
     });
+    // Lets CI read the result while the log keeps the readable report.
+    if (typeof values["json-file"] === "string")
+      await writeFile(values["json-file"], `${JSON.stringify(result.value)}\n`);
     output.result(result.value, result.human);
     if (failed)
       process.stderr.write(`Checklist did not pass (--fail-on ${failOn}).\n`);

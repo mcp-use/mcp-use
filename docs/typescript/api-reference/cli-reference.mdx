@@ -638,7 +638,7 @@ mcp-use github repos [--installation <id>] [--page <n>] [--limit <n>] [options]
 Run the publishing checklist for a server.
 
 ```bash
-mcp-use checklist run [--branch <branch>] [--no-wait] [--fail-on <level>] [options]
+mcp-use checklist run [--branch <branch>] [--no-wait] [--fail-on <level>] [--json-file <path>] [options]
 ```
 
 Retain the run ID when using `--no-wait`, then inspect it with `checklist get`. A completed check does not publish the server.
@@ -652,6 +652,8 @@ By default the command exits 0 once the run finishes, whatever the results. In C
 | `warnings` | Same as `failed`, or a check reports a warning |
 
 `--fail-on` can't be combined with `--no-wait`.
+
+To keep the readable report in CI logs and still read the result from a script, pass `--json-file <path>`. The report prints as usual, and the same result `--json` would print is written to the file.
 
 ### `checklist list`
 
