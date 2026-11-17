@@ -1,5 +1,39 @@
 # @mcp-use/client
 
+## 2.4.6-canary.4
+
+### Patch Changes
+
+- 620471f: `getViewResourceUri()` and `isViewTool()` now also read the deprecated flat `_meta["ui/resourceUri"]` key, so tools from servers that only send that key are detected as MCP Apps views.
+
+## 2.4.6-canary.3
+
+### Patch Changes
+
+- 130bd44: Start a stdio server whose config has a `command` and no `args`. `MCPClient` used to reject that config with "Cannot determine connector type from config" even though `StdioConnector` already defaults `args` to an empty list.
+
+## 2.4.6-canary.2
+
+### Patch Changes
+
+- c4c27e0: Stop telemetry from reading `globalThis.localStorage` outside the browser. The opt-out and source-hint checks fell back to `localStorage` in every runtime. On Node 25, reading a property of that global prints `Warning: --localstorage-file was provided without a valid path` unless Node runs with `--localstorage-file`, so creating an `MCPClient` printed it. The client’s Node runtime now uses the `MCP_USE_ANONYMIZED_TELEMETRY` and `MCP_USE_TELEMETRY_SOURCE` env vars; browsers keep using `localStorage`.
+
+## 2.4.6-canary.1
+
+### Patch Changes
+
+- 8adac01: Route OAuth discovery, registration, and token requests through `oauthProxyUrl` for `BrowserMCPClient`. `HttpConnector` now wraps the configured fetch with the OAuth provider's scoped fetch, so every client applies the proxy the same way and MCP transport requests stay on the configured fetch.
+- db11d54: Code mode's VM executor no longer loses error details or fails the run when the executed code logs something. `console.error(e)` and `console.error({ error: e })` on a caught error used to log `{}` for the error and now log `Error: Boom`. An error's `cause` is logged too, for example `TypeError: fetch failed (cause: Error: connect ECONNREFUSED)`. Logging an object with a circular reference or a BigInt used to throw into the executed code and fail it; those values now appear as `"[Circular]"` and `"1n"`. A value whose getters, `toJSON` or `toString` throw no longer fails the run either: it is logged with `String(value)`, or as `[unserializable value]` when that throws too. Other objects are logged as the same pretty-printed JSON as before.
+
+## 2.4.6-canary.0
+
+### Patch Changes
+
+- 00aa1a9: fix(client): allow bracketed IPv6 hostnames and prevent path double percent-encoding in sanitizeUrl
+  - Support RFC 3986 and WHATWG bracketed IPv6 hostnames (e.g., `[::1]`) in `sanitizeUrl` instead of falsely rejecting them as malformed.
+  - Preserve already percent-encoded path octets (`%XX`) in `url.pathname` and `url.hash` to prevent double percent-encoding (such as `%20` -> `%2520`).
+  - Preserve forward slashes in fragment identifiers for SPA routes (e.g. `#/routes/profile`).
+
 ## 2.4.5
 
 ### Patch Changes

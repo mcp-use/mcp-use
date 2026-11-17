@@ -6,6 +6,32 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.6" description="November 2026">
+  ## Client connections & CLI reliability
+  Patch release improving OAuth, client startup, scaffolding, and binary HTTP requests on top of the v2.12.5 CSP hotfix.
+
+- **Fix** (@mcp-use/client): route browser OAuth discovery, registration, and token requests through `oauthProxyUrl`, while keeping MCP transport requests on the configured fetch (`#3075`)
+- **Fix** (@mcp-use/client): accept bracketed IPv6 hostnames, preserve already percent-encoded URL paths and fragments, and keep slashes in SPA fragment routes (`#2545`)
+- **Fix** (@mcp-use/client): start stdio servers configured with a `command` and no `args` (`#3076`)
+- **Fix** (@mcp-use/client): preserve errors and their causes in code-mode console logs; logging circular objects, BigInt values, or values that throw during serialization no longer fails execution (`#2753`)
+- **Fix** (server, @mcp-use/client): stop telemetry from reading `localStorage` in Node. Use environment variables for Node telemetry settings without triggering Node 25's local-storage warning (`#3077`)
+- **Fix** (server): preserve binary request bodies through the Node bridge, including uploads containing bytes that are not valid UTF-8 (`#2703`)
+- **Fix** (@mcp-use/cli): reuse an installed client SDK, including the project's copy when running through `npx`; otherwise install it in `~/.mcp-use/client-sdk` and load it immediately without modifying the project's dependencies or lockfiles (`#3088`, `#3077`)
+- **Fix** (@mcp-use/cli): let `--auth-timeout` govern interactive OAuth, including the Enter prompt, and hide client SDK info logs unless `MCP_USE_LOG_LEVEL` or `DEBUG` enables them (`#3080`)
+- **Fix** (@mcp-use/cli): include the tool's error text in human-readable `mcp-use screenshot` failures (`#3079`)
+- **Fix** (create-mcp-use-app, @mcp-use/cli): reject unknown options, extra project names, and invalid names before creating files; print build paths with consistent separators on Windows (`#2657`, `#3078`)
+- **Update**: Updated @mcp-use/client to v2.4.6 and @mcp-use/agent to v2.0.27
+- **Update**: Updated @mcp-use/cli to v5.1.1 and create-mcp-use-app to v2.1.2
+- **Update**: Updated @mcp-use/inspector to v20.3.30 with support for legacy MCP Apps view metadata; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.12.5" description="November 2026">
+  ## Empty CSP domain hotfix
+  Patch release correcting view CSP metadata without promoting the pending canary changes.
+
+- **Fix** (server): omit `frameDomains` and `baseUriDomains` when their merged domain lists are empty, including explicitly configured empty arrays (`#3107`)
+</Update>
+
 <Update label="v2.12.4" description="November 2026">
   ## CLI analytics & view caching
   Canary release adding server analytics and explicit feedback commands, fixing production view cache identity, and linking landing pages to an available Inspector.

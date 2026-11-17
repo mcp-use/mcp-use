@@ -1,10 +1,95 @@
 # mcp-use
 
+## 2.12.6-canary.0
+
+### Patch Changes
+
+- Release pending canary improvements on top of the 2.12.5 CSP hotfix.
+- Updated dependencies [136c9e3]
+  - @mcp-use/inspector@20.3.30-canary.5
+
 ## 2.12.5
 
 ### Patch Changes
 
 - 6e08b9d: Omit `frameDomains` and `baseUriDomains` from view CSP metadata when their merged lists are empty, including explicitly configured empty arrays.
+
+## 2.12.5-canary.9
+
+### Patch Changes
+
+- Updated dependencies [620471f]
+  - @mcp-use/inspector@20.3.30-canary.4
+  - @mcp-use/cli@5.1.1-canary.5
+
+## 2.12.5-canary.8
+
+### Patch Changes
+
+- Updated dependencies [0130e50]
+  - @mcp-use/cli@5.1.1-canary.5
+
+## 2.12.5-canary.7
+
+### Patch Changes
+
+- Updated dependencies [c8f90f5]
+  - @mcp-use/cli@5.1.1-canary.4
+
+## 2.12.5-canary.6
+
+### Patch Changes
+
+- Updated dependencies [018ba48]
+  - @mcp-use/cli@5.1.1-canary.3
+
+## 2.12.5-canary.5
+
+### Patch Changes
+
+- Updated dependencies [9eba5b3]
+  - @mcp-use/cli@5.1.1-canary.2
+
+## 2.12.5-canary.4
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.30-canary.3
+  - @mcp-use/cli@5.1.1-canary.1
+
+## 2.12.5-canary.3
+
+### Patch Changes
+
+- c4c27e0: Stop the server's usage telemetry from reading `globalThis.localStorage`. On Node 25 the opt-out check printed `Warning: --localstorage-file was provided without a valid path` on a server's first request. Turn telemetry off with `MCP_USE_ANONYMIZED_TELEMETRY=false`; the server no longer reads that setting from `localStorage`.
+- Updated dependencies [c4c27e0]
+- Updated dependencies
+  - @mcp-use/cli@5.1.1-canary.1
+  - @mcp-use/inspector@20.3.30-canary.2
+
+## 2.12.5-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.30-canary.1
+  - @mcp-use/cli@5.1.1-canary.0
+
+## 2.12.5-canary.1
+
+### Patch Changes
+
+- 353790c: Keep binary request bodies intact under Node. `toWebRequest` decoded every request body as UTF-8 text, so bytes that aren't valid UTF-8, such as a file uploaded to a custom route, reached the handler replaced with U+FFFD. This affected `listen()`, `mcp-use start`, `mcp-use dev`, and `toNodeHandler`/`toWebRequest` from `mcp-use/node`. The body is now passed on as the bytes that were received.
+
+## 2.12.5-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@5.1.1-canary.0
+  - @mcp-use/inspector@20.3.30-canary.0
 
 ## 2.12.4
 

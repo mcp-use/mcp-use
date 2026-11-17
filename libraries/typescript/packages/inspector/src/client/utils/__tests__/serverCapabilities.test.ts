@@ -120,6 +120,20 @@ describe("buildServerCapabilityRows", () => {
     expect(extensions?.detail).toBe("text/html;profile=mcp-app");
   });
 
+  it("infers MCP Apps from tools that only send the flat ui/resourceUri key", () => {
+    const rows = buildServerCapabilityRows(
+      conformanceCaps,
+      {},
+      { tools: [{ _meta: { "ui/resourceUri": "ui://widget/weather.html" } }] }
+    );
+
+    const extensions = rows.find((row) => row.id === "extensions");
+    expect(extensions?.supported).toBe(true);
+    expect(extensions?.features).toEqual([
+      { id: "io.modelcontextprotocol/ui", label: "MCP Apps" },
+    ]);
+  });
+
   it("infers MCP Apps from mcp-app resource templates", () => {
     const rows = buildServerCapabilityRows(
       conformanceCaps,

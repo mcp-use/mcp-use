@@ -1,5 +1,41 @@
 # @mcp-use/agent
 
+## 2.0.27-canary.4
+
+### Patch Changes
+
+- Updated dependencies [620471f]
+  - @mcp-use/client@2.4.6-canary.4
+
+## 2.0.27-canary.3
+
+### Patch Changes
+
+- Updated dependencies [130bd44]
+  - @mcp-use/client@2.4.6-canary.3
+
+## 2.0.27-canary.2
+
+### Patch Changes
+
+- Updated dependencies [c4c27e0]
+  - @mcp-use/client@2.4.6-canary.2
+
+## 2.0.27-canary.1
+
+### Patch Changes
+
+- Updated dependencies [8adac01]
+- Updated dependencies [db11d54]
+  - @mcp-use/client@2.4.6-canary.1
+
+## 2.0.27-canary.0
+
+### Patch Changes
+
+- Updated dependencies [00aa1a9]
+  - @mcp-use/client@2.4.6-canary.0
+
 ## 2.0.26
 
 ### Patch Changes

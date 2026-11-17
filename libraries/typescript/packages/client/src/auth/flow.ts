@@ -24,6 +24,28 @@ type FlowProvider = OAuthClientProvider & {
   useRedirectFlow?: boolean;
 };
 
+/**
+ * Wrap `baseFetch` with the provider's OAuth routing, when it has any.
+ *
+ * Browser providers expose `getProxyFetch()`, which sends OAuth metadata,
+ * registration, and token requests through `oauthProxyUrl` and passes every
+ * other request to `baseFetch` unchanged. Providers without it get `baseFetch`
+ * back as-is.
+ *
+ * @param provider - OAuth provider that may expose `getProxyFetch()`.
+ * @param baseFetch - Fetch used for requests the provider does not handle.
+ * @returns The provider-scoped fetch, or `baseFetch` when there is no wrapper.
+ */
+export function scopeOAuthFetch(
+  provider: OAuthClientProvider | undefined,
+  baseFetch: typeof fetch | undefined
+): typeof fetch | undefined {
+  return (
+    (provider as FlowProvider | undefined)?.getProxyFetch?.(baseFetch) ??
+    baseFetch
+  );
+}
+
 /** Host callback used to complete the official transport's pending OAuth flow. */
 type FinishOAuthAuthorization = (code: string, iss?: string) => Promise<void>;
 

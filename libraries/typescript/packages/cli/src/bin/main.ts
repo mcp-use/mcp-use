@@ -13,23 +13,6 @@ import {
   type ParsedArgs,
 } from "./args.js";
 
-// Node 25 exposes `localStorage` through a warning-producing lazy getter when
-// no --localstorage-file is configured. CLI/server code does not use that
-// browser store, so shadow it before any optional client or Inspector module
-// can probe the global.
-const nodeLocalStorage = Object.getOwnPropertyDescriptor(
-  globalThis,
-  "localStorage"
-);
-if (nodeLocalStorage?.get !== undefined && nodeLocalStorage.configurable) {
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    enumerable: nodeLocalStorage.enumerable ?? false,
-    value: undefined,
-    writable: true,
-  });
-}
-
 /**
  * Options this bin passes to the cli's `runDev`/`runBuild`.
  *

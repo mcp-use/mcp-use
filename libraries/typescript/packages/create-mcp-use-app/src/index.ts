@@ -31,6 +31,7 @@ import {
   runPackageManager,
   updateIndexTs,
   updatePackageJson,
+  validateProjectName,
 } from "./utils.js";
 import {
   getDefaultDistTag,
@@ -75,28 +76,21 @@ function parseCli(argv: string[]): {
       version: { type: "boolean", short: "V" },
     },
     allowPositionals: true,
-    strict: false,
+    allowNegative: true,
+    strict: true,
   });
 
-  const install = argv.includes("--install")
-    ? true
-    : argv.includes("--no-install")
-      ? false
-      : (values.install as boolean | undefined);
-
-  const skills = argv.includes("--skills")
-    ? true
-    : argv.includes("--no-skills")
-      ? false
-      : (values.skills as boolean | undefined);
+  if (positionals.length > 1) {
+    throw new Error(`Unexpected extra argument: ${positionals[1]}`);
+  }
 
   return {
     projectName: positionals[0],
     options: {
       template: values.template as string | undefined,
       listTemplates: values["list-templates"] as boolean | undefined,
-      install,
-      skills,
+      install: values.install as boolean | undefined,
+      skills: values.skills as boolean | undefined,
       dev: values.dev as boolean | undefined,
       sdkVersion: values["sdk-version"] as string | undefined,
       npm: values.npm as boolean | undefined,
@@ -691,8 +685,9 @@ async function promptForProjectName(): Promise<string> {
         }
         return undefined;
       }
-      if (!/^[a-zA-Z0-9-_]+$/.test(value)) {
-        return "Project name can only contain letters, numbers, hyphens, and underscores";
+      const nameError = validateProjectName(value);
+      if (nameError) {
+        return nameError;
       }
       if (existsSync(join(process.cwd(), value))) {
         return `Directory "${value}" already exists! Please choose a different name.`;
@@ -829,15 +824,11 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   } else {
-    if (
-      trimmedProjectName.includes("..") ||
-      trimmedProjectName.includes("/") ||
-      trimmedProjectName.includes("\\")
-    ) {
-      console.error(
-        ansi.red('❌ Project name cannot contain path separators or ".."')
-      );
-      console.error(ansi.yellow('   Use simple names like "my-mcp-server"'));
+    // Same rule as the interactive prompt. It also rules out path separators
+    // and "..", so the project always lands in a direct child directory.
+    const nameError = validateProjectName(trimmedProjectName);
+    if (nameError) {
+      console.error(ansi.red(`❌ ${nameError}`));
       process.exit(1);
     }
 

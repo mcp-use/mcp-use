@@ -1,4 +1,4 @@
-import { isViewTool } from "@mcp-use/client/react";
+import { getViewResourceUri, isViewTool } from "@mcp-use/client/react";
 import type { ViewDisplayMode } from "@mcp-use/client/react";
 import { useMemo, useState } from "react";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
@@ -72,9 +72,7 @@ export function ToolResultRenderer({
   }, [result]);
 
   const isMcpAppsTool = isViewTool(toolMeta);
-  const resourceUri = isMcpAppsTool
-    ? ((toolMeta?.ui?.resourceUri as string | undefined) ?? null)
-    : null;
+  const resourceUri = getViewResourceUri(toolMeta);
 
   const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
   const memoizedResult = useMemo(() => parsedResult, [toolName, parsedResult]);

@@ -1,5 +1,43 @@
 # @mcp-use/cli
 
+## 5.1.1-canary.5
+
+### Patch Changes
+
+- 0130e50: `mcp-use client` and `mcp-use screenshot` use the `@mcp-use/client` already installed in your project, including when the CLI runs through `npx`. When no copy is found, they install it into `~/.mcp-use/client-sdk` and no longer add it to your project. Before, running the CLI with `npx` in a pnpm project ran `npm install` there, which crashed with `Cannot read properties of null (reading 'matches')` or wrote a `package-lock.json` next to `pnpm-lock.yaml` (#3081).
+
+  With `--json`, a missing `@mcp-use/client` still fails with `client_install_required`, now without an `npm install` next step: the message says to install it in the project with its package manager.
+
+## 5.1.1-canary.4
+
+### Patch Changes
+
+- c8f90f5: Print a failed tool's error text with `mcp-use screenshot`. Before, the text output said only "Tool <name> returned an error." and the reason was visible only with `--json`. JSON output is unchanged.
+
+## 5.1.1-canary.3
+
+### Patch Changes
+
+- 018ba48: Interactive OAuth in `mcp-use client` no longer fails after 10 seconds at the "Press Enter to open your browser" prompt. The prompt now runs outside the HTTP connection timeout, so `--auth-timeout` governs the whole sign-in, and it closes when that sign-in succeeds, times out or is cancelled. `mcp-use client` and `mcp-use screenshot` also hide the client SDK's info logs; set `MCP_USE_LOG_LEVEL` or `DEBUG` to show them.
+
+## 5.1.1-canary.2
+
+### Patch Changes
+
+- 9eba5b3: create-mcp-use-app now applies the same project name rule to the command-line argument as to the interactive prompt: letters, numbers, hyphens and underscores only. A name like `"my app"` is rejected with a suggestion (`my-app`) instead of creating a directory whose `cd` hint breaks when pasted into a shell. `mcp-use build` now prints the output path with one separator style, so Windows shows `.mcp-use\build\index.js` instead of `.mcp-use\build/index.js`.
+
+## 5.1.1-canary.1
+
+### Patch Changes
+
+- c4c27e0: Load `@mcp-use/client` right after `mcp-use client` or `mcp-use screenshot` auto-installs it. On Node 24 and 25 the first run installed the package but still reported `@mcp-use/client is not installed`, because Node cached the failed lookup from the import that triggered the install. The CLI now finds the installed copy with `module.findPackageJSON` and imports its entry file. The CLI also no longer replaces `globalThis.localStorage` at startup and before loading the client; the client and server stop reading it in Node instead.
+
+## 5.1.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 5.1.0
 
 ### Minor Changes

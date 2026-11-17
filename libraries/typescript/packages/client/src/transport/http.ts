@@ -10,7 +10,11 @@ import {
   type OAuthClientProvider,
   type VersionNegotiationMode,
 } from "@modelcontextprotocol/client";
-import { completeOAuthFlow, isOAuthInteractionRequired } from "../auth/flow.js";
+import {
+  completeOAuthFlow,
+  isOAuthInteractionRequired,
+  scopeOAuthFetch,
+} from "../auth/flow.js";
 import type { MCPAuthorizationInfo } from "../core/session.js";
 import { DialectJsonSchemaValidator } from "../utils/json-schema-validator.js";
 import { logger } from "../utils/logging.js";
@@ -246,15 +250,21 @@ export class HttpConnector extends BaseConnector {
     }
 
     this.timeout = opts.timeout ?? 10000; // Default 10 seconds
-    const baseFetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
+    // OAuth routing (e.g. a browser provider's `oauthProxyUrl`) wraps the
+    // caller's fetch; the MCP gateway wraps that. The gateway only rewrites
+    // the MCP endpoint, so OAuth URLs still reach the provider's wrapper.
+    const oauthFetch = scopeOAuthFetch(
+      isOAuthClientProvider(opts.authProvider) ? opts.authProvider : undefined,
+      opts.fetch
+    );
     this.customFetch = this.gatewayUrl
       ? createMcpProxyFetch(
           originalUrl,
           this.gatewayUrl,
-          baseFetch,
+          oauthFetch ?? globalThis.fetch.bind(globalThis),
           this.serverId
         )
-      : opts.fetch;
+      : oauthFetch;
     this.clientInfo = opts.clientInfo ?? {
       name: "http-connector",
       version: "1.0.0",
