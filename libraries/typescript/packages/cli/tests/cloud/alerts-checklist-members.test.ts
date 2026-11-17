@@ -420,6 +420,103 @@ test("checklist run --json-file prints the readable report and writes the JSON r
   });
 });
 
+test("checklist get --markdown-file writes a dashboard-style report", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    body: {
+      id: "run_1",
+      status: "completed",
+      gitBranch: null,
+      score: 84,
+      isReadyForChatgpt: false,
+      isReadyForClaudeai: true,
+      startedAt: "2026-11-17T23:45:19Z",
+      completedAt: "2026-11-17T23:49:51Z",
+      checks: [
+        {
+          checkId: "server-responds",
+          checkName: "MCP negotiation succeeds (v1/v2)",
+          status: "pass",
+          severity: "error",
+          category: "connectivity",
+          platforms: [],
+          message: "MCP modern negotiation succeeded in 1098ms",
+        },
+        {
+          checkId: "tool-title-present",
+          checkName: "All tools have a display title",
+          status: "pass",
+          severity: "error",
+          category: "client-compatibility",
+          platforms: ["claudeai"],
+          message: "All tools have a display title",
+        },
+        {
+          checkId: "policy-review-summary",
+          checkName: "Policy review partial",
+          status: "fail",
+          severity: "warning",
+          category: "policy-conformance",
+          platforms: [],
+          message: "Accepted 1 policy finding(s)",
+        },
+        {
+          checkId: "policy-review-71cf55ed7c53",
+          checkName: "Enabled alert creation can send notifications",
+          status: "fail",
+          severity: "error",
+          category: "policy-conformance",
+          platforms: ["chatgpt"],
+          message: "create_alert | advertises destructiveHint <false>",
+          hint: { text: "Set destructiveHint to true." },
+          details: [
+            {
+              label: "policy URL",
+              value: "https://developers.openai.com/plugins/deploy/app-review",
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const result = await cli.run(
+    [
+      "checklist",
+      "get",
+      "run_1",
+      "--server",
+      "weather",
+      "--markdown-file",
+      "report.md",
+    ],
+    { env: SIGNED_IN }
+  );
+  expect(result.exitCode).toBe(0);
+  const markdown = await readFile(join(cli.cwd, "report.md"), "utf8");
+  for (const line of [
+    "## Checklist · Weather",
+    "Production · 4m 32s",
+    "| **84** /100 | ✅ 2 passed | ❌ Not ready | ✅ Ready |",
+    "> **May require additional review** · 1 policy concern<br>",
+    "<details><summary><b>Protocol</b> &nbsp; ✅ Pass · 1/1</summary>",
+    "| ✅ | **MCP negotiation succeeds (v1/v2)**<br>MCP modern negotiation succeeded in 1098ms |  |",
+    "<details open><summary><b>Policy review</b> &nbsp; ❌ Issues · 0/2</summary>",
+    "| 🛑 | **Enabled alert creation can send notifications**<br>create_alert \\| advertises destructiveHint &lt;false&gt;<br><b>How to fix:</b> Set destructiveHint to true. | `error` `ChatGPT` [Policy text ↗](https://developers.openai.com/plugins/deploy/app-review) |",
+    "| ⚠️ | **Policy review partial**<br>Accepted 1 policy finding(s) | `warning` |",
+  ])
+    expect(markdown).toContain(line);
+  // Sections follow the dashboard's order.
+  expect(markdown.indexOf("<b>Protocol</b>")).toBeLessThan(
+    markdown.indexOf("<b>Client compatibility</b>")
+  );
+  expect(markdown.indexOf("<b>Client compatibility</b>")).toBeLessThan(
+    markdown.indexOf("<b>Policy review</b>")
+  );
+});
+
 test("checklist run keeps polling through dropped connections and server errors", async ({
   cloud,
   cli,

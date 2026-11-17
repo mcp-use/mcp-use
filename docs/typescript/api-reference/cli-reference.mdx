@@ -638,7 +638,7 @@ mcp-use github repos [--installation <id>] [--page <n>] [--limit <n>] [options]
 Run the publishing checklist for a server.
 
 ```bash
-mcp-use checklist run [--branch <branch>] [--no-wait] [--fail-on <level>] [--json-file <path>] [options]
+mcp-use checklist run [--branch <branch>] [--no-wait] [--fail-on <level>] [--json-file <path>] [--markdown-file <path>] [options]
 ```
 
 Retain the run ID when using `--no-wait`, then inspect it with `checklist get`. A completed check does not publish the server.
@@ -655,6 +655,8 @@ By default the command exits 0 once the run finishes, whatever the results. In C
 
 To keep the readable report in CI logs and still read the result from a script, pass `--json-file <path>`. The report prints as usual, and the same result `--json` would print is written to the file.
 
+Pass `--markdown-file <path>` to also write a Markdown report laid out like the dashboard's checklist page: the score, a policy-review banner, and one section per category. Use it for pull request comments or CI job summaries. `checklist get` accepts it too.
+
 ### `checklist list`
 
 List publishing checklist runs.
@@ -668,7 +670,7 @@ mcp-use checklist list [--branch <branch>] [--limit <n>] [--skip <n>] [options]
 Inspect a publishing checklist run.
 
 ```bash
-mcp-use checklist get <run-id> [options]
+mcp-use checklist get <run-id> [--markdown-file <path>] [options]
 ```
 
 ### `checklist cancel`

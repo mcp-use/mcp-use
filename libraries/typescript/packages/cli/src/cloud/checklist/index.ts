@@ -7,7 +7,11 @@ import { CommandError, UsageError } from "../../core/errors.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
 import { cloudWebUrl } from "../cloud-api.js";
 import { checklistClient, checklistRun, type ChecklistRun } from "./api.js";
-import { checkStatus, formatChecklist } from "./output.js";
+import {
+  checkStatus,
+  formatChecklist,
+  formatChecklistMarkdown,
+} from "./output.js";
 import { withProgress } from "../../core/progress.js";
 
 const FAIL_ON = ["none", "failed", "warnings"] as const;
@@ -65,6 +69,9 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
           : {}),
         ...(command === "run" || command === "list"
           ? { branch: { type: "string" as const } }
+          : {}),
+        ...(command === "run" || command === "get"
+          ? { "markdown-file": { type: "string" as const } }
           : {}),
         ...(command === "run"
           ? {
@@ -221,11 +228,13 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
       }
       // Judge the full run: the public result omits check severity.
       if (command === "run") failed = shouldFail(run, failOn);
+      const serverName = found.name ?? found.slug ?? serverId;
       return {
         value: { ...checklistRun(run), dashboardUrl },
+        markdown: formatChecklistMarkdown(run, { serverName, dashboardUrl }),
         human: formatChecklist(run, {
           verbose: values.verbose === true,
-          serverName: found.name ?? found.slug ?? serverId,
+          serverName,
           dashboardUrl,
           color:
             process.stdout.isTTY === true &&
@@ -237,6 +246,9 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
     // Lets CI read the result while the log keeps the readable report.
     if (typeof values["json-file"] === "string")
       await writeFile(values["json-file"], `${JSON.stringify(result.value)}\n`);
+    // A dashboard-style report for pull request comments and job summaries.
+    if (typeof values["markdown-file"] === "string" && "markdown" in result)
+      await writeFile(values["markdown-file"], `${result.markdown}\n`);
     output.result(result.value, result.human);
     if (failed)
       process.stderr.write(`Checklist did not pass (--fail-on ${failOn}).\n`);

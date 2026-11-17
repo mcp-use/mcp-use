@@ -385,6 +385,10 @@ const pages: Record<string, Page> = {
             "--json-file <path>",
             "Also write the --json result to a file; the readable report still prints",
           ],
+          [
+            "--markdown-file <path>",
+            "Also write a Markdown report, laid out like the dashboard",
+          ],
           ["--verbose", "Show every check and full finding details"],
         ],
         examples: [
@@ -404,6 +408,10 @@ const pages: Record<string, Page> = {
         options: [
           ...project,
           ["--verbose", "Show every check and full finding details"],
+          [
+            "--markdown-file <path>",
+            "Also write a Markdown report, laid out like the dashboard",
+          ],
         ],
         examples: ["mcp-use checklist get run_123"],
       },
