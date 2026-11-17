@@ -117,12 +117,18 @@ function toWebSocketOrigin(serverOrigin: string): string {
  *
  * Precedence (high → low): author → env (`CSP_*_DOMAINS`, or `CSP_URLS` for
  * connect/resource domains) → MCP auto-append (lowest).
+ * Frame and base-uri domain fields are omitted when their merged lists are empty.
  */
 export function buildMergedResourceCsp(
   authorFacts: ViewResourceFacts | undefined,
   options: BuildCspOptions
 ): McpUiResourceCsp {
   const author = authorFacts?.csp as McpUseResourceCsp | undefined;
+  const {
+    frameDomains: authorFrameDomains,
+    baseUriDomains: authorBaseUriDomains,
+    ...otherAuthorCsp
+  } = author ?? {};
 
   const mcpConnectAuto: string[] = [];
   if (options.serverOrigin !== "") {
@@ -153,12 +159,12 @@ export function buildMergedResourceCsp(
   );
 
   const frameDomains = mergeDomainLists(
-    author?.frameDomains ?? [],
+    authorFrameDomains ?? [],
     readEnvDomainsForCategory("frameDomains")
   );
 
   const baseUriDomains = mergeDomainLists(
-    author?.baseUriDomains ?? [],
+    authorBaseUriDomains ?? [],
     readEnvDomainsForCategory("baseUriDomains")
   );
   const scriptDirectives = mergeDomainLists(
@@ -167,11 +173,11 @@ export function buildMergedResourceCsp(
   );
 
   return {
-    ...author,
+    ...otherAuthorCsp,
     connectDomains,
     resourceDomains,
-    frameDomains,
-    baseUriDomains,
+    ...(frameDomains.length > 0 ? { frameDomains } : {}),
+    ...(baseUriDomains.length > 0 ? { baseUriDomains } : {}),
     ...(scriptDirectives.length > 0 ? { scriptDirectives } : {}),
   } as McpUseResourceCsp;
 }
