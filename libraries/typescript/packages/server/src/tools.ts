@@ -91,8 +91,10 @@ export interface ToolViewConfig {
   /**
    * CSP domains the host must allow → resource `_meta.ui.csp`. The framework
    * appends the server origin to `connectDomains` and the configured assets
-   * origin (or server origin) to `resourceDomains` at emission time. Other
-   * author-set fields (`frameDomains`, `baseUriDomains`, …) pass through.
+   * origin (or server origin) to `resourceDomains` at emission time.
+   * `frameDomains` and `baseUriDomains` merge authored and category-specific
+   * environment lists; each field is omitted when its merged list is empty.
+   * Other author-set fields pass through.
    */
   csp?: McpUiResourceCsp;
   /** Sandbox permissions the view needs → resource `_meta.ui.permissions`. */
