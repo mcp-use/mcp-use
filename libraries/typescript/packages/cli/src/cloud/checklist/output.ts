@@ -2,7 +2,8 @@ import { elapsed, fields, plain, prose } from "../../core/format.js";
 import type { ChecklistRun } from "./api.js";
 
 type Check = NonNullable<ChecklistRun["checks"]>[number];
-type Status =
+/** A check result normalized for display and `--fail-on`. */
+export type CheckStatus =
   | "passed"
   | "failed"
   | "warnings"
@@ -26,7 +27,8 @@ const categories: Record<string, string> = {
   "policy-conformance": "Policy review",
   e2e: "Live tests",
 };
-function status(check: Check): Status {
+/** Normalize an API check status, folding low-severity failures into warnings. */
+export function checkStatus(check: Check): CheckStatus {
   switch (check.status.toLowerCase()) {
     case "pass":
     case "passed":
@@ -53,7 +55,7 @@ function status(check: Check): Status {
   }
 }
 function counts(checks: Check[]): string {
-  const totals: Record<Status, number> = {
+  const totals: Record<CheckStatus, number> = {
     passed: 0,
     failed: 0,
     warnings: 0,
@@ -61,8 +63,8 @@ function counts(checks: Check[]): string {
     pending: 0,
     unknown: 0,
   };
-  for (const check of checks) totals[status(check)]++;
-  return (Object.entries(totals) as [Status, number][])
+  for (const check of checks) totals[checkStatus(check)]++;
+  return (Object.entries(totals) as [CheckStatus, number][])
     .filter(([, count]) => count)
     .map(
       ([kind, count]) =>
@@ -70,7 +72,7 @@ function counts(checks: Check[]): string {
     )
     .join(" · ");
 }
-function groupStatus(checks: Check[]): Status {
+function groupStatus(checks: Check[]): CheckStatus {
   for (const kind of [
     "failed",
     "warnings",
@@ -79,7 +81,7 @@ function groupStatus(checks: Check[]): Status {
     "passed",
     "skipped",
   ] as const)
-    if (checks.some((check) => status(check) === kind)) return kind;
+    if (checks.some((check) => checkStatus(check) === kind)) return kind;
   return "unknown";
 }
 function score(checks: Check[]): number | undefined {
@@ -98,7 +100,7 @@ function score(checks: Check[]): number | undefined {
         check.severity!
       ] ?? 1;
     total += weight;
-    if (status(check) === "passed") passed += weight;
+    if (checkStatus(check) === "passed") passed += weight;
   }
   return total ? Math.round((passed / total) * 100) : undefined;
 }
@@ -115,7 +117,7 @@ export function formatChecklist(
 ): string {
   const paint = (value: string, code: number) =>
     options.color ? `\u001b[${code}m${value}\u001b[0m` : value;
-  const icons: Record<Status, string> = {
+  const icons: Record<CheckStatus, string> = {
     passed: paint("✓", 32),
     failed: paint("✗", 31),
     warnings: paint("!", 33),
@@ -141,7 +143,7 @@ export function formatChecklist(
     const policy = checks.filter(
       (check) =>
         check.category === "policy-conformance" &&
-        ["failed", "warnings"].includes(status(check))
+        ["failed", "warnings"].includes(checkStatus(check))
     );
     // Dynamic policy concerns are separate from the fixed publishing checks.
     lines.push("", counts(checks.filter((check) => !policy.includes(check))));
@@ -169,7 +171,7 @@ export function formatChecklist(
         `  ${counts(items)}`
       );
       for (const check of items) {
-        const kind = status(check);
+        const kind = checkStatus(check);
         // Older API responses without categories retain individual check names.
         if (kind === "passed" && !options.verbose && check.category) continue;
         const clients = check.platforms?.map(

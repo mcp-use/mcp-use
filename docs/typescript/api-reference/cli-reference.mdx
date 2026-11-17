@@ -638,10 +638,20 @@ mcp-use github repos [--installation <id>] [--page <n>] [--limit <n>] [options]
 Run the publishing checklist for a server.
 
 ```bash
-mcp-use checklist run [--branch <branch>] [--no-wait] [options]
+mcp-use checklist run [--branch <branch>] [--no-wait] [--fail-on <level>] [options]
 ```
 
 Retain the run ID when using `--no-wait`, then inspect it with `checklist get`. A completed check does not publish the server.
+
+By default the command exits 0 once the run finishes, whatever the results. In CI, pass `--fail-on` to set the exit code from the results:
+
+| Level | Exits 1 when |
+| --- | --- |
+| `none` (default) | Never, for a finished run |
+| `failed` | A check fails, or the run itself fails or is cancelled |
+| `warnings` | Same as `failed`, or a check reports a warning |
+
+`--fail-on` can't be combined with `--no-wait`.
 
 ### `checklist list`
 

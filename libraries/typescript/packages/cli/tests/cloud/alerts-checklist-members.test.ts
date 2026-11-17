@@ -304,6 +304,96 @@ test("checklist --no-wait returns immediately and cancel sends the selected run"
   ).toHaveLength(1);
 });
 
+const PASS = { checkId: "connection", checkName: "Connection", status: "pass" };
+const ERROR = {
+  checkId: "schema",
+  checkName: "Tool schemas",
+  status: "fail",
+  severity: "error",
+};
+const WARNING = {
+  checkId: "icon",
+  checkName: "Server icon",
+  status: "fail",
+  severity: "warning",
+};
+for (const { name, failOn, run, exitCode } of [
+  {
+    name: "a failed check fails --fail-on failed",
+    failOn: "failed",
+    run: { status: "completed", checks: [PASS, ERROR] },
+    exitCode: 1,
+  },
+  {
+    name: "passing checks pass --fail-on failed",
+    failOn: "failed",
+    run: { status: "completed", checks: [PASS] },
+    exitCode: 0,
+  },
+  {
+    name: "a warning passes --fail-on failed",
+    failOn: "failed",
+    run: { status: "completed", checks: [PASS, WARNING] },
+    exitCode: 0,
+  },
+  {
+    name: "a warning fails --fail-on warnings",
+    failOn: "warnings",
+    run: { status: "completed", checks: [PASS, WARNING] },
+    exitCode: 1,
+  },
+  {
+    name: "a run that errored fails --fail-on failed",
+    failOn: "failed",
+    run: { status: "failed", errorMessage: "Server unreachable" },
+    exitCode: 1,
+  },
+  {
+    name: "a failed check passes --fail-on none",
+    failOn: "none",
+    run: { status: "completed", checks: [ERROR] },
+    exitCode: 0,
+  },
+]) {
+  test(`checklist run: ${name}`, async ({ cloud, cli }) => {
+    server(cloud);
+    cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+      status: 201,
+      body: { id: "run_1", status: "pending" },
+    });
+    cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+      body: { id: "run_1", ...run },
+    });
+    const result = await cli.run(
+      ["checklist", "run", "--fail-on", failOn, ...SCOPE],
+      { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+    );
+    expect(result.exitCode).toBe(exitCode);
+    // The full result is still written so CI logs show what failed.
+    expect(result.json).toMatchObject({ id: "run_1", status: run.status });
+  });
+}
+
+test("checklist run rejects an unknown --fail-on and --fail-on with --no-wait", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  for (const args of [
+    ["--fail-on", "sometimes"],
+    ["--fail-on", "failed", "--no-wait"],
+  ]) {
+    const result = await cli.run(["checklist", "run", ...args, ...SCOPE], {
+      env: SIGNED_IN,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.json).toMatchObject({ error: { code: "usage_error" } });
+  }
+  expect(
+    cloud.requestsTo("POST", "/api/v1/server-audits/srv_1/audits")
+  ).toEqual([]);
+});
+
 test("alerts create accepts dashboard YAML and adds metadata for the resolved server", async ({
   cloud,
   cli,

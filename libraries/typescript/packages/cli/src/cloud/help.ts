@@ -377,9 +377,16 @@ const pages: Record<string, Page> = {
           ...project,
           branch,
           ["--no-wait", "Return the run ID immediately"],
+          [
+            "--fail-on <level>",
+            "Exit 1 on failed checks or warnings: none, failed, warnings (default: none)",
+          ],
           ["--verbose", "Show every check and full finding details"],
         ],
-        examples: ["mcp-use checklist run --no-wait"],
+        examples: [
+          "mcp-use checklist run --no-wait",
+          "mcp-use checklist run --fail-on failed",
+        ],
       },
       list: {
         summary: "List checklist runs.",

@@ -5,9 +5,24 @@ import { parseCommandArgs, runCommand } from "../../core/command.js";
 import { CommandError, UsageError } from "../../core/errors.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
 import { cloudWebUrl } from "../cloud-api.js";
-import { checklistClient, checklistRun } from "./api.js";
-import { formatChecklist } from "./output.js";
+import { checklistClient, checklistRun, type ChecklistRun } from "./api.js";
+import { checkStatus, formatChecklist } from "./output.js";
 import { withProgress } from "../../core/progress.js";
+
+const FAIL_ON = ["none", "failed", "warnings"] as const;
+
+/** Whether a finished run should fail the command under `--fail-on`. */
+function shouldFail(
+  run: ChecklistRun,
+  failOn: (typeof FAIL_ON)[number]
+): boolean {
+  if (failOn === "none") return false;
+  if (run.status !== "completed") return true;
+  const failing = failOn === "warnings" ? ["failed", "warnings"] : ["failed"];
+  return (run.checks ?? []).some((check) =>
+    failing.includes(checkStatus(check))
+  );
+}
 
 const USAGE =
   "mcp-use checklist <run|list|get <run-id>|cancel <run-id>> [options]";
@@ -19,7 +34,8 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
     process.stdout.write(help);
     return 0;
   }
-  return runCommand(argv, help, async (output) => {
+  let failed = false;
+  const code = await runCommand(argv, help, async (output) => {
     const command = argv[0];
     if (!["run", "list", "get", "cancel"].includes(command ?? ""))
       throw new UsageError(`Usage: ${USAGE}`);
@@ -34,7 +50,10 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
           ? { branch: { type: "string" as const } }
           : {}),
         ...(command === "run"
-          ? { "no-wait": { type: "boolean" as const } }
+          ? {
+              "no-wait": { type: "boolean" as const },
+              "fail-on": { type: "string" as const },
+            }
           : {}),
         ...(command === "list"
           ? {
@@ -58,6 +77,11 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
       throw new UsageError(
         "Pass --limit between 1 and 100 and a non-negative --skip."
       );
+    const failOn = (values["fail-on"] ?? "none") as (typeof FAIL_ON)[number];
+    if (!FAIL_ON.includes(failOn))
+      throw new UsageError("Pass --fail-on as none, failed or warnings.");
+    if (failOn !== "none" && values["no-wait"] === true)
+      throw new UsageError("--fail-on needs a finished run; drop --no-wait.");
     const label =
       command === "run"
         ? "Running checklist"
@@ -165,6 +189,8 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
           }
         }
       }
+      // Judge the full run: the public result omits check severity.
+      if (command === "run") failed = shouldFail(run, failOn);
       return {
         value: { ...checklistRun(run), dashboardUrl },
         human: formatChecklist(run, {
@@ -179,5 +205,8 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
       };
     });
     output.result(result.value, result.human);
+    if (failed)
+      process.stderr.write(`Checklist did not pass (--fail-on ${failOn}).\n`);
   });
+  return code === 0 && failed ? 1 : code;
 }
