@@ -20,6 +20,7 @@ export interface DeployValues {
   "watch-paths"?: string[];
   "wait-for-ci"?: boolean;
   "no-github"?: boolean;
+  "dry-run"?: boolean;
   "external-url"?: string;
   "no-wait"?: boolean;
   new?: boolean;

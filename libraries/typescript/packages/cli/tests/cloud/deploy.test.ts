@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:https";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -205,6 +205,130 @@ describe("deploy", () => {
     expect(cloud.requestsTo("GET", "/api/v1/deployments/dep_1")).toEqual([]);
   });
 
+  test("--dry-run lists what Git keeps, applies .manufactignore and the denylist, and makes no Cloud requests", async ({
+    cli,
+    cloud,
+  }) => {
+    // A monorepo: the ignore rules live at the repository root, in
+    // .git/info/exclude, and in a nested .gitignore below the app.
+    const repo = cli.cwd;
+    const app = join(repo, "apps", "weather");
+    await mkdir(join(app, "config"), { recursive: true });
+    await mkdir(join(app, "secrets"), { recursive: true });
+    await mkdir(join(app, "fixtures"), { recursive: true });
+    await exec("git", ["init", "-b", "main"], { cwd: repo });
+    await writeFile(join(repo, ".gitignore"), "secrets/\n*.sqlite\n");
+    await writeFile(join(repo, ".git", "info", "exclude"), "notes.txt\n");
+    const files: Record<string, string> = {
+      "server.py": "print('weather')\n",
+      "notes.txt": "excluded by .git/info/exclude",
+      "secrets/token.txt": "root-gitignored-token",
+      "data.sqlite": "brought back by .manufactignore",
+      "config/.gitignore": "credentials.json\n",
+      "config/credentials.json": "nested-gitignored-credentials",
+      "config/settings.json": "{}",
+      "fixtures/large.json": "excluded by .manufactignore",
+      ".manufactignore": "fixtures/\n!data.sqlite\n",
+      "server-key.pem": "private-key",
+      id_ed25519: "ssh-key",
+      ".env.production": "SECRET=1",
+    };
+    for (const [path, content] of Object.entries(files))
+      await writeFile(join(app, path), content);
+    if (process.platform !== "win32")
+      await symlink("server.py", join(app, "alias.py"));
+
+    const result = await cli.run(
+      ["deploy", "apps/weather", "--dry-run", "--json"],
+      { cwd: repo }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toMatchObject({
+      dryRun: true,
+      skipped: {
+        sensitive: [".env.production", "id_ed25519", "server-key.pem"],
+        symlinks: process.platform === "win32" ? [] : ["alias.py"],
+      },
+    });
+    const listed = (result.json as { files: Array<{ path: string }> }).files;
+    expect(listed.map((file) => file.path)).toEqual([
+      ".manufactignore",
+      "config/.gitignore",
+      "config/settings.json",
+      "data.sqlite",
+      "server.py",
+    ]);
+    expect(cloud.requests).toEqual([]);
+
+    const human = await cli.run(["deploy", "apps/weather", "--dry-run"], {
+      cwd: repo,
+    });
+    expect(human.exitCode).toBe(0);
+    expect(human.stdout).toContain("server.py");
+    expect(human.stdout).toContain("Would upload 5 files");
+    expect(human.stdout).toContain(
+      "Skipped credential files: .env.production, id_ed25519, server-key.pem"
+    );
+  });
+
+  test("outside a Git repository only the project's .gitignore applies", async ({
+    cli,
+  }) => {
+    await mkdir(join(cli.cwd, "logs"), { recursive: true });
+    await writeFile(join(cli.cwd, "server.py"), "print('weather')\n");
+    await writeFile(join(cli.cwd, ".gitignore"), "logs/\n");
+    await writeFile(join(cli.cwd, "logs", "today.log"), "ignored");
+    const result = await cli.run(["deploy", "--dry-run", "--json"]);
+    expect(result.exitCode).toBe(0);
+    const listed = (result.json as { files: Array<{ path: string }> }).files;
+    expect(listed.map((file) => file.path)).toEqual([
+      ".gitignore",
+      "server.py",
+    ]);
+  });
+
+  test("an upload with nothing left to send fails before contacting Cloud", async ({
+    cli,
+    cloud,
+  }) => {
+    await writeFile(join(cli.cwd, ".env"), "SECRET=1\n");
+    const result = await cli.run(["deploy", "--dry-run", "--json"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({ error: { code: "nothing_to_upload" } });
+    expect(cloud.requests).toEqual([]);
+  });
+
+  test("a local upload prints what it sends and leaves Git-ignored files out", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    await exec("git", ["init", "-b", "main"], { cwd: cli.cwd });
+    await writeFile(join(cli.cwd, ".gitignore"), "*.db\n");
+    await writeFile(join(cli.cwd, "weather.py"), "print('weather')\n");
+    await writeFile(join(cli.cwd, "local.db"), "git-ignored-database");
+    await writeFile(join(cli.cwd, "server.key"), "private-key-material");
+    cloud.on("POST", "/api/v1/servers", {
+      body: { server: { id: "srv_1", slug: "weather" }, deploymentId: "dep_1" },
+    });
+    const result = await cli.run(
+      ["deploy", "--no-github", "--name", "weather", "--no-wait"],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain("Uploading 2 files");
+    expect(result.stderr).toContain("Skipped credential files: server.key");
+    const request = cloud.requestsTo("POST", "/api/v1/servers")[0]!;
+    const boundary =
+      request.headers["content-type"]!.match(/boundary=(.+)$/)![1]!;
+    const start = request.rawBody.indexOf("\r\n\r\n") + 4;
+    const end = request.rawBody.indexOf(`\r\n--${boundary}`, start);
+    const archive = gunzipSync(request.rawBody.subarray(start, end)).toString();
+    expect(archive).toContain("app/weather.py");
+    expect(archive).not.toContain("git-ignored-database");
+    expect(archive).not.toContain("private-key-material");
+  });
+
   test("waits by default through pending to running and emits only the final result", async ({
     cli,
     cloud,
@@ -245,6 +369,7 @@ describe("deploy", () => {
     cloud,
   }) => {
     signIn(cloud);
+    await writeFile(join(cli.cwd, "server.py"), "print('weather')\n");
     cloud.on("POST", "/api/v1/servers", {
       body: { server: { id: "srv_1", slug: null }, deploymentId: "dep_1" },
     });
@@ -441,6 +566,7 @@ describe("deploy", () => {
     cloud,
   }) => {
     signIn(cloud);
+    await writeFile(join(cli.cwd, "server.py"), "print('weather')\n");
     cloud.on("POST", "/api/v1/servers", {
       status: 400,
       body: {
