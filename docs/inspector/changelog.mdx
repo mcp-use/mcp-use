@@ -6,6 +6,16 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.30" description="November 2026">
+  ## Legacy MCP Apps views
+  Patch release restoring view rendering for servers that use the deprecated flat resource URI metadata key.
+
+- **Fix**: render MCP Apps views from tools that only send `_meta["ui/resourceUri"]`, keeping chat results, tool resource prefetch, and MCP Apps capability detection consistent (`#3097`)
+- **Update**: rebuild bundled workspace code with @mcp-use/client v2.4.6 and @mcp-use/agent v2.0.27, including the OAuth routing and code-mode logging fixes; see the [TypeScript changelog](/typescript/changelog)
+- **Update**: upgrade Playwright to v1.65.1 so Inspector E2E browser installation supports Ubuntu 26.04 runners (`#3109`)
+- **Update**: Updated mcp-use to v2.12.6
+</Update>
+
 <Update label="v20.3.29" description="November 2026">
   ## Framework compatibility refresh
   Canary release rebuilding bundled workspace code and synchronizing package metadata with the framework's view-cache and landing-page fixes. There are no Inspector-specific runtime changes.
