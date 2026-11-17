@@ -15,6 +15,11 @@ on:
         required: false
         type: boolean
         default: false
+      preserve_canary:
+        description: "Preserve unreleased canary commits when publishing a stable hotfix"
+        required: false
+        type: boolean
+        default: false
 
 # Canary publication and main's canary reset must not overlap or drop queued releases.
 concurrency:
@@ -471,7 +476,12 @@ jobs:
           done < .release-tags
 
       - name: Reset canary to main
-        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
+        # A stable hotfix does not promote the unreleased work on canary.
+        if: >-
+          github.ref == 'refs/heads/main' &&
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true' &&
+          inputs.preserve_canary != true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
