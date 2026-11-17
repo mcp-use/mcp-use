@@ -1942,7 +1942,7 @@ describe("views env URL / CSP (e2e)", () => {
     expect(viewCsp?.connectDomains).toContain("https://server.example.com");
     expect(viewCsp?.resourceDomains?.[0]).toBe("https://platform.example.com");
     expect(viewCsp?.resourceDomains).toContain("https://server.example.com");
-    expect(viewCsp?.frameDomains).toEqual([]);
-    expect(viewCsp?.baseUriDomains).toEqual([]);
+    expect(viewCsp).not.toHaveProperty("frameDomains");
+    expect(viewCsp).not.toHaveProperty("baseUriDomains");
   });
 });
