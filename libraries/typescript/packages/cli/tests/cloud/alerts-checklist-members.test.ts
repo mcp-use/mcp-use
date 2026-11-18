@@ -516,8 +516,8 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
   expect(result.exitCode).toBe(0);
   const markdown = await readFile(join(cli.cwd, "report.md"), "utf8");
   for (const line of [
-    "## Checklist · Manufact",
-    "Weather · Production · 4m 32s",
+    "## Manufact Publishing Checks · Weather",
+    "Production · 4m 32s",
     "| **84** /100 | ✅ 2 passed | ❌ Not ready | ✅ Ready |",
     "> **May require additional review** · 1 policy concern<br>",
     "<details><summary><b>Protocol</b> &nbsp; ✅ Pass · 1/1</summary>",

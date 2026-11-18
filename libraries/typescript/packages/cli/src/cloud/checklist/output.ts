@@ -259,9 +259,9 @@ export function formatChecklistMarkdown(
   const points = typeof run.score === "number" ? run.score : score(checks);
   const duration = elapsed(run.startedAt, run.completedAt);
   const lines: string[] = [
-    "## Checklist · Manufact",
+    `## Manufact Publishing Checks · ${cell(options.serverName)}`,
     "",
-    `${cell(options.serverName)} · ${run.gitBranch ? `Branch \`${run.gitBranch}\`` : "Production"}${duration ? ` · ${duration}` : ""}`,
+    `${run.gitBranch ? `Branch \`${run.gitBranch}\`` : "Production"}${duration ? ` · ${duration}` : ""}`,
     "",
   ];
 
