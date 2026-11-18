@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
 import { test } from "../helpers/cli-test.js";
@@ -302,6 +302,357 @@ test("checklist --no-wait returns immediately and cancel sends the selected run"
   expect(
     cloud.requestsTo("POST", "/api/v1/server-audits/srv_1/audits/run_1/cancel")
   ).toHaveLength(1);
+});
+
+const PASS = { checkId: "connection", checkName: "Connection", status: "pass" };
+const ERROR = {
+  checkId: "schema",
+  checkName: "Tool schemas",
+  status: "fail",
+  severity: "error",
+};
+const WARNING = {
+  checkId: "icon",
+  checkName: "Server icon",
+  status: "fail",
+  severity: "warning",
+};
+const POLICY = {
+  checkId: "policy-review-71cf55ed7c53",
+  checkName: "Alert creation can send notifications",
+  status: "fail",
+  severity: "error",
+  category: "policy-conformance",
+};
+for (const { name, failOn, run, exitCode } of [
+  {
+    name: "a failed check fails --fail-on failed",
+    failOn: "failed",
+    run: { status: "completed", checks: [PASS, ERROR] },
+    exitCode: 1,
+  },
+  {
+    name: "passing checks pass --fail-on failed",
+    failOn: "failed",
+    run: { status: "completed", checks: [PASS] },
+    exitCode: 0,
+  },
+  {
+    name: "a warning passes --fail-on failed",
+    failOn: "failed",
+    run: { status: "completed", checks: [PASS, WARNING] },
+    exitCode: 0,
+  },
+  {
+    name: "a warning fails --fail-on warnings",
+    failOn: "warnings",
+    run: { status: "completed", checks: [PASS, WARNING] },
+    exitCode: 1,
+  },
+  {
+    name: "a run that errored fails --fail-on failed",
+    failOn: "failed",
+    run: { status: "failed", errorMessage: "Server unreachable" },
+    exitCode: 1,
+  },
+  {
+    name: "an error-severity policy concern passes --fail-on failed",
+    failOn: "failed",
+    run: { status: "completed", checks: [PASS, POLICY] },
+    exitCode: 0,
+  },
+  {
+    name: "a policy concern fails --fail-on warnings",
+    failOn: "warnings",
+    run: { status: "completed", checks: [PASS, POLICY] },
+    exitCode: 1,
+  },
+  {
+    name: "a failed check passes --fail-on none",
+    failOn: "none",
+    run: { status: "completed", checks: [ERROR] },
+    exitCode: 0,
+  },
+]) {
+  test(`checklist run: ${name}`, async ({ cloud, cli }) => {
+    server(cloud);
+    cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+      status: 201,
+      body: { id: "run_1", status: "pending" },
+    });
+    cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+      body: { id: "run_1", ...run },
+    });
+    const result = await cli.run(
+      ["checklist", "run", "--fail-on", failOn, ...SCOPE],
+      { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+    );
+    expect(result.exitCode).toBe(exitCode);
+    // The full result is still written so CI logs show what failed.
+    expect(result.json).toMatchObject({ id: "run_1", status: run.status });
+  });
+}
+
+test("checklist run --json-file prints the readable report and writes the JSON result", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+    status: 201,
+    body: { id: "run_1", status: "pending" },
+  });
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    body: {
+      id: "run_1",
+      status: "completed",
+      isReadyForChatgpt: false,
+      checks: [PASS, { ...ERROR, message: "Missing schema" }],
+    },
+  });
+  const result = await cli.run(
+    [
+      "checklist",
+      "run",
+      "--server",
+      "weather",
+      "--fail-on",
+      "failed",
+      "--json-file",
+      "result.json",
+    ],
+    { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+  );
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toContain("1 passed · 1 failed");
+  expect(result.stdout).toContain("      Missing schema");
+  expect(
+    JSON.parse(await readFile(join(cli.cwd, "result.json"), "utf8"))
+  ).toMatchObject({
+    id: "run_1",
+    status: "completed",
+    isReadyForChatgpt: false,
+    checks: [
+      { checkId: "connection", status: "pass" },
+      { checkId: "schema", status: "fail", message: "Missing schema" },
+    ],
+  });
+});
+
+test("checklist get --markdown-file writes a dashboard-style report", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    body: {
+      id: "run_1",
+      status: "completed",
+      gitBranch: null,
+      score: 84,
+      targetUrl: "https://weather.test/mcp",
+      isReadyForChatgpt: false,
+      isReadyForClaudeai: true,
+      startedAt: "2026-11-17T23:45:19Z",
+      completedAt: "2026-11-17T23:49:51Z",
+      checks: [
+        {
+          checkId: "server-responds",
+          checkName: "MCP negotiation succeeds (v1/v2)",
+          status: "pass",
+          severity: "error",
+          category: "connectivity",
+          platforms: [],
+          message: "MCP modern negotiation succeeded in 1098ms",
+        },
+        {
+          checkId: "tool-title-present",
+          checkName: "All tools have a display title",
+          status: "pass",
+          severity: "error",
+          category: "client-compatibility",
+          platforms: ["claudeai"],
+          message: "All tools have a display title",
+        },
+        {
+          checkId: "policy-review-summary",
+          checkName: "Policy review partial",
+          status: "fail",
+          severity: "warning",
+          category: "policy-conformance",
+          platforms: [],
+          message: "Accepted 1 policy finding(s)",
+        },
+        {
+          checkId: "policy-review-71cf55ed7c53",
+          checkName: "Enabled alert creation can send notifications",
+          status: "fail",
+          severity: "error",
+          category: "policy-conformance",
+          platforms: ["chatgpt"],
+          message: "create_alert | advertises destructiveHint <false>",
+          hint: { text: "Set destructiveHint to true." },
+          details: [
+            {
+              label: "policy URL",
+              value: "https://developers.openai.com/plugins/deploy/app-review",
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const result = await cli.run(
+    [
+      "checklist",
+      "get",
+      "run_1",
+      "--server",
+      "weather",
+      "--markdown-file",
+      "report.md",
+    ],
+    { env: SIGNED_IN }
+  );
+  expect(result.exitCode).toBe(0);
+  const markdown = await readFile(join(cli.cwd, "report.md"), "utf8");
+  for (const line of [
+    "## Manufact Publishing Checks · Weather",
+    "Production · 4m 32s",
+    "[View in dashboard ↗](",
+    "| **84** /100 | ✅ 2 passed | ❌ Not ready | ✅ Ready |",
+    "> **May require additional review** · 1 policy concern<br>",
+    "<details><summary><b>Protocol</b> &nbsp; ✅ Pass · 1/1</summary>",
+    "| ✅ | **MCP negotiation succeeds (v1/v2)**<br>MCP modern negotiation succeeded in 1098ms |",
+    "<details open><summary><b>Policy review</b> &nbsp; ❌ Issues · 0/2</summary>",
+    "| 🛑 | **Enabled alert creation can send notifications**<br>error · ChatGPT · [Policy text ↗](https://developers.openai.com/plugins/deploy/app-review)<br>create_alert \\| advertises destructiveHint &lt;false&gt;<br><b>How to fix:</b> Set destructiveHint to true. |",
+    "| ⚠️ | **Policy review partial**<br>warning<br>Accepted 1 policy finding(s) |",
+  ])
+    expect(markdown).toContain(line);
+  // The dashboard's fix prompt, collapsed and copyable. Text inside the code
+  // block is not HTML-escaped, and the policy summary meta-check is left out.
+  expect(markdown).toContain(
+    "<details><summary>Prompt for AI agents</summary>\n\n```text\nYou are an MCP server developer. Your server at https://weather.test/mcp has 1 issue(s) to fix before it will pass automated platform compatibility checks.\n"
+  );
+  expect(markdown).toContain(
+    "### [ERROR] policy-review-71cf55ed7c53\ncreate_alert | advertises destructiveHint <false>\nAffected:\n- policy URL: https://developers.openai.com/plugins/deploy/app-review\nFix: Set destructiveHint to true.\n"
+  );
+  expect(markdown).not.toContain("policy-review-summary");
+  expect(markdown).toContain(
+    "For each issue above, locate the relevant code in your MCP server implementation and apply the fix described. Validate inputs with proper error messages, not raw schema validation errors.\n```\n\n</details>"
+  );
+  // Every section is a two-column table; tags sit inside the check cell.
+  expect(markdown).toContain("| | Check |\n| :-: | :-- |\n");
+  expect(markdown).not.toContain("| | Check | |");
+  // The footer is just the dashboard link, without the run ID.
+  expect(markdown).not.toContain("run_1");
+  // Sections follow the dashboard's order.
+  expect(markdown.indexOf("<b>Protocol</b>")).toBeLessThan(
+    markdown.indexOf("<b>Client compatibility</b>")
+  );
+  expect(markdown.indexOf("<b>Client compatibility</b>")).toBeLessThan(
+    markdown.indexOf("<b>Policy review</b>")
+  );
+});
+
+test("checklist run keeps polling through dropped connections and server errors", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+    status: 201,
+    body: { id: "run_1", status: "pending" },
+  });
+  const replies = [
+    { reset: true },
+    { status: 503, body: { message: "Service Unavailable" } },
+    { status: 429, body: { message: "Too many requests" } },
+    { body: { id: "run_1", status: "running" } },
+    { reset: true },
+    { body: { id: "run_1", status: "completed", checks: [PASS] } },
+  ];
+  let polls = 0;
+  cloud.onUndocumented(
+    "GET",
+    "/api/v1/server-audits/srv_1/audits/run_1",
+    () => replies[polls++]!
+  );
+  const result = await cli.run(
+    ["checklist", "run", "--fail-on", "failed", ...SCOPE],
+    { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+  );
+  expect(result.exitCode).toBe(0);
+  expect(result.json).toMatchObject({ id: "run_1", status: "completed" });
+  expect(
+    cloud.requestsTo("GET", "/api/v1/server-audits/srv_1/audits/run_1")
+  ).toHaveLength(6);
+});
+
+test("checklist run gives up after repeated poll failures", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+    status: 201,
+    body: { id: "run_1", status: "pending" },
+  });
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    reset: true,
+  });
+  const result = await cli.run(["checklist", "run", ...SCOPE], {
+    env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" },
+  });
+  expect(result.exitCode).toBe(1);
+  expect(result.json).toMatchObject({ error: { code: "cloud_unreachable" } });
+  // One first attempt plus six retries.
+  expect(
+    cloud.requestsTo("GET", "/api/v1/server-audits/srv_1/audits/run_1")
+  ).toHaveLength(7);
+});
+
+test("checklist run stops polling on an error that retrying can't fix", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("POST", "/api/v1/server-audits/srv_1/audits", {
+    status: 201,
+    body: { id: "run_1", status: "pending" },
+  });
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    status: 401,
+    body: { message: "Unauthorized" },
+  });
+  const result = await cli.run(["checklist", "run", ...SCOPE], {
+    env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" },
+  });
+  expect(result.exitCode).toBe(1);
+  expect(result.json).toMatchObject({ error: { code: "not_authenticated" } });
+  expect(
+    cloud.requestsTo("GET", "/api/v1/server-audits/srv_1/audits/run_1")
+  ).toHaveLength(1);
+});
+
+test("checklist run rejects an unknown --fail-on and --fail-on with --no-wait", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  for (const args of [
+    ["--fail-on", "sometimes"],
+    ["--fail-on", "failed", "--no-wait"],
+  ]) {
+    const result = await cli.run(["checklist", "run", ...args, ...SCOPE], {
+      env: SIGNED_IN,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.json).toMatchObject({ error: { code: "usage_error" } });
+  }
+  expect(
+    cloud.requestsTo("POST", "/api/v1/server-audits/srv_1/audits")
+  ).toEqual([]);
 });
 
 test("alerts create accepts dashboard YAML and adds metadata for the resolved server", async ({

@@ -17,6 +17,8 @@ export interface ChecklistRun {
   completedAt?: string | null;
   isReadyForChatgpt?: boolean | null;
   isReadyForClaudeai?: boolean | null;
+  score?: number | null;
+  targetUrl?: string | null;
   checks?: Array<{
     checkId: string;
     checkName: string;
@@ -106,6 +108,8 @@ export function checklistRun(
     "completedAt",
     "isReadyForChatgpt",
     "isReadyForClaudeai",
+    "score",
+    "targetUrl",
   ] as const) {
     if (item[key] !== undefined) Object.assign(result, { [key]: item[key] });
   }

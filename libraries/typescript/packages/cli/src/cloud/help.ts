@@ -377,9 +377,25 @@ const pages: Record<string, Page> = {
           ...project,
           branch,
           ["--no-wait", "Return the run ID immediately"],
+          [
+            "--fail-on <level>",
+            "none (default), failed (failed checks or unfinished run), warnings (also warning checks); not with --no-wait",
+          ],
+          [
+            "--json-file <path>",
+            "Also write the --json result to a file; the readable report still prints",
+          ],
+          [
+            "--markdown-file <path>",
+            "Also write a Markdown report, laid out like the dashboard",
+          ],
           ["--verbose", "Show every check and full finding details"],
         ],
-        examples: ["mcp-use checklist run --no-wait"],
+        examples: [
+          "mcp-use checklist run --no-wait",
+          "mcp-use checklist run --fail-on failed",
+          "mcp-use checklist run --fail-on failed --json-file checklist.json",
+        ],
       },
       list: {
         summary: "List checklist runs.",
@@ -392,6 +408,10 @@ const pages: Record<string, Page> = {
         options: [
           ...project,
           ["--verbose", "Show every check and full finding details"],
+          [
+            "--markdown-file <path>",
+            "Also write a Markdown report, laid out like the dashboard",
+          ],
         ],
         examples: ["mcp-use checklist get run_123"],
       },
