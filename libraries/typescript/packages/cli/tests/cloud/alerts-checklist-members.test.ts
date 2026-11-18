@@ -522,7 +522,8 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
     "| **84** /100 | ✅ 2 passed | ❌ Not ready | ✅ Ready |",
     "> **May require additional review** · 1 policy concern<br>",
     "<details><summary><b>Protocol</b> &nbsp; ✅ Pass · 1/1</summary>",
-    "| ✅ | **MCP negotiation succeeds (v1/v2)**<br>MCP modern negotiation succeeded in 1098ms |  |",
+    // All-pass sections have no tags column.
+    "| | Check |\n| :-: | :-- |\n| ✅ | **MCP negotiation succeeds (v1/v2)**<br>MCP modern negotiation succeeded in 1098ms |\n",
     "<details open><summary><b>Policy review</b> &nbsp; ❌ Issues · 0/2</summary>",
     "| 🛑 | **Enabled alert creation can send notifications**<br>create_alert \\| advertises destructiveHint &lt;false&gt;<br><b>How to fix:</b> Set destructiveHint to true. | `error` `ChatGPT` [Policy text ↗](https://developers.openai.com/plugins/deploy/app-review) |",
     "| ⚠️ | **Policy review partial**<br>Accepted 1 policy finding(s) | `warning` |",
