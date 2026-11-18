@@ -247,8 +247,14 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
     if (typeof values["json-file"] === "string")
       await writeFile(values["json-file"], `${JSON.stringify(result.value)}\n`);
     // A dashboard-style report for pull request comments and job summaries.
-    if (typeof values["markdown-file"] === "string" && "markdown" in result)
-      await writeFile(values["markdown-file"], `${result.markdown}\n`);
+    if (typeof values["markdown-file"] === "string") {
+      if (values["markdown-file"] === values["json-file"])
+        throw new UsageError(
+          "--json-file and --markdown-file must use different paths."
+        );
+      if ("markdown" in result)
+        await writeFile(values["markdown-file"], `${result.markdown}\n`);
+    }
     output.result(result.value, result.human);
     if (failed)
       process.stderr.write(`Checklist did not pass (--fail-on ${failOn}).\n`);
