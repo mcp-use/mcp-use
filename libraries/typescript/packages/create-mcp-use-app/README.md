@@ -116,6 +116,8 @@ npx create-mcp-use-app my-project --template mcp-server
 npx create-mcp-use-app my-project --template owner/repo
 npx create-mcp-use-app my-project --template https://github.com/owner/repo
 npx create-mcp-use-app my-project --template owner/repo#branch-name
+npx create-mcp-use-app my-project --template owner/repo.git
+npx create-mcp-use-app my-project --template owner/repo.git#branch-name
 
 # Use a specific package manager
 npx create-mcp-use-app my-project --npm
@@ -171,7 +173,8 @@ Ideal for starting from an empty server and adding your own tools.
 
 ### GitHub Repository Templates
 
-You can use any GitHub repository as a template by providing the repository URL:
+You can use any GitHub repository as a template with `owner/repo` or a GitHub URL.
+Both forms accept an optional `.git` suffix and `#branch-name` fragment:
 
 ```bash
 # Short format (owner/repo)
@@ -182,6 +185,8 @@ npx create-mcp-use-app my-project --template https://github.com/owner/repo
 
 # With specific branch
 npx create-mcp-use-app my-project --template owner/repo#branch-name
+npx create-mcp-use-app my-project --template owner/repo.git
+npx create-mcp-use-app my-project --template owner/repo.git#branch-name
 npx create-mcp-use-app my-project --template https://github.com/owner/repo#branch-name
 ```
 
