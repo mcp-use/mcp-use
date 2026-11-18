@@ -1,12 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   deriveOAuthProxyUrl,
+  loadServerIcon,
   startConnectionHealthMonitoring,
 } from "../../../src/react/useMcp-helpers.js";
+import { detectFavicon } from "../../../src/utils/favicon.js";
+
+vi.mock("../../../src/utils/favicon.js", () => ({
+  detectFavicon: vi.fn(),
+}));
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.mocked(detectFavicon).mockReset();
 });
 
 describe("deriveOAuthProxyUrl", () => {
@@ -63,6 +71,163 @@ describe("startConnectionHealthMonitoring", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
 
     cleanup();
+  });
+});
+
+describe("loadServerIcon", () => {
+  it("falls back to favicon detection when the server icon request fails", async () => {
+    vi.mocked(detectFavicon).mockResolvedValue("data:image/png;base64,icon");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Not Found", { status: 404 })
+    );
+
+    const result = await loadServerIcon({
+      serverInfo: {
+        name: "demo",
+        icons: [{ src: "https://example.com/icon.svg" }],
+      },
+      url: "https://example.com/mcp",
+      isMounted: () => true,
+      setServerInfo: vi.fn(),
+      addLog: vi.fn(),
+    });
+
+    expect(result).toBe("data:image/png;base64,icon");
+    expect(detectFavicon).toHaveBeenCalledWith("https://example.com/mcp");
+  });
+
+  it("falls back when a successful icon response is not an image", async () => {
+    vi.mocked(detectFavicon).mockResolvedValue("data:image/png;base64,icon");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<html>Not an icon</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      })
+    );
+
+    const result = await loadServerIcon({
+      serverInfo: {
+        name: "demo",
+        icons: [{ src: "https://example.com/icon.svg" }],
+      },
+      url: "https://example.com/mcp",
+      isMounted: () => true,
+      setServerInfo: vi.fn(),
+      addLog: vi.fn(),
+    });
+
+    expect(result).toBe("data:image/png;base64,icon");
+    expect(detectFavicon).toHaveBeenCalledWith("https://example.com/mcp");
+  });
+
+  it("does not apply a favicon from an outdated connection", async () => {
+    let resolveFavicon!: (favicon: string) => void;
+    vi.mocked(detectFavicon).mockReturnValue(
+      new Promise((resolve) => {
+        resolveFavicon = resolve;
+      })
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Not Found", { status: 404 })
+    );
+    const setServerInfo = vi.fn();
+    let isCurrent = true;
+
+    const loading = loadServerIcon({
+      serverInfo: {
+        name: "old-server",
+        icons: [{ src: "https://old.example.com/icon.svg" }],
+      },
+      url: "https://old.example.com/mcp",
+      isMounted: () => true,
+      isCurrent: () => isCurrent,
+      setServerInfo,
+      addLog: vi.fn(),
+    });
+
+    await Promise.resolve();
+    isCurrent = false;
+    resolveFavicon("data:image/png;base64,old-icon");
+
+    expect(await loading).toBeNull();
+    expect(setServerInfo).not.toHaveBeenCalled();
+  });
+
+  it("stores a valid server image", async () => {
+    vi.stubGlobal(
+      "FileReader",
+      class {
+        result = "data:image/png;base64,server-icon";
+        onloadend: (() => void) | null = null;
+        onerror: ((error: unknown) => void) | null = null;
+
+        readAsDataURL() {
+          queueMicrotask(() => this.onloadend?.());
+        }
+      }
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("icon", {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      })
+    );
+    const setServerInfo = vi.fn();
+
+    const result = await loadServerIcon({
+      serverInfo: {
+        name: "demo",
+        icons: [{ src: "https://example.com/icon.png" }],
+      },
+      isMounted: () => true,
+      setServerInfo,
+      addLog: vi.fn(),
+    });
+
+    expect(result).toBe("data:image/png;base64,server-icon");
+    expect(setServerInfo).toHaveBeenCalledOnce();
+    expect(setServerInfo.mock.calls[0][0]({ name: "demo" })).toEqual({
+      name: "demo",
+      icon: result,
+    });
+  });
+
+  it("does not apply a server image from an outdated connection", async () => {
+    let isCurrent = true;
+    vi.stubGlobal(
+      "FileReader",
+      class {
+        result = "data:image/png;base64,old-icon";
+        onloadend: (() => void) | null = null;
+        onerror: ((error: unknown) => void) | null = null;
+
+        readAsDataURL() {
+          isCurrent = false;
+          queueMicrotask(() => this.onloadend?.());
+        }
+      }
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("icon", {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      })
+    );
+    const setServerInfo = vi.fn();
+
+    const result = await loadServerIcon({
+      serverInfo: {
+        name: "old-server",
+        icons: [{ src: "https://old.example.com/icon.png" }],
+      },
+      isMounted: () => true,
+      isCurrent: () => isCurrent,
+      setServerInfo,
+      addLog: vi.fn(),
+    });
+
+    expect(result).toBeNull();
+    expect(setServerInfo).not.toHaveBeenCalled();
   });
 });
 
