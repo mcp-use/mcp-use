@@ -291,6 +291,7 @@ export function formatFixPrompt(run: ChecklistRun): string | undefined {
 /** Escape text for a Markdown table cell inside GitHub-flavored Markdown. */
 function cell(value: string): string {
   return value
+    .replace(/\\/g, "\\\\")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
