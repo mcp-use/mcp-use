@@ -16,6 +16,16 @@ import { withProgress } from "../../core/progress.js";
 
 const FAIL_ON = ["none", "failed", "warnings"] as const;
 
+/** Whether `value` is an absolute http(s) URL, the only kind Cloud accepts for `--url`. */
+function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 /** Whether a finished run should fail the command under `--fail-on`. */
 function shouldFail(
   run: ChecklistRun,
@@ -78,6 +88,8 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
               "no-wait": { type: "boolean" as const },
               "fail-on": { type: "string" as const },
               "json-file": { type: "string" as const },
+              url: { type: "string" as const },
+              profile: { type: "string" as const },
             }
           : {}),
         ...(command === "list"
@@ -107,6 +119,17 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
       throw new UsageError("Pass --fail-on as none, failed or warnings.");
     if (values["fail-on"] !== undefined && values["no-wait"] === true)
       throw new UsageError("--fail-on needs a finished run; drop --no-wait.");
+    const targetUrl = typeof values.url === "string" ? values.url.trim() : "";
+    const profileId =
+      typeof values.profile === "string" ? values.profile.trim() : "";
+    if (values.url !== undefined && !isHttpUrl(targetUrl))
+      throw new UsageError("Pass --url as an http or https URL.");
+    if (values.profile !== undefined && profileId === "")
+      throw new UsageError("Pass --profile as a profile ID.");
+    if ((targetUrl || profileId) && values.branch !== undefined)
+      throw new UsageError(
+        "External URL servers have no branches; drop --branch with --url or --profile."
+      );
     const label =
       command === "run"
         ? "Running checklist"
@@ -184,7 +207,11 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
           await cloud.call(
             api.POST("/api/v1/server-audits/{serverId}/audits", {
               params: { path: { serverId } },
-              body: branch,
+              body: {
+                ...branch,
+                ...(targetUrl ? { url: targetUrl } : {}),
+                ...(profileId ? { profileId } : {}),
+              },
             })
           ),
           true
