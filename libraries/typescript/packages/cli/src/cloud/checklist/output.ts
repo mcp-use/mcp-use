@@ -410,7 +410,7 @@ export function formatChecklistMarkdown(
     const passed = items.filter((c) => checkStatus(c) === "passed").length;
     const counted = items.filter((c) => checkStatus(c) !== "skipped").length;
     const issues = items.some((c) =>
-      ["failed", "warnings"].includes(checkStatus(c))
+      ["failed", "warnings", "pending", "unknown"].includes(checkStatus(c))
     );
     const name =
       categories[category] ??
