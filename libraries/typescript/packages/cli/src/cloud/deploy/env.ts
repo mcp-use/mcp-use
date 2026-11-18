@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { UsageError } from "../../core/errors.js";
 import { pathExists } from "../../core/fs.js";
+import { parseEnvFile } from "../env-file.js";
 import type { Cloud } from "./types.js";
 /** Resolve a relative path while keeping it inside the project root. */
 export function resolveContainedPath(
@@ -40,11 +41,8 @@ export async function loadEnvironment(
     if (!(await pathExists(path))) {
       throw new UsageError(`Environment file not found: ${envFile}`);
     }
-    for (const raw of (await readFile(path, "utf8")).split(/\r?\n/)) {
-      const line = raw.trim();
-      if (line === "" || line.startsWith("#")) continue;
-      assignEnvironment(result, line);
-    }
+    for (const { key, value } of parseEnvFile(await readFile(path, "utf8")))
+      result[key] = value;
   }
   for (const assignment of assignments) assignEnvironment(result, assignment);
   return result;
