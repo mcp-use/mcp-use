@@ -105,7 +105,7 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
     const failOn = (values["fail-on"] ?? "none") as (typeof FAIL_ON)[number];
     if (!FAIL_ON.includes(failOn))
       throw new UsageError("Pass --fail-on as none, failed or warnings.");
-    if (failOn !== "none" && values["no-wait"] === true)
+    if (values["fail-on"] !== undefined && values["no-wait"] === true)
       throw new UsageError("--fail-on needs a finished run; drop --no-wait.");
     const label =
       command === "run"
