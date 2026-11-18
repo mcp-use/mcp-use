@@ -83,7 +83,11 @@ export abstract class BaseCodeExecutor {
         logger.debug(
           `Connecting to configured servers for code execution: ${missingServers.join(", ")}`
         );
-        await this.client.createAllSessions();
+        for (const serverName of missingServers) {
+          if (!this.client.activeSessions.includes(serverName)) {
+            await this.client.createSession(serverName);
+          }
+        }
       } finally {
         this._connecting = false;
       }
