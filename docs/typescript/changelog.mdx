@@ -6,6 +6,20 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.7" description="November 2026">
+  ## Publishing checklist exit codes & reports
+  Patch release bundling @mcp-use/cli v5.2.0, which adds result-based exit codes and report files to `mcp-use checklist run`.
+
+- **New** (@mcp-use/cli): `mcp-use checklist run --fail-on <none|failed|warnings>` exits 1 when publishing checks fail, or also when they report warnings. Policy-review concerns count as warnings, as on the dashboard. The default `none` keeps exit code 0 for a finished run, and `--fail-on` can't be combined with `--no-wait` (`#3113`)
+- **New** (@mcp-use/cli): `--json-file <path>` writes the JSON result to a file while the readable report still prints (`#3113`)
+- **New** (@mcp-use/cli): `--markdown-file <path>` on `checklist run` and `checklist get` writes a Markdown report laid out like the dashboard, including the fix prompt in a collapsed "Prompt for AI agents" block (`#3113`)
+- **Enhancement** (@mcp-use/cli): the JSON result includes the run's `score` and `targetUrl`, and the terminal report counts policy concerns the same way as the dashboard (`#3113`)
+- **Fix** (@mcp-use/cli): while waiting for a run, `checklist run` retries status checks that fail with a network error, timeout, rate limit, or server error, using exponential backoff, instead of exiting while the run continues on Manufact Cloud (`#3113`)
+- **Documentation**: document the new flags in the [CLI reference](/typescript/api-reference/cli-reference#checklist-run)
+- **Update**: Updated @mcp-use/cli to v5.2.0
+- **Update**: Updated @mcp-use/inspector to v20.3.31; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.12.6" description="November 2026">
   ## Client connections & CLI reliability
   Patch release improving OAuth, client startup, scaffolding, and binary HTTP requests on top of the v2.12.5 CSP hotfix.

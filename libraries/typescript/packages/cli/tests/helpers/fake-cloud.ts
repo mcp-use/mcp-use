@@ -56,6 +56,8 @@ export interface FakeResponse {
   body?: unknown;
   /** Extra response headers. */
   headers?: Record<string, string>;
+  /** Drop the connection without a response, like a TCP reset (ECONNRESET). */
+  reset?: boolean;
 }
 
 /** An untyped reply, for `onUndocumented`. */
@@ -286,6 +288,10 @@ export async function startFakeCloud(): Promise<FakeCloud> {
               },
             };
           }
+        }
+        if (response.reset === true) {
+          req.socket.destroy();
+          return;
         }
         const status =
           response.status ??
