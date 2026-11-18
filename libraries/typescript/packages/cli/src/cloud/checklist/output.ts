@@ -159,6 +159,7 @@ export function formatChecklist(
     `Checklist ${plain(label)}${duration ? ` in ${duration}` : ""}`,
     `${plain(options.serverName)}${run.gitBranch ? ` · ${plain(run.gitBranch)}` : ""} · All clients${points === undefined ? "" : ` · Score ${points}/100`}`,
   ];
+  if (run.targetUrl) lines.push(`Checked ${plain(run.targetUrl)}`);
   if (run.errorMessage) lines.push("", prose(run.errorMessage));
   if (checks.length) {
     const policy = policyConcerns(checks);
@@ -318,6 +319,8 @@ export function formatChecklistMarkdown(
     `${run.gitBranch ? `Branch \`${run.gitBranch}\`` : "Production"}${duration ? ` · ${duration}` : ""}`,
     "",
   ];
+  // The URL the run checked: for an External URL server it can be a preview deployment (--url).
+  if (run.targetUrl) lines.push(`Checked \`${cell(run.targetUrl)}\``, "");
 
   if (run.status !== "completed") {
     lines.push(
