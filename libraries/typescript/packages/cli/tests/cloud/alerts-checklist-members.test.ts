@@ -522,13 +522,15 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
     "| **84** /100 | ✅ 2 passed | ❌ Not ready | ✅ Ready |",
     "> **May require additional review** · 1 policy concern<br>",
     "<details><summary><b>Protocol</b> &nbsp; ✅ Pass · 1/1</summary>",
-    // All-pass sections have no tags column.
-    "| | Check |\n| :-: | :-- |\n| ✅ | **MCP negotiation succeeds (v1/v2)**<br>MCP modern negotiation succeeded in 1098ms |\n",
+    "| ✅ | **MCP negotiation succeeds (v1/v2)**<br>MCP modern negotiation succeeded in 1098ms |",
     "<details open><summary><b>Policy review</b> &nbsp; ❌ Issues · 0/2</summary>",
-    "| 🛑 | **Enabled alert creation can send notifications**<br>create_alert \\| advertises destructiveHint &lt;false&gt;<br><b>How to fix:</b> Set destructiveHint to true. | `error` `ChatGPT` [Policy text ↗](https://developers.openai.com/plugins/deploy/app-review) |",
-    "| ⚠️ | **Policy review partial**<br>Accepted 1 policy finding(s) | `warning` |",
+    "| 🛑 | **Enabled alert creation can send notifications**<br>error · ChatGPT · [Policy text ↗](https://developers.openai.com/plugins/deploy/app-review)<br>create_alert \\| advertises destructiveHint &lt;false&gt;<br><b>How to fix:</b> Set destructiveHint to true. |",
+    "| ⚠️ | **Policy review partial**<br>warning<br>Accepted 1 policy finding(s) |",
   ])
     expect(markdown).toContain(line);
+  // Every section is a two-column table; tags sit inside the check cell.
+  expect(markdown).toContain("| | Check |\n| :-: | :-- |\n");
+  expect(markdown).not.toContain("| | Check | |");
   // The footer is just the dashboard link, without the run ID.
   expect(markdown).not.toContain("run_1");
   // Sections follow the dashboard's order.

@@ -343,14 +343,10 @@ export function formatChecklistMarkdown(
       `<details${issues ? " open" : ""}><summary><b>${cell(name)}</b> &nbsp; ${issues ? "❌ Issues" : "✅ Pass"} · ${passed}/${counted}</summary>`,
       ""
     );
-    const rows: Array<{ mark: string; body: string; tags: string }> = [];
+    lines.push("| | Check |", "| :-: | :-- |");
     for (const check of items) {
       const kind = checkStatus(check);
       const open = ["failed", "warnings"].includes(kind);
-      const body = [`**${cell(check.checkName || check.checkId)}**`];
-      if (check.message) body.push(cell(check.message));
-      if (open && check.hint?.text)
-        body.push(`<b>How to fix:</b> ${cell(check.hint.text)}`);
       const tags: string[] = [];
       if (open) {
         const severity =
@@ -359,9 +355,9 @@ export function formatChecklistMarkdown(
             : kind === "failed"
               ? "error"
               : "warning";
-        tags.push(`\`${severity}\``);
+        tags.push(severity);
         for (const platform of check.platforms ?? [])
-          tags.push(`\`${cell(CLIENTS[platform] ?? platform)}\``);
+          tags.push(cell(CLIENTS[platform] ?? platform));
         const policyUrl = check.details?.find(
           (d) => d.label === "policy URL"
         )?.value;
@@ -369,16 +365,14 @@ export function formatChecklistMarkdown(
           tags.push(`[Policy text ↗](${policyUrl})`);
       }
       const mark = open && check.severity === "error" ? "🛑" : icon[kind];
-      rows.push({ mark, body: body.join("<br>"), tags: tags.join(" ") });
-    }
-    // Only add the tags column when a row in this section has tags.
-    if (rows.some((row) => row.tags)) {
-      lines.push("| | Check | |", "| :-: | :-- | :-- |");
-      for (const row of rows)
-        lines.push(`| ${row.mark} | ${row.body} | ${row.tags} |`);
-    } else {
-      lines.push("| | Check |", "| :-: | :-- |");
-      for (const row of rows) lines.push(`| ${row.mark} | ${row.body} |`);
+      // Name, then severity · clients · policy link on one plain line, then
+      // the message and fix, so rows don't need a narrow tags column.
+      const body = [`**${cell(check.checkName || check.checkId)}**`];
+      if (tags.length) body.push(tags.join(" · "));
+      if (check.message) body.push(cell(check.message));
+      if (open && check.hint?.text)
+        body.push(`<b>How to fix:</b> ${cell(check.hint.text)}`);
+      lines.push(`| ${mark} | ${body.join("<br>")} |`);
     }
     lines.push("", "</details>", "");
   }
