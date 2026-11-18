@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.12.7
+
+### Patch Changes
+
+- Updated dependencies [33279c8]
+- Updated dependencies [33279c8]
+  - @mcp-use/cli@5.2.0
+  - @mcp-use/inspector@20.3.31
+
 ## 2.12.7-canary.0
 
 ### Patch Changes
