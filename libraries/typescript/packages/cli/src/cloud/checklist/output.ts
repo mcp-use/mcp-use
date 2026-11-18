@@ -377,8 +377,6 @@ export function formatChecklistMarkdown(
   if (!checks.length && run.status === "completed")
     lines.push("No individual check results were returned.", "");
 
-  lines.push(
-    `[View in dashboard ↗](${options.dashboardUrl}) · Run \`${run.id}\``
-  );
+  lines.push(`[View in dashboard ↗](${options.dashboardUrl})`);
   return lines.join("\n");
 }

@@ -518,6 +518,7 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
   for (const line of [
     "## Manufact Publishing Checks · Weather",
     "Production · 4m 32s",
+    "[View in dashboard ↗](",
     "| **84** /100 | ✅ 2 passed | ❌ Not ready | ✅ Ready |",
     "> **May require additional review** · 1 policy concern<br>",
     "<details><summary><b>Protocol</b> &nbsp; ✅ Pass · 1/1</summary>",
@@ -527,6 +528,8 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
     "| ⚠️ | **Policy review partial**<br>Accepted 1 policy finding(s) | `warning` |",
   ])
     expect(markdown).toContain(line);
+  // The footer is just the dashboard link, without the run ID.
+  expect(markdown).not.toContain("run_1");
   // Sections follow the dashboard's order.
   expect(markdown.indexOf("<b>Protocol</b>")).toBeLessThan(
     markdown.indexOf("<b>Client compatibility</b>")
