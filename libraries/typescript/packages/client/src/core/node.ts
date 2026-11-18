@@ -15,6 +15,7 @@ import {
   BaseCodeExecutor,
   FunctionCodeExecutor,
 } from "../code-mode/executor.js";
+import { BoxdCodeExecutor } from "../code-mode/executor-boxd.js";
 import { E2BCodeExecutor } from "../code-mode/executor-e2b.js";
 import { VMCodeExecutor } from "../code-mode/executor-vm.js";
 import { CodeModeConnector } from "../code-mode/connector.js";
@@ -76,8 +77,9 @@ export type CodeExecutorFunction = (
  * Built-in code executor types.
  * - `"vm"`: Node.js VM-based executor (default, local execution)
  * - `"e2b"`: E2B cloud sandbox executor (secure remote execution)
+ * - `"boxd"`: boxd microVM executor (secure remote execution)
  */
-export type CodeExecutorType = "vm" | "e2b";
+export type CodeExecutorType = "vm" | "e2b" | "boxd";
 
 /**
  * Configuration options for the VM-based code executor.
@@ -103,9 +105,37 @@ export interface E2BExecutorOptions {
 }
 
 /**
+ * Configuration options for the boxd microVM executor.
+ */
+export interface BoxdExecutorOptions {
+  /**
+   * boxd API key. Defaults to the BOXD_API_KEY environment variable.
+   * Get one at https://boxd.sh?ref=mcp-use
+   */
+  apiKey?: string;
+  /** Org (name or id) to create the machine in. Defaults to BOXD_ORG */
+  org?: string;
+  /** Region to create the machine in, for example "fra" or "nyc". Defaults to BOXD_REGION */
+  region?: string;
+  /** Machine name. Default: a name boxd generates */
+  name?: string;
+  /** Labels to put on the machine */
+  labels?: Record<string, string>;
+  /**
+   * Delete the machine this many milliseconds after it is created, even if
+   * cleanup() never runs. Rounded up to whole seconds. Default: the machine
+   * lives until cleanup()
+   */
+  timeoutMs?: number;
+}
+
+/**
  * Union type for executor configuration options.
  */
-export type ExecutorOptions = VMExecutorOptions | E2BExecutorOptions;
+export type ExecutorOptions =
+  | VMExecutorOptions
+  | E2BExecutorOptions
+  | BoxdExecutorOptions;
 
 /**
  * Advanced configuration for code execution mode.
@@ -159,6 +189,7 @@ export interface MCPClientOptions {
 
 // Export executor classes and utilities for external use
 export { BaseCodeExecutor } from "../code-mode/executor.js";
+export { BoxdCodeExecutor } from "../code-mode/executor-boxd.js";
 export { E2BCodeExecutor } from "../code-mode/executor-e2b.js";
 export { isVMAvailable, VMCodeExecutor } from "../code-mode/executor-vm.js";
 
@@ -572,6 +603,11 @@ export class MCPClient extends BaseMCPClient {
         } else {
           this._codeExecutor = new E2BCodeExecutor(this, opts);
         }
+      } else if (config === "boxd") {
+        this._codeExecutor = new BoxdCodeExecutor(
+          this,
+          this._executorOptions as BoxdExecutorOptions | undefined
+        );
       } else {
         // Default to VM, but fall back to E2B if VM is not available
         try {
