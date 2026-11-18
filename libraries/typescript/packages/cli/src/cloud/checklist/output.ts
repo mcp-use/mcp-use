@@ -37,7 +37,11 @@ export function checkStatus(check: Check): CheckStatus {
     case "fail":
     case "failed":
     case "error":
-      return check.severity === "warning" || check.severity === "info"
+      // Policy findings are advisory, as on the dashboard: they may need
+      // store review but are not failed publishing checks.
+      return check.severity === "warning" ||
+        check.severity === "info" ||
+        check.category === "policy-conformance"
         ? "warnings"
         : "failed";
     case "warn":
@@ -255,9 +259,9 @@ export function formatChecklistMarkdown(
   const points = typeof run.score === "number" ? run.score : score(checks);
   const duration = elapsed(run.startedAt, run.completedAt);
   const lines: string[] = [
-    `## Checklist · ${cell(options.serverName)}`,
+    "## Checklist · Manufact",
     "",
-    `${run.gitBranch ? `Branch \`${run.gitBranch}\`` : "Production"}${duration ? ` · ${duration}` : ""}`,
+    `${cell(options.serverName)} · ${run.gitBranch ? `Branch \`${run.gitBranch}\`` : "Production"}${duration ? ` · ${duration}` : ""}`,
     "",
   ];
 

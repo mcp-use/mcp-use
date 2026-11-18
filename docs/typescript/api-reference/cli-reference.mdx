@@ -648,8 +648,10 @@ By default the command exits 0 once the run finishes, whatever the results. In C
 | Level | Exits 1 when |
 | --- | --- |
 | `none` (default) | Never, for a finished run |
-| `failed` | A check fails, or the run itself fails or is cancelled |
-| `warnings` | Same as `failed`, or a check reports a warning |
+| `failed` | A publishing check fails, or the run itself fails or is cancelled |
+| `warnings` | Same as `failed`, or a check reports a warning or policy concern |
+
+Policy concerns, the findings under **Policy review**, count as warnings, as on the dashboard: they may need store review but aren't failed publishing checks.
 
 `--fail-on` can't be combined with `--no-wait`.
 

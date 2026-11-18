@@ -317,6 +317,13 @@ const WARNING = {
   status: "fail",
   severity: "warning",
 };
+const POLICY = {
+  checkId: "policy-review-71cf55ed7c53",
+  checkName: "Alert creation can send notifications",
+  status: "fail",
+  severity: "error",
+  category: "policy-conformance",
+};
 for (const { name, failOn, run, exitCode } of [
   {
     name: "a failed check fails --fail-on failed",
@@ -346,6 +353,18 @@ for (const { name, failOn, run, exitCode } of [
     name: "a run that errored fails --fail-on failed",
     failOn: "failed",
     run: { status: "failed", errorMessage: "Server unreachable" },
+    exitCode: 1,
+  },
+  {
+    name: "an error-severity policy concern passes --fail-on failed",
+    failOn: "failed",
+    run: { status: "completed", checks: [PASS, POLICY] },
+    exitCode: 0,
+  },
+  {
+    name: "a policy concern fails --fail-on warnings",
+    failOn: "warnings",
+    run: { status: "completed", checks: [PASS, POLICY] },
     exitCode: 1,
   },
   {
@@ -497,8 +516,8 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
   expect(result.exitCode).toBe(0);
   const markdown = await readFile(join(cli.cwd, "report.md"), "utf8");
   for (const line of [
-    "## Checklist · Weather",
-    "Production · 4m 32s",
+    "## Checklist · Manufact",
+    "Weather · Production · 4m 32s",
     "| **84** /100 | ✅ 2 passed | ❌ Not ready | ✅ Ready |",
     "> **May require additional review** · 1 policy concern<br>",
     "<details><summary><b>Protocol</b> &nbsp; ✅ Pass · 1/1</summary>",
