@@ -379,7 +379,7 @@ const pages: Record<string, Page> = {
           ["--no-wait", "Return the run ID immediately"],
           [
             "--fail-on <level>",
-            "Exit 1 on failed checks or warnings: none, failed, warnings (default: none)",
+            "none (default), failed (failed checks or unfinished run), warnings (also warning checks); not with --no-wait",
           ],
           [
             "--json-file <path>",
