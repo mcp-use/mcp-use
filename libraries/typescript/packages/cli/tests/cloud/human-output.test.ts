@@ -1,6 +1,9 @@
 import { expect, test } from "vitest";
 import { checklistRun } from "../../src/cloud/checklist/api.js";
-import { formatChecklist } from "../../src/cloud/checklist/output.js";
+import {
+  formatChecklist,
+  formatChecklistMarkdown,
+} from "../../src/cloud/checklist/output.js";
 import { formatAlert, formatAlertList } from "../../src/cloud/alerts/output.js";
 import { formatDomain } from "../../src/cloud/domains/output.js";
 import { table } from "../../src/core/format.js";
@@ -106,6 +109,56 @@ test("checklist presentation uses severity, groups policy separately, and leaves
     status: "fail",
     message: "Review frames",
   });
+});
+
+test("checklist terminal and Markdown reports count policy concerns the same way", () => {
+  const run = checklistRun(
+    {
+      id: "run_1",
+      status: "completed",
+      checks: [
+        {
+          checkId: "connect",
+          checkName: "Connect",
+          status: "pass",
+          severity: "error",
+          category: "connectivity",
+        },
+        {
+          checkId: "policy-review-summary",
+          checkName: "Policy review partial",
+          status: "fail",
+          severity: "warning",
+          category: "policy-conformance",
+        },
+        {
+          checkId: "policy-review-1",
+          checkName: "Unsolicited feedback",
+          status: "fail",
+          severity: "error",
+          category: "policy-conformance",
+        },
+        {
+          checkId: "policy-review-2",
+          checkName: "Accepted policy check",
+          status: "pass",
+          severity: "error",
+          category: "policy-conformance",
+        },
+      ],
+    },
+    true
+  );
+  const options = { serverName: "Weather", dashboardUrl: "https://x.test" };
+  const terminal = formatChecklist(run, options);
+  const markdown = formatChecklistMarkdown(run, options);
+  // The summary meta-check isn't a concern, and policy checks aren't
+  // counted as passed publishing checks.
+  expect(terminal).toContain(
+    "\n1 passed\n1 policy concern may require additional review"
+  );
+  expect(markdown).toContain("| ✅ 1 passed |");
+  expect(markdown).toContain("· 1 policy concern<br>");
 });
 
 test("domain guidance keeps certificate validation records and never uses a hostname ID as a domain ID", () => {

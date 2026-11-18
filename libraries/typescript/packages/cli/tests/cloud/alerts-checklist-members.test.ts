@@ -450,6 +450,7 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
       status: "completed",
       gitBranch: null,
       score: 84,
+      targetUrl: "https://weather.test/mcp",
       isReadyForChatgpt: false,
       isReadyForClaudeai: true,
       startedAt: "2026-11-17T23:45:19Z",
@@ -528,6 +529,18 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
     "| ⚠️ | **Policy review partial**<br>warning<br>Accepted 1 policy finding(s) |",
   ])
     expect(markdown).toContain(line);
+  // The dashboard's fix prompt, collapsed and copyable. Text inside the code
+  // block is not HTML-escaped, and the policy summary meta-check is left out.
+  expect(markdown).toContain(
+    "<details><summary>Prompt for AI agents</summary>\n\n```text\nYou are an MCP server developer. Your server at https://weather.test/mcp has 1 issue(s) to fix before it will pass automated platform compatibility checks.\n"
+  );
+  expect(markdown).toContain(
+    "### [ERROR] policy-review-71cf55ed7c53\ncreate_alert | advertises destructiveHint <false>\nAffected:\n- policy URL: https://developers.openai.com/plugins/deploy/app-review\nFix: Set destructiveHint to true.\n"
+  );
+  expect(markdown).not.toContain("policy-review-summary");
+  expect(markdown).toContain(
+    "For each issue above, locate the relevant code in your MCP server implementation and apply the fix described. Validate inputs with proper error messages, not raw schema validation errors.\n```\n\n</details>"
+  );
   // Every section is a two-column table; tags sit inside the check cell.
   expect(markdown).toContain("| | Check |\n| :-: | :-- |\n");
   expect(markdown).not.toContain("| | Check | |");
