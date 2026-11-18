@@ -343,6 +343,8 @@ export function formatChecklistMarkdown(
       ? `⚠️ ${tally.warnings} warning${tally.warnings === 1 ? "" : "s"}`
       : "",
     tally.skipped ? `➖ ${tally.skipped} skipped` : "",
+    tally.pending ? `⏳ ${tally.pending} pending` : "",
+    tally.unknown ? `❔ ${tally.unknown} unknown` : "",
   ]
     .filter(Boolean)
     .join(" · ");
