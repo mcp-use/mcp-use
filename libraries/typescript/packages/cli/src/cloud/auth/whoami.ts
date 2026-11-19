@@ -11,7 +11,7 @@ import {
   sessionEmail,
   type CloudOrganization,
 } from "./account.js";
-import { readAuth, requireCredential } from "./store.js";
+import { readAuth, requireCredential, savedOrganizationId } from "./store.js";
 
 const USAGE = "mcp-use whoami [--json]";
 
@@ -52,7 +52,7 @@ export async function runWhoami(argv: readonly string[]): Promise<number> {
     const organization = await activeOrganization(
       api,
       organizations,
-      auth.orgId
+      await savedOrganizationId(credential)
     );
     const fromFile = credential.source.type === "file";
     const result = {

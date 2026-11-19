@@ -73,6 +73,7 @@ Cloud projects:
   domains      Manage server domains
   github       Manage GitHub App access
   alerts       Manage alert rules
+  evals        Define and run eval suites
   checklist    Run publishing checks
 
 Account:
@@ -230,6 +231,10 @@ export async function main(
   if (command === "alerts") {
     const { runAlerts } = await import("../cloud/alerts/index.js");
     return runAlerts(commandArgs);
+  }
+  if (command === "evals") {
+    const { runEvals } = await import("../cloud/evals/index.js");
+    return runEvals(commandArgs);
   }
   if (command === "checklist") {
     const { runChecklist } = await import("../cloud/checklist/index.js");

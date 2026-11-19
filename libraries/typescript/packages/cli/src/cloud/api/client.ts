@@ -29,7 +29,11 @@ import {
   organizationRequired,
   type CloudOrganization,
 } from "../auth/account.js";
-import { readAuth, requireCredential, LOG_IN } from "../auth/store.js";
+import {
+  requireCredential,
+  savedOrganizationId,
+  LOG_IN,
+} from "../auth/store.js";
 import { CommandError, type NextStep } from "../../core/errors.js";
 
 /** Cloud origin. Generated paths already start with `/api/...`. */
@@ -165,7 +169,8 @@ interface CloudConnection {
 export async function connectCloud(
   options: { organization?: string | undefined } = {}
 ): Promise<CloudConnection> {
-  const { apiKey } = await requireCredential();
+  const credential = await requireCredential();
+  const { apiKey } = credential;
   const api = {
     client: createCloudClient({ apiKey }),
     call: callerFor(apiKey),
@@ -173,7 +178,7 @@ export async function connectCloud(
   const organizations = await listOrganizations(api);
   const organization = await chooseOrganization(api, organizations, {
     selector: options.organization,
-    storedId: (await readAuth()).orgId,
+    storedId: await savedOrganizationId(credential),
   });
   if (organization === undefined) throw organizationRequired();
   return {
