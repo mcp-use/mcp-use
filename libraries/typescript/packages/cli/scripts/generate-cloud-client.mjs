@@ -287,6 +287,7 @@ const RESPONSE_FIELDS = {
     "status",
     "pass",
     "score",
+    "profileId",
   ],
   "GET /api/v1/server-evals/{serverId}/runs": [
     "items[].id",

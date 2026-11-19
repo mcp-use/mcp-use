@@ -6808,6 +6808,8 @@ export interface operations {
             query?: {
                 branch?: string;
                 client?: "chatgpt" | "codex" | "both";
+                /** @description Authenticate with this profile of the server's organization instead of the server's bound profile. Not supported for clients that sign in with the suite's test account (native apps, claude.ai with its connector lifecycle). */
+                profileId?: string;
             };
             header?: never;
             path: {
@@ -6830,6 +6832,7 @@ export interface operations {
                         status: string;
                         pass: boolean | null;
                         score: number | null;
+                        profileId: string | null;
                     };
                 };
             };

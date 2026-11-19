@@ -440,6 +440,7 @@ describe("evals run", () => {
         status: "pending",
         pass: null,
         score: null,
+        profileId: null,
       },
     });
     let polls = 0;
@@ -643,6 +644,7 @@ describe("evals run", () => {
         status: "running",
         pass: null,
         score: null,
+        profileId: null,
       },
     });
     cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
@@ -715,6 +717,7 @@ describe("evals run", () => {
           status: "running",
           pass: null,
           score: null,
+          profileId: null,
         },
       });
     cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
@@ -875,6 +878,7 @@ describe("evals run", () => {
         status: "running",
         pass: null,
         score: null,
+        profileId: null,
       },
     });
     cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
@@ -941,6 +945,7 @@ describe("evals run", () => {
             status: "running",
             pass: null,
             score: null,
+            profileId: null,
           },
         });
       cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
@@ -1004,6 +1009,95 @@ describe("evals run", () => {
       ).toHaveLength(0);
     }
   );
+  test("--profile starts each run with that profile", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: "suite_1", name: "Rome weather" })],
+    });
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      body: {
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+        profileId: "profile_free",
+      },
+    });
+
+    const result = await cli.run(
+      ["evals", "run", "suite_1", "--profile", "profile_free", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toMatchObject({ runs: [{ id: "run_1" }] });
+    expect(cloud.requestsTo("POST", `${SUITES}/suite_1/runs`)).toMatchObject([
+      { query: { profileId: "profile_free" } },
+    ]);
+  });
+
+  test("--profile cancels a run that Cloud started without the profile", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: "suite_1", name: "Rome weather" })],
+    });
+    // A Cloud without run profiles drops the parameter.
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      body: {
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+        profileId: null,
+      },
+    });
+    cloud.on("POST", "/api/v1/server-evals/srv_1/runs/run_1/cancel", {
+      body: { success: true },
+    });
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "suite_1",
+        "--wait",
+        "--profile",
+        "profile_free",
+        ...SCOPE,
+      ],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      error: {
+        code: "eval_profile_unsupported",
+        message: expect.stringContaining("did not apply --profile"),
+      },
+    });
+    expect(
+      cloud.requestsTo("POST", "/api/v1/server-evals/srv_1/runs/run_1/cancel")
+    ).toHaveLength(1);
+    expect(
+      cloud.requestsTo("GET", "/api/v1/server-evals/srv_1/runs/run_1")
+    ).toHaveLength(0);
+  });
+
+  test("--profile needs a profile ID", async ({ cli }) => {
+    const result = await cli.run(
+      ["evals", "run", "--all", "--profile", " ", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(2);
+  });
 
   test("--markdown-file needs --wait", async ({ cli }) => {
     const result = await cli.run(
@@ -1031,6 +1125,7 @@ describe("evals run", () => {
         status: "running",
         pass: null,
         score: null,
+        profileId: null,
       },
     });
     cloud.on("POST", `${SUITES}/suite_2/runs`, {
@@ -1194,6 +1289,7 @@ describe("evals run --wait live progress", () => {
         status: "running",
         pass: null,
         score: null,
+        profileId: null,
       },
     });
     cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
@@ -1498,6 +1594,7 @@ describe("suite references", () => {
           status: "pending",
           pass: null,
           score: null,
+          profileId: null,
         },
       });
 

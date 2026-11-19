@@ -114,6 +114,9 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         : undefined;
     if (markdownFile !== undefined && values.wait !== true)
       throw new UsageError("--markdown-file needs --wait.");
+    const profile =
+      typeof values.profile === "string" ? values.profile.trim() : undefined;
+    if (profile === "") throw new UsageError("Pass --profile as a profile ID.");
     if (markdownFile !== undefined && markdownFile === jsonFile)
       throw new UsageError(
         "--json-file and --markdown-file must use different paths."
@@ -290,8 +293,17 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       }> = [];
       for (const suiteId of ids) {
         try {
-          const { id, status } = await api.start(suiteId, branch);
-          started.push({ id, suiteId, status });
+          const run = await api.start(suiteId, branch, profile);
+          // Cloud without run profiles drops the parameter and starts the run with the
+          // server's own profile: stop it rather than report results for the wrong account.
+          if (profile !== undefined && run.profileId !== profile) {
+            await api.cancel(run.id).catch(() => undefined);
+            throw new CommandError(
+              "eval_profile_unsupported",
+              `Manufact Cloud did not apply --profile to the run of “${plain(names.get(suiteId) ?? suiteId)}”, so it was cancelled. This Cloud does not support profiles for eval runs yet.`
+            );
+          }
+          started.push({ id: run.id, suiteId, status: run.status });
         } catch (error) {
           if (started.length === 0) throw error;
           // Runs that already started keep going (and count against credits): name them.
@@ -474,6 +486,7 @@ function parse(command: string, argv: readonly string[]) {
           timeout: { type: "string" as const },
           "json-file": { type: "string" as const },
           "markdown-file": { type: "string" as const },
+          profile: { type: "string" as const },
         }
       : {}),
     ...(command === "runs"
@@ -595,14 +608,25 @@ function evalApi(cloud: Cloud, serverId: string) {
         ),
         suiteNotFound
       ),
-    start: (suiteId: string, branch: string | undefined) =>
+    start: (
+      suiteId: string,
+      branch: string | undefined,
+      profileId: string | undefined
+    ) =>
       cloud.call(
         cloud.client.POST(
           "/api/v1/server-evals/{serverId}/suites/{suiteId}/runs",
           {
             params: {
               path: { ...path, suiteId },
-              ...(branch === undefined ? {} : { query: { branch } }),
+              ...(branch === undefined && profileId === undefined
+                ? {}
+                : {
+                    query: {
+                      ...(branch === undefined ? {} : { branch }),
+                      ...(profileId === undefined ? {} : { profileId }),
+                    },
+                  }),
             },
           }
         ),
