@@ -36,6 +36,7 @@ Set `AGENT_EXAMPLE_DEMO=1` for non-interactive chat verification.
 | --- | --- | --- | --- |
 | [code_mode_example.ts](code-mode/code_mode_example.ts) | langchain | Local VM code mode | `ANTHROPIC_API_KEY` |
 | [code_mode_e2b_example.ts](code-mode/code_mode_e2b_example.ts) | langchain | E2B remote sandbox | `ANTHROPIC_API_KEY`, `E2B_API_KEY`, `@e2b/code-interpreter` |
+| [code_mode_boxd_example.ts](code-mode/code_mode_boxd_example.ts) | langchain | boxd remote microVM | `ANTHROPIC_API_KEY`, `BOXD_API_KEY`, `@boxd-sh/sdk` |
 
 ## Frameworks
 
