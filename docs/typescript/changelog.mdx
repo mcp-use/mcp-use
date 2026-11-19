@@ -6,6 +6,22 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.9" description="November 2026">
+  ## Evals from the CLI and CI
+  Patch release bundling @mcp-use/cli v5.4.0, which adds `mcp-use evals` to keep eval suites as YAML files, run them on Manufact Cloud, and gate CI on the results.
+
+- **New** (@mcp-use/cli): `mcp-use evals` with `push`, `list`, `get`, `export`, `create`, `update`, `rm`, `run`, `runs`, `report`, `cancel`, `options` and `models`. Suite files use the dashboard's `kind:` steps and a keyed `clients` format, are validated locally, and reject unknown keys. A suite can be named by ID, name or file path; `push` and `run` also take directories (`#3124`)
+- **New** (@mcp-use/cli): `mcp-use evals run --wait` waits for the runs and exits 1 unless every run passes; `--timeout` caps the wait, and runs still going at the timeout keep running on Cloud (`#3124`)
+- **New** (@mcp-use/cli): `evals run --json-file <path>` and `--markdown-file <path>` write the JSON result and a Markdown report for pull request comments and job summaries, while the readable output still prints. After a timeout, both files get the runs as they stand (`#3124`)
+- **New** (@mcp-use/cli): `evals run --wait` streams progress: each suite's dashboard link, then a line per finished client and model with its score, duration and why it failed, and a closing summary. Reports show each client's tool calls and link failed executions to their report in the dashboard (`#3124`)
+- **New** (@mcp-use/cli): `mcp-use evals run --profile <id>` signs the runs in with that profile instead of the server's own. The output names the profile, and a run that Manufact Cloud starts without it is cancelled (`#3125`)
+- **Enhancement** (@mcp-use/cli): stopping `evals run --wait` with Ctrl+C, or cancelling the CI job, cancels the runs it started that haven't finished (`#3124`)
+- **Fix** (@mcp-use/cli): a key from `MANUFACT_TOKEN` or `MCP_USE_API_KEY` no longer inherits the organization saved with a different logged-in key, which failed with "The saved organization is no longer one of yours" (`#3124`)
+- **Documentation**: document `mcp-use evals` in the [CLI reference](/typescript/api-reference/cli-reference#evals-run) and the Manufact Cloud agent skill
+- **Update**: Updated @mcp-use/cli to v5.4.0
+- **Update**: Updated @mcp-use/inspector to v20.3.33; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.12.8" description="November 2026">
   ## Publishing checklist for External URL servers
   Patch release bundling @mcp-use/cli v5.3.0, which lets `mcp-use checklist run` check another MCP URL for External URL servers.
