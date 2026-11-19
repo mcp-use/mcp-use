@@ -97,6 +97,26 @@ async function findCredential(): Promise<Credential | undefined> {
   return { apiKey, source: { type: "file", path: authFilePath() } };
 }
 
+/**
+ * The saved active organization, unless it was saved for another key. A key
+ * from `MANUFACT_TOKEN` or `MCP_USE_API_KEY` can belong to another account or
+ * another Cloud than the logged-in key, where that organization is not one of
+ * its own. An organization saved without a key (`mcp-use org use` under an
+ * environment key) still applies.
+ */
+export async function savedOrganizationId(credential: {
+  apiKey: string;
+}): Promise<string | undefined> {
+  const saved = await readAuth();
+  if (
+    saved.apiKey !== undefined &&
+    saved.apiKey !== "" &&
+    saved.apiKey !== credential.apiKey
+  )
+    return undefined;
+  return saved.orgId;
+}
+
 /** The credential to use; throws `not_authenticated` when there is none. */
 export async function requireCredential(): Promise<Credential> {
   const credential = await findCredential();

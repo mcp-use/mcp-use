@@ -9,6 +9,7 @@ import { callerFor, connectCloud, createCloudClient } from "./api/client.js";
 import {
   readAuth,
   requireCredential,
+  savedOrganizationId,
   updateAuth,
   type StoredAuth,
 } from "./auth/store.js";
@@ -66,10 +67,10 @@ export class CloudApi {
 
   /** Create a client from persisted credentials. */
   static async create(organizationId?: string): Promise<CloudApi> {
-    const { apiKey } = await requireCredential();
+    const credential = await requireCredential();
     return new CloudApi(
-      apiKey,
-      organizationId ?? (await readCloudConfig()).orgId
+      credential.apiKey,
+      organizationId ?? (await savedOrganizationId(credential))
     );
   }
 

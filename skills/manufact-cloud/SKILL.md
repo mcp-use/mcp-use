@@ -1,6 +1,6 @@
 ---
 name: manufact-cloud
-description: Deploy and manage MCP servers on Manufact Cloud with the mcp-use CLI, including authentication, projects, environments, deployments, domains, organizations, publishing checks, and YAML alerts.
+description: Deploy and manage MCP servers on Manufact Cloud with the mcp-use CLI, including authentication, projects, environments, deployments, domains, organizations, publishing checks, YAML alerts, and YAML eval suites.
 ---
 
 # Manufact Cloud CLI
@@ -77,6 +77,8 @@ Network failures and timeouts leave acceptance unknown; do not retry automatical
   [other Cloud commands](references/cloud-commands.md).
 - **Create or update alerts:** read [alert rules](references/alerts.md) for the
   dashboard YAML format, metric selection, and useful recovery conditions.
+- **Write, push, or run eval suites:** read [eval suites](references/evals.md)
+  for the YAML format, client selection, and CI usage.
 - **Analyze server usage, errors, latency, or clients:** use the bundled
   `manufact-analytics` skill for `analytics catalog` and read-only SQL queries.
 

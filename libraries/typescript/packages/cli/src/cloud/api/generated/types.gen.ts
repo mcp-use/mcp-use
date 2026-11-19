@@ -532,6 +532,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{id}/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's profiles (website logins, OAuth connections and static headers or bearer tokens) with their status, account, sites and the servers and environments they are bound to. Secret values read as "[REDACTED]". */
+        get: operations["getApiV1OrganizationsByIdProfiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{id}/invitations": {
         parameters: {
             query?: never;
@@ -644,6 +661,144 @@ export interface paths {
         };
         /** @description Mint a GitHub App install URL carrying a short-lived signed `state` that binds the install to the current user + organization. Used by the in-chat connect_github flow so the install can complete in a fresh browser tab (no session) and link back via /installations/callback-by-state. */
         get: operations["getApiV1GithubConnectUrl"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List available tool-capable LLM models from OpenRouter, ordered by weekly popularity. */
+        get: operations["getApiV1Models"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/suites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all eval suites for a server, each with its latest run. */
+        get: operations["getApiV1ServerEvalsByServerIdSuites"];
+        put?: never;
+        /** @description Create a new eval suite for a server. */
+        post: operations["postApiV1ServerEvalsByServerIdSuites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/suites/{suiteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Delete an eval suite, its runs, and cancel any in-flight BullMQ eval jobs. */
+        delete: operations["deleteApiV1ServerEvalsByServerIdSuitesBySuiteId"];
+        options?: never;
+        head?: never;
+        /** @description Update an eval suite. */
+        patch: operations["patchApiV1ServerEvalsByServerIdSuitesBySuiteId"];
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/suites/{suiteId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Trigger a new eval run for a suite. Returns 202 while the run executes in the background. */
+        post: operations["postApiV1ServerEvalsByServerIdSuitesBySuiteIdRuns"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List eval runs for a server. Optional filter by suiteId. */
+        get: operations["getApiV1ServerEvalsByServerIdRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a single eval run with all scenarios and executions. */
+        get: operations["getApiV1ServerEvalsByServerIdRunsByRunId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/runs/{runId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Cancel unfinished eval executions: remove queued jobs, signal active browser and agent jobs, and preserve completed results. */
+        post: operations["postApiV1ServerEvalsByServerIdRunsByRunIdCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/runtime-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Sandbox harness compatibility and credential readiness. */
+        get: operations["getApiV1ServerEvalsByServerIdRuntimeOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1198,6 +1353,7 @@ export interface operations {
                             createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
+                            failedAt: string | null;
                             /** Format: date-time */
                             buildStartedAt: string;
                             /** Format: date-time */
@@ -1436,6 +1592,7 @@ export interface operations {
                         createdAt: string;
                         /** Format: date-time */
                         updatedAt: string;
+                        failedAt: string | null;
                         /** Format: date-time */
                         buildStartedAt: string;
                         /** Format: date-time */
@@ -3879,6 +4036,7 @@ export interface operations {
                         createdAt: string;
                         /** Format: date-time */
                         updatedAt: string;
+                        failedAt: string | null;
                         /** Format: date-time */
                         buildStartedAt: string;
                         /** Format: date-time */
@@ -5408,6 +5566,95 @@ export interface operations {
             };
         };
     };
+    getApiV1OrganizationsByIdProfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: string;
+                            label: string | null;
+                            /** @description OAuth profiles: the connected account. */
+                            account: {
+                                email: string | null;
+                                name: string | null;
+                                issuerHost: string;
+                            } | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
     getApiV1OrganizationsByIdInvitations: {
         parameters: {
             query?: never;
@@ -6152,6 +6399,939 @@ export interface operations {
                         /** Format: uri */
                         url: string;
                         expiresInSeconds: number;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1Models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        defaultModelId: string;
+                        models: {
+                            id: string;
+                            name: string;
+                            provider: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServerEvalsByServerIdSuites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serverId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        enabled: boolean;
+                        threshold: number;
+                        prompt: string | null;
+                        flow: unknown;
+                        requiredTools: unknown;
+                        rubric: string | null;
+                        models: unknown;
+                        disallowedTools: unknown;
+                        clientTargets: unknown;
+                        clientSettings: unknown;
+                        runs?: {
+                            id: string;
+                            status: string;
+                            pass: boolean | null;
+                            score: number | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
+                    }[];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ServerEvalsByServerIdSuites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serverId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** @default [] */
+                    flow?: ({
+                        /** @constant */
+                        kind: "user";
+                        content: string;
+                    } | {
+                        /** @constant */
+                        kind: "tool_call";
+                        name: string;
+                        args?: {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** @constant */
+                        kind: "assistant_text";
+                        note?: string;
+                    })[];
+                    rubric?: string;
+                    /** @default 0.7 */
+                    threshold?: number;
+                    /** @default [] */
+                    disallowedTools?: string[];
+                    models?: string[];
+                    /**
+                     * @default [
+                     *       "inspector"
+                     *     ]
+                     */
+                    clientTargets?: string[];
+                    clientSettings?: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ServerEvalsByServerIdSuitesBySuiteId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serverId: string;
+                suiteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    patchApiV1ServerEvalsByServerIdSuitesBySuiteId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serverId: string;
+                suiteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    flow?: ({
+                        /** @constant */
+                        kind: "user";
+                        content: string;
+                    } | {
+                        /** @constant */
+                        kind: "tool_call";
+                        name: string;
+                        args?: {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** @constant */
+                        kind: "assistant_text";
+                        note?: string;
+                    })[];
+                    rubric?: string | null;
+                    threshold?: number;
+                    disallowedTools?: string[];
+                    models?: string[];
+                    clientTargets?: string[];
+                    clientSettings?: unknown;
+                    enabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ServerEvalsByServerIdSuitesBySuiteIdRuns: {
+        parameters: {
+            query?: {
+                branch?: string;
+                client?: "chatgpt" | "codex" | "both";
+                /** @description Authenticate with this profile of the server's organization instead of the server's bound profile. Not supported for clients that sign in with the suite's test account (native apps, claude.ai with its connector lifecycle). */
+                profileId?: string;
+            };
+            header?: never;
+            path: {
+                serverId: string;
+                suiteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        suiteId: string;
+                        status: string;
+                        pass: boolean | null;
+                        score: number | null;
+                        profileId: string | null;
+                    };
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServerEvalsByServerIdRuns: {
+        parameters: {
+            query?: {
+                activeOnly?: "true" | "false";
+                suiteId?: string;
+                limit?: number;
+                take?: number;
+                skip?: number;
+                sort?: string;
+            };
+            header?: never;
+            path: {
+                serverId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: string;
+                            suiteId: string;
+                            status: string;
+                            pass: boolean | null;
+                            score: number | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
+                        total: number;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServerEvalsByServerIdRunsByRunId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serverId: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        suiteId: string;
+                        status: string;
+                        pass: boolean | null;
+                        score: number | null;
+                        serverUrl: string | null;
+                        /** Format: date-time */
+                        createdAt: string;
+                        prompt: string | null;
+                        messages: unknown;
+                        scenarios?: {
+                            executions?: {
+                                id: string;
+                                client: string;
+                                modelName: string | null;
+                                status: string;
+                                pass: boolean | null;
+                                score: number | null;
+                                error: string | null;
+                                judgement: string | null;
+                                judgeVerdict: ((string | number | boolean | null) | {
+                                    [key: string]: unknown;
+                                } | unknown[]) | null;
+                                toolAssertions: unknown;
+                                durationMs: number | null;
+                                toolCalls: unknown;
+                                agentResponse: unknown;
+                            }[];
+                        }[];
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ServerEvalsByServerIdRunsByRunIdCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serverId: string;
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServerEvalsByServerIdRuntimeOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serverId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        captureClients: {
+                            /** @enum {string} */
+                            id: "windows-codex" | "android-chatgpt" | "windows-claude" | "claude" | "chatgpt";
+                            available: boolean;
+                            reason: string | null;
+                        }[];
+                        webModels: {
+                            chatgpt: {
+                                id: string;
+                                name: string;
+                            }[];
+                            claude: {
+                                id: string;
+                                name: string;
+                            }[];
+                        };
+                        harnesses: {
+                            /** @enum {string} */
+                            id: "pi" | "codex" | "claude-code" | "cursor";
+                            available: boolean;
+                            reason: string | null;
+                            models: {
+                                /** @enum {string} */
+                                provider: "openrouter" | "openai" | "anthropic" | "cursor";
+                                model: string;
+                                label: string;
+                            }[];
+                        }[];
                     };
                 };
             };

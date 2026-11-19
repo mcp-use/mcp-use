@@ -485,6 +485,161 @@ const pages: Record<string, Page> = {
       },
     },
   },
+  evals: {
+    summary:
+      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: name and flow are required; rubric, threshold (default 0.7), clients (default: Inspector with the default model), disallowedTools and enabled are optional, and omitted fields reset to their defaults. A <suite> is a suite ID, its name, or a suite file.",
+    examples: [
+      "mcp-use evals push evals/",
+      "mcp-use evals run --all --wait",
+      "mcp-use evals run evals/checkout.yaml --wait",
+    ],
+    commands: {
+      push: {
+        summary:
+          "Create or replace one suite per file, matched by name. Directories contribute their .yaml, .yml and .json files (not subdirectories). Every file is attempted; exits 1 if any fails.",
+        args: "<path...>",
+        options: project,
+        examples: [
+          "mcp-use evals push evals/",
+          "mcp-use evals push evals/checkout.yaml",
+        ],
+      },
+      list: {
+        summary: "List eval suites with their latest run.",
+        options: project,
+        examples: ["mcp-use evals list"],
+      },
+      get: {
+        summary: "Show a suite as YAML with its latest run.",
+        args: "<suite>",
+        options: project,
+        examples: ['mcp-use evals get "Rome weather"'],
+      },
+      export: {
+        summary: "Print a suite as a suite file that push accepts.",
+        args: "<suite>",
+        options: [...project, ["--out <path>", "Write the file instead"]],
+        examples: ['mcp-use evals export "Rome weather" --out evals/rome.yaml'],
+      },
+      create: {
+        summary:
+          "Create a suite from a file. Fails if a suite has the same name; use push or update to replace it.",
+        options: [
+          ...project,
+          ["--file <suite.yaml>", "Required suite file (YAML or JSON)"],
+        ],
+        examples: ["mcp-use evals create --file evals/checkout.yaml"],
+      },
+      update: {
+        summary:
+          "Replace a suite with a file's definition, including its name.",
+        args: "<suite>",
+        options: [
+          ...project,
+          ["--file <suite.yaml>", "Required suite file (YAML or JSON)"],
+        ],
+        examples: [
+          'mcp-use evals update "Old name" --file evals/checkout.yaml',
+        ],
+      },
+      rm: {
+        summary:
+          "Delete a suite and all of its runs; cancels runs in progress (alias: remove).",
+        args: "<suite>",
+        options: [...project, yes],
+        examples: ['mcp-use evals rm "Rome weather" --yes'],
+      },
+      run: {
+        summary:
+          "Start one run per suite against the production endpoint, or a branch environment with --branch. Runs continue on Cloud.",
+        args: "[<suite...>]",
+        options: [
+          ...project,
+          ["--all", "Run every enabled suite"],
+          ["--branch <name>", "Target a branch environment"],
+          [
+            "--profile <id>",
+            "Sign in with this profile instead of the server's own; not for native apps or plugin-lifecycle clients",
+          ],
+          [
+            "--wait",
+            "Wait for results; exit 1 unless every run passes. Ctrl+C cancels the runs still going",
+          ],
+          ["--timeout <seconds>", "Maximum wait with --wait (default: 1800)"],
+          [
+            "--json-file <path>",
+            "Also write the --json result to a file; the readable report still prints",
+          ],
+          [
+            "--markdown-file <path>",
+            "With --wait, also write a Markdown report for pull request comments",
+          ],
+        ],
+        examples: [
+          "mcp-use evals run --all --wait",
+          "mcp-use evals run evals/ --wait",
+          'mcp-use evals run "Rome weather" --branch preview',
+          "mcp-use evals run --all --wait --json-file evals.json --markdown-file evals.md",
+          "mcp-use evals run --all --wait --profile <profile-id>",
+        ],
+      },
+      runs: {
+        summary: "List eval runs, newest first.",
+        options: [
+          ...project,
+          ["--suite <suite>", "Only runs of this suite"],
+          limit(100, 30),
+          skip,
+        ],
+        examples: ['mcp-use evals runs --suite "Rome weather"'],
+      },
+      report: {
+        summary:
+          "Show each client's result and why each failed execution failed.",
+        args: "<run-id...>",
+        options: project,
+        examples: ["mcp-use evals report <run-id>"],
+      },
+      cancel: {
+        summary:
+          "Cancel a run's remaining executions. Finished results are kept.",
+        args: "<run-id>",
+        options: [...project, yes],
+        examples: ["mcp-use evals cancel <run-id> --yes"],
+      },
+      options: {
+        summary:
+          "Show the web apps and agent harnesses this organization can run, with the model IDs each accepts in clients. Each lists its first 10 models unless filtered.",
+        options: [
+          ...project,
+          [
+            "--harness <id>",
+            "Only this harness: pi, codex, claude-code or cursor",
+          ],
+          [
+            "--query <text>",
+            "Only web-app and harness models whose ID or name contains this",
+          ],
+        ],
+        examples: [
+          "mcp-use evals options",
+          "mcp-use evals options --harness pi --query claude",
+        ],
+      },
+      models: {
+        summary:
+          "List model IDs for clients.inspector.models, most popular first.",
+        options: [
+          org,
+          ["--query <text>", "Match the model ID or name"],
+          ["--provider <name>", "Exact provider prefix, such as openai"],
+          limit(100, 30),
+          skip,
+        ],
+        examples: ["mcp-use evals models --provider anthropic"],
+      },
+    },
+  },
   logs: {
     summary:
       "Read Cloud build or runtime logs. Follow until interrupted; build logs stop at completion.",
