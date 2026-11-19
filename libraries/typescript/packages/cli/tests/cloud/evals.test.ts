@@ -8,7 +8,7 @@ import {
   suiteFile,
   toYaml,
 } from "../../src/cloud/evals/config.js";
-import { createLiveReport, elapsed } from "../../src/cloud/evals/output.js";
+import { createLiveReport, duration } from "../../src/cloud/evals/output.js";
 import type { operations } from "../../src/cloud/api/generated/types.gen.js";
 import { test } from "../helpers/cli-test.js";
 import { signIn, SIGNED_IN } from "../helpers/cloud-auth.js";
@@ -52,15 +52,49 @@ function suite(fields: Pick<Suite, "id" | "name"> & Partial<Suite>): Suite {
   };
 }
 
-function run(fields: Pick<Run, "id" | "suiteId"> & Partial<Run>): Run {
+type Execution = NonNullable<
+  NonNullable<Run["scenarios"]>[number]["executions"]
+>[number];
+/** An execution; fields the tests do not look at get neutral values. */
+type ExecutionInput = Omit<
+  Execution,
+  "id" | "durationMs" | "toolCalls" | "agentResponse"
+> &
+  Partial<Pick<Execution, "id" | "durationMs" | "toolCalls" | "agentResponse">>;
+
+/** The dashboard page of the test server's suites. */
+const DASHBOARD =
+  "https://manufact.com/cloud/org-one/servers/srv_1/evals/suites";
+
+function run(
+  fields: Pick<Run, "id" | "suiteId"> &
+    Partial<Omit<Run, "scenarios">> & {
+      scenarios?: Array<{ executions?: ExecutionInput[] }>;
+    }
+): Run {
+  const { scenarios = [], ...rest } = fields;
   return {
     status: "complete",
     pass: true,
     score: 90,
     serverUrl: "https://weather.run.mcp-use.com/mcp",
     createdAt: "2026-11-17T00:00:00Z",
-    scenarios: [],
-    ...fields,
+    prompt: null,
+    messages: [],
+    ...rest,
+    scenarios: scenarios.map((scenario) =>
+      scenario.executions === undefined
+        ? {}
+        : {
+            executions: scenario.executions.map((execution, i) => ({
+              id: `exec_${i + 1}`,
+              durationMs: null,
+              toolCalls: [],
+              agentResponse: null,
+              ...execution,
+            })),
+          }
+    ),
   };
 }
 
@@ -460,11 +494,14 @@ describe("evals run", () => {
     ]);
   });
 
-  test("report prints each client's result and why it failed", async ({
+  test("report prints each client's result, duration and tool calls, and why it failed", async ({
     cloud,
     cli,
   }) => {
     server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: "suite_1", name: "Rome weather" })],
+    });
     cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
       body: run({
         id: "run_1",
@@ -480,9 +517,10 @@ describe("evals run", () => {
                 status: "complete",
                 pass: false,
                 score: 40,
+                durationMs: 84_400,
                 error: null,
                 judgement:
-                  "# Weather task assessment\n\n## Outcome\n\nScore: 0.4.",
+                  "# Weather task assessment\n\n## Outcome\n\nScore: 0.4. The answer was wrong.",
                 judgeVerdict: {
                   score: 0.4,
                   majorProblems: [
@@ -495,6 +533,13 @@ describe("evals run", () => {
                     { kind: "forbidden", name: "delete_city", passed: false },
                   ],
                 },
+                toolCalls: [
+                  {
+                    tool: "delete_city",
+                    args: { city: "Rome" },
+                    isError: false,
+                  },
+                ],
               },
               {
                 client: "inspector",
@@ -502,10 +547,23 @@ describe("evals run", () => {
                 status: "complete",
                 pass: false,
                 score: 20,
+                durationMs: 45_046,
                 error: null,
                 judgement: "# Assessment\n\n- The answer ignored the rubric.",
                 judgeVerdict: null,
                 toolAssertions: null,
+                toolCalls: [
+                  {
+                    tool: "get_weather",
+                    args: { city: "Rome" },
+                    isError: false,
+                  },
+                  {
+                    tool: "get_weather",
+                    args: { city: "rome" },
+                    isError: true,
+                  },
+                ],
               },
               {
                 client: "chatgpt",
@@ -517,6 +575,25 @@ describe("evals run", () => {
                 judgement: null,
                 judgeVerdict: null,
                 toolAssertions: null,
+              },
+              {
+                client: "codex",
+                modelName: "openai/gpt-5",
+                status: "complete",
+                pass: true,
+                score: 100,
+                durationMs: 38_000,
+                error: null,
+                judgement: null,
+                judgeVerdict: null,
+                toolAssertions: null,
+                toolCalls: [
+                  {
+                    tool: "get_weather",
+                    args: { city: "Rome" },
+                    isError: false,
+                  },
+                ],
               },
             ],
           },
@@ -532,16 +609,20 @@ describe("evals run", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
       [
-        "Run run_1: Failed (40)",
-        "Target: https://weather.run.mcp-use.com/mcp",
-        "  FAIL 40  claude-code anthropic/claude-sonnet-5.5",
-        "    Missing tool call: get_weather",
-        "    Called disallowed tool delete_city",
-        "    Weather result contradicts the rubric",
-        "  FAIL 20  inspector openai/gpt-5",
-        "    The answer ignored the rubric.",
-        "  FAIL  chatgpt",
-        "    Browser session expired",
+        "❌ Rome weather · 40%",
+        "   ❌ Claude Code · anthropic/claude-sonnet-5.5 · 40% · 1m 24s · delete_city ×1",
+        "      Missing tool call: get_weather",
+        "      Called disallowed tool delete_city",
+        "      Weather result contradicts the rubric",
+        "      Judge: Score: 0.4.",
+        `      🔗 ${DASHBOARD}/suite_1?execution=exec_1&tab=report`,
+        "   ❌ Manufact Inspector · openai/gpt-5 · 20% · 45s · get_weather ×2 · 1 error",
+        "      Judge: The answer ignored the rubric.",
+        `      🔗 ${DASHBOARD}/suite_1?execution=exec_2&tab=report`,
+        "   ❌ chatgpt.com · failed · no tool calls",
+        "      Browser session expired",
+        `      🔗 ${DASHBOARD}/suite_1?execution=exec_3&tab=report`,
+        "   ✅ Codex CLI · openai/gpt-5 · 100% · 38s · get_weather ×1",
         "",
       ].join("\n")
     );
@@ -597,9 +678,11 @@ describe("evals run", () => {
     );
 
     expect(result.exitCode).toBe(1);
-    expect(result.stdout).toContain("Run run_1: Cancelled\n");
     expect(result.stdout).toContain(
-      "  cancelled  inspector openai/gpt-5\n    Run cancelled"
+      "➖ Rome weather · Manufact Inspector · openai/gpt-5 · cancelled\n"
+    );
+    expect(result.stdout).toContain(
+      "➖ Rome weather · cancelled\n   ➖ Manufact Inspector · openai/gpt-5 · cancelled\n"
     );
     expect(
       cloud.requestsTo("GET", "/api/v1/server-evals/srv_1/runs/run_1")
@@ -664,6 +747,7 @@ describe("evals run", () => {
         suiteId: "suite_2",
         pass: false,
         score: 0,
+        messages: ["Buy a shirt"],
         scenarios: [
           {
             executions: [
@@ -681,6 +765,11 @@ describe("evals run", () => {
                     { kind: "required", name: "checkout", passed: false },
                   ],
                 },
+                durationMs: 12_000,
+                toolCalls: [
+                  { tool: "search", args: { q: "shirt" }, isError: true },
+                ],
+                agentResponse: "I could not place the order.",
               },
             ],
           },
@@ -707,7 +796,7 @@ describe("evals run", () => {
     );
 
     expect(result.exitCode).toBe(1);
-    expect(result.stdout).toContain("Run run_2: Failed (0)");
+    expect(result.stdout).toContain("❌ Checkout | cart · 0%");
     const json = JSON.parse(
       await readFile(join(cli.cwd, "evals.json"), "utf8")
     );
@@ -722,32 +811,51 @@ describe("evals run", () => {
     const suites = json.dashboardUrl as string;
     expect(markdown).toContain(
       [
-        "## Manufact Evals · Weather",
+        "## 🧪 Manufact Evals · Weather",
         "",
         "Branch `feat/cart` · 2 suites · ✅ 1 passed · ❌ 1 failed",
         "",
-        "Target `https://weather.run.mcp-use.com/mcp`",
-        "",
         "| Suite | Result | Score | Executions |",
         "| :-- | :-- | :-- | :-- |",
-        `| [Rome weather](${suites}/suite_1) | ✅ Passed | 100 | 1/1 passed |`,
-        `| [Checkout \\| cart](${suites}/suite_2) | ❌ Failed | 0 | 0/1 passed |`,
+        `| [Rome weather](${suites}/suite_1) | ✅ Passed | 100% | 1/1 passed |`,
+        `| [Checkout \\| cart](${suites}/suite_2) | ❌ Failed | 0% | 0/1 passed |`,
       ].join("\n")
     );
+    expect(markdown).not.toContain("Target");
     expect(markdown).toContain(
-      "<details><summary>✅ <b>Rome weather</b> · Passed (100)</summary>"
+      "<details><summary>✅ <b>Rome weather</b> · 100%</summary>"
     );
     expect(markdown).toContain(
       [
-        "<details open><summary>❌ <b>Checkout | cart</b> · Failed (0)</summary>",
+        "<details open><summary>❌ <b>Checkout | cart</b> · 0%</summary>",
         "",
-        "| Client | Model | Result | Score |",
-        "| :-- | :-- | :-- | :-- |",
-        "| claude-code | anthropic/claude-haiku-5.5 | ❌ Fail | 0 |",
+        "| Client | Model | Result | Score | Duration | Tool calls |",
+        "| :-- | :-- | :-- | :-- | :-- | :-- |",
+        "| Claude Code | anthropic/claude-haiku-5.5 | ❌ Fail | 0% | 12s | search ×1 · 1 error |",
         "",
-        "**claude-code anthropic/claude-haiku-5.5**",
+        `**❌ Claude Code · anthropic/claude-haiku-5.5** · [Open the report](${suites}/suite_2?execution=exec_1&tab=report)`,
         "",
         "- Missing tool call: checkout",
+        "",
+        "<details><summary>Conversation</summary>",
+        "",
+        "**User**",
+        "",
+        "```text",
+        "Buy a shirt",
+        "```",
+        "",
+        "**Tool calls**",
+        "",
+        '- `search` `{"q":"shirt"}` ❌ error',
+        "",
+        "**Answer**",
+        "",
+        "```text",
+        "I could not place the order.",
+        "```",
+        "",
+        "</details>",
       ].join("\n")
     );
   });
@@ -859,11 +967,7 @@ describe("evals run", () => {
 });
 
 describe("evals run --wait live progress", () => {
-  function execution(
-    fields: Partial<
-      NonNullable<NonNullable<Run["scenarios"]>[number]["executions"]>[number]
-    >
-  ) {
+  function execution(fields: Partial<ExecutionInput>): ExecutionInput {
     return {
       client: "inspector",
       modelName: "openai/gpt-5",
@@ -881,67 +985,77 @@ describe("evals run --wait live progress", () => {
     ["suite_1", "Rome weather"],
     ["suite_2", "Paris forecast"],
   ]);
+  const dashboardUrl = "https://manufact.test/suites";
 
-  unit("prints each execution once as it finishes, and why it failed", () => {
-    const live = createLiveReport({ names, startedAt: 0 });
-    const running = [
-      run({
-        id: "run_1",
-        suiteId: "suite_1",
-        status: "running",
-        pass: null,
-        score: null,
-        scenarios: [
-          {
-            executions: [
-              execution({}),
-              execution({ client: "chatgpt", modelName: null }),
-            ],
-          },
-        ],
-      }),
-    ];
-    expect(live.update(running, 5_000)).toEqual([]);
+  unit(
+    "prints each execution once as it finishes, with why it failed and a link",
+    () => {
+      const live = createLiveReport({ names, dashboardUrl, startedAt: 0 });
+      const running = [
+        run({
+          id: "run_1",
+          suiteId: "suite_1",
+          status: "running",
+          pass: null,
+          score: null,
+          scenarios: [
+            {
+              executions: [
+                execution({}),
+                execution({ client: "chatgpt", modelName: null }),
+              ],
+            },
+          ],
+        }),
+      ];
+      expect(live.update(running, 5_000)).toEqual([]);
 
-    const later = [
-      run({
-        id: "run_1",
-        suiteId: "suite_1",
-        status: "running",
-        pass: null,
-        score: null,
-        scenarios: [
-          {
-            executions: [
-              execution({ status: "complete", pass: true, score: 100 }),
-              execution({
-                client: "chatgpt",
-                modelName: null,
-                status: "complete",
-                pass: false,
-                score: 40,
-                toolAssertions: {
-                  checks: [
-                    { kind: "required", name: "get_weather", passed: false },
-                  ],
-                },
-              }),
-            ],
-          },
-        ],
-      }),
-    ];
-    expect(live.update(later, 34_000)).toEqual([
-      "[0:34] ✓ Rome weather · inspector openai/gpt-5 · pass 100",
-      "[0:34] ✗ Rome weather · chatgpt · fail 40",
-      "         Missing tool call: get_weather",
-    ]);
-    // Already reported: nothing new on the next poll.
-    expect(live.update(later, 39_000)).toEqual([]);
-  });
+      const later = [
+        run({
+          id: "run_1",
+          suiteId: "suite_1",
+          status: "running",
+          pass: null,
+          score: null,
+          scenarios: [
+            {
+              executions: [
+                execution({
+                  status: "complete",
+                  pass: true,
+                  score: 100,
+                  durationMs: 41_000,
+                }),
+                execution({
+                  client: "chatgpt",
+                  modelName: null,
+                  status: "complete",
+                  pass: false,
+                  score: 40,
+                  toolAssertions: {
+                    checks: [
+                      { kind: "required", name: "get_weather", passed: false },
+                    ],
+                  },
+                }),
+              ],
+            },
+          ],
+        }),
+      ];
+      expect(live.update(later, 34_000)).toEqual([
+        "✅ Rome weather · Manufact Inspector · openai/gpt-5 · 100% · 41s",
+        "❌ Rome weather · chatgpt.com · 40%",
+        "   Missing tool call: get_weather",
+        `   🔗 ${dashboardUrl}/suite_1?execution=exec_2&tab=report`,
+      ]);
+      // Already reported: nothing new on the next poll.
+      expect(live.update(later, 39_000)).toEqual([]);
+    }
+  );
 
   unit("names what is still running after a quiet minute", () => {
-    const live = createLiveReport({ names, startedAt: 0 });
+    const live = createLiveReport({ names, dashboardUrl, startedAt: 0 });
     const runs = [
       run({
         id: "run_1",
@@ -961,21 +1075,22 @@ describe("evals run --wait live progress", () => {
     ];
     expect(live.update(runs, 59_000)).toEqual([]);
     expect(live.update(runs, 60_000)).toEqual([
-      "[1:00] … 2 running (Rome weather: judging; Paris forecast: running)",
+      "⏳ 2 still running: Rome weather (judging), Paris forecast (running)",
     ]);
     expect(live.update(runs, 65_000)).toEqual([]);
     expect(live.summary(runs, 3_725_000)).toBe(
-      "Stopped waiting after 1:02:05 · 0 of 2 suites passed, 2 still running"
+      "⏱️ Stopped waiting after 1h 02m · 0 of 2 suites passed, 2 still running"
     );
   });
 
-  unit("formats elapsed time", () => {
-    expect(elapsed(0)).toBe("0:00");
-    expect(elapsed(72_400)).toBe("1:12");
-    expect(elapsed(3_600_000)).toBe("1:00:00");
+  unit("formats durations", () => {
+    expect(duration(0)).toBe("0s");
+    expect(duration(45_046)).toBe("45s");
+    expect(duration(84_400)).toBe("1m 24s");
+    expect(duration(3_600_000)).toBe("1h 00m");
   });
 
-  test("streams run links and results before the full report, and stays silent with --json", async ({
+  test("streams suite links and results before the full report, and stays silent with --json", async ({
     cloud,
     cli,
   }) => {
@@ -1000,7 +1115,12 @@ describe("evals run --wait live progress", () => {
         scenarios: [
           {
             executions: [
-              execution({ status: "complete", pass: true, score: 100 }),
+              execution({
+                status: "complete",
+                pass: true,
+                score: 100,
+                durationMs: 38_000,
+              }),
             ],
           },
         ],
@@ -1015,22 +1135,25 @@ describe("evals run --wait live progress", () => {
 
     expect(human.exitCode).toBe(0);
     const lines = human.stdout.split("\n");
-    expect(lines[0]).toBe("Started 1 eval run on Weather (production)");
-    expect(lines[1]).toMatch(
-      /^ {2}Rome weather {2}https:\/\/.*\/servers\/srv_1\/evals\/suites\/suite_1$/
-    );
-    const event = lines.findIndex((line) =>
-      /^\[0:0\d\] ✓ Rome weather · inspector openai\/gpt-5 · pass 100$/.test(
-        line
-      )
+    expect(lines.slice(0, 4)).toEqual([
+      "🧪 Running 1 eval suite on Weather (production)",
+      "",
+      "  Rome weather",
+      `  ${DASHBOARD}/suite_1`,
+    ]);
+    const event = lines.indexOf(
+      "✅ Rome weather · Manufact Inspector · openai/gpt-5 · 100% · 38s"
     );
     const done = lines.findIndex((line) =>
-      /^Done in 0:0\d · 1 of 1 suite passed$/.test(line)
+      /^🏁 Done in \d+s · 1 of 1 suite passed$/.test(line)
     );
-    const report = lines.indexOf("Run run_1: Passed (100)");
-    expect(event).toBeGreaterThan(1);
+    const report = lines.indexOf("✅ Rome weather · 100%");
+    expect(event).toBeGreaterThan(3);
     expect(done).toBeGreaterThan(event);
     expect(report).toBeGreaterThan(done);
+    expect(lines[report + 1]).toBe(
+      "   ✅ Manufact Inspector · openai/gpt-5 · 100% · 38s · no tool calls"
+    );
 
     const json = await cli.run(
       ["evals", "run", "suite_1", "--wait", ...SCOPE],

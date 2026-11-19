@@ -21,7 +21,7 @@ import {
 } from "./config.js";
 import {
   createLiveReport,
-  elapsed,
+  duration,
   finished,
   formatReport,
   formatRunList,
@@ -331,7 +331,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       // The readable output streams: run links now, then a line per finished
       // execution, so a CI log shows progress while the runs go on.
       const startedAt = Date.now();
-      const live = createLiveReport({ names, startedAt });
+      const live = createLiveReport({ names, dashboardUrl, startedAt });
       let printedEvents = false;
       if (!output.json)
         process.stdout.write(
@@ -354,7 +354,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
               }
               const done = polled.filter(finished).length;
               progress.update(
-                `${done} of ${polled.length} suite${polled.length === 1 ? "" : "s"} done · ${elapsed(now - startedAt)}`
+                `${done} of ${polled.length} suite${polled.length === 1 ? "" : "s"} done · ${duration(now - startedAt)}`
               );
             }
           )
@@ -386,7 +386,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       failed = !runs.every((run) => run.pass === true);
       return output.result(
         { runs, dashboardUrl },
-        runs.map(formatReport).join("\n\n")
+        runs.map((run) => formatReport(run, { names, dashboardUrl })).join("\n")
       );
     }
     if (command === "runs") {
@@ -404,7 +404,14 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
     if (command === "report") {
       const runs: Run[] = [];
       for (const runId of new Set(positionals)) runs.push(await api.run(runId));
-      return output.result({ runs }, runs.map(formatReport).join("\n\n"));
+      // Human output names each suite; JSON keeps the runs as Cloud returns them.
+      const names = output.json
+        ? new Map<string, string>()
+        : new Map((await api.suites()).map((item) => [item.id, item.name]));
+      return output.result(
+        { runs },
+        runs.map((run) => formatReport(run, { names, dashboardUrl })).join("\n")
+      );
     }
     if (command === "cancel") {
       const runId = positionals[0]!;

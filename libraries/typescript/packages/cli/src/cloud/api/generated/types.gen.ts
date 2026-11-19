@@ -7014,8 +7014,11 @@ export interface operations {
                         serverUrl: string | null;
                         /** Format: date-time */
                         createdAt: string;
+                        prompt: string | null;
+                        messages: unknown;
                         scenarios?: {
                             executions?: {
+                                id: string;
                                 client: string;
                                 modelName: string | null;
                                 status: string;
@@ -7027,6 +7030,9 @@ export interface operations {
                                     [key: string]: unknown;
                                 } | unknown[]) | null;
                                 toolAssertions: unknown;
+                                durationMs: number | null;
+                                toolCalls: unknown;
+                                agentResponse: unknown;
                             }[];
                         }[];
                     };

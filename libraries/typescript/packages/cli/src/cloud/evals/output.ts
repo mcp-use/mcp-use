@@ -112,29 +112,32 @@ export function formatRunList(
   ].join("\n");
 }
 
-/** One run with a line per client and model, and why each failure failed. */
-export function formatReport(run: Run): string {
-  const executions = (run.scenarios ?? []).flatMap(
-    (scenario) => scenario.executions ?? []
-  );
-  const lines = [`Run ${plain(run.id)}: ${verdict(run)}`];
-  if (run.serverUrl) lines.push(`Target: ${plain(run.serverUrl)}`);
-  for (const execution of executions) {
-    const model =
-      WEB_CLIENTS.has(execution.client) || !execution.modelName
-        ? ""
-        : ` ${plain(execution.modelName)}`;
-    const result = !finished(execution)
-      ? plain(execution.status)
-      : execution.status === "cancelled"
-        ? "cancelled"
-        : execution.pass === true
-          ? "pass"
-          : "FAIL";
-    const score = execution.score === null ? "" : ` ${execution.score}`;
-    lines.push(`  ${result}${score}  ${plain(execution.client)}${model}`);
-    if (execution.pass !== true)
-      lines.push(...reasons(execution).map((reason) => `    ${reason}`));
+/**
+ * One run as `evals report` and `evals run --wait` print it: the suite and
+ * its score, then a line per client and model with its duration and tool
+ * calls. Failed executions add why they failed, the judge's assessment and a
+ * link to their report in the dashboard.
+ */
+export function formatReport(
+  run: Run,
+  options: { names: ReadonlyMap<string, string>; dashboardUrl: string }
+): string {
+  const lines = [
+    `${mark(run)} ${plain(options.names.get(run.suiteId) ?? run.suiteId)} · ${outcome(run)}`,
+  ];
+  for (const execution of executionsOf(run)) {
+    const ran = finished(execution) && execution.status !== "cancelled";
+    lines.push(
+      `   ${mark(execution)} ${[...executionParts(execution), ran ? toolSummary(execution) : undefined].filter(Boolean).join(" · ")}`
+    );
+    if (!ran || execution.pass === true) continue;
+    const found = problems(execution);
+    const judge = judgeSummary(execution);
+    lines.push(
+      ...found.map((problem) => `      ${problem}`),
+      ...(judge && !found.includes(judge) ? [`      Judge: ${judge}`] : []),
+      `      🔗 ${executionUrl(options.dashboardUrl, run.suiteId, execution.id)}`
+    );
   }
   return lines.join("\n");
 }
@@ -260,7 +263,8 @@ type Execution = NonNullable<
  * Render `evals run --wait` results as GitHub-flavored Markdown, for pull
  * request comments and job summaries: a table of suites, then one section
  * per suite with a row per client and model. Suites that did not pass start
- * open and list why each execution failed.
+ * open; each failed execution lists why, the judge's assessment, a link to
+ * its report and the conversation.
  */
 export function formatRunsMarkdown(
   runs: readonly Run[],
@@ -271,41 +275,29 @@ export function formatRunsMarkdown(
     names: ReadonlyMap<string, string>;
   }
 ): string {
-  const icon = (item: { status: string; pass: boolean | null }) =>
-    !finished(item)
-      ? "⏳"
-      : item.status === "cancelled"
-        ? "➖"
-        : item.pass === true
-          ? "✅"
-          : "❌";
   const count = (wanted: string) =>
-    runs.filter((run) => icon(run) === wanted).length;
+    runs.filter((run) => mark(run) === wanted).length;
   const tally = [
     ["✅", "passed"],
     ["❌", "failed"],
     ["➖", "cancelled"],
     ["⏳", "still running"],
   ]
-    .map(([mark, label]) => [count(mark!), mark, label] as const)
+    .map(([icon, label]) => [count(icon!), icon, label] as const)
     .filter(([n]) => n > 0)
-    .map(([n, mark, label]) => `${mark} ${n} ${label}`)
+    .map(([n, icon, label]) => `${icon} ${n} ${label}`)
     .join(" · ");
   const pending = count("⏳");
-  const targets = [
-    ...new Set(runs.map((run) => run.serverUrl ?? "").filter(Boolean)),
-  ];
   const suiteName = (run: Run) => options.names.get(run.suiteId) ?? run.suiteId;
   const suiteUrl = (run: Run) =>
     `${options.dashboardUrl}/${encodeURIComponent(run.suiteId)}`;
 
   const lines: string[] = [
-    `## Manufact Evals · ${cell(options.serverName)}`,
+    `## 🧪 Manufact Evals · ${cell(options.serverName)}`,
     "",
     `${options.branch ? `Branch ${code(options.branch)}` : "Production"} · ${runs.length} suite${runs.length === 1 ? "" : "s"}${tally ? ` · ${tally}` : ""}`,
     "",
   ];
-  if (targets.length === 1) lines.push(`Target ${code(targets[0]!)}`, "");
   if (pending)
     lines.push(
       "> [!CAUTION]",
@@ -321,7 +313,7 @@ export function formatRunsMarkdown(
     const executions = executionsOf(run);
     const ok = executions.filter((execution) => execution.pass === true).length;
     lines.push(
-      `| [${cell(suiteName(run))}](${suiteUrl(run)}) | ${icon(run)} ${cell(verdict({ ...run, score: null }))} | ${run.score ?? "—"} | ${executions.length ? `${ok}/${executions.length} passed` : "—"} |`
+      `| [${cell(suiteName(run))}](${suiteUrl(run)}) | ${mark(run)} ${cell(verdict({ ...run, score: null }))} | ${run.score === null ? "—" : `${run.score}%`} | ${executions.length ? `${ok}/${executions.length} passed` : "—"} |`
     );
   }
   lines.push("");
@@ -331,17 +323,14 @@ export function formatRunsMarkdown(
     if (executions.length === 0) continue;
     lines.push(
       // An HTML line: Markdown escapes would show as typed here.
-      `<details${run.pass === true ? "" : " open"}><summary>${icon(run)} <b>${html(suiteName(run))}</b> · ${html(verdict(run))}</summary>`,
+      `<details${run.pass === true ? "" : " open"}><summary>${mark(run)} <b>${html(suiteName(run))}</b> · ${html(outcome(run))}</summary>`,
       "",
-      "| Client | Model | Result | Score |",
-      "| :-- | :-- | :-- | :-- |"
+      "| Client | Model | Result | Score | Duration | Tool calls |",
+      "| :-- | :-- | :-- | :-- | :-- | :-- |"
     );
     const failures: string[] = [];
     for (const execution of executions) {
-      const model =
-        WEB_CLIENTS.has(execution.client) || !execution.modelName
-          ? ""
-          : cell(execution.modelName);
+      const ran = finished(execution) && execution.status !== "cancelled";
       const result = !finished(execution)
         ? `⏳ ${cell(execution.status)}`
         : execution.status === "cancelled"
@@ -350,18 +339,23 @@ export function formatRunsMarkdown(
             ? "✅ Pass"
             : "❌ Fail";
       lines.push(
-        `| ${cell(execution.client)} | ${model || "—"} | ${result} | ${execution.score ?? "—"} |`
+        `| ${cell(clientName(execution.client))} | ${cell(modelOf(execution) ?? "—")} | ${result} | ${execution.score === null ? "—" : `${execution.score}%`} | ${execution.durationMs == null ? "—" : duration(execution.durationMs)} | ${ran ? cell(toolSummary(execution)) : "—"} |`
       );
-      if (finished(execution) && execution.status !== "cancelled") {
-        const why = execution.pass === true ? [] : reasons(execution);
-        if (why.length)
-          failures.push(
-            `**${cell(execution.client)}${model ? ` ${model}` : ""}**`,
-            "",
-            ...why.map((reason) => `- ${cell(reason)}`),
-            ""
-          );
-      }
+      if (!ran || execution.pass === true) continue;
+      const found = problems(execution);
+      const judge = judgeSummary(execution);
+      const model = modelOf(execution);
+      failures.push(
+        `**❌ ${cell(clientName(execution.client))}${model ? ` · ${cell(model)}` : ""}** · [Open the report](${executionUrl(options.dashboardUrl, run.suiteId, execution.id)})`,
+        "",
+        ...found.map((problem) => `- ${cell(problem)}`),
+        ...(judge && !found.includes(judge)
+          ? [`- **Judge:** ${cell(judge)}`]
+          : []),
+        "",
+        ...conversation(run, execution),
+        ""
+      );
     }
     lines.push("", ...failures);
     lines.push(
@@ -376,22 +370,155 @@ export function formatRunsMarkdown(
   return lines.join("\n");
 }
 
+/** A collapsed transcript of one execution: the user's messages, its tool calls and its answer. */
+function conversation(run: Run, execution: Execution): string[] {
+  const messages = list(run.messages).filter(
+    (message): message is string => typeof message === "string"
+  );
+  const calls = toolCallsOf(execution);
+  const answer =
+    typeof execution.agentResponse === "string"
+      ? execution.agentResponse.trim()
+      : "";
+  if (messages.length === 0 && calls.length === 0 && !answer) return [];
+  const clipped = answer.length > 1500 ? `${answer.slice(0, 1497)}...` : answer;
+  return [
+    "<details><summary>Conversation</summary>",
+    "",
+    ...messages.flatMap((message) => ["**User**", "", ...fenced(message), ""]),
+    ...(calls.length
+      ? [
+          "**Tool calls**",
+          "",
+          ...calls.map(
+            (call) =>
+              `- ${code(call.tool)} ${code(JSON.stringify(call.args ?? {}))}${call.isError ? " ❌ error" : ""}`
+          ),
+          "",
+        ]
+      : ["**Tool calls:** none", ""]),
+    ...(answer ? ["**Answer**", "", ...fenced(clipped), ""] : []),
+    "</details>",
+  ];
+}
+
+/** A text code block whose fence outgrows any backticks inside. */
+function fenced(text: string): string[] {
+  const body = plain(text);
+  const longest = Math.max(
+    0,
+    ...[...body.matchAll(/`+/g)].map((match) => match[0].length)
+  );
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return [`${fence}text`, body, fence];
+}
+
 function executionsOf(run: Run): Execution[] {
   return (run.scenarios ?? []).flatMap((scenario) => scenario.executions ?? []);
 }
 
-/** Elapsed time as m:ss, or h:mm:ss from an hour. */
-export function elapsed(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = String(total % 60).padStart(2, "0");
-  return hours > 0
-    ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
-    : `${minutes}:${seconds}`;
+/** Client names as the dashboard shows them. */
+const CLIENT_NAMES: Record<string, string> = {
+  inspector: "Manufact Inspector",
+  chatgpt: "chatgpt.com",
+  claude: "claude.ai",
+  pi: "Pi",
+  codex: "Codex CLI",
+  "claude-code": "Claude Code",
+  cursor: "Cursor CLI",
+  "windows-codex": "Codex Desktop (Windows)",
+  "android-chatgpt": "ChatGPT (Android)",
+  "windows-claude": "Claude Desktop (Windows)",
+};
+
+function clientName(client: string): string {
+  return CLIENT_NAMES[client] ?? plain(client);
 }
 
-/** The lines `evals run --wait` prints once its runs have started. */
+/** The model an execution used; web apps use the app's default. */
+function modelOf(execution: Execution): string | undefined {
+  return WEB_CLIENTS.has(execution.client) || !execution.modelName
+    ? undefined
+    : plain(execution.modelName);
+}
+
+/** ✅ passed, ❌ failed, ➖ cancelled, ⏳ not finished yet. */
+function mark(item: { status: string; pass: boolean | null }): string {
+  if (!finished(item)) return "⏳";
+  if (item.status === "cancelled") return "➖";
+  return item.pass === true ? "✅" : "❌";
+}
+
+/** A run's or execution's result: its score as a percentage, else its state. */
+function outcome(item: {
+  status: string;
+  pass: boolean | null;
+  score: number | null;
+}): string {
+  if (!finished(item)) return plain(item.status);
+  if (item.status === "cancelled") return "cancelled";
+  if (item.score !== null) return `${item.score}%`;
+  return item.pass === true ? "passed" : "failed";
+}
+
+/** A duration in words: 45s, 1m 24s, 1h 02m. */
+export function duration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60)
+    return `${minutes}m ${String(total % 60).padStart(2, "0")}s`;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
+/** Client, model, result and duration, as the dashboard's run table shows them. */
+function executionParts(execution: Execution): string[] {
+  return [
+    clientName(execution.client),
+    modelOf(execution),
+    outcome(execution),
+    execution.durationMs == null ? undefined : duration(execution.durationMs),
+  ].filter((part): part is string => part !== undefined);
+}
+
+/** The MCP tool calls an execution made. */
+function toolCallsOf(
+  execution: Execution
+): Array<{ tool: string; args: unknown; isError: boolean }> {
+  return list(execution.toolCalls)
+    .map(record)
+    .filter((call) => typeof call.tool === "string")
+    .map((call) => ({
+      tool: plain(call.tool),
+      args: call.args,
+      isError: call.isError === true,
+    }));
+}
+
+/** The tool calls in a few words: `get_weather ×2, get_forecast ×1 · 1 error`. */
+function toolSummary(execution: Execution): string {
+  const calls = toolCallsOf(execution);
+  if (calls.length === 0) return "no tool calls";
+  const counts = new Map<string, number>();
+  for (const call of calls)
+    counts.set(call.tool, (counts.get(call.tool) ?? 0) + 1);
+  const errors = calls.filter((call) => call.isError).length;
+  return `${[...counts].map(([tool, n]) => `${tool} ×${n}`).join(", ")}${errors ? ` · ${errors} error${errors === 1 ? "" : "s"}` : ""}`;
+}
+
+/** An execution's report in the dashboard; its suite's page when Cloud sent no execution ID. */
+function executionUrl(
+  dashboardUrl: string,
+  suiteId: string,
+  executionId: string | undefined
+): string {
+  const suite = `${dashboardUrl}/${encodeURIComponent(suiteId)}`;
+  return executionId
+    ? `${suite}?execution=${encodeURIComponent(executionId)}&tab=report`
+    : suite;
+}
+
+/** The lines `evals run --wait` prints once its runs have started: each suite and its dashboard page. */
 export function formatRunsStarted(
   runs: ReadonlyArray<{ suiteId: string }>,
   options: {
@@ -401,27 +528,24 @@ export function formatRunsStarted(
     names: ReadonlyMap<string, string>;
   }
 ): string {
-  const names = runs.map((run) =>
-    plain(options.names.get(run.suiteId) ?? run.suiteId)
-  );
-  const width = Math.max(...names.map((name) => name.length));
   return [
-    `Started ${runs.length} eval run${runs.length === 1 ? "" : "s"} on ${plain(options.serverName)} (${options.branch ? `branch ${plain(options.branch)}` : "production"})`,
-    ...runs.map(
-      (run, i) =>
-        `  ${names[i]!.padEnd(width)}  ${options.dashboardUrl}/${encodeURIComponent(run.suiteId)}`
-    ),
+    `🧪 Running ${runs.length} eval suite${runs.length === 1 ? "" : "s"} on ${plain(options.serverName)} (${options.branch ? `branch ${plain(options.branch)}` : "production"})`,
+    ...runs.flatMap((run) => [
+      "",
+      `  ${plain(options.names.get(run.suiteId) ?? run.suiteId)}`,
+      `  ${options.dashboardUrl}/${encodeURIComponent(run.suiteId)}`,
+    ]),
   ].join("\n");
 }
 
 /**
  * Live progress for `evals run --wait`, fed every poll: a line as each
- * execution finishes (with why it failed), and a line naming what is still
- * running after `heartbeatMs` without one. Times are elapsed since
- * `startedAt`, accurate to the poll interval: Cloud reports no execution times.
+ * execution finishes (with why it failed and a link to its report), and a
+ * line naming what is still running after `heartbeatMs` without one.
  */
 export function createLiveReport(options: {
   names: ReadonlyMap<string, string>;
+  dashboardUrl: string;
   startedAt: number;
   heartbeatMs?: number;
 }) {
@@ -430,7 +554,6 @@ export function createLiveReport(options: {
   let lastLine = options.startedAt;
   const suiteName = (run: Run) =>
     plain(options.names.get(run.suiteId) ?? run.suiteId);
-  const stamp = (now: number) => `[${elapsed(now - options.startedAt)}]`;
 
   return {
     /** Lines for what changed since the last poll. */
@@ -438,26 +561,20 @@ export function createLiveReport(options: {
       const lines: string[] = [];
       for (const run of runs) {
         executionsOf(run).forEach((execution, index) => {
-          const key = `${run.id}:${index}`;
+          // The execution's ID, else its place in the run.
+          const key = `${run.id}:${execution.id || `#${index}`}`;
           if (!finished(execution) || reported.has(key)) return;
           reported.add(key);
-          const target = `${suiteName(run)} · ${plain(execution.client)}${
-            WEB_CLIENTS.has(execution.client) || !execution.modelName
-              ? ""
-              : ` ${plain(execution.modelName)}`
-          }`;
-          const score = execution.score === null ? "" : ` ${execution.score}`;
-          if (execution.status === "cancelled") {
-            lines.push(`${stamp(now)} – ${target} · cancelled`);
-          } else if (execution.pass === true) {
-            lines.push(`${stamp(now)} ✓ ${target} · pass${score}`);
-          } else {
-            lines.push(
-              `${stamp(now)} ✗ ${target} · ${execution.score === null ? plain(execution.status) : `fail${score}`}`
-            );
-            const why = reasons(execution)[0];
-            if (why) lines.push(`${" ".repeat(stamp(now).length + 3)}${why}`);
-          }
+          lines.push(
+            `${mark(execution)} ${[suiteName(run), ...executionParts(execution)].join(" · ")}`
+          );
+          if (execution.status === "cancelled" || execution.pass === true)
+            return;
+          const why = reasons(execution)[0];
+          if (why) lines.push(`   ${why}`);
+          lines.push(
+            `   🔗 ${executionUrl(options.dashboardUrl, run.suiteId, execution.id)}`
+          );
         });
       }
       const pending = runs.filter((run) => !finished(run));
@@ -473,11 +590,11 @@ export function createLiveReport(options: {
                 .map((execution) => plain(execution.status))
             ),
           ];
-          return `${suiteName(run)}: ${states.length ? states.join(", ") : plain(run.status)}`;
+          return `${suiteName(run)} (${states.length ? states.join(", ") : plain(run.status)})`;
         });
         const more = pending.length - shown.length;
         lines.push(
-          `${stamp(now)} … ${pending.length} running (${shown.join("; ")}${more > 0 ? `; ${more} more` : ""})`
+          `⏳ ${pending.length} still running: ${shown.join(", ")}${more > 0 ? `, and ${more} more` : ""}`
         );
       }
       return lines;
@@ -486,11 +603,11 @@ export function createLiveReport(options: {
     summary(runs: readonly Run[], now: number): string {
       const passed = runs.filter((run) => run.pass === true).length;
       const pending = runs.filter((run) => !finished(run)).length;
-      const took = elapsed(now - options.startedAt);
+      const took = duration(now - options.startedAt);
       const tally = `${passed} of ${runs.length} suite${runs.length === 1 ? "" : "s"} passed`;
       return pending > 0
-        ? `Stopped waiting after ${took} · ${tally}, ${pending} still running`
-        : `Done in ${took} · ${tally}`;
+        ? `⏱️ Stopped waiting after ${took} · ${tally}, ${pending} still running`
+        : `🏁 Done in ${took} · ${tally}`;
     },
   };
 }
@@ -528,11 +645,10 @@ function code(value: string): string {
 }
 
 /**
- * Why an execution did not pass, most specific first: its error, the tool
- * checks it failed, the judge's problem titles, else the first sentence of
- * the judgement (which is Markdown, usually opening with a heading).
+ * What went wrong in an execution, most specific first: its error, the tool
+ * checks it failed, then the judge's problem titles.
  */
-function reasons(execution: Execution): string[] {
+function problems(execution: Execution): string[] {
   if (execution.error) return [firstLine(execution.error)];
   const tools = list(record(execution.toolAssertions).checks)
     .map(record)
@@ -542,19 +658,35 @@ function reasons(execution: Execution): string[] {
         ? `Called disallowed tool ${String(check.name)}`
         : `Missing tool call: ${String(check.name)}`
     );
-  const problems = list(record(execution.judgeVerdict).majorProblems)
+  const titles = list(record(execution.judgeVerdict).majorProblems)
     .map((problem) => record(problem).title)
     .filter(
       (title): title is string => typeof title === "string" && title !== ""
     )
     .map(firstLine);
-  if (tools.length > 0 || problems.length > 0) return [...tools, ...problems];
+  return [...tools, ...titles];
+}
+
+/**
+ * The judge's assessment in one sentence: the first sentence of its report,
+ * which is Markdown that usually opens with a heading.
+ */
+function judgeSummary(execution: Execution): string | undefined {
   const text = (execution.judgement ?? "")
     .split("\n")
     .filter((line) => !/^\s*#/.test(line))
     .map((line) => line.replace(/^\s*(?:[-*]|\d+\.)\s+/, "").trim())
     .find((line) => line !== "");
-  return text ? [firstLine(text)] : [];
+  if (!text) return undefined;
+  return firstLine(text.split(/(?<=[.!?])\s+/)[0] ?? text);
+}
+
+/** Why an execution did not pass: its problems, else the judge's assessment. */
+function reasons(execution: Execution): string[] {
+  const found = problems(execution);
+  if (found.length > 0) return found;
+  const judge = judgeSummary(execution);
+  return judge ? [judge] : [];
 }
 
 function list(value: unknown): unknown[] {
