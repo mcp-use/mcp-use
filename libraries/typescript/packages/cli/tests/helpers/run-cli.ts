@@ -56,6 +56,8 @@ export interface RunOptions {
   signal?: {
     name: NodeJS.Signals;
     when: (output: { stdout: string; stderr: string }) => boolean;
+    /** How many times to send it, back to back. Defaults to 1. */
+    times?: number;
   };
 }
 
@@ -111,7 +113,8 @@ export async function runCli(
   const maybeSignal = () => {
     if (signalled || !options.signal?.when({ stdout, stderr })) return;
     signalled = true;
-    child.kill(options.signal.name);
+    for (let i = 0; i < (options.signal.times ?? 1); i++)
+      child.kill(options.signal.name);
   };
   child.stdout.setEncoding("utf8").on("data", (chunk) => {
     stdout += chunk;

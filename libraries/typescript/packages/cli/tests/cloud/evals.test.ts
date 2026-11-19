@@ -917,11 +917,13 @@ describe("evals run", () => {
   });
 
   test.for([
-    ["SIGINT", 130],
-    ["SIGTERM", 143],
+    ["SIGINT", 130, 1],
+    ["SIGTERM", 143, 1],
+    // CI can deliver a cancel twice; the second must not cut cancelling short.
+    ["SIGINT", 130, 2],
   ] as const)(
-    "%s while waiting cancels the runs still going",
-    async ([signal, exitCode], { cloud, cli }) => {
+    "%s while waiting cancels the runs still going (sent %i×)",
+    async ([signal, exitCode, times], { cloud, cli }) => {
       server(cloud);
       cloud.on("GET", SUITES, {
         body: [
@@ -984,6 +986,7 @@ describe("evals run", () => {
           signal: {
             name: signal,
             when: ({ stdout }) => stdout.includes("✅ Rome weather"),
+            times,
           },
         }
       );

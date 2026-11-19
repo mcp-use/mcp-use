@@ -809,8 +809,10 @@ const CANCEL_TIMEOUT_MS = 5000;
 
 /**
  * On SIGINT or SIGTERM (Ctrl+C, or a cancelled CI job), cancel the runs
- * `open` returns, report it on stderr, then exit 130 or 143. A second signal
- * of the same kind exits at once. Returns a function that removes the handlers.
+ * `open` returns, report it on stderr, then exit 130 or 143. Signals that
+ * arrive while cancelling are ignored: CI can deliver the same signal twice
+ * (to the job's process group and through a wrapper), and cancelling is
+ * capped at CANCEL_TIMEOUT_MS. Returns a function that removes the handlers.
  */
 function cancelRunsOnSignal(
   api: EvalApi,
@@ -842,8 +844,8 @@ function cancelRunsOnSignal(
       exit();
     });
   };
-  process.once("SIGINT", onSignal);
-  process.once("SIGTERM", onSignal);
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
   return () => {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
