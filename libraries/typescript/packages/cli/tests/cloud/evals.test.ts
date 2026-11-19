@@ -130,13 +130,20 @@ describe("evals push", () => {
         /\/cloud\/org-one\/servers\/srv_1\/evals\/suites$/
       ),
       results: [
-        { path: "evals/broken.yaml", error: expect.stringContaining("flow") },
         {
-          path: "evals/checkout.yml",
+          path: join("evals", "broken.yaml"),
+          error: expect.stringContaining("flow"),
+        },
+        {
+          path: join("evals", "checkout.yml"),
           action: "updated",
           suiteId: "suite_checkout",
         },
-        { path: "evals/rome.yaml", action: "created", suiteId: "suite_rome" },
+        {
+          path: join("evals", "rome.yaml"),
+          action: "created",
+          suiteId: "suite_rome",
+        },
       ],
     });
     expect(cloud.requestsTo("POST", SUITES).map((r) => r.body)).toEqual([
