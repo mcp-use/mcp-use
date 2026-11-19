@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 5.3.0
+
+### Minor Changes
+
+- 343a803: `mcp-use checklist run` takes `--url` and `--profile` for External URL servers: check another MCP URL, such as a preview deployment, and authenticate with a chosen profile instead of the server's.
+
 ## 5.3.0-canary.0
 
 ### Minor Changes
