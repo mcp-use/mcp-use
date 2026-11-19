@@ -273,6 +273,8 @@ export function formatRunsMarkdown(
     dashboardUrl: string;
     branch: string | undefined;
     names: ReadonlyMap<string, string>;
+    /** The profile the runs sign in with, when not the server's own. */
+    profile?: string | undefined;
   }
 ): string {
   const count = (wanted: string) =>
@@ -295,7 +297,7 @@ export function formatRunsMarkdown(
   const lines: string[] = [
     `## 🧪 Manufact Evals · ${cell(options.serverName)}`,
     "",
-    `${options.branch ? `Branch ${code(options.branch)}` : "Production"} · ${runs.length} suite${runs.length === 1 ? "" : "s"}${tally ? ` · ${tally}` : ""}`,
+    `${options.branch ? `Branch ${code(options.branch)}` : "Production"}${options.profile ? ` · Profile ${cell(options.profile)}` : ""} · ${runs.length} suite${runs.length === 1 ? "" : "s"}${tally ? ` · ${tally}` : ""}`,
     "",
   ];
   if (pending)
@@ -526,10 +528,12 @@ export function formatRunsStarted(
     dashboardUrl: string;
     branch: string | undefined;
     names: ReadonlyMap<string, string>;
+    /** The profile the runs sign in with, when not the server's own. */
+    profile?: string | undefined;
   }
 ): string {
   return [
-    `🧪 Running ${runs.length} eval suite${runs.length === 1 ? "" : "s"} on ${plain(options.serverName)} (${options.branch ? `branch ${plain(options.branch)}` : "production"})`,
+    `🧪 Running ${runs.length} eval suite${runs.length === 1 ? "" : "s"} on ${plain(options.serverName)} (${options.branch ? `branch ${plain(options.branch)}` : "production"})${options.profile ? ` · profile ${plain(options.profile)}` : ""}`,
     ...runs.flatMap((run) => [
       "",
       `  ${plain(options.names.get(run.suiteId) ?? run.suiteId)}`,

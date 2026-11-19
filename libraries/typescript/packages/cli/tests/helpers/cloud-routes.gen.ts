@@ -413,6 +413,28 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/organizations/{id}/profiles": {
+    data: T.operations["getApiV1OrganizationsByIdProfiles"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfiles"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfiles"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfiles"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfiles"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfiles"]["responses"][404]
+      >;
+    };
+  };
   "GET /api/v1/server-evals/{serverId}/runs": {
     data: T.operations["getApiV1ServerEvalsByServerIdRuns"]["parameters"];
     responses: {
@@ -1362,6 +1384,7 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "GET /api/v1/organizations",
   "GET /api/v1/organizations/{id}/invitations",
   "GET /api/v1/organizations/{id}/members",
+  "GET /api/v1/organizations/{id}/profiles",
   "GET /api/v1/server-evals/{serverId}/runs",
   "GET /api/v1/server-evals/{serverId}/runs/{runId}",
   "GET /api/v1/server-evals/{serverId}/runtime-options",
@@ -1429,6 +1452,7 @@ export const cloudRouteSuccessStatus: Readonly<
   "GET /api/v1/organizations": 200,
   "GET /api/v1/organizations/{id}/invitations": 200,
   "GET /api/v1/organizations/{id}/members": 200,
+  "GET /api/v1/organizations/{id}/profiles": 200,
   "GET /api/v1/server-evals/{serverId}/runs": 200,
   "GET /api/v1/server-evals/{serverId}/runs/{runId}": 200,
   "GET /api/v1/server-evals/{serverId}/runtime-options": 200,

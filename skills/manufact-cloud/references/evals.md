@@ -73,6 +73,9 @@ read them later with `report`. Stopping `run --wait` with SIGINT or SIGTERM
 (Ctrl+C, a cancelled CI job) cancels the unfinished runs it started. Starting a run is not idempotent, so do not
 retry a start whose outcome is unknown. Check `mcp-use evals runs --json`
 first. `--branch NAME` targets a branch environment instead of production.
+`--profile ID` signs in with that profile instead of the server's own (not for
+native apps or plugin-lifecycle clients); a Cloud that ignores it gets the run
+cancelled and the command fails.
 If a start fails after others began, the error names the runs already going.
 In CI, `--json-file PATH` and `--markdown-file PATH` (with `--wait`) write the
 results and a Markdown report to files; on timeout both get the runs as they

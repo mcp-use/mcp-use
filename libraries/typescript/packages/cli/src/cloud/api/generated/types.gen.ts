@@ -532,6 +532,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{id}/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's profiles (website logins, OAuth connections and static headers or bearer tokens) with their status, account, sites and the servers and environments they are bound to. Secret values read as "[REDACTED]". */
+        get: operations["getApiV1OrganizationsByIdProfiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{id}/invitations": {
         parameters: {
             query?: never;
@@ -5549,6 +5566,95 @@ export interface operations {
             };
         };
     };
+    getApiV1OrganizationsByIdProfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: string;
+                            label: string | null;
+                            /** @description OAuth profiles: the connected account. */
+                            account: {
+                                email: string | null;
+                                name: string | null;
+                                issuerHost: string;
+                            } | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
     getApiV1OrganizationsByIdInvitations: {
         parameters: {
             query?: never;
@@ -6808,6 +6914,8 @@ export interface operations {
             query?: {
                 branch?: string;
                 client?: "chatgpt" | "codex" | "both";
+                /** @description Authenticate with this profile of the server's organization instead of the server's bound profile. Not supported for clients that sign in with the suite's test account (native apps, claude.ai with its connector lifecycle). */
+                profileId?: string;
             };
             header?: never;
             path: {
@@ -6830,6 +6938,7 @@ export interface operations {
                         status: string;
                         pass: boolean | null;
                         score: number | null;
+                        profileId: string | null;
                     };
                 };
             };

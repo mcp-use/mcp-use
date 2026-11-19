@@ -558,6 +558,10 @@ const pages: Record<string, Page> = {
           ["--all", "Run every enabled suite"],
           ["--branch <name>", "Target a branch environment"],
           [
+            "--profile <id>",
+            "Sign in with this profile instead of the server's own; not for native apps or plugin-lifecycle clients",
+          ],
+          [
             "--wait",
             "Wait for results; exit 1 unless every run passes. Ctrl+C cancels the runs still going",
           ],
@@ -576,6 +580,7 @@ const pages: Record<string, Page> = {
           "mcp-use evals run evals/ --wait",
           'mcp-use evals run "Rome weather" --branch preview',
           "mcp-use evals run --all --wait --json-file evals.json --markdown-file evals.md",
+          "mcp-use evals run --all --wait --profile <profile-id>",
         ],
       },
       runs: {
