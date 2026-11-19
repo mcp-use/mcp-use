@@ -611,6 +611,209 @@ describe("evals run", () => {
     });
     expect(result.exitCode).toBe(2);
   });
+
+  test("--json-file and --markdown-file write the results next to the readable report", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [
+        suite({ id: "suite_1", name: "Rome weather" }),
+        suite({ id: "suite_2", name: "Checkout | cart" }),
+      ],
+    });
+    for (const id of ["1", "2"])
+      cloud.on("POST", `${SUITES}/suite_${id}/runs`, {
+        body: {
+          id: `run_${id}`,
+          suiteId: `suite_${id}`,
+          status: "running",
+          pass: null,
+          score: null,
+        },
+      });
+    cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
+      body: run({
+        id: "run_1",
+        suiteId: "suite_1",
+        score: 100,
+        scenarios: [
+          {
+            executions: [
+              {
+                client: "inspector",
+                modelName: "openai/gpt-5",
+                status: "complete",
+                pass: true,
+                score: 100,
+                error: null,
+                judgement: null,
+                judgeVerdict: null,
+                toolAssertions: null,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_2", {
+      body: run({
+        id: "run_2",
+        suiteId: "suite_2",
+        pass: false,
+        score: 0,
+        scenarios: [
+          {
+            executions: [
+              {
+                client: "claude-code",
+                modelName: "anthropic/claude-haiku-5.5",
+                status: "complete",
+                pass: false,
+                score: 0,
+                error: null,
+                judgement: null,
+                judgeVerdict: null,
+                toolAssertions: {
+                  checks: [
+                    { kind: "required", name: "checkout", passed: false },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "--all",
+        "--wait",
+        "--branch",
+        "feat/cart",
+        "--json-file",
+        "evals.json",
+        "--markdown-file",
+        "evals.md",
+        "--server",
+        "weather",
+      ],
+      { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("Run run_2: Failed (0)");
+    const json = JSON.parse(
+      await readFile(join(cli.cwd, "evals.json"), "utf8")
+    );
+    expect(json).toMatchObject({
+      runs: [
+        { id: "run_1", pass: true },
+        { id: "run_2", pass: false },
+      ],
+      dashboardUrl: expect.stringContaining("/servers/srv_1/evals/suites"),
+    });
+    const markdown = await readFile(join(cli.cwd, "evals.md"), "utf8");
+    const suites = json.dashboardUrl as string;
+    expect(markdown).toContain(
+      [
+        "## Manufact Evals · Weather",
+        "",
+        "Branch `feat/cart` · 2 suites · ✅ 1 passed · ❌ 1 failed",
+        "",
+        "Target `https://weather.run.mcp-use.com/mcp`",
+        "",
+        "| Suite | Result | Score | Executions |",
+        "| :-- | :-- | :-- | :-- |",
+        `| [Rome weather](${suites}/suite_1) | ✅ Passed | 100 | 1/1 passed |`,
+        `| [Checkout \\| cart](${suites}/suite_2) | ❌ Failed | 0 | 0/1 passed |`,
+      ].join("\n")
+    );
+    expect(markdown).toContain(
+      "<details><summary>✅ <b>Rome weather</b> · Passed (100)</summary>"
+    );
+    expect(markdown).toContain(
+      [
+        "<details open><summary>❌ <b>Checkout \\| cart</b> · Failed (0)</summary>",
+        "",
+        "| Client | Model | Result | Score |",
+        "| :-- | :-- | :-- | :-- |",
+        "| claude-code | anthropic/claude-haiku-5.5 | ❌ Fail | 0 |",
+        "",
+        "**claude-code anthropic/claude-haiku-5.5**",
+        "",
+        "- Missing tool call: checkout",
+      ].join("\n")
+    );
+  });
+
+  test("--timeout still writes the files, then fails with the runs left", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: "suite_1", name: "Rome weather" })],
+    });
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      body: {
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+      },
+    });
+    cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
+      body: run({
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+      }),
+    });
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "suite_1",
+        "--wait",
+        "--timeout",
+        "1",
+        "--json-file",
+        "evals.json",
+        "--markdown-file",
+        "evals.md",
+        ...SCOPE,
+      ],
+      { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "300" } }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      error: { code: "eval_wait_timeout" },
+    });
+    expect(
+      JSON.parse(await readFile(join(cli.cwd, "evals.json"), "utf8"))
+    ).toMatchObject({ runs: [{ id: "run_1", status: "running" }] });
+    const markdown = await readFile(join(cli.cwd, "evals.md"), "utf8");
+    expect(markdown).toContain("Production · 1 suite · ⏳ 1 still running");
+    expect(markdown).toContain("**Timed out waiting for 1 run.**");
+  });
+
+  test("--markdown-file needs --wait", async ({ cli }) => {
+    const result = await cli.run(
+      ["evals", "run", "--all", "--markdown-file", "evals.md", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(2);
+  });
 });
 
 test("evals export reports a path it cannot write", async ({ cloud, cli }) => {

@@ -257,6 +257,152 @@ type Execution = NonNullable<
 >[number];
 
 /**
+ * Render `evals run --wait` results as GitHub-flavored Markdown, for pull
+ * request comments and job summaries: a table of suites, then one section
+ * per suite with a row per client and model. Suites that did not pass start
+ * open and list why each execution failed.
+ */
+export function formatRunsMarkdown(
+  runs: readonly Run[],
+  options: {
+    serverName: string;
+    dashboardUrl: string;
+    branch: string | undefined;
+    names: ReadonlyMap<string, string>;
+  }
+): string {
+  const icon = (item: { status: string; pass: boolean | null }) =>
+    !finished(item)
+      ? "⏳"
+      : item.status === "cancelled"
+        ? "➖"
+        : item.pass === true
+          ? "✅"
+          : "❌";
+  const count = (wanted: string) =>
+    runs.filter((run) => icon(run) === wanted).length;
+  const tally = [
+    ["✅", "passed"],
+    ["❌", "failed"],
+    ["➖", "cancelled"],
+    ["⏳", "still running"],
+  ]
+    .map(([mark, label]) => [count(mark!), mark, label] as const)
+    .filter(([n]) => n > 0)
+    .map(([n, mark, label]) => `${mark} ${n} ${label}`)
+    .join(" · ");
+  const pending = count("⏳");
+  const targets = [
+    ...new Set(runs.map((run) => run.serverUrl ?? "").filter(Boolean)),
+  ];
+  const suiteName = (run: Run) => options.names.get(run.suiteId) ?? run.suiteId;
+  const suiteUrl = (run: Run) =>
+    `${options.dashboardUrl}/${encodeURIComponent(run.suiteId)}`;
+
+  const lines: string[] = [
+    `## Manufact Evals · ${cell(options.serverName)}`,
+    "",
+    `${options.branch ? `Branch ${code(options.branch)}` : "Production"} · ${runs.length} suite${runs.length === 1 ? "" : "s"}${tally ? ` · ${tally}` : ""}`,
+    "",
+  ];
+  if (targets.length === 1) lines.push(`Target ${code(targets[0]!)}`, "");
+  if (pending)
+    lines.push(
+      "> [!CAUTION]",
+      `> **Timed out waiting for ${pending} run${pending === 1 ? "" : "s"}.** They keep running on Cloud; open the dashboard for their results.`,
+      ""
+    );
+
+  lines.push(
+    "| Suite | Result | Score | Executions |",
+    "| :-- | :-- | :-- | :-- |"
+  );
+  for (const run of runs) {
+    const executions = executionsOf(run);
+    const ok = executions.filter((execution) => execution.pass === true).length;
+    lines.push(
+      `| [${cell(suiteName(run))}](${suiteUrl(run)}) | ${icon(run)} ${cell(verdict({ ...run, score: null }))} | ${run.score ?? "—"} | ${executions.length ? `${ok}/${executions.length} passed` : "—"} |`
+    );
+  }
+  lines.push("");
+
+  for (const run of runs) {
+    const executions = executionsOf(run);
+    if (executions.length === 0) continue;
+    lines.push(
+      `<details${run.pass === true ? "" : " open"}><summary>${icon(run)} <b>${cell(suiteName(run))}</b> · ${cell(verdict(run))}</summary>`,
+      "",
+      "| Client | Model | Result | Score |",
+      "| :-- | :-- | :-- | :-- |"
+    );
+    const failures: string[] = [];
+    for (const execution of executions) {
+      const model =
+        WEB_CLIENTS.has(execution.client) || !execution.modelName
+          ? ""
+          : cell(execution.modelName);
+      const result = !finished(execution)
+        ? `⏳ ${cell(execution.status)}`
+        : execution.status === "cancelled"
+          ? "➖ Cancelled"
+          : execution.pass === true
+            ? "✅ Pass"
+            : "❌ Fail";
+      lines.push(
+        `| ${cell(execution.client)} | ${model || "—"} | ${result} | ${execution.score ?? "—"} |`
+      );
+      if (finished(execution) && execution.status !== "cancelled") {
+        const why = execution.pass === true ? [] : reasons(execution);
+        if (why.length)
+          failures.push(
+            `**${cell(execution.client)}${model ? ` ${model}` : ""}**`,
+            "",
+            ...why.map((reason) => `- ${cell(reason)}`),
+            ""
+          );
+      }
+    }
+    lines.push("", ...failures);
+    lines.push(
+      `[Open in the dashboard](${suiteUrl(run)})`,
+      "",
+      "</details>",
+      ""
+    );
+  }
+
+  lines.push(`[All eval suites](${options.dashboardUrl})`);
+  return lines.join("\n");
+}
+
+function executionsOf(run: Run): Execution[] {
+  return (run.scenarios ?? []).flatMap((scenario) => scenario.executions ?? []);
+}
+
+/** Escape text for GitHub-flavored Markdown, including table cells. */
+function cell(value: string): string {
+  return plain(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\|/g, "\\|")
+    .replace(/[`*_[\]]/g, "\\$&")
+    .replace(/\r?\n/g, "<br>");
+}
+
+/** A one-line code span outside tables, with a fence longer than any backticks inside. */
+function code(value: string): string {
+  const text = plain(value).replace(/\r?\n/g, " ");
+  const longest = Math.max(
+    0,
+    ...[...text.matchAll(/`+/g)].map((match) => match[0].length)
+  );
+  const fence = "`".repeat(longest + 1);
+  return longest ? `${fence} ${text} ${fence}` : `${fence}${text}${fence}`;
+}
+
+/**
  * Why an execution did not pass, most specific first: its error, the tool
  * checks it failed, the judge's problem titles, else the first sentence of
  * the judgement (which is Markdown, usually opening with a heading).

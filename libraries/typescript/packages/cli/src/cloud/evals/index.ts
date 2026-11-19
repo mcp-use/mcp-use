@@ -23,6 +23,7 @@ import {
   finished,
   formatReport,
   formatRunList,
+  formatRunsMarkdown,
   formatRuntimeOptions,
   formatSuite,
   formatSuiteList,
@@ -101,6 +102,18 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
     if (command === "run" && (values.all === true) === positionals.length > 0)
       throw new UsageError(
         "Pass suites or --all, not both.\nUsage: mcp-use evals run <suite...>|--all"
+      );
+    const jsonFile =
+      typeof values["json-file"] === "string" ? values["json-file"] : undefined;
+    const markdownFile =
+      typeof values["markdown-file"] === "string"
+        ? values["markdown-file"]
+        : undefined;
+    if (markdownFile !== undefined && values.wait !== true)
+      throw new UsageError("--markdown-file needs --wait.");
+    if (markdownFile !== undefined && markdownFile === jsonFile)
+      throw new UsageError(
+        "--json-file and --markdown-file must use different paths."
       );
     if (
       (command === "create" || command === "update") &&
@@ -276,7 +289,13 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         const { id, status } = await api.start(suiteId, branch);
         started.push({ id, suiteId, status });
       }
-      if (values.wait !== true)
+      // Lets CI read the result while the log keeps the readable report.
+      const writeJson = async (value: unknown) => {
+        if (jsonFile !== undefined)
+          await writeFile(jsonFile, `${JSON.stringify(value)}\n`);
+      };
+      if (values.wait !== true) {
+        await writeJson({ runs: started, dashboardUrl });
         return output.result(
           { runs: started, dashboardUrl },
           [
@@ -288,6 +307,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
             `Results: mcp-use evals report ${started.map((run) => run.id).join(" ")}`,
           ].join("\n")
         );
+      }
       const runs = await withProgress(
         `Waiting for ${started.length} eval run${started.length === 1 ? "" : "s"}`,
         output.json,
@@ -298,6 +318,26 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
             timeout * 1000
           )
       );
+      // On a timeout the files still get the runs as they stand.
+      await writeJson({ runs, dashboardUrl });
+      if (markdownFile !== undefined)
+        await writeFile(
+          markdownFile,
+          `${formatRunsMarkdown(runs, { serverName, dashboardUrl, branch, names })}\n`
+        );
+      const pending = runs.filter((run) => !finished(run));
+      if (pending.length > 0)
+        throw new CommandError(
+          "eval_wait_timeout",
+          `Timed out waiting for ${pending.length} eval run(s): ${pending.map(verdict).join(", ")}. They keep running on Cloud.`,
+          undefined,
+          [
+            {
+              description: "Check the results later",
+              command: `mcp-use evals report ${pending.map((run) => run.id).join(" ")}`,
+            },
+          ]
+        );
       failed = !runs.every((run) => run.pass === true);
       return output.result(
         { runs, dashboardUrl },
@@ -363,6 +403,8 @@ function parse(command: string, argv: readonly string[]) {
           branch: { type: "string" as const },
           wait: { type: "boolean" as const },
           timeout: { type: "string" as const },
+          "json-file": { type: "string" as const },
+          "markdown-file": { type: "string" as const },
         }
       : {}),
     ...(command === "runs"
@@ -693,7 +735,10 @@ async function suiteFiles(paths: readonly string[]): Promise<string[]> {
   return [...new Set(files)];
 }
 
-/** Poll runs until each finishes. Runs keep going on Cloud after a timeout. */
+/**
+ * Poll runs until each finishes or the time runs out, and return them as
+ * they stand; runs keep going on Cloud after a timeout.
+ */
 async function waitForRuns(
   api: EvalApi,
   runIds: readonly string[],
@@ -706,20 +751,7 @@ async function waitForRuns(
   for (;;) {
     const runs: Run[] = [];
     for (const runId of runIds) runs.push(await api.run(runId));
-    if (runs.every(finished)) return runs;
-    const pending = runs.filter((run) => !finished(run));
-    if (Date.now() >= deadline)
-      throw new CommandError(
-        "eval_wait_timeout",
-        `Timed out waiting for ${pending.length} eval run(s): ${pending.map(verdict).join(", ")}. They keep running on Cloud.`,
-        undefined,
-        [
-          {
-            description: "Check the results later",
-            command: `mcp-use evals report ${pending.map((run) => run.id).join(" ")}`,
-          },
-        ]
-      );
+    if (runs.every(finished) || Date.now() >= deadline) return runs;
     await delay(interval);
   }
 }

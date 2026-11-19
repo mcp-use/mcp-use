@@ -559,11 +559,20 @@ const pages: Record<string, Page> = {
           ["--branch <name>", "Target a branch environment"],
           ["--wait", "Wait for results; exit 1 unless every run passes"],
           ["--timeout <seconds>", "Maximum wait with --wait (default: 1800)"],
+          [
+            "--json-file <path>",
+            "Also write the --json result to a file; the readable report still prints",
+          ],
+          [
+            "--markdown-file <path>",
+            "With --wait, also write a Markdown report for pull request comments",
+          ],
         ],
         examples: [
           "mcp-use evals run --all --wait",
           "mcp-use evals run evals/ --wait",
           'mcp-use evals run "Rome weather" --branch preview',
+          "mcp-use evals run --all --wait --json-file evals.json --markdown-file evals.md",
         ],
       },
       runs: {
