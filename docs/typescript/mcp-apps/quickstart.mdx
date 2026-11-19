@@ -217,9 +217,11 @@ If the tool runs but no view appears, check that `view.name` exactly matches the
 
 ## View caching in production
 
-Production builds automatically include the build ID in each view resource URI, such as `ui://views/my-view-a1b2c3.html`. Hosts use this URI as a cache key, so rebuilding the app gives its views fresh keys. All replicas deployed from the same build share the same URIs. This applies to external assets and `mcp-use build --inline`, including Next.js and Vite framework integrations.
+Production builds include a content hash in each view resource URI, such as `ui://views/my-view-3f9a1c0e7b2d4a68.html`. Hosts use this URI as a cache key. The hash covers the view's built JavaScript and CSS and its resource metadata, including `view.csp`, `view.permissions`, `view.domain`, and display modes. Changing any of these gives that view a new URI. Rebuilding identical sources, a backend-only change, or another replica keeps the same URI. This applies to external assets and `mcp-use build --inline`, including Next.js and Vite framework integrations.
 
-Development keeps the unversioned URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list` when reading a view; avoid hardcoding production URIs. Refresh tool discovery after deployment so the host receives the new URI. A deployment serves only its current build's view URIs. When a read reaches resource lookup, unversioned and previous-build URIs return a resource-not-found error. OAuth-protected deployments can return HTTP 401 before lookup if the request lacks authorization. These old URIs never serve the current HTML under an old cache key.
+Development keeps the unversioned URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list`; avoid hardcoding production URIs. Refresh tool discovery after deployment so the host receives a changed view's new URI.
+
+A host may still hold a URI from an earlier deployment, for example a published ChatGPT app whose tool metadata is fixed by its approved submission. The server answers a read of `ui://views/my-view.html` or a `ui://views/my-view-<hash>.html` from an earlier deployment with the current view, so the view keeps loading instead of failing with resource-not-found. A host that already cached the old URI keeps showing its cached copy until it fetches the new URI.
 
 ## Next steps
 

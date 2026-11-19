@@ -9,6 +9,7 @@ import {
   PROTOCOL_VERSION_META_KEY,
   isJSONRPCRequest,
   isInputRequiredResult,
+  ResourceNotFoundError,
   type ClientCapabilities,
   type McpHttpHandler,
   type McpRequestContext,
@@ -162,6 +163,8 @@ import {
   synthesizeViewDocument,
   viewResourceConfig,
   viewResourceUri,
+  resolveViewResourceUri,
+  computeViewVersion,
   applyClaudeResourceDomain,
   buildResourceUiMeta,
   buildToolResultUiMeta,
@@ -177,6 +180,12 @@ import {
  * Safe because the SDK validates params against the definition's schema
  * before any callback runs.
  */
+/** Reads one view resource for a requested URI, through MCP middleware. */
+type ViewResourceReader = (
+  uri: URL,
+  ctx: ServerContext
+) => Promise<McpMiddlewareResult<"resources/read">>;
+
 type HasOAuth<TUser> = [TUser] extends [never] ? false : true;
 
 /**
@@ -410,8 +419,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   /** When true, resource CSP emission includes the HMR websocket origin. */
   #viewsDevMode = false;
 
-  /** Immutable build identity used by every view URI on this instance. */
-  #viewBuildId: string | undefined;
+  /**
+   * Content-derived production version per view, computed on first use.
+   * Cleared whenever views or view bindings change.
+   */
+  #viewVersions: Map<string, string> | undefined;
+  /** Whether build tooling asked for content-versioned view URIs. */
+  #viewsVersioned = false;
   /** Project root for filesystem-backed view bundle and public routes. */
   #viewsProjectRoot = process.cwd();
 
@@ -757,9 +771,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * emission appends the serving origin's websocket variant to
    * `connectDomains` so Vite HMR passes host-enforced CSP. Pass
    * `projectRoot` in dev so the `public/` route resolves against the user's
-   * project directory rather than the CLI process cwd. Production builds pass
-   * an immutable `buildId` to version view resource URIs across replicas;
-   * development ignores it and retains unversioned URIs.
+   * project directory rather than the CLI process cwd. Production build
+   * tooling passes `versioned: true` to version each view URI by a hash of
+   * that view's content; development keeps unversioned URIs. A `buildId`
+   * from older build tooling also turns versioning on; its value is ignored.
    * @throws If views are already primed, or after the server has started.
    *
    * @internal
@@ -787,7 +802,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
     }
     this.#viewsDevMode = options?.dev === true;
-    this.#viewBuildId = this.#viewsDevMode ? undefined : options?.buildId;
+    this.#viewsVersioned =
+      !this.#viewsDevMode &&
+      (options?.versioned === true || options?.buildId !== undefined);
+    this.#viewVersions = undefined;
     this.#embeddedViewAssets = options?.assets;
     if (options?.projectRoot !== undefined) {
       this.#viewsProjectRoot = options.projectRoot;
@@ -1857,9 +1875,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           mixedAuth,
           toolSchemes: (name) => this.#tools.get(name)?.schemes,
           // Only views a tool binds; an unbound manifest entry stays gated.
-          openResourceUris: [...this.#viewBindings.keys()].map((name) =>
-            viewResourceUri(name, this.#viewBuildId)
-          ),
+          // Any URI a client may hold for such a view counts, including one
+          // advertised by an earlier deployment.
+          isOpenResourceUri: (uri) =>
+            resolveViewResourceUri(uri, this.#viewBindings.keys()) !==
+            undefined,
         };
         // The gate and its challenge builder load on the first MCP request,
         // keeping them out of the static graph of servers without OAuth.
@@ -2048,6 +2068,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       toolName: definition.name,
       config: view,
     });
+    this.#viewVersions = undefined;
   }
 
   #validateViewBindingsAtMount(): void {
@@ -2153,15 +2174,20 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     for (const entry of this.#prompts.values()) {
       this.#registerPrompt(server, entry);
     }
+    const viewReaders = new Map<string, ViewResourceReader>();
     for (const [viewName, viewEntry] of this.#views.entries()) {
-      this.#registerViewResource(
-        server,
+      viewReaders.set(
         viewName,
-        viewEntry,
-        viewMetaOptions,
-        basePath
+        this.#registerViewResource(
+          server,
+          viewName,
+          viewEntry,
+          viewMetaOptions,
+          basePath
+        )
       );
     }
+    this.#wrapViewResourceRead(server, viewReaders);
     if (this.#skills !== undefined) {
       registerSkillsRuntime(server, this.#skills);
     }
@@ -2442,7 +2468,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       view?.name,
       definition.visibility,
       buildEntrypointMeta(definition),
-      this.#viewBuildId
+      view === undefined ? undefined : this.#viewVersion(view.name)
     );
     const uiMeta = entry.mentions
       ? finalizeMentionsMeta(definition, serializedUiMeta)
@@ -2477,7 +2503,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     };
     const wireResultMeta =
       view !== undefined
-        ? buildToolResultUiMeta(view.name, this.#viewBuildId)
+        ? buildToolResultUiMeta(view.name, this.#viewVersion(view.name))
         : undefined;
 
     const inputSchema = resolveToolInputSchema(definition);
@@ -2534,86 +2560,164 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
   }
 
-  #registerViewResource(
-    server: SdkMcpServer,
+  /**
+   * Resource facts for a view: the bound tool's view config plus the display
+   * modes from the frontend `viewConfig` export.
+   */
+  #viewAuthorFacts(
     viewName: string,
-    entry: ViewManifestEntry,
-    metaOptions: { request?: Request; hmrWs?: boolean },
-    basePath: string
-  ): void {
-    const uri = viewResourceUri(viewName, this.#viewBuildId);
+    entry: ViewManifestEntry
+  ): ViewResourceFacts {
     const frontendConfig = normalizeViewConfig(entry.viewConfig);
-    const authorFacts = {
+    return {
       ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),
       displayModes: frontendConfig.displayModes,
       ...(frontendConfig.preferredDisplayMode !== undefined && {
         preferredDisplayMode: frontendConfig.preferredDisplayMode,
       }),
     };
+  }
+
+  /**
+   * Content-derived URI version for a view, or `undefined` when versioning
+   * is off (development, or views primed without `versioned`) and for
+   * unknown views. Computed once per registry state; tools and views
+   * cannot change after the server starts.
+   */
+  #viewVersion(viewName: string): string | undefined {
+    if (!this.#viewsVersioned) {
+      return undefined;
+    }
+    if (this.#viewVersions === undefined) {
+      const versions = new Map<string, string>();
+      for (const [name, entry] of this.#views) {
+        versions.set(
+          name,
+          computeViewVersion(name, entry, this.#viewAuthorFacts(name, entry))
+        );
+      }
+      this.#viewVersions = versions;
+    }
+    return this.#viewVersions.get(viewName);
+  }
+
+  #registerViewResource(
+    server: SdkMcpServer,
+    viewName: string,
+    entry: ViewManifestEntry,
+    metaOptions: { request?: Request; hmrWs?: boolean },
+    basePath: string
+  ): ViewResourceReader {
+    const uri = viewResourceUri(viewName, this.#viewVersion(viewName));
+    const authorFacts = this.#viewAuthorFacts(viewName, entry);
     const resourceConfig = viewResourceConfig(
       viewName,
       entry,
       authorFacts,
       metaOptions
     );
-    server.registerResource(
-      viewName,
-      uri,
-      resourceConfig,
-      async (readUri, ctx) => {
-        const innerFn = async () => {
-          const req = ctx.http?.req;
-          const readOptions: BuildResourceUiMetaOptions =
-            req !== undefined
-              ? {
-                  request: req,
-                  ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
-                }
-              : metaOptions.hmrWs === true
-                ? { hmrWs: true }
-                : {};
-          const assetsBase =
-            req !== undefined
-              ? resolveAssetsBase(req)
-              : metaOptions.request !== undefined
-                ? resolveAssetsBase(metaOptions.request)
-                : "";
-          const html = synthesizeViewDocument(
-            entry,
-            assetsBase,
-            basePath,
-            viewName
-          );
-          // UI origin and MCP endpoint identity are separate. Claude hashes the
-          // full public endpoint, never the website or asset origin.
-          const meta = await applyClaudeResourceDomain(
-            buildResourceUiMeta(authorFacts, readOptions),
-            requestClientInfo(ctx),
-            (req ?? metaOptions.request)?.headers.get("user-agent"),
-            resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
-              authorFacts?.domain
-          );
-          return {
-            contents: [
-              {
-                uri: readUri.href,
-                mimeType: resourceConfig.mimeType,
-                text: html,
-                _meta: meta,
-              },
-            ],
-          };
-        };
-        // Only tool-bound views are views to middleware; on a `mixedAuth`
-        // server these are the ones the OAuth gate serves signed out.
-        return await this.#hookResourceRead(
-          readUri,
-          ctx,
-          innerFn,
-          this.#viewBindings.has(viewName) ? { name: viewName } : undefined
+    const read: ViewResourceReader = async (readUri, ctx) => {
+      const innerFn = async () => {
+        const req = ctx.http?.req;
+        const readOptions: BuildResourceUiMetaOptions =
+          req !== undefined
+            ? {
+                request: req,
+                ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
+              }
+            : metaOptions.hmrWs === true
+              ? { hmrWs: true }
+              : {};
+        const assetsBase =
+          req !== undefined
+            ? resolveAssetsBase(req)
+            : metaOptions.request !== undefined
+              ? resolveAssetsBase(metaOptions.request)
+              : "";
+        const html = synthesizeViewDocument(
+          entry,
+          assetsBase,
+          basePath,
+          viewName
         );
+        // UI origin and MCP endpoint identity are separate. Claude hashes the
+        // full public endpoint, never the website or asset origin.
+        const meta = await applyClaudeResourceDomain(
+          buildResourceUiMeta(authorFacts, readOptions),
+          requestClientInfo(ctx),
+          (req ?? metaOptions.request)?.headers.get("user-agent"),
+          resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
+            authorFacts?.domain
+        );
+        return {
+          contents: [
+            {
+              uri: readUri.href,
+              mimeType: resourceConfig.mimeType,
+              text: html,
+              _meta: meta,
+            },
+          ],
+        };
+      };
+      // Only tool-bound views are views to middleware; on a `mixedAuth`
+      // server these are the ones the OAuth gate serves signed out.
+      return await this.#hookResourceRead(
+        readUri,
+        ctx,
+        innerFn,
+        this.#viewBindings.has(viewName) ? { name: viewName } : undefined
+      );
+    };
+    server.registerResource(viewName, uri, resourceConfig, read);
+    return read;
+  }
+
+  /**
+   * Serve the current view for any URI a client holds for it.
+   *
+   * Hosts keep the view URIs from the tool catalog they last fetched, and a
+   * published ChatGPT app keeps the catalog of its approved submission. When
+   * a read misses every registered resource, a URI naming a current view (see
+   * {@link resolveViewResourceUri}) is answered with that view's current
+   * document under the requested URI. A host that cached the old URI keeps
+   * its copy; one that did not gets the current view instead of an error.
+   */
+  #wrapViewResourceRead(
+    server: SdkMcpServer,
+    readers: ReadonlyMap<string, ViewResourceReader>
+  ): void {
+    if (readers.size === 0) {
+      return;
+    }
+    type RequestHandler = (
+      request: unknown,
+      extra: unknown
+    ) => Promise<unknown>;
+    const handlers = (
+      server.server as unknown as {
+        _requestHandlers?: Map<string, RequestHandler>;
       }
-    );
+    )._requestHandlers;
+    const original = handlers?.get("resources/read");
+    if (handlers === undefined || original === undefined) {
+      return;
+    }
+    handlers.set("resources/read", async (request, extra) => {
+      try {
+        return await original(request, extra);
+      } catch (error) {
+        if (!(error instanceof ResourceNotFoundError)) {
+          throw error;
+        }
+        const name = resolveViewResourceUri(error.uri, readers.keys());
+        const read = name === undefined ? undefined : readers.get(name);
+        if (read === undefined) {
+          throw error;
+        }
+        return await read(new URL(error.uri), extra as ServerContext);
+      }
+    });
   }
 
   #registerResource(

@@ -31,6 +31,23 @@ const UI_META = {
   },
 };
 
+/** The advertised URI of the fixture's `product-search-result` view. */
+async function productViewUri(
+  handler: (request: Request) => Promise<Response>,
+  endpoint = "http://localhost/mcp"
+): Promise<string> {
+  const listed = await handlerMcp(handler, "resources/list", {}, {}, endpoint);
+  const uri = (
+    listed["result"] as { resources: { uri: string }[] }
+  ).resources.find((resource) =>
+    /^ui:\/\/views\/product-search-result-[0-9a-f]{16}\.html$/.test(
+      resource.uri
+    )
+  )?.uri;
+  if (uri === undefined) throw new Error("product view is not listed");
+  return uri;
+}
+
 async function handlerMcp(
   handler: (request: Request) => Promise<Response>,
   method: string,
@@ -604,16 +621,13 @@ describe("runBuild (views)", () => {
       const listBody = await handlerMcp(handler, "resources/list");
       const resources = (listBody["result"] as { resources: { uri: string }[] })
         .resources;
-      expect(
-        resources.some(
-          (r) =>
-            r.uri ===
-            `ui://views/product-search-result-${manifest.buildId}.html`
-        )
-      ).toBe(true);
+      const viewUri = resources.find((r) =>
+        /^ui:\/\/views\/product-search-result-[0-9a-f]{16}\.html$/.test(r.uri)
+      )?.uri;
+      expect(viewUri).toBeDefined();
 
       const readBody = await handlerMcp(handler, "resources/read", {
-        uri: `ui://views/product-search-result-${manifest.buildId}.html`,
+        uri: viewUri!,
       });
       const text = (readBody["result"] as { contents: { text: string }[] })
         .contents[0]!.text;
@@ -685,7 +699,7 @@ describe("runBuild (views)", () => {
       const readProxied = await handlerMcp(
         handler,
         "resources/read",
-        { uri: `ui://views/product-search-result-${manifest.buildId}.html` },
+        { uri: viewUri! },
         {
           "x-forwarded-proto": "https",
           "x-forwarded-host": "fruit.example.com",
@@ -720,10 +734,7 @@ describe("runBuild (views)", () => {
             _meta?: { ui?: { csp?: unknown } };
           }[];
         }
-      ).resources.find(
-        (r) =>
-          r.uri === `ui://views/product-search-result-${manifest.buildId}.html`
-      );
+      ).resources.find((r) => r.uri === viewUri);
       const resourceDomains = (
         viewResource?._meta?.ui as { csp?: { resourceDomains?: string[] } }
       )?.csp?.resourceDomains;
@@ -772,7 +783,7 @@ describe("runBuild (views)", () => {
       default: { fetch(request: Request): Promise<Response> };
     };
     const readBody = await handlerMcp(mod.default.fetch, "resources/read", {
-      uri: `ui://views/product-search-result-${manifest.buildId}.html`,
+      uri: await productViewUri(mod.default.fetch),
     });
     const text = (readBody["result"] as { contents: { text: string }[] })
       .contents[0]!.text;
@@ -898,7 +909,12 @@ describe("runBuild (views)", () => {
       const readBody = await handlerMcp(
         mod.default.fetch,
         "resources/read",
-        { uri: `ui://views/product-search-result-${manifest.buildId}.html` },
+        {
+          uri: await productViewUri(
+            mod.default.fetch,
+            "http://localhost/api/mcp"
+          ),
+        },
         {},
         "http://localhost/api/mcp"
       );

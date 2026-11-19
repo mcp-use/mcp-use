@@ -136,7 +136,18 @@ export interface EmbeddedViewAssets {
 export interface ViewRegistrationOptions {
   /** Whether view URLs target a development module server. */
   dev?: boolean;
-  /** Production build identifier shared by all replicas; ignored in dev. */
+  /**
+   * Version view resource URIs by view content
+   * (`ui://views/<name>-<hash>.html`). Production build tooling sets it;
+   * ignored in dev.
+   */
+  versioned?: boolean;
+  /**
+   * Legacy random build ID from older build tooling. Its value is ignored;
+   * its presence turns on {@link ViewRegistrationOptions.versioned}.
+   *
+   * @deprecated Set `versioned: true`; URI versions derive from view content.
+   */
   buildId?: string;
   /** Source project used by filesystem-backed assets. */
   projectRoot?: string;

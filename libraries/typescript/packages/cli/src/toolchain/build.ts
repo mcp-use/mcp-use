@@ -122,7 +122,6 @@ async function writeWrapperEntry(
   cacheDir: string,
   userEntry: string,
   viewsManifest: ViewsManifest,
-  buildId: string,
   skillsSnapshot: SkillsSnapshot | undefined,
   landing?: BuiltLanding
 ): Promise<string> {
@@ -144,7 +143,7 @@ async function writeWrapperEntry(
             `import { __withLandingData } from "mcp-use/landing";`,
             `import { fileURLToPath } from "node:url";`,
           ]),
-      `server[registerViews](${manifestJson}, { buildId: ${JSON.stringify(buildId)} });`,
+      `server[registerViews](${manifestJson}, { versioned: true });`,
       `server[registerSkills](${skillsJson});`,
       ...(landing === undefined
         ? []
@@ -582,7 +581,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         paths.cache,
         entry,
         {},
-        buildId,
         skillsSnapshot,
         landing
       );
@@ -749,7 +747,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     paths.cache,
     entry,
     viewsManifest,
-    buildId,
     skillsSnapshot,
     landing
   );
