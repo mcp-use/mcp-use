@@ -814,6 +814,47 @@ describe("evals run", () => {
     );
     expect(result.exitCode).toBe(2);
   });
+
+  test("a failed start names the runs that already started", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [
+        suite({ id: "suite_1", name: "Rome weather" }),
+        suite({ id: "suite_2", name: "Checkout" }),
+      ],
+    });
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      body: {
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+      },
+    });
+    cloud.on("POST", `${SUITES}/suite_2/runs`, {
+      status: 402,
+      body: { error: "Out of eval credits", code: "INSUFFICIENT_CREDITS" },
+    });
+
+    const result = await cli.run(
+      ["evals", "run", "--all", "--wait", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      error: {
+        message: expect.stringMatching(
+          /Could not start “Checkout”: .*Out of eval credits[\s\S]*Already started, still running on Cloud: run_1 \(Rome weather\)\./
+        ),
+        nextSteps: [{ command: "mcp-use evals report run_1" }],
+      },
+    });
+  });
 });
 
 test("evals export reports a path it cannot write", async ({ cloud, cli }) => {

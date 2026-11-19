@@ -286,8 +286,25 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         status: string;
       }> = [];
       for (const suiteId of ids) {
-        const { id, status } = await api.start(suiteId, branch);
-        started.push({ id, suiteId, status });
+        try {
+          const { id, status } = await api.start(suiteId, branch);
+          started.push({ id, suiteId, status });
+        } catch (error) {
+          if (started.length === 0) throw error;
+          // Runs that already started keep going (and count against credits): name them.
+          const code = (error as { code?: unknown }).code;
+          throw new CommandError(
+            typeof code === "string" ? code : "eval_start_failed",
+            `Could not start “${plain(names.get(suiteId) ?? suiteId)}”: ${messageOf(error)}\nAlready started, still running on Cloud: ${started.map((run) => `${run.id} (${plain(names.get(run.suiteId) ?? run.suiteId)})`).join(", ")}.`,
+            { started },
+            [
+              {
+                description: "Check their results",
+                command: `mcp-use evals report ${started.map((run) => run.id).join(" ")}`,
+              },
+            ]
+          );
+        }
       }
       // Lets CI read the result while the log keeps the readable report.
       const writeJson = async (value: unknown) => {

@@ -861,13 +861,18 @@ mcp-use evals rm <suite> [--yes] [options]
 Start one run per suite against the server's production endpoint.
 
 ```bash
-mcp-use evals run [<suite...>] [--all] [--branch <name>] [--wait] [--timeout <seconds>] [options]
+mcp-use evals run [<suite...>] [--all] [--branch <name>] [--wait] [--timeout <seconds>] [--json-file <path>] [--markdown-file <path>] [options]
 ```
 
 `--all` runs every enabled suite, and `--branch` targets a branch environment.
 Runs continue on Cloud after the command returns. With `--wait`, the command
 polls until every run finishes (default limit: 1800 seconds) and exits 1 unless
 every run passes.
+
+For CI, `--json-file` also writes the `--json` result to a file while the
+readable report still prints. With `--wait`, `--markdown-file` writes a
+Markdown report for pull request comments and job summaries. On a timeout, both
+files still get the runs as they stand before the command fails.
 
 ### `evals runs`
 

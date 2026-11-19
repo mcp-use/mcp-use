@@ -72,3 +72,7 @@ unless every run passes. On timeout (`eval_wait_timeout`) the runs keep going;
 read them later with `report`. Starting a run is not idempotent, so do not
 retry a start whose outcome is unknown. Check `mcp-use evals runs --json`
 first. `--branch NAME` targets a branch environment instead of production.
+If a start fails after others began, the error names the runs already going.
+In CI, `--json-file PATH` and `--markdown-file PATH` (with `--wait`) write the
+results and a Markdown report to files; on timeout both get the runs as they
+stand.
