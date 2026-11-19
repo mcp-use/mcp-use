@@ -738,7 +738,7 @@ describe("evals run", () => {
     );
     expect(markdown).toContain(
       [
-        "<details open><summary>❌ <b>Checkout \\| cart</b> · Failed (0)</summary>",
+        "<details open><summary>❌ <b>Checkout | cart</b> · Failed (0)</summary>",
         "",
         "| Client | Model | Result | Score |",
         "| :-- | :-- | :-- | :-- |",

@@ -330,7 +330,8 @@ export function formatRunsMarkdown(
     const executions = executionsOf(run);
     if (executions.length === 0) continue;
     lines.push(
-      `<details${run.pass === true ? "" : " open"}><summary>${icon(run)} <b>${cell(suiteName(run))}</b> · ${cell(verdict(run))}</summary>`,
+      // An HTML line: Markdown escapes would show as typed here.
+      `<details${run.pass === true ? "" : " open"}><summary>${icon(run)} <b>${html(suiteName(run))}</b> · ${html(verdict(run))}</summary>`,
       "",
       "| Client | Model | Result | Score |",
       "| :-- | :-- | :-- | :-- |"
@@ -377,6 +378,15 @@ export function formatRunsMarkdown(
 
 function executionsOf(run: Run): Execution[] {
   return (run.scenarios ?? []).flatMap((scenario) => scenario.executions ?? []);
+}
+
+/** Escape text for one line of raw HTML. */
+function html(value: string): string {
+  return plain(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\r?\n/g, " ");
 }
 
 /** Escape text for GitHub-flavored Markdown, including table cells. */
