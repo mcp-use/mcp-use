@@ -59,11 +59,11 @@ describe("screenshot readiness gate", () => {
   it("has no failure while the view is still resolving", () => {
     expect(readyStateFailure(undefined)).toBeUndefined();
     expect(readyStateFailure({})).toBeUndefined();
-    expect(readyStateFailure({ ready: false, selector: true })).toBeUndefined();
+    expect(readyStateFailure({ ready: false })).toBeUndefined();
   });
 
   it("has no failure once the view becomes ready", () => {
-    expect(readyStateFailure({ ready: true, selector: true })).toBeUndefined();
+    expect(readyStateFailure({ ready: true })).toBeUndefined();
   });
 
   it("fails only on an explicit initialization failure", () => {
@@ -89,7 +89,6 @@ describe("screenshot readiness gate", () => {
     expect(
       readyStateFailure({
         ready: true,
-        selector: true,
         error: "runtime_error",
       })
     ).toBeUndefined();
