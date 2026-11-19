@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 5.4.0
+
+### Minor Changes
+
+- 9663941: feat(cli): add `--profile <id>` to `mcp-use evals run` to sign in with a chosen profile instead of the server's own. If Manufact Cloud doesn't apply the profile, the run is cancelled and the command fails rather than reporting results for the wrong account.
+- 9663941: feat(cli): add `mcp-use evals` to define eval suites as YAML files, push them to Manufact Cloud, run them (`--wait` for CI), and read results. Files are validated locally and match the Manufact MCP eval tools' shape.
+
+### Patch Changes
+
+- 9663941: fix(cli): a key from `MANUFACT_TOKEN` or `MCP_USE_API_KEY` no longer inherits the organization saved with a different logged-in key, which failed with "The saved organization is no longer one of yours" when the two keys belong to different accounts or Clouds.
+
 ## 5.4.0-canary.0
 
 ### Minor Changes
