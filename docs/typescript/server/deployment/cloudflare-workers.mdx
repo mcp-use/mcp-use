@@ -1,0 +1,155 @@
+---
+title: Cloudflare Workers
+description: Deploy an mcp-use server on Cloudflare Workers with the web-standard fetch handler.
+icon: cloud
+---
+
+Cloudflare Workers run a web-standard `fetch` handler. `MCPServer.fetch` uses
+the same interface, so a Worker can call it directly without a Node adapter.
+
+## Create the Worker
+
+Export the Worker handler from `worker.ts`:
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "workers-example",
+  version: "1.0.0",
+  basePath: "/mcp",
+});
+
+server.tool(
+  {
+    name: "echo",
+    inputSchema: z.object({ message: z.string() }),
+  },
+  async ({ message }) => ({
+    content: [{ type: "text", text: message }],
+  }),
+);
+
+export default {
+  fetch(request: Request): Promise<Response> {
+    return server.fetch(request);
+  },
+};
+```
+
+`server.fetch` is stateless: each request gets a fresh SDK server built from
+the registrations made at module scope. There is no session state that needs
+sticky routing across Worker isolates.
+
+## Configure Wrangler
+
+```jsonc wrangler.jsonc
+{
+  "name": "mcp-use-workers-example",
+  "main": "worker.ts",
+  "compatibility_date": "2026-11-12",
+}
+```
+
+Keep the Worker route and `basePath` aligned. The example above serves MCP at:
+
+```text
+https://<worker>.<account>.workers.dev/mcp
+```
+
+## Validate and deploy
+
+The repository example exports the handler directly and runs it under Node's
+`workerd` condition, which checks the edge import graph without starting
+Wrangler:
+
+```bash
+cd libraries/typescript/packages/server/examples/cloudflare-workers
+pnpm smoke
+```
+
+To run the Worker in Wrangler's local runtime:
+
+```bash
+pnpm dev
+```
+
+Deploy from a separate terminal:
+
+```bash
+pnpm deploy
+```
+
+## OAuth proxy storage
+
+If the server uses `oauthProxy`, Workers KV is not a valid store because it
+does not provide an atomic read-and-delete for authorization codes. Bind a D1
+database and use `cloudflareStorage`. This replaces the `MCPServer` in
+the repository example's `worker.ts`, whose `fetch` forwards `request`, `env`,
+and `ctx` to the server.
+
+```typescript
+import { env } from "cloudflare:workers";
+import { MCPServer } from "mcp-use";
+import { github, oauthProxy } from "mcp-use/oauth";
+import { cloudflareStorage } from "mcp-use/oauth/storage";
+
+const database = env.OAUTH_DB;
+if (!database) throw new Error("Bind OAUTH_DB before enabling oauthProxy");
+
+const storage = cloudflareStorage({
+  d1: database,
+  table: "mcp_use_oauth",
+});
+
+const server = new MCPServer({
+  name: "workers-example",
+  version: "1.0.0",
+  oauth: oauthProxy({
+    upstream: github({
+      clientId: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+    }),
+    secret: env.MCP_USE_OAUTH_SECRET,
+    storage,
+  }),
+});
+```
+
+Store the OAuth credentials as Worker secrets for the deployed Worker. For
+`pnpm dev`, put the same values in a git-ignored `.dev.vars` file, because
+`wrangler secret put` does not populate the local runtime:
+
+```bash
+openssl rand -base64 32
+pnpm exec wrangler secret put GITHUB_CLIENT_ID
+pnpm exec wrangler secret put GITHUB_CLIENT_SECRET
+pnpm exec wrangler secret put MCP_USE_OAUTH_SECRET
+```
+
+Use the generated random value for `MCP_USE_OAUTH_SECRET`; keep it stable and
+at least 32 characters long.
+
+```jsonc wrangler.jsonc
+{
+  "d1_databases": [
+    {
+      "binding": "OAUTH_DB",
+      "database_name": "mcp-use-oauth",
+      "database_id": "<database-id>",
+    },
+  ],
+}
+```
+
+The adapter creates its table on first use. See
+[OAuth proxy storage](/typescript/server/authentication/providers/oauth-proxy-storage)
+for D1 and Durable Object options.
+
+## Example project
+
+The
+[`cloudflare-workers`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/cloudflare-workers)
+example includes a Worker entry point, Wrangler configuration, and a
+no-network smoke test.
