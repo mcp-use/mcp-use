@@ -376,6 +376,14 @@ const pages: Record<string, Page> = {
         options: [
           ...project,
           branch,
+          [
+            "--url <url>",
+            "External URL servers: check this MCP URL instead of the server's, such as a preview deployment; not with --branch",
+          ],
+          [
+            "--profile <id>",
+            "External URL servers: authenticate with this profile instead of the server's; not with --branch",
+          ],
           ["--no-wait", "Return the run ID immediately"],
           [
             "--fail-on <level>",
@@ -395,6 +403,7 @@ const pages: Record<string, Page> = {
           "mcp-use checklist run --no-wait",
           "mcp-use checklist run --fail-on failed",
           "mcp-use checklist run --fail-on failed --json-file checklist.json",
+          "mcp-use checklist run --url https://preview.example.com/mcp --profile <profile-id>",
         ],
       },
       list: {
