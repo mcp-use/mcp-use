@@ -869,7 +869,9 @@ mcp-use evals run [<suite...>] [--all] [--branch <name>] [--profile <id>] [--wai
 the server's own, so the same suites can run as different accounts. It doesn't
 apply to native apps or to clients running the plugin lifecycle, which sign in
 with the suite's test account; Cloud refuses the run for those. If Cloud
-doesn't apply the profile, the command cancels the run and fails.
+doesn't apply the profile, the command cancels the run and fails. The output
+names the profile by its label or account (falling back to its ID): in the
+first line of the live log, the Markdown report, and `profile` in the JSON.
 Runs continue on Cloud after the command returns. With `--wait`, the command
 polls until every run finishes (default limit: 1800 seconds) and exits 1 unless
 every run passes. While it waits, it prints each suite's dashboard link, then a

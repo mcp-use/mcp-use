@@ -286,6 +286,11 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         typeof values.branch === "string" ? values.branch : undefined;
       // Starting a run is not idempotent, so a failed start is never retried.
       const names = new Map(selected.map((suite) => [suite.id, suite.name]));
+      // Named in every output, so a log says which account the results are for.
+      const runProfile =
+        profile === undefined
+          ? undefined
+          : { id: profile, name: await api.profileName(profile) };
       const started: Array<{
         id: string;
         suiteId: string;
@@ -327,14 +332,23 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
           await writeFile(jsonFile, `${JSON.stringify(value)}\n`);
       };
       if (values.wait !== true) {
-        await writeJson({ runs: started, dashboardUrl });
+        await writeJson({
+          runs: started,
+          dashboardUrl,
+          ...(runProfile ? { profile: runProfile } : {}),
+        });
         return output.result(
-          { runs: started, dashboardUrl },
+          {
+            runs: started,
+            dashboardUrl,
+            ...(runProfile ? { profile: runProfile } : {}),
+          },
           [
             ...started.map(
               (run) =>
                 `✓ Started run ${run.id} (${plain(names.get(run.suiteId) ?? run.suiteId)})`
             ),
+            ...(runProfile ? [`  Profile: ${plain(runProfile.name)}`] : []),
             "",
             `Results: mcp-use evals report ${started.map((run) => run.id).join(" ")}`,
           ].join("\n")
@@ -347,7 +361,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       let printedEvents = false;
       if (!output.json)
         process.stdout.write(
-          `${formatRunsStarted(started, { serverName, dashboardUrl, branch, names })}\n\n`
+          `${formatRunsStarted(started, { serverName, dashboardUrl, branch, names, profile: runProfile?.name })}\n\n`
         );
       // Stopping the command (Ctrl+C, or a cancelled CI job) cancels the runs it started.
       let polledRuns: readonly Run[] = [];
@@ -393,11 +407,15 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
           `${printedEvents ? "\n" : ""}${live.summary(runs, Date.now())}\n\n`
         );
       // On a timeout the files still get the runs as they stand.
-      await writeJson({ runs, dashboardUrl });
+      await writeJson({
+        runs,
+        dashboardUrl,
+        ...(runProfile ? { profile: runProfile } : {}),
+      });
       if (markdownFile !== undefined)
         await writeFile(
           markdownFile,
-          `${formatRunsMarkdown(runs, { serverName, dashboardUrl, branch, names })}\n`
+          `${formatRunsMarkdown(runs, { serverName, dashboardUrl, branch, names, profile: runProfile?.name })}\n`
         );
       const pending = runs.filter((run) => !finished(run));
       if (pending.length > 0)
@@ -414,7 +432,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         );
       failed = !runs.every((run) => run.pass === true);
       return output.result(
-        { runs, dashboardUrl },
+        { runs, dashboardUrl, ...(runProfile ? { profile: runProfile } : {}) },
         runs.map((run) => formatReport(run, { names, dashboardUrl })).join("\n")
       );
     }
@@ -674,6 +692,27 @@ function evalApi(cloud: Cloud, serverId: string) {
           params: { path },
         })
       ),
+    /**
+     * How outputs name a profile: its label or account name, with the
+     * account's email. Falls back to the ID when the profile can't be read
+     * (another organization's, or no permission): naming it is best effort.
+     */
+    profileName: async (profileId: string): Promise<string> => {
+      try {
+        const { items } = await cloud.call(
+          cloud.client.GET("/api/v1/organizations/{id}/profiles", {
+            params: { path: { id: cloud.organization.id } },
+          })
+        );
+        const found = items.find((item) => item.id === profileId);
+        const name = found?.label || found?.account?.name || "";
+        const email = found?.account?.email || "";
+        if (name && email && name !== email) return `${name} (${email})`;
+        return name || email || profileId;
+      } catch {
+        return profileId;
+      }
+    },
   };
   return api;
 }

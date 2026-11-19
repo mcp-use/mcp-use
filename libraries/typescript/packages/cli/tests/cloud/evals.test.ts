@@ -35,6 +35,25 @@ function server(cloud: FakeCloud): void {
   });
 }
 
+/** The organization's profiles, as `evals run --profile` looks them up for its output. */
+function profiles(cloud: FakeCloud): void {
+  cloud.on("GET", "/api/v1/organizations/org_1/profiles", {
+    body: {
+      items: [
+        {
+          id: "profile_free",
+          label: "Free tier",
+          account: {
+            email: "free@evals.test",
+            name: null,
+            issuerHost: "auth.test",
+          },
+        },
+      ],
+    },
+  });
+}
+
 function suite(fields: Pick<Suite, "id" | "name"> & Partial<Suite>): Suite {
   return {
     enabled: true,
@@ -1027,6 +1046,7 @@ describe("evals run", () => {
         profileId: "profile_free",
       },
     });
+    profiles(cloud);
 
     const result = await cli.run(
       ["evals", "run", "suite_1", "--profile", "profile_free", ...SCOPE],
@@ -1034,7 +1054,10 @@ describe("evals run", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    expect(result.json).toMatchObject({ runs: [{ id: "run_1" }] });
+    expect(result.json).toMatchObject({
+      runs: [{ id: "run_1" }],
+      profile: { id: "profile_free", name: "Free tier (free@evals.test)" },
+    });
     expect(cloud.requestsTo("POST", `${SUITES}/suite_1/runs`)).toMatchObject([
       { query: { profileId: "profile_free" } },
     ]);
@@ -1059,6 +1082,7 @@ describe("evals run", () => {
         profileId: null,
       },
     });
+    profiles(cloud);
     cloud.on("POST", "/api/v1/server-evals/srv_1/runs/run_1/cancel", {
       body: { success: true },
     });
@@ -1089,6 +1113,94 @@ describe("evals run", () => {
     expect(
       cloud.requestsTo("GET", "/api/v1/server-evals/srv_1/runs/run_1")
     ).toHaveLength(0);
+  });
+
+  test("--profile names the profile in the live header and the Markdown report", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    profiles(cloud);
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: "suite_1", name: "Rome weather" })],
+    });
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      body: {
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+        profileId: "profile_free",
+      },
+    });
+    cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
+      body: run({ id: "run_1", suiteId: "suite_1", score: 100 }),
+    });
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "suite_1",
+        "--wait",
+        "--profile",
+        "profile_free",
+        "--markdown-file",
+        "evals.md",
+        "--server",
+        "weather",
+      ],
+      { env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" } }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.split("\n")[0]).toBe(
+      "🧪 Running 1 eval suite on Weather (production) · profile Free tier (free@evals.test)"
+    );
+    expect(await readFile(join(cli.cwd, "evals.md"), "utf8")).toContain(
+      "Production · Profile Free tier (free@evals.test) · 1 suite · ✅ 1 passed"
+    );
+  });
+
+  test("--profile falls back to the profile ID when the profiles can't be read", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", "/api/v1/organizations/org_1/profiles", {
+      status: 403,
+      body: { error: "Forbidden" },
+    });
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: "suite_1", name: "Rome weather" })],
+    });
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      body: {
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+        profileId: "profile_free",
+      },
+    });
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "suite_1",
+        "--profile",
+        "profile_free",
+        "--server",
+        "weather",
+      ],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("  Profile: profile_free\n");
   });
 
   test("--profile needs a profile ID", async ({ cli }) => {

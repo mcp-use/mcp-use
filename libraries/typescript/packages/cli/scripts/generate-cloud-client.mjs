@@ -70,6 +70,7 @@ const OPERATIONS = [
   "PUT /api/v1/servers/{id}/alerts/rules/{ruleId}",
   "DELETE /api/v1/servers/{id}/alerts/rules/{ruleId}",
   "GET /api/v1/organizations/{id}/members",
+  "GET /api/v1/organizations/{id}/profiles",
   "GET /api/v1/organizations/{id}/invitations",
   "POST /api/v1/organizations/{id}/invitations",
   "POST /api/v1/organizations/{id}/invitations/{invitationId}/cancel",
@@ -100,6 +101,12 @@ const RESPONSE_FIELDS = {
   "GET /api/auth/get-session": ["user.email"],
   "POST /api/auth/api-key/create": ["id", "key", "name"],
   "POST /api/auth/api-key/delete": ["success"],
+  // Names a run's profile in evals output; never its secrets.
+  "GET /api/v1/organizations/{id}/profiles": [
+    "items[].id",
+    "items[].label",
+    "items[].account",
+  ],
   "GET /api/v1/organizations": [
     "organizations[].id",
     "organizations[].name",
