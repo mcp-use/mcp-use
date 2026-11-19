@@ -43,7 +43,7 @@ vi.mock("@mcp-use/tunnel", () => ({
 vi.mock("@tailwindcss/vite", () => ({ default: vi.fn() }));
 vi.mock("@vitejs/plugin-react", () => ({ default: vi.fn() }));
 vi.mock("../../src/toolchain/port.js", () => ({
-  resolvePort: async () => ({ port: 3000, requested: 3000 }),
+  listenOnAvailablePort: async () => ({ port: 3000, requested: 3000 }),
 }));
 vi.mock("../../src/toolchain/mcp-env-declaration.js", () => ({
   syncMcpEnvDeclaration: vi.fn(),
