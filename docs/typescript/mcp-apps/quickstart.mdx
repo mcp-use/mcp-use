@@ -217,11 +217,11 @@ If the tool runs but no view appears, check that `view.name` exactly matches the
 
 ## View caching in production
 
-Production builds include a content hash in each view resource URI, such as `ui://views/my-view-3f9a1c0e7b2d4a68.html`. Hosts use this URI as a cache key. The hash covers the view's built JavaScript and CSS and its resource metadata, including `view.csp`, `view.permissions`, `view.domain`, and display modes. Changing any of these gives that view a new URI. Rebuilding identical sources, a backend-only change, or another replica keeps the same URI. This applies to external assets and `mcp-use build --inline`, including Next.js and Vite framework integrations.
+Production builds add a version query to each view resource URI, such as `ui://views/my-view.html?v=3f9a1c0e`. Hosts use this URI as a cache key. The version is a hash of the view's built bundle, so it changes only when the view's JavaScript or CSS changes. Rebuilding identical sources, a backend-only change, or another replica keeps the same URI. Server-side view settings such as `view.csp` are not part of the version. This applies to external assets and `mcp-use build --inline`, including Next.js and Vite framework integrations.
 
-Development keeps the unversioned URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list`; avoid hardcoding production URIs. Refresh tool discovery after deployment so the host receives a changed view's new URI.
+Development uses the bare URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list`; avoid hardcoding production URIs. Refresh tool discovery after deployment so the host receives a changed view's new URI.
 
-A host may still hold a URI from an earlier deployment, for example a published ChatGPT app whose tool metadata is fixed by its approved submission. The server answers a read of `ui://views/my-view.html` or a `ui://views/my-view-<hash>.html` from an earlier deployment with the current view, so the view keeps loading instead of failing with resource-not-found. A host that already cached the old URI keeps showing its cached copy until it fetches the new URI.
+The `?v=` value only busts caches; it does not select a view. The server answers `ui://views/my-view.html` with any `?v=` value, or none, with the current view. It also answers the `ui://views/my-view-<build ID>.html` URIs advertised by mcp-use 2.12. A host holding a URI from an earlier deployment, for example a published ChatGPT app whose tool metadata is fixed by its approved submission, keeps loading the view instead of failing with resource-not-found.
 
 ## Next steps
 

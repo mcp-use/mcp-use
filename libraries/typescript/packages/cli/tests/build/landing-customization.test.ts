@@ -924,7 +924,7 @@ export default function Resources() {
       resources: expect.arrayContaining([
         expect.objectContaining({
           uri: expect.stringMatching(
-            /^ui:\/\/views\/product-search-result-[0-9a-f]{16}\.html$/
+            /^ui:\/\/views\/product-search-result\.html\?v=[0-9a-f]{8}$/
           ),
         }),
       ]),

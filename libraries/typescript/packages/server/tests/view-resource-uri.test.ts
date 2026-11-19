@@ -128,7 +128,7 @@ async function rpc(
   return response.json();
 }
 
-const VERSIONED_DASHBOARD = /^ui:\/\/views\/dashboard-[0-9a-f]{16}\.html$/;
+const VERSIONED_DASHBOARD = /^ui:\/\/views\/dashboard\.html\?v=[0-9a-f]{8}$/;
 
 describe("view resource cache keys", () => {
   it.each([
@@ -198,14 +198,14 @@ describe("view resource cache keys", () => {
     expect(after["chart"]).toBe(before["chart"]);
   });
 
-  it("changes the URI when only the view's CSP changes", async () => {
+  it("keeps the URI when only server-side view config changes", async () => {
     const before = await listedUris(makeServer());
     const after = await listedUris(
       makeServer(undefined, {
         csp: { connectDomains: ["https://api.example.com"] },
       })
     );
-    expect(after["dashboard"]).not.toBe(before["dashboard"]);
+    expect(after["dashboard"]).toBe(before["dashboard"]);
   });
 
   it("does not let views whose names share a prefix shadow each other", async () => {
@@ -222,6 +222,7 @@ describe("view resource cache keys", () => {
 
   it.each([
     "ui://views/dashboard.html",
+    "ui://views/dashboard.html?v=0123abcd",
     "ui://views/dashboard-0123456789abcdef.html",
   ])(
     "serves the current view under a URI from an earlier deployment: %s",
@@ -238,6 +239,7 @@ describe("view resource cache keys", () => {
   );
 
   it.each([
+    "ui://views/missing.html?v=0123abcd",
     "ui://views/missing-0123456789abcdef.html",
     "ui://views/dashboard-old.html",
   ])("returns resource-not-found for %s", async (uri) => {

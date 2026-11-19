@@ -137,16 +137,16 @@ export interface ViewRegistrationOptions {
   /** Whether view URLs target a development module server. */
   dev?: boolean;
   /**
-   * Version view resource URIs by view content
-   * (`ui://views/<name>-<hash>.html`). Production build tooling sets it;
-   * ignored in dev.
+   * Add a `?v=<hash>` cache key, derived from each view's built bundle, to
+   * view resource URIs (`ui://views/<name>.html?v=<hash>`). Production build
+   * tooling sets it; ignored in dev.
    */
   versioned?: boolean;
   /**
    * Legacy random build ID from older build tooling. Its value is ignored;
    * its presence turns on {@link ViewRegistrationOptions.versioned}.
    *
-   * @deprecated Set `versioned: true`; URI versions derive from view content.
+   * @deprecated Set `versioned: true`; URI versions derive from the view bundle.
    */
   buildId?: string;
   /** Source project used by filesystem-backed assets. */

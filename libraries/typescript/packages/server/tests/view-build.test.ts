@@ -92,7 +92,7 @@ await server.close();
 
       await build();
       const first = await advertisedUri();
-      expect(first).toMatch(/^ui:\/\/views\/dashboard-[0-9a-f]{16}\.html$/);
+      expect(first).toMatch(/^ui:\/\/views\/dashboard\.html\?v=[0-9a-f]{8}$/);
       // Another replica of the same artifact advertises the same URI.
       expect(await advertisedUri()).toBe(first);
 
@@ -111,7 +111,7 @@ await server.close();
       await writeView("Dashboard v2");
       await build();
       const changed = await advertisedUri();
-      expect(changed).toMatch(/^ui:\/\/views\/dashboard-[0-9a-f]{16}\.html$/);
+      expect(changed).toMatch(/^ui:\/\/views\/dashboard\.html\?v=[0-9a-f]{8}$/);
       expect(changed).not.toBe(first);
     }
   );

@@ -40,7 +40,7 @@ async function productViewUri(
   const uri = (
     listed["result"] as { resources: { uri: string }[] }
   ).resources.find((resource) =>
-    /^ui:\/\/views\/product-search-result-[0-9a-f]{16}\.html$/.test(
+    /^ui:\/\/views\/product-search-result\.html\?v=[0-9a-f]{8}$/.test(
       resource.uri
     )
   )?.uri;
@@ -622,7 +622,7 @@ describe("runBuild (views)", () => {
       const resources = (listBody["result"] as { resources: { uri: string }[] })
         .resources;
       const viewUri = resources.find((r) =>
-        /^ui:\/\/views\/product-search-result-[0-9a-f]{16}\.html$/.test(r.uri)
+        /^ui:\/\/views\/product-search-result\.html\?v=[0-9a-f]{8}$/.test(r.uri)
       )?.uri;
       expect(viewUri).toBeDefined();
 

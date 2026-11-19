@@ -420,11 +420,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #viewsDevMode = false;
 
   /**
-   * Content-derived production version per view, computed on first use.
-   * Cleared whenever views or view bindings change.
+   * Production `?v=` cache-key version per view, computed on first use from
+   * the view bundle. Cleared when views are primed.
    */
   #viewVersions: Map<string, string> | undefined;
-  /** Whether build tooling asked for content-versioned view URIs. */
+  /** Whether build tooling asked for `?v=`-versioned view URIs. */
   #viewsVersioned = false;
   /** Project root for filesystem-backed view bundle and public routes. */
   #viewsProjectRoot = process.cwd();
@@ -772,8 +772,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * `connectDomains` so Vite HMR passes host-enforced CSP. Pass
    * `projectRoot` in dev so the `public/` route resolves against the user's
    * project directory rather than the CLI process cwd. Production build
-   * tooling passes `versioned: true` to version each view URI by a hash of
-   * that view's content; development keeps unversioned URIs. A `buildId`
+   * tooling passes `versioned: true` to add a `?v=` cache key, hashed from
+   * each view's bundle, to its URI; development keeps bare URIs. A `buildId`
    * from older build tooling also turns versioning on; its value is ignored.
    * @throws If views are already primed, or after the server has started.
    *
@@ -2069,7 +2069,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       toolName: definition.name,
       config: view,
     });
-    this.#viewVersions = undefined;
   }
 
   #validateViewBindingsAtMount(): void {
@@ -2580,10 +2579,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   /**
-   * Content-derived URI version for a view, or `undefined` when versioning
-   * is off (development, or views primed without `versioned`) and for
-   * unknown views. Computed once per registry state; tools and views
-   * cannot change after the server starts.
+   * `?v=` cache-key version for a view, or `undefined` when versioning is
+   * off (development, or views primed without `versioned`) and for unknown
+   * views. Computed once per primed manifest.
    */
   #viewVersion(viewName: string): string | undefined {
     if (!this.#viewsVersioned) {
@@ -2592,10 +2590,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     if (this.#viewVersions === undefined) {
       const versions = new Map<string, string>();
       for (const [name, entry] of this.#views) {
-        versions.set(
-          name,
-          computeViewVersion(name, entry, this.#viewAuthorFacts(name, entry))
-        );
+        versions.set(name, computeViewVersion(entry));
       }
       this.#viewVersions = versions;
     }

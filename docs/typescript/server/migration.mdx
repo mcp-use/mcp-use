@@ -508,7 +508,7 @@ Native View documents are generated MCP resources. Do not register
 | Production View bundles          | `${basePath}/_mcp-use/views/<name>/...` |
 | Public files                     | `${basePath}/_mcp-use/public/...`       |
 | View resource URI in development | `ui://views/<name>.html`                |
-| View resource URI in production  | `ui://views/<name>-<hash>.html`         |
+| View resource URI in production  | `ui://views/<name>.html?v=<hash>`       |
 
 Move existing widget CSP domains to `view.csp`.
 
@@ -522,18 +522,19 @@ for legacy URL values, proxy configuration, and metadata precedence.
 
 v1 served widgets at `ui://widget/<name>.html`, and sometimes
 `ui://widget/<name>.<buildId>.html`. v2 uses `ui://views/<name>.html` in development
-and `ui://views/<name>-<hash>.html` in production, where `<hash>` is derived
-from the View's content and resource metadata. Production builds version both
-external and inline View resources automatically. A View keeps its URI until
-it changes, across rebuilds, backend-only deploys, and replicas.
+and `ui://views/<name>.html?v=<hash>` in production, where `<hash>` is derived
+from the View's built bundle. Production builds version both external and
+inline View resources automatically. A View keeps its URI until its bundle
+changes, across rebuilds, backend-only deploys, and replicas.
 
 Read the URI advertised by the tool's `_meta.ui.resourceUri` or by
 `resources/list`, and remove hardcoded View URIs. Refresh tool discovery after
 each deployment so hosts obtain a changed View's new URI.
 
-A v2 server also serves the current View for `ui://views/<name>.html` and for
-any `ui://views/<name>-<hash>.html`, so a host holding a URI from an earlier v2
-deployment still loads the View. v1 `ui://widget/...` URIs are not resolved.
+The `?v=` value only busts caches. A v2 server serves the current View for
+`ui://views/<name>.html` with any `?v=` value or none, and for the
+`ui://views/<name>-<build ID>.html` URIs advertised by mcp-use 2.12, so a host
+holding a URI from an earlier v2 deployment still loads the View. v1 `ui://widget/...` URIs are not resolved.
 Published ChatGPT apps can retain tool metadata from their approved submission;
 submit an updated app version so ChatGPT requests the v2 URIs.
 

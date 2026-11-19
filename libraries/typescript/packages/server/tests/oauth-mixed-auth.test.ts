@@ -695,14 +695,18 @@ describe("mixed auth: resources, prompts, and views", () => {
       (item) => item.name === "catalog-card"
     )?.uri;
     expect(catalogUri).toMatch(
-      /^ui:\/\/views\/catalog-card-[0-9a-f]{16}\.html$/
+      /^ui:\/\/views\/catalog-card\.html\?v=[0-9a-f]{8}$/
     );
     const catalog = await shop.fetch(read(catalogUri!));
     expect(catalog.status).toBe(200);
     expect(await resourceText(catalog)).toContain("<!doctype html>");
   });
 
-  it.each(["ui://views/%s.html", "ui://views/%s-0123456789abcdef.html"])(
+  it.each([
+    "ui://views/%s.html",
+    "ui://views/%s.html?v=0123abcd",
+    "ui://views/%s-0123456789abcdef.html",
+  ])(
     "gates views by tool binding for URIs like %s from earlier deployments",
     async (pattern) => {
       const uri = (name: string) => pattern.replace("%s", name);

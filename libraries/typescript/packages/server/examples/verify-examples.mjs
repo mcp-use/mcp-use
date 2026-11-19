@@ -473,7 +473,9 @@ async function assertScenario(connection, example, origin) {
         ?._meta?.ui?.resourceUri;
       if (
         typeof resourceUri !== "string" ||
-        !/^ui:\/\/views\/next-status-card-[0-9a-f]{16}\.html$/.test(resourceUri)
+        !/^ui:\/\/views\/next-status-card\.html\?v=[0-9a-f]{8}$/.test(
+          resourceUri
+        )
       )
         throw new Error(
           "Next.js status tool did not advertise a content-versioned view URI."
