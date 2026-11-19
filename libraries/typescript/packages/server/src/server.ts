@@ -2176,7 +2176,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     fields: { view?: { name: string } } = {}
   ): MiddlewareContext<M, TEnv> {
     const requestContext = toRequestContext<TEnv>(ctx);
-    return Object.assign(requestContext, {
+    // `requestContext` is the Hono Context shared with the tool callback, whose
+    // own `ctx.auth` has a different shape. Keep the middleware fields on a
+    // per-operation overlay instead of writing them onto the shared object.
+    const overlay: Record<PropertyKey, unknown> = {
       ...fields,
       method,
       params,
@@ -2185,6 +2188,42 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }),
       ...(ctx.http?.authInfo !== undefined && { auth: ctx.http.authInfo }),
       state: new Map(),
+    };
+    // Hono's Context keeps true #private fields, so the view must forward
+    // reads to the original instance rather than inherit from it.
+    return new Proxy(requestContext as object, {
+      get(target, prop) {
+        if (Object.hasOwn(overlay, prop)) return overlay[prop];
+        const value: unknown = Reflect.get(target, prop, target);
+        return typeof value === "function"
+          ? (value as (...args: unknown[]) => unknown).bind(target)
+          : value;
+      },
+      set(target, prop, value) {
+        // Middleware fields (and new keys) live on the overlay; writes to
+        // existing Hono members such as `res` still reach the shared Context.
+        if (Object.hasOwn(overlay, prop) || !(prop in target)) {
+          overlay[prop] = value;
+          return true;
+        }
+        return Reflect.set(target, prop, value, target);
+      },
+      has: (target, prop) => Object.hasOwn(overlay, prop) || prop in target,
+      ownKeys: (target) => [
+        ...new Set([...Reflect.ownKeys(target), ...Reflect.ownKeys(overlay)]),
+      ],
+      getOwnPropertyDescriptor(target, prop) {
+        const own = Reflect.getOwnPropertyDescriptor(target, prop);
+        if (Object.hasOwn(overlay, prop) && (!own || own.configurable)) {
+          return {
+            value: overlay[prop],
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          };
+        }
+        return own;
+      },
     }) as unknown as MiddlewareContext<M, TEnv>;
   }
 
