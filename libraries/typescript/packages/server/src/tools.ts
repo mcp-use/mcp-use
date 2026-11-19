@@ -4,6 +4,7 @@ import type {
   InputRequiredResult,
   MetaObject,
   StandardSchemaWithJSON,
+  Tool,
   ToolAnnotations,
 } from "@modelcontextprotocol/server";
 import type { Env } from "hono";
@@ -308,3 +309,6 @@ export type ToolCallback<
   params: TInput,
   ctx: RequestContext<TUser, HasOAuth, TEnv>
 ) => ToolResult<TOutput> | Promise<ToolResult<TOutput>>;
+
+export type { Tool };
+
