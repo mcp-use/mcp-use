@@ -916,6 +916,90 @@ describe("evals run", () => {
     expect(markdown).toContain("**Timed out waiting for 1 run.**");
   });
 
+  test.for([
+    ["SIGINT", 130],
+    ["SIGTERM", 143],
+  ] as const)(
+    "%s while waiting cancels the runs still going",
+    async ([signal, exitCode], { cloud, cli }) => {
+      server(cloud);
+      cloud.on("GET", SUITES, {
+        body: [
+          suite({ id: "suite_1", name: "Rome weather" }),
+          suite({ id: "suite_2", name: "Paris forecast" }),
+        ],
+      });
+      for (const id of ["1", "2"])
+        cloud.on("POST", `${SUITES}/suite_${id}/runs`, {
+          body: {
+            id: `run_${id}`,
+            suiteId: `suite_${id}`,
+            status: "running",
+            pass: null,
+            score: null,
+          },
+        });
+      cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
+        body: run({
+          id: "run_1",
+          suiteId: "suite_1",
+          score: 100,
+          scenarios: [
+            {
+              executions: [
+                {
+                  client: "inspector",
+                  modelName: "openai/gpt-5",
+                  status: "complete",
+                  pass: true,
+                  score: 100,
+                  error: null,
+                  judgement: null,
+                  judgeVerdict: null,
+                  toolAssertions: null,
+                },
+              ],
+            },
+          ],
+        }),
+      });
+      cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_2", {
+        body: run({
+          id: "run_2",
+          suiteId: "suite_2",
+          status: "running",
+          pass: null,
+          score: null,
+        }),
+      });
+      cloud.on("POST", "/api/v1/server-evals/srv_1/runs/run_2/cancel", {
+        body: { success: true },
+      });
+
+      const result = await cli.run(
+        ["evals", "run", "--all", "--wait", "--server", "weather"],
+        {
+          env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "200" },
+          // Once Rome weather has finished, so only Paris forecast is still going.
+          signal: {
+            name: signal,
+            when: ({ stdout }) => stdout.includes("✅ Rome weather"),
+          },
+        }
+      );
+
+      expect(result.exitCode).toBe(exitCode);
+      expect(result.stderr).toContain("Cancelling 1 eval run…");
+      expect(result.stderr).toContain("Cancelled run_2 (Paris forecast).");
+      expect(
+        cloud.requestsTo("POST", "/api/v1/server-evals/srv_1/runs/run_2/cancel")
+      ).toHaveLength(1);
+      expect(
+        cloud.requestsTo("POST", "/api/v1/server-evals/srv_1/runs/run_1/cancel")
+      ).toHaveLength(0);
+    }
+  );
+
   test("--markdown-file needs --wait", async ({ cli }) => {
     const result = await cli.run(
       ["evals", "run", "--all", "--markdown-file", "evals.md", ...SCOPE],

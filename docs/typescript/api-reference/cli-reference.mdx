@@ -869,6 +869,9 @@ Runs continue on Cloud after the command returns. With `--wait`, the command
 polls until every run finishes (default limit: 1800 seconds) and exits 1 unless
 every run passes. While it waits, it prints each suite's dashboard link, then a
 line as each client and model finishes, so a CI log shows results as they come.
+Stopping the command while it waits (Ctrl+C, or a cancelled CI job) cancels the
+runs it started that haven't finished. Runs still going when `--timeout` runs out
+keep running on Cloud.
 
 For CI, `--json-file` also writes the `--json` result to a file while the
 readable report still prints. With `--wait`, `--markdown-file` writes a

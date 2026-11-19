@@ -337,6 +337,21 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         process.stdout.write(
           `${formatRunsStarted(started, { serverName, dashboardUrl, branch, names })}\n\n`
         );
+      // Stopping the command (Ctrl+C, or a cancelled CI job) cancels the runs it started.
+      let polledRuns: readonly Run[] = [];
+      const stopCancellingOnSignal = cancelRunsOnSignal(api, () =>
+        started
+          .filter(
+            (run) =>
+              !polledRuns.some(
+                (polled) => polled.id === run.id && finished(polled)
+              )
+          )
+          .map((run) => ({
+            id: run.id,
+            name: names.get(run.suiteId) ?? run.suiteId,
+          }))
+      );
       const runs = await withProgress(
         `Waiting for ${started.length} eval run${started.length === 1 ? "" : "s"}`,
         output.json,
@@ -346,6 +361,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
             started.map((run) => run.id),
             timeout * 1000,
             (polled) => {
+              polledRuns = polled;
               if (output.json) return;
               const now = Date.now();
               for (const line of live.update(polled, now)) {
@@ -359,6 +375,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
             }
           )
       );
+      stopCancellingOnSignal();
       if (!output.json)
         process.stdout.write(
           `${printedEvents ? "\n" : ""}${live.summary(runs, Date.now())}\n\n`
@@ -785,6 +802,52 @@ async function suiteFiles(paths: readonly string[]): Promise<string[]> {
     files.push(...entries);
   }
   return [...new Set(files)];
+}
+
+/** How long cancelling may take after a signal: CI sends SIGTERM 7.5 s after SIGINT. */
+const CANCEL_TIMEOUT_MS = 5000;
+
+/**
+ * On SIGINT or SIGTERM (Ctrl+C, or a cancelled CI job), cancel the runs
+ * `open` returns, report it on stderr, then exit 130 or 143. A second signal
+ * of the same kind exits at once. Returns a function that removes the handlers.
+ */
+function cancelRunsOnSignal(
+  api: EvalApi,
+  open: () => Array<{ id: string; name: string }>
+): () => void {
+  let stopping = false;
+  const onSignal = (signal: NodeJS.Signals) => {
+    if (stopping) return;
+    stopping = true;
+    const runs = open();
+    const exit = () => process.exit(signal === "SIGINT" ? 130 : 143);
+    if (runs.length === 0) return exit();
+    process.stderr.write(
+      `\nCancelling ${runs.length} eval run${runs.length === 1 ? "" : "s"}…\n`
+    );
+    const cancels = Promise.allSettled(runs.map((run) => api.cancel(run.id)));
+    const timeout = delay(CANCEL_TIMEOUT_MS).then(() => undefined);
+    void Promise.race([cancels, timeout]).then((results) => {
+      const lines = runs.map((run, i) => {
+        const result = results?.[i];
+        const label = `${run.id} (${plain(run.name)})`;
+        if (result === undefined)
+          return `Could not confirm cancelling ${label}.`;
+        return result.status === "fulfilled"
+          ? `Cancelled ${label}.`
+          : `Could not cancel ${label}: ${messageOf(result.reason)}`;
+      });
+      process.stderr.write(`${lines.join("\n")}\n`);
+      exit();
+    });
+  };
+  process.once("SIGINT", onSignal);
+  process.once("SIGTERM", onSignal);
+  return () => {
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
+  };
 }
 
 /**

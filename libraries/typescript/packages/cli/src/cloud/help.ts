@@ -557,7 +557,10 @@ const pages: Record<string, Page> = {
           ...project,
           ["--all", "Run every enabled suite"],
           ["--branch <name>", "Target a branch environment"],
-          ["--wait", "Wait for results; exit 1 unless every run passes"],
+          [
+            "--wait",
+            "Wait for results; exit 1 unless every run passes. Ctrl+C cancels the runs still going",
+          ],
           ["--timeout <seconds>", "Maximum wait with --wait (default: 1800)"],
           [
             "--json-file <path>",

@@ -69,7 +69,8 @@ enabled: true
 
 `run` starts runs on Cloud and returns their IDs. With `--wait`, it exits 1
 unless every run passes. On timeout (`eval_wait_timeout`) the runs keep going;
-read them later with `report`. Starting a run is not idempotent, so do not
+read them later with `report`. Stopping `run --wait` with SIGINT or SIGTERM
+(Ctrl+C, a cancelled CI job) cancels the unfinished runs it started. Starting a run is not idempotent, so do not
 retry a start whose outcome is unknown. Check `mcp-use evals runs --json`
 first. `--branch NAME` targets a branch environment instead of production.
 If a start fails after others began, the error names the runs already going.

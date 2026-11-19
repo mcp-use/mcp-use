@@ -52,6 +52,11 @@ export interface RunOptions {
   input?: string;
   /** Kill the child after this many milliseconds. Defaults to 30 s. */
   timeoutMs?: number;
+  /** Send `name` to the child once `when` is true of its output so far. */
+  signal?: {
+    name: NodeJS.Signals;
+    when: (output: { stdout: string; stderr: string }) => boolean;
+  };
 }
 
 /** What one CLI invocation produced. */
@@ -102,8 +107,20 @@ export async function runCli(
   });
   let stdout = "";
   let stderr = "";
-  child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
-  child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+  let signalled = false;
+  const maybeSignal = () => {
+    if (signalled || !options.signal?.when({ stdout, stderr })) return;
+    signalled = true;
+    child.kill(options.signal.name);
+  };
+  child.stdout.setEncoding("utf8").on("data", (chunk) => {
+    stdout += chunk;
+    maybeSignal();
+  });
+  child.stderr.setEncoding("utf8").on("data", (chunk) => {
+    stderr += chunk;
+    maybeSignal();
+  });
   child.stdin.end(options.input ?? "");
 
   const timeoutMs = options.timeoutMs ?? 30_000;
