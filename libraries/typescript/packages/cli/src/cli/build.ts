@@ -11,7 +11,7 @@
  * `mcp-use start` therefore never evaluate Vite.
  */
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
@@ -54,6 +54,37 @@ const WRAPPER_BASENAME = "entry-wrapper.ts";
 /** Inline imported assets as data URLs up to this byte size (effectively all). */
 const ASSETS_INLINE_LIMIT = 100 * 1024 * 1024;
 
+/**
+ * Derive a stable build ID from the views manifest so that byte-identical
+ * builds produce the same ID. Falls back to a random ID when no views are
+ * present and no override is set.
+ *
+ * Priority: explicit override \> `MCP_USE_BUILD_ID` env var \> content-derived
+ * hash \> random.
+ */
+function deriveBuildId(
+  views: ViewsManifest,
+  override?: string | undefined
+): string {
+  if (override !== undefined && override.trim() !== "") {
+    return override.trim();
+  }
+  const envOverride = process.env["MCP_USE_BUILD_ID"];
+  if (envOverride !== undefined && envOverride.trim() !== "") {
+    return envOverride.trim();
+  }
+  const viewNames = Object.keys(views).sort();
+  if (viewNames.length === 0) {
+    return randomBytes(8).toString("hex");
+  }
+  const hash = createHash("sha256");
+  for (const name of viewNames) {
+    hash.update(name);
+    hash.update(JSON.stringify(views[name]));
+  }
+  return hash.digest("hex").slice(0, 16);
+}
+
 async function copyPublicAssets(cwd: string, outputDir: string): Promise<void> {
   const publicSrc = join(cwd, "public");
   if (existsSync(publicSrc)) {
@@ -88,6 +119,14 @@ export interface BuildOptions {
    * @defaultValue `false`; views use external hashed assets.
    */
   inline?: boolean;
+  /**
+   * Override the `buildId` written to `manifest.json`.
+   *
+   * Takes precedence over both the content-derived hash and the
+   * `MCP_USE_BUILD_ID` environment variable. Useful when the caller wants
+   * to pin the ID to a git SHA or release tag.
+   */
+  buildId?: string;
 }
 
 /**
@@ -402,7 +441,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     await copyPublicAssets(options.cwd, join(paths.build, "views/public"));
 
     const manifest: BuildManifest = {
-      buildId: randomBytes(8).toString("hex"),
+      buildId: deriveBuildId({}, options.buildId),
       entryPoint: BUILD_ENTRY_NAME,
       createdAt: new Date().toISOString(),
       views: {},
@@ -531,7 +570,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   });
 
   const manifest: BuildManifest = {
-    buildId: randomBytes(8).toString("hex"),
+    buildId: deriveBuildId(viewsManifest, options.buildId),
     entryPoint: BUILD_ENTRY_NAME,
     createdAt: new Date().toISOString(),
     views: viewsManifest,

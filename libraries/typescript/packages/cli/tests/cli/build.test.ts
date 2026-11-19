@@ -382,6 +382,52 @@ describe("runBuild", () => {
     removeDir(join(cwd, "src"));
     await expect(runBuild({ cwd })).rejects.toThrow(/No server entry found/);
   });
+
+  it("uses MCP_USE_BUILD_ID env var when set", async () => {
+    const cwd = copyFixture("build");
+    dirs.push(cwd);
+    const previous = process.env.MCP_USE_BUILD_ID;
+    process.env.MCP_USE_BUILD_ID = "my-pinned-build-id";
+    try {
+      await runBuild({ cwd });
+      const manifest = JSON.parse(
+        readFileSync(
+          join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
+          "utf8"
+        )
+      ) as BuildManifest;
+      expect(manifest.buildId).toBe("my-pinned-build-id");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.MCP_USE_BUILD_ID;
+      } else {
+        process.env.MCP_USE_BUILD_ID = previous;
+      }
+    }
+  });
+
+  it("honors an explicit buildId option over MCP_USE_BUILD_ID", async () => {
+    const cwd = copyFixture("build");
+    dirs.push(cwd);
+    const previous = process.env.MCP_USE_BUILD_ID;
+    process.env.MCP_USE_BUILD_ID = "env-id";
+    try {
+      await runBuild({ cwd, buildId: "explicit-id" });
+      const manifest = JSON.parse(
+        readFileSync(
+          join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
+          "utf8"
+        )
+      ) as BuildManifest;
+      expect(manifest.buildId).toBe("explicit-id");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.MCP_USE_BUILD_ID;
+      } else {
+        process.env.MCP_USE_BUILD_ID = previous;
+      }
+    }
+  });
 });
 
 describe("runBuild (views)", () => {
@@ -884,6 +930,58 @@ describe("runBuild (views)", () => {
         delete process.env.MCP_ASSETS_URL;
       } else {
         process.env.MCP_ASSETS_URL = previous;
+      }
+    }
+  }, 60_000);
+
+  it("produces a stable content-derived buildId across two identical builds", async () => {
+    const cwd = copyFixture("build-views-stable-id", "views");
+    dirs.push(cwd);
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await runBuild({ cwd });
+    const manifest1 = JSON.parse(
+      readFileSync(
+        join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
+        "utf8"
+      )
+    ) as BuildManifest;
+
+    // Second build from the same source.
+    await runBuild({ cwd });
+    const manifest2 = JSON.parse(
+      readFileSync(
+        join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
+        "utf8"
+      )
+    ) as BuildManifest;
+    warnSpy.mockRestore();
+
+    expect(manifest1.buildId).toMatch(/^[0-9a-f]{16}$/);
+    expect(manifest1.buildId).toBe(manifest2.buildId);
+  }, 60_000);
+
+  it("uses MCP_USE_BUILD_ID env override for views builds", async () => {
+    const cwd = copyFixture("build-views-env-id", "views");
+    dirs.push(cwd);
+    const previous = process.env.MCP_USE_BUILD_ID;
+    process.env.MCP_USE_BUILD_ID = "pinned-views-id";
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await runBuild({ cwd });
+      const manifest = JSON.parse(
+        readFileSync(
+          join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
+          "utf8"
+        )
+      ) as BuildManifest;
+      expect(manifest.buildId).toBe("pinned-views-id");
+    } finally {
+      warnSpy.mockRestore();
+      if (previous === undefined) {
+        delete process.env.MCP_USE_BUILD_ID;
+      } else {
+        process.env.MCP_USE_BUILD_ID = previous;
       }
     }
   }, 60_000);

@@ -41,6 +41,13 @@ export interface ParsedArgs {
   sourceMaps: boolean;
   /** Whether production view JS and CSS should be embedded in MCP resources. */
   inline: boolean;
+  /**
+   * Explicit build ID override from `--build-id` (build only).
+   *
+   * When set it takes precedence over both the content-derived hash and the
+   * `MCP_USE_BUILD_ID` environment variable.
+   */
+  buildId: string | undefined;
   /** Whether `--help`/`-h` was passed. */
   help: boolean;
   /** Whether `--version`/`-v` was passed. */
@@ -75,6 +82,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     inspector: undefined,
     sourceMaps: false,
     inline: false,
+    buildId: undefined,
     help: false,
     version: false,
     passthrough: [],
@@ -161,6 +169,9 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
         break;
       case "--inline":
         args.inline = true;
+        break;
+      case "--build-id":
+        args.buildId = takeValue();
         break;
       default:
         if (flag.startsWith("-")) {

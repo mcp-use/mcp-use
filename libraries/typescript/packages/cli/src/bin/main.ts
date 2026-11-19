@@ -58,6 +58,8 @@ interface CliCommandOptions {
   sourceMaps?: boolean;
   /** Embed production view JS and CSS in MCP resources (`--inline`). */
   inline?: boolean;
+  /** Override the manifest buildId (`--build-id`). */
+  buildId?: string;
 }
 
 /** Metadata owned by the package invoking the shared CLI dispatcher. */
@@ -125,13 +127,14 @@ Exit codes: 0 started/help, 2 invalid arguments, 1 startup failure`,
 Build the MCP server into .mcp-use/build.
 
 Options:
-  --path <directory> Project root (default: current directory)
-  --entry <path>     Server entry module
-  --mcp-dir <dir>    Directory containing the entry and views/
-  --views-dir <dir>  Views directory
-  --source-maps      Emit source maps
-  --inline           Embed view JavaScript and CSS in MCP resources
-  -h, --help         Show this help
+  --path <directory>   Project root (default: current directory)
+  --entry <path>       Server entry module
+  --mcp-dir <dir>      Directory containing the entry and views/
+  --views-dir <dir>    Views directory
+  --source-maps        Emit source maps
+  --inline             Embed view JavaScript and CSS in MCP resources
+  --build-id <id>      Override the manifest buildId (env: MCP_USE_BUILD_ID)
+  -h, --help           Show this help
 
 Exit codes: 0 built/help, 2 invalid arguments, 1 build failure`,
   typecheck: `Usage: mcp-use typecheck [options] [-- <tsc options>]
@@ -333,6 +336,7 @@ async function cliCommand(
     ...(args.inspector === false && { inspector: false }),
     ...(args.sourceMaps && { sourceMaps: true }),
     ...(args.inline && { inline: true }),
+    ...(args.buildId !== undefined && { buildId: args.buildId }),
   };
 
   try {

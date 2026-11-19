@@ -262,6 +262,18 @@ describe("parseArgs", () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining("--inline"));
   });
 
+  it("parses --build-id for build", () => {
+    expect(parseArgs(["build", "--build-id", "abc123"]).buildId).toBe("abc123");
+    expect(parseArgs(["build", "--build-id=v1.2.3"]).buildId).toBe("v1.2.3");
+    expect(parseArgs(["build"]).buildId).toBeUndefined();
+  });
+
+  it("documents --build-id in build command help", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await expect(main(["build", "--help"])).resolves.toBe(0);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("--build-id"));
+  });
+
   it("parses help and version flags", () => {
     expect(parseArgs(["--help"]).help).toBe(true);
     expect(parseArgs(["-h"]).help).toBe(true);

@@ -51,7 +51,13 @@ export const BUILD_MANIFEST_NAME = "manifest.json";
  * @internal
  */
 export interface BuildManifest {
-  /** Unique identifier for this build (random hex, regenerated per build). */
+  /**
+   * Stable identifier for this build. When views are present it is a
+   * truncated SHA-256 of the views manifest, so identical sources produce
+   * identical IDs across deploys. Without views it is random hex.
+   * Override with `MCP_USE_BUILD_ID` to supply an external identifier (e.g.
+   * a git SHA or release version).
+   */
   buildId: string;
   /**
    * Filename of the emitted server entry, relative to the build directory
