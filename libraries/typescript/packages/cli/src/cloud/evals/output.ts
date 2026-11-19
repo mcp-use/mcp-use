@@ -380,6 +380,121 @@ function executionsOf(run: Run): Execution[] {
   return (run.scenarios ?? []).flatMap((scenario) => scenario.executions ?? []);
 }
 
+/** Elapsed time as m:ss, or h:mm:ss from an hour. */
+export function elapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = String(total % 60).padStart(2, "0");
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
+    : `${minutes}:${seconds}`;
+}
+
+/** The lines `evals run --wait` prints once its runs have started. */
+export function formatRunsStarted(
+  runs: ReadonlyArray<{ suiteId: string }>,
+  options: {
+    serverName: string;
+    dashboardUrl: string;
+    branch: string | undefined;
+    names: ReadonlyMap<string, string>;
+  }
+): string {
+  const names = runs.map((run) =>
+    plain(options.names.get(run.suiteId) ?? run.suiteId)
+  );
+  const width = Math.max(...names.map((name) => name.length));
+  return [
+    `Started ${runs.length} eval run${runs.length === 1 ? "" : "s"} on ${plain(options.serverName)} (${options.branch ? `branch ${plain(options.branch)}` : "production"})`,
+    ...runs.map(
+      (run, i) =>
+        `  ${names[i]!.padEnd(width)}  ${options.dashboardUrl}/${encodeURIComponent(run.suiteId)}`
+    ),
+  ].join("\n");
+}
+
+/**
+ * Live progress for `evals run --wait`, fed every poll: a line as each
+ * execution finishes (with why it failed), and a line naming what is still
+ * running after `heartbeatMs` without one. Times are elapsed since
+ * `startedAt`, accurate to the poll interval: Cloud reports no execution times.
+ */
+export function createLiveReport(options: {
+  names: ReadonlyMap<string, string>;
+  startedAt: number;
+  heartbeatMs?: number;
+}) {
+  const heartbeatMs = options.heartbeatMs ?? 60_000;
+  const reported = new Set<string>();
+  let lastLine = options.startedAt;
+  const suiteName = (run: Run) =>
+    plain(options.names.get(run.suiteId) ?? run.suiteId);
+  const stamp = (now: number) => `[${elapsed(now - options.startedAt)}]`;
+
+  return {
+    /** Lines for what changed since the last poll. */
+    update(runs: readonly Run[], now: number): string[] {
+      const lines: string[] = [];
+      for (const run of runs) {
+        executionsOf(run).forEach((execution, index) => {
+          const key = `${run.id}:${index}`;
+          if (!finished(execution) || reported.has(key)) return;
+          reported.add(key);
+          const target = `${suiteName(run)} · ${plain(execution.client)}${
+            WEB_CLIENTS.has(execution.client) || !execution.modelName
+              ? ""
+              : ` ${plain(execution.modelName)}`
+          }`;
+          const score = execution.score === null ? "" : ` ${execution.score}`;
+          if (execution.status === "cancelled") {
+            lines.push(`${stamp(now)} – ${target} · cancelled`);
+          } else if (execution.pass === true) {
+            lines.push(`${stamp(now)} ✓ ${target} · pass${score}`);
+          } else {
+            lines.push(
+              `${stamp(now)} ✗ ${target} · ${execution.score === null ? plain(execution.status) : `fail${score}`}`
+            );
+            const why = reasons(execution)[0];
+            if (why) lines.push(`${" ".repeat(stamp(now).length + 3)}${why}`);
+          }
+        });
+      }
+      const pending = runs.filter((run) => !finished(run));
+      if (lines.length > 0) {
+        lastLine = now;
+      } else if (pending.length > 0 && now - lastLine >= heartbeatMs) {
+        lastLine = now;
+        const shown = pending.slice(0, 3).map((run) => {
+          const states = [
+            ...new Set(
+              executionsOf(run)
+                .filter((execution) => !finished(execution))
+                .map((execution) => plain(execution.status))
+            ),
+          ];
+          return `${suiteName(run)}: ${states.length ? states.join(", ") : plain(run.status)}`;
+        });
+        const more = pending.length - shown.length;
+        lines.push(
+          `${stamp(now)} … ${pending.length} running (${shown.join("; ")}${more > 0 ? `; ${more} more` : ""})`
+        );
+      }
+      return lines;
+    },
+    /** The closing line: how long it took and how many suites passed. */
+    summary(runs: readonly Run[], now: number): string {
+      const passed = runs.filter((run) => run.pass === true).length;
+      const pending = runs.filter((run) => !finished(run)).length;
+      const took = elapsed(now - options.startedAt);
+      const tally = `${passed} of ${runs.length} suite${runs.length === 1 ? "" : "s"} passed`;
+      return pending > 0
+        ? `Stopped waiting after ${took} · ${tally}, ${pending} still running`
+        : `Done in ${took} · ${tally}`;
+    },
+  };
+}
+
 /** Escape text for one line of raw HTML. */
 function html(value: string): string {
   return plain(value)

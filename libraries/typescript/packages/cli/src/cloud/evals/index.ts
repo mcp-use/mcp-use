@@ -20,10 +20,13 @@ import {
   type EvalSuiteFile,
 } from "./config.js";
 import {
+  createLiveReport,
+  elapsed,
   finished,
   formatReport,
   formatRunList,
   formatRunsMarkdown,
+  formatRunsStarted,
   formatRuntimeOptions,
   formatSuite,
   formatSuiteList,
@@ -325,16 +328,41 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
           ].join("\n")
         );
       }
+      // The readable output streams: run links now, then a line per finished
+      // execution, so a CI log shows progress while the runs go on.
+      const startedAt = Date.now();
+      const live = createLiveReport({ names, startedAt });
+      let printedEvents = false;
+      if (!output.json)
+        process.stdout.write(
+          `${formatRunsStarted(started, { serverName, dashboardUrl, branch, names })}\n\n`
+        );
       const runs = await withProgress(
         `Waiting for ${started.length} eval run${started.length === 1 ? "" : "s"}`,
         output.json,
-        () =>
+        (progress) =>
           waitForRuns(
             api,
             started.map((run) => run.id),
-            timeout * 1000
+            timeout * 1000,
+            (polled) => {
+              if (output.json) return;
+              const now = Date.now();
+              for (const line of live.update(polled, now)) {
+                progress.print(line);
+                printedEvents = true;
+              }
+              const done = polled.filter(finished).length;
+              progress.update(
+                `${done} of ${polled.length} suite${polled.length === 1 ? "" : "s"} done · ${elapsed(now - startedAt)}`
+              );
+            }
           )
       );
+      if (!output.json)
+        process.stdout.write(
+          `${printedEvents ? "\n" : ""}${live.summary(runs, Date.now())}\n\n`
+        );
       // On a timeout the files still get the runs as they stand.
       await writeJson({ runs, dashboardUrl });
       if (markdownFile !== undefined)
@@ -759,7 +787,8 @@ async function suiteFiles(paths: readonly string[]): Promise<string[]> {
 async function waitForRuns(
   api: EvalApi,
   runIds: readonly string[],
-  timeoutMs: number
+  timeoutMs: number,
+  onPoll: (runs: readonly Run[]) => void = () => {}
 ): Promise<Run[]> {
   const deadline = Date.now() + timeoutMs;
   const configured = process.env["MCP_USE_POLL_INTERVAL_MS"];
@@ -768,6 +797,7 @@ async function waitForRuns(
   for (;;) {
     const runs: Run[] = [];
     for (const runId of runIds) runs.push(await api.run(runId));
+    onPoll(runs);
     if (runs.every(finished) || Date.now() >= deadline) return runs;
     await delay(interval);
   }

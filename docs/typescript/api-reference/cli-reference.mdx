@@ -867,7 +867,8 @@ mcp-use evals run [<suite...>] [--all] [--branch <name>] [--wait] [--timeout <se
 `--all` runs every enabled suite, and `--branch` targets a branch environment.
 Runs continue on Cloud after the command returns. With `--wait`, the command
 polls until every run finishes (default limit: 1800 seconds) and exits 1 unless
-every run passes.
+every run passes. While it waits, it prints each suite's dashboard link, then a
+line as each client and model finishes, so a CI log shows results as they come.
 
 For CI, `--json-file` also writes the `--json` result to a file while the
 readable report still prints. With `--wait`, `--markdown-file` writes a

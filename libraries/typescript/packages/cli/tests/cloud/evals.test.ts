@@ -8,6 +8,7 @@ import {
   suiteFile,
   toYaml,
 } from "../../src/cloud/evals/config.js";
+import { createLiveReport, elapsed } from "../../src/cloud/evals/output.js";
 import type { operations } from "../../src/cloud/api/generated/types.gen.js";
 import { test } from "../helpers/cli-test.js";
 import { signIn, SIGNED_IN } from "../helpers/cloud-auth.js";
@@ -854,6 +855,190 @@ describe("evals run", () => {
         nextSteps: [{ command: "mcp-use evals report run_1" }],
       },
     });
+  });
+});
+
+describe("evals run --wait live progress", () => {
+  function execution(
+    fields: Partial<
+      NonNullable<NonNullable<Run["scenarios"]>[number]["executions"]>[number]
+    >
+  ) {
+    return {
+      client: "inspector",
+      modelName: "openai/gpt-5",
+      status: "running",
+      pass: null,
+      score: null,
+      error: null,
+      judgement: null,
+      judgeVerdict: null,
+      toolAssertions: null,
+      ...fields,
+    };
+  }
+  const names = new Map([
+    ["suite_1", "Rome weather"],
+    ["suite_2", "Paris forecast"],
+  ]);
+
+  unit("prints each execution once as it finishes, and why it failed", () => {
+    const live = createLiveReport({ names, startedAt: 0 });
+    const running = [
+      run({
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+        scenarios: [
+          {
+            executions: [
+              execution({}),
+              execution({ client: "chatgpt", modelName: null }),
+            ],
+          },
+        ],
+      }),
+    ];
+    expect(live.update(running, 5_000)).toEqual([]);
+
+    const later = [
+      run({
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+        scenarios: [
+          {
+            executions: [
+              execution({ status: "complete", pass: true, score: 100 }),
+              execution({
+                client: "chatgpt",
+                modelName: null,
+                status: "complete",
+                pass: false,
+                score: 40,
+                toolAssertions: {
+                  checks: [
+                    { kind: "required", name: "get_weather", passed: false },
+                  ],
+                },
+              }),
+            ],
+          },
+        ],
+      }),
+    ];
+    expect(live.update(later, 34_000)).toEqual([
+      "[0:34] ✓ Rome weather · inspector openai/gpt-5 · pass 100",
+      "[0:34] ✗ Rome weather · chatgpt · fail 40",
+      "         Missing tool call: get_weather",
+    ]);
+    // Already reported: nothing new on the next poll.
+    expect(live.update(later, 39_000)).toEqual([]);
+  });
+
+  unit("names what is still running after a quiet minute", () => {
+    const live = createLiveReport({ names, startedAt: 0 });
+    const runs = [
+      run({
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+        scenarios: [{ executions: [execution({ status: "judging" })] }],
+      }),
+      run({
+        id: "run_2",
+        suiteId: "suite_2",
+        status: "running",
+        pass: null,
+        score: null,
+      }),
+    ];
+    expect(live.update(runs, 59_000)).toEqual([]);
+    expect(live.update(runs, 60_000)).toEqual([
+      "[1:00] … 2 running (Rome weather: judging; Paris forecast: running)",
+    ]);
+    expect(live.update(runs, 65_000)).toEqual([]);
+    expect(live.summary(runs, 3_725_000)).toBe(
+      "Stopped waiting after 1:02:05 · 0 of 2 suites passed, 2 still running"
+    );
+  });
+
+  unit("formats elapsed time", () => {
+    expect(elapsed(0)).toBe("0:00");
+    expect(elapsed(72_400)).toBe("1:12");
+    expect(elapsed(3_600_000)).toBe("1:00:00");
+  });
+
+  test("streams run links and results before the full report, and stays silent with --json", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: "suite_1", name: "Rome weather" })],
+    });
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      body: {
+        id: "run_1",
+        suiteId: "suite_1",
+        status: "running",
+        pass: null,
+        score: null,
+      },
+    });
+    cloud.on("GET", "/api/v1/server-evals/srv_1/runs/run_1", {
+      body: run({
+        id: "run_1",
+        suiteId: "suite_1",
+        score: 100,
+        scenarios: [
+          {
+            executions: [
+              execution({ status: "complete", pass: true, score: 100 }),
+            ],
+          },
+        ],
+      }),
+    });
+    const env = { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" };
+
+    const human = await cli.run(
+      ["evals", "run", "suite_1", "--wait", "--server", "weather"],
+      { env }
+    );
+
+    expect(human.exitCode).toBe(0);
+    const lines = human.stdout.split("\n");
+    expect(lines[0]).toBe("Started 1 eval run on Weather (production)");
+    expect(lines[1]).toMatch(
+      /^ {2}Rome weather {2}https:\/\/.*\/servers\/srv_1\/evals\/suites\/suite_1$/
+    );
+    const event = lines.findIndex((line) =>
+      /^\[0:0\d\] ✓ Rome weather · inspector openai\/gpt-5 · pass 100$/.test(
+        line
+      )
+    );
+    const done = lines.findIndex((line) =>
+      /^Done in 0:0\d · 1 of 1 suite passed$/.test(line)
+    );
+    const report = lines.indexOf("Run run_1: Passed (100)");
+    expect(event).toBeGreaterThan(1);
+    expect(done).toBeGreaterThan(event);
+    expect(report).toBeGreaterThan(done);
+
+    const json = await cli.run(
+      ["evals", "run", "suite_1", "--wait", ...SCOPE],
+      { env }
+    );
+    expect(json.exitCode).toBe(0);
+    expect(json.stdout.trim().split("\n")).toHaveLength(1);
+    expect(json.json).toMatchObject({ runs: [{ id: "run_1", pass: true }] });
   });
 });
 
