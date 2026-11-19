@@ -836,7 +836,7 @@ describe("evals run", () => {
       },
     });
     cloud.on("POST", `${SUITES}/suite_2/runs`, {
-      status: 402,
+      status: 403,
       body: { error: "Out of eval credits", code: "INSUFFICIENT_CREDITS" },
     });
 
@@ -855,6 +855,35 @@ describe("evals run", () => {
       },
     });
   });
+});
+
+test("evals models ignores an organization saved for another credential", async ({
+  cloud,
+  cli,
+}) => {
+  // A login saved for another account or Cloud, while MANUFACT_TOKEN supplies the key.
+  await mkdir(join(cli.home, ".manufact"), { recursive: true });
+  await writeFile(
+    join(cli.home, ".manufact", "auth.json"),
+    JSON.stringify({ apiKey: "mcp_saved", orgId: "org_elsewhere" })
+  );
+  signIn(cloud);
+  cloud.on("GET", "/api/v1/models", {
+    body: {
+      defaultModelId: "openai/gpt-5",
+      models: [{ id: "openai/gpt-5", name: "GPT-5", provider: "openai" }],
+    },
+  });
+
+  const result = await cli.run(["evals", "models", "--json"], {
+    env: SIGNED_IN,
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(result.json).toMatchObject({ models: [{ id: "openai/gpt-5" }] });
+  expect(cloud.requestsTo("GET", "/api/v1/models")).toMatchObject([
+    { headers: { "x-api-key": "test_key", "x-profile-id": "org_1" } },
+  ]);
 });
 
 test("evals export reports a path it cannot write", async ({ cloud, cli }) => {

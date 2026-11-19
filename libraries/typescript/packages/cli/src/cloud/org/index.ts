@@ -8,7 +8,12 @@ import {
   findOrganization,
   listOrganizations,
 } from "../auth/account.js";
-import { readAuth, requireCredential, updateAuth } from "../auth/store.js";
+import {
+  readAuth,
+  requireCredential,
+  savedOrganizationId,
+  updateAuth,
+} from "../auth/store.js";
 import { cloudFor, parseCloudArgs } from "../options.js";
 import { cloudHelp } from "../help.js";
 import { runCommand } from "../../core/command.js";
@@ -71,7 +76,8 @@ export async function runOrganizations(
     )
       throw new UsageError("--name and --logo are available on org update.");
     const logo = values.logo ? await readFile(values.logo) : undefined;
-    const { apiKey } = await requireCredential();
+    const credential = await requireCredential();
+    const { apiKey } = credential;
     const api = {
       client: createCloudClient({ apiKey }),
       call: callerFor(apiKey),
@@ -101,7 +107,7 @@ export async function runOrganizations(
       const organizations = await listOrganizations(api);
       if (operation === "list") {
         const active = await chooseOrganization(api, organizations, {
-          storedId: saved.orgId,
+          storedId: await savedOrganizationId(credential),
         });
         const result = organizations.map((item) => ({
           ...item,
