@@ -638,7 +638,7 @@ mcp-use github repos [--installation <id>] [--page <n>] [--limit <n>] [options]
 Run the publishing checklist for a server.
 
 ```bash
-mcp-use checklist run [--branch <branch>] [--no-wait] [--fail-on <level>] [--json-file <path>] [--markdown-file <path>] [options]
+mcp-use checklist run [--branch <branch>] [--url <url>] [--profile <id>] [--no-wait] [--fail-on <level>] [--json-file <path>] [--markdown-file <path>] [options]
 ```
 
 Retain the run ID when using `--no-wait`, then inspect it with `checklist get`. A completed check does not publish the server.
@@ -658,6 +658,17 @@ Policy concerns, the findings under **Policy review**, count as warnings, as on 
 To keep the readable report in CI logs and still read the result from a script, pass `--json-file <path>`. The report prints as usual, and the same result `--json` would print is written to the file.
 
 Pass `--markdown-file <path>` to also write a Markdown report laid out like the dashboard's checklist page: the score, a policy-review banner, and one section per category. Use it for pull request comments or CI job summaries. `checklist get` accepts it too.
+
+For an External URL server, two more options change what a run checks:
+
+- `--url <url>` checks this MCP URL instead of the server's own, for example a preview deployment. It must be an absolute `http` or `https` URL.
+- `--profile <id>` authenticates with this profile instead of the one bound to the server. It must be one of your profiles or a profile shared with the organization.
+
+Neither can be combined with `--branch`, because External URL servers have no branches. Reports show the URL that was checked.
+
+```bash
+mcp-use checklist run --url https://my-app-git-feature.vercel.app/mcp --profile <profile-id> --fail-on failed
+```
 
 ### `checklist list`
 

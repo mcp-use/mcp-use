@@ -6,6 +6,18 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.8" description="November 2026">
+  ## Publishing checklist for External URL servers
+  Patch release bundling @mcp-use/cli v5.3.0, which lets `mcp-use checklist run` check another MCP URL for External URL servers.
+
+- **New** (@mcp-use/cli): `mcp-use checklist run --url <url>` checks that MCP URL instead of the server's, such as a preview deployment. The URL must be an absolute `http` or `https` URL (`#3121`)
+- **New** (@mcp-use/cli): `mcp-use checklist run --profile <id>` authenticates the run with that profile instead of the server's. `--url` and `--profile` apply to External URL servers and can't be combined with `--branch` (`#3121`)
+- **Enhancement** (@mcp-use/cli): checklist reports show a `Checked <url>` line with the URL the run checked, in both the terminal report and the Markdown report (`#3121`)
+- **Documentation** (@mcp-use/cli): add `--url` and `--profile` and an example to `mcp-use checklist run --help` (`#3121`)
+- **Update**: Updated @mcp-use/cli to v5.3.0
+- **Update**: Updated @mcp-use/inspector to v20.3.32; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.12.7" description="November 2026">
   ## Publishing checklist exit codes & reports
   Patch release bundling @mcp-use/cli v5.2.0, which adds result-based exit codes and report files to `mcp-use checklist run`.

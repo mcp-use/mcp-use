@@ -51,7 +51,15 @@ interface ChecklistPaths {
     };
     post: {
       parameters: { path: { serverId: string } };
-      requestBody: { content: { "application/json": { branch?: string } } };
+      requestBody: {
+        content: {
+          "application/json": {
+            branch?: string;
+            url?: string;
+            profileId?: string;
+          };
+        };
+      };
       responses: { 201: { content: { "application/json": unknown } } };
     };
   };
