@@ -916,7 +916,9 @@ describe("evals run", () => {
     expect(markdown).toContain("**Timed out waiting for 1 run.**");
   });
 
-  test.for([
+  // Windows has no POSIX signals: killing a child with one ends it at once,
+  // so the handler under test can't run there.
+  test.skipIf(process.platform === "win32").for([
     ["SIGINT", 130, 1],
     ["SIGTERM", 143, 1],
     // CI can deliver a cancel twice; the second must not cut cancelling short.
