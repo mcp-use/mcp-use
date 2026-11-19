@@ -54,8 +54,8 @@ export const BUILD_MANIFEST_NAME = "manifest.json";
 export interface BuildManifest {
   /**
    * Unique identifier for this build artifact (random hex, regenerated per
-   * build). View resource URIs do not use it; the server versions each view
-   * URI by that view's content.
+   * build). Current `mcp-use` servers version each view URI by that view's
+   * content and ignore this ID; older servers used it as the URI version.
    */
   buildId: string;
   /**

@@ -1877,9 +1877,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           // Only views a tool binds; an unbound manifest entry stays gated.
           // Any URI a client may hold for such a view counts, including one
           // advertised by an earlier deployment.
-          isOpenResourceUri: (uri) =>
-            resolveViewResourceUri(uri, this.#viewBindings.keys()) !==
-            undefined,
+          isOpenResourceUri: (uri) => {
+            const name = resolveViewResourceUri(uri, this.#views.keys());
+            return name !== undefined && this.#viewBindings.has(name);
+          },
         };
         // The gate and its challenge builder load on the first MCP request,
         // keeping them out of the static graph of servers without OAuth.
