@@ -1,3 +1,4 @@
+import { normalizeViewDomain } from "./origin.js";
 import { sha256Hex } from "./sha256.js";
 import type { ViewManifestEntry, ViewResourceFacts } from "./types.js";
 
@@ -33,7 +34,8 @@ function stableStringify(value: unknown): string {
  * Hashes what a host caches under the URI: the view's built bundle (the
  * content-hashed file names of an external build, or the embedded JavaScript
  * and CSS of an inline build) and the settings declared on the bound tool's
- * `view` (`csp`, `permissions`, `domain`, `prefersBorder`). The version
+ * `view` (`csp`, `permissions`, `domain`, `prefersBorder`), with `domain`
+ * normalized as it is emitted. The version
  * therefore changes when the bundle or one of those settings changes, and
  * stays the same across rebuilds of identical sources, backend-only deploys,
  * and replicas. Values resolved per request or from the environment, such as
@@ -57,7 +59,11 @@ export function computeViewVersion(
   const declared = stableStringify({
     csp: settings?.csp,
     permissions: settings?.permissions,
-    domain: settings?.domain,
+    // Hash what the host receives: an HTTP(S) domain is emitted as its origin.
+    domain:
+      settings?.domain === undefined
+        ? undefined
+        : normalizeViewDomain(settings.domain),
     prefersBorder: settings?.prefersBorder,
   });
   // A view with no declared settings hashes its bundle alone.

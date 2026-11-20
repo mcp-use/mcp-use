@@ -72,6 +72,20 @@ describe("computeViewVersion", () => {
     );
   });
 
+  it("hashes the domain as the origin the host receives", () => {
+    const entry = { kind: "inline", js: "x", css: "" } as const;
+    const origin = computeViewVersion(entry, {
+      domain: "https://app.example.com",
+    });
+    expect(origin).toBe("9d80c2f2");
+    expect(
+      computeViewVersion(entry, { domain: "https://app.example.com/a/b?c=1" })
+    ).toBe(origin);
+    expect(
+      computeViewVersion(entry, { domain: "https://other.example.com" })
+    ).not.toBe(origin);
+  });
+
   it("gives equal settings the same version whatever their key order", () => {
     const entry = { kind: "inline", js: "x", css: "" } as const;
     expect(
