@@ -16,10 +16,16 @@ export const UI_RESOURCE_URI_META_KEY = "ui/resourceUri" as const;
 /**
  * Build a view resource URI, versioned when a production build ID is supplied.
  *
+ * The build ID is carried in the `v` query parameter
+ * (`ui://views/<name>.html?v=<buildId>`), so the resource path stays stable
+ * across builds while each build still gets a fresh host cache key.
+ *
  * @param viewName - View directory / registry key.
  * @param buildId - Immutable production build ID; omit for unversioned URIs.
  */
 export function viewResourceUri(viewName: string, buildId?: string): string {
-  const suffix = buildId === undefined ? "" : `-${buildId}`;
-  return `${UI_RESOURCE_URI_PREFIX}${viewName}${suffix}.html`;
+  const path = `${UI_RESOURCE_URI_PREFIX}${viewName}.html`;
+  return buildId === undefined
+    ? path
+    : `${path}?v=${encodeURIComponent(buildId)}`;
 }

@@ -692,7 +692,7 @@ describe("mixed auth: resources, prompts, and views", () => {
       // ChatGPT reads every view while an app is created, before sign-in.
       const shop = shopServer({ ...(buildId !== undefined && { buildId }) });
       const catalogUri = buildId
-        ? "ui://views/catalog-card-a1b2c3.html"
+        ? "ui://views/catalog-card.html?v=a1b2c3"
         : "ui://views/catalog-card.html";
       const catalog = await shop.fetch(read(catalogUri));
       expect(catalog.status).toBe(200);
@@ -724,7 +724,7 @@ describe("mixed auth: resources, prompts, and views", () => {
             await server.fetch(
               read(
                 buildId
-                  ? "ui://views/private-card-a1b2c3.html"
+                  ? "ui://views/private-card.html?v=a1b2c3"
                   : "ui://views/private-card.html"
               )
             )
@@ -735,7 +735,7 @@ describe("mixed auth: resources, prompts, and views", () => {
             await server.fetch(
               read(
                 buildId
-                  ? "ui://views/orphan-a1b2c3.html"
+                  ? "ui://views/orphan.html?v=a1b2c3"
                   : "ui://views/orphan.html"
               )
             )
@@ -749,17 +749,24 @@ describe("mixed auth: resources, prompts, and views", () => {
     }
   );
 
-  it("challenges stale view URIs signed out and reports them missing after sign-in", async () => {
+  it("serves views signed out under any build version", async () => {
     const server = shopServer({ buildId: "a1b2c3" });
-    const current = await server.fetch(
-      read("ui://views/catalog-card-a1b2c3.html")
-    );
-    expect(current.status).toBe(200);
-    expect(await resourceText(current)).toContain("<!doctype html>");
-
     for (const uri of [
+      "ui://views/catalog-card.html?v=a1b2c3",
+      "ui://views/catalog-card.html?v=old",
       "ui://views/catalog-card.html",
+    ]) {
+      const response = await server.fetch(read(uri));
+      expect(response.status).toBe(200);
+      expect(await resourceText(response)).toContain("<!doctype html>");
+    }
+  });
+
+  it("challenges unknown view URIs signed out and reports them missing after sign-in", async () => {
+    const server = shopServer({ buildId: "a1b2c3" });
+    for (const uri of [
       "ui://views/catalog-card-old.html",
+      "ui://views/catalog-card.html?v=old&x=1",
     ]) {
       const signedOut = await server.fetch(read(uri));
       expect(signedOut.status).toBe(401);

@@ -926,7 +926,7 @@ export default function Resources() {
     expect(resources["result"]).toMatchObject({
       resources: expect.arrayContaining([
         expect.objectContaining({
-          uri: `ui://views/product-search-result-${manifest.buildId}.html`,
+          uri: `ui://views/product-search-result.html?v=${manifest.buildId}`,
         }),
       ]),
     });

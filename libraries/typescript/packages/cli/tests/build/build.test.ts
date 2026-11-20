@@ -608,12 +608,12 @@ describe("runBuild (views)", () => {
         resources.some(
           (r) =>
             r.uri ===
-            `ui://views/product-search-result-${manifest.buildId}.html`
+            `ui://views/product-search-result.html?v=${manifest.buildId}`
         )
       ).toBe(true);
 
       const readBody = await handlerMcp(handler, "resources/read", {
-        uri: `ui://views/product-search-result-${manifest.buildId}.html`,
+        uri: `ui://views/product-search-result.html?v=${manifest.buildId}`,
       });
       const text = (readBody["result"] as { contents: { text: string }[] })
         .contents[0]!.text;
@@ -685,7 +685,7 @@ describe("runBuild (views)", () => {
       const readProxied = await handlerMcp(
         handler,
         "resources/read",
-        { uri: `ui://views/product-search-result-${manifest.buildId}.html` },
+        { uri: `ui://views/product-search-result.html?v=${manifest.buildId}` },
         {
           "x-forwarded-proto": "https",
           "x-forwarded-host": "fruit.example.com",
@@ -722,7 +722,7 @@ describe("runBuild (views)", () => {
         }
       ).resources.find(
         (r) =>
-          r.uri === `ui://views/product-search-result-${manifest.buildId}.html`
+          r.uri === `ui://views/product-search-result.html?v=${manifest.buildId}`
       );
       const resourceDomains = (
         viewResource?._meta?.ui as { csp?: { resourceDomains?: string[] } }
@@ -772,7 +772,7 @@ describe("runBuild (views)", () => {
       default: { fetch(request: Request): Promise<Response> };
     };
     const readBody = await handlerMcp(mod.default.fetch, "resources/read", {
-      uri: `ui://views/product-search-result-${manifest.buildId}.html`,
+      uri: `ui://views/product-search-result.html?v=${manifest.buildId}`,
     });
     const text = (readBody["result"] as { contents: { text: string }[] })
       .contents[0]!.text;
@@ -898,7 +898,7 @@ describe("runBuild (views)", () => {
       const readBody = await handlerMcp(
         mod.default.fetch,
         "resources/read",
-        { uri: `ui://views/product-search-result-${manifest.buildId}.html` },
+        { uri: `ui://views/product-search-result.html?v=${manifest.buildId}` },
         {},
         "http://localhost/api/mcp"
       );

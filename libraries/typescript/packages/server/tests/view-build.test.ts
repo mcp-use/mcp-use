@@ -83,7 +83,7 @@ await server.close();
         await readFile(join(root, ".mcp-use/build/manifest.json"), "utf8")
       );
       expect(manifest.buildId).toMatch(/^[0-9a-f]{16}$/);
-      const expectedUri = `ui://views/dashboard-${manifest.buildId}.html`;
+      const expectedUri = `ui://views/dashboard.html?v=${manifest.buildId}`;
       for (let replica = 0; replica < 2; replica++) {
         const result = await inspect();
         expect(result.result.tools[0]._meta.ui.resourceUri).toBe(expectedUri);
@@ -97,7 +97,7 @@ await server.close();
       );
       expect(rebuilt.buildId).not.toBe(manifest.buildId);
       expect((await inspect()).result.tools[0]._meta.ui.resourceUri).toBe(
-        `ui://views/dashboard-${rebuilt.buildId}.html`
+        `ui://views/dashboard.html?v=${rebuilt.buildId}`
       );
     }
   );
