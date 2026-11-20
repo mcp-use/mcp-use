@@ -275,8 +275,15 @@ export function formatRunsMarkdown(
     names: ReadonlyMap<string, string>;
     /** The profile the runs sign in with, when not the server's own. */
     profile?: string | undefined;
+    /** Suites the command could not start. */
+    notStarted?: ReadonlyArray<{
+      suiteId: string;
+      name: string;
+      error: string;
+    }>;
   }
 ): string {
+  const notStarted = options.notStarted ?? [];
   const count = (wanted: string) =>
     runs.filter((run) => mark(run) === wanted).length;
   const tally = [
@@ -288,7 +295,11 @@ export function formatRunsMarkdown(
     .map(([icon, label]) => [count(icon!), icon, label] as const)
     .filter(([n]) => n > 0)
     .map(([n, icon, label]) => `${icon} ${n} ${label}`)
+    .concat(
+      notStarted.length > 0 ? [`⛔ ${notStarted.length} not started`] : []
+    )
     .join(" · ");
+  const total = runs.length + notStarted.length;
   const pending = count("⏳");
   const suiteName = (run: Run) => options.names.get(run.suiteId) ?? run.suiteId;
   const suiteUrl = (run: Run) =>
@@ -297,13 +308,23 @@ export function formatRunsMarkdown(
   const lines: string[] = [
     `## 🧪 Manufact Evals · ${cell(options.serverName)}`,
     "",
-    `${options.branch ? `Branch ${code(options.branch)}` : "Production"}${options.profile ? ` · Profile ${cell(options.profile)}` : ""} · ${runs.length} suite${runs.length === 1 ? "" : "s"}${tally ? ` · ${tally}` : ""}`,
+    `${options.branch ? `Branch ${code(options.branch)}` : "Production"}${options.profile ? ` · Profile ${cell(options.profile)}` : ""} · ${total} suite${total === 1 ? "" : "s"}${tally ? ` · ${tally}` : ""}`,
     "",
   ];
   if (pending)
     lines.push(
       "> [!CAUTION]",
       `> **Timed out waiting for ${pending} run${pending === 1 ? "" : "s"}.** They keep running on Cloud; open the dashboard for their results.`,
+      ""
+    );
+  if (notStarted.length > 0)
+    lines.push(
+      "> [!CAUTION]",
+      `> **${notStarted.length} suite${notStarted.length === 1 ? "" : "s"} did not start**, so ${notStarted.length === 1 ? "it has" : "they have"} no results in this report:`,
+      ...notStarted.map(
+        (suite) =>
+          `> - [${cell(suite.name)}](${options.dashboardUrl}/${encodeURIComponent(suite.suiteId)}): ${cell(suite.error)}`
+      ),
       ""
     );
 

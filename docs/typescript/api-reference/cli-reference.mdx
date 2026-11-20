@@ -881,6 +881,15 @@ Stopping the command while it waits (Ctrl+C, or a cancelled CI job) cancels the
 runs it started that haven't finished. Runs still going when `--timeout` runs out
 keep running on Cloud.
 
+One suite that can't start doesn't stop the others. A dropped connection, a
+timeout, a 5xx or a 429 gets up to 3 attempts in all; before sending a start
+again, the command checks the suite's runs and uses a run the lost request
+created, so a suite isn't started twice. A suite Cloud rejects (for example, an
+invalid configuration) is skipped, and a 401 or 403 (signed out, no access, or
+out of credits) stops further starts. The suites without a run are listed under
+`notStarted` in the JSON and in both reports, and the command exits 1 after
+reporting the runs that started.
+
 For CI, `--json-file` also writes the `--json` result to a file while the
 readable report still prints. With `--wait`, `--markdown-file` writes a
 Markdown report for pull request comments and job summaries. On a timeout, both

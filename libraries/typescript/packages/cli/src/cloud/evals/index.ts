@@ -11,6 +11,7 @@ import { confirm } from "../../core/prompt.js";
 import { withProgress } from "../../core/progress.js";
 import { cloudWebUrl } from "../cloud-api.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
+import { startRuns, type UnstartedSuite } from "./start.js";
 import {
   HARNESSES,
   readEvalSuiteFile,
@@ -284,48 +285,34 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         );
       const branch =
         typeof values.branch === "string" ? values.branch : undefined;
-      // Starting a run is not idempotent, so a failed start is never retried.
       const names = new Map(selected.map((suite) => [suite.id, suite.name]));
       // Named in every output, so a log says which account the results are for.
       const runProfile =
         profile === undefined
           ? undefined
           : { id: profile, name: await api.profileName(profile) };
-      const started: Array<{
-        id: string;
-        suiteId: string;
-        status: string;
-      }> = [];
-      for (const suiteId of ids) {
-        try {
-          const run = await api.start(suiteId, branch, profile);
-          // Cloud without run profiles drops the parameter and starts the run with the
-          // server's own profile: stop it rather than report results for the wrong account.
-          if (profile !== undefined && run.profileId !== profile) {
-            await api.cancel(run.id).catch(() => undefined);
-            throw new CommandError(
-              "eval_profile_unsupported",
-              `Manufact Cloud did not apply --profile to the run of “${plain(names.get(suiteId) ?? suiteId)}”, so it was cancelled. This Cloud does not support profiles for eval runs yet.`
-            );
-          }
-          started.push({ id: run.id, suiteId, status: run.status });
-        } catch (error) {
-          if (started.length === 0) throw error;
-          // Runs that already started keep going (and count against credits): name them.
-          const code = (error as { code?: unknown }).code;
-          throw new CommandError(
-            typeof code === "string" ? code : "eval_start_failed",
-            `Could not start “${plain(names.get(suiteId) ?? suiteId)}”: ${messageOf(error)}\nAlready started, still running on Cloud: ${started.map((run) => `${run.id} (${plain(names.get(run.suiteId) ?? run.suiteId)})`).join(", ")}.`,
-            { started },
-            [
-              {
-                description: "Check their results",
-                command: `mcp-use evals report ${started.map((run) => run.id).join(" ")}`,
-              },
-            ]
-          );
-        }
+      // One suite that can't start doesn't stop the others; see start.ts.
+      const { started, notStarted, firstError } = await startRuns(api, ids, {
+        branch,
+        profile,
+        names,
+      });
+      if (started.length === 0) {
+        // One error accounts for every suite when the first failure stopped the rest.
+        if (
+          firstError &&
+          notStarted.slice(1).every((suite) => suite.attempts === 0)
+        )
+          throw firstError;
+        throw new CommandError(
+          firstError?.code ?? "eval_start_failed",
+          `Could not start any of the ${notStarted.length} eval suites:\n${formatNotStarted(notStarted)}`,
+          { notStarted }
+        );
       }
+      // Suites that didn't start fail the command once the started runs are reported.
+      if (notStarted.length > 0) failed = true;
+      const notStartedField = notStarted.length > 0 ? { notStarted } : {};
       // Lets CI read the result while the log keeps the readable report.
       const writeJson = async (value: unknown) => {
         if (jsonFile !== undefined)
@@ -334,12 +321,14 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       if (values.wait !== true) {
         await writeJson({
           runs: started,
+          ...notStartedField,
           dashboardUrl,
           ...(runProfile ? { profile: runProfile } : {}),
         });
         return output.result(
           {
             runs: started,
+            ...notStartedField,
             dashboardUrl,
             ...(runProfile ? { profile: runProfile } : {}),
           },
@@ -349,6 +338,13 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
                 `✓ Started run ${run.id} (${plain(names.get(run.suiteId) ?? run.suiteId)})`
             ),
             ...(runProfile ? [`  Profile: ${plain(runProfile.name)}`] : []),
+            ...(notStarted.length > 0
+              ? [
+                  "",
+                  notStartedHeading(notStarted),
+                  formatNotStarted(notStarted),
+                ]
+              : []),
             "",
             `Results: mcp-use evals report ${started.map((run) => run.id).join(" ")}`,
           ].join("\n")
@@ -404,18 +400,19 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       stopCancellingOnSignal();
       if (!output.json)
         process.stdout.write(
-          `${printedEvents ? "\n" : ""}${live.summary(runs, Date.now())}\n\n`
+          `${printedEvents ? "\n" : ""}${live.summary(runs, Date.now())}\n\n${notStarted.length > 0 ? `${notStartedHeading(notStarted)}\n${formatNotStarted(notStarted)}\n\n` : ""}`
         );
       // On a timeout the files still get the runs as they stand.
       await writeJson({
         runs,
+        ...notStartedField,
         dashboardUrl,
         ...(runProfile ? { profile: runProfile } : {}),
       });
       if (markdownFile !== undefined)
         await writeFile(
           markdownFile,
-          `${formatRunsMarkdown(runs, { serverName, dashboardUrl, branch, names, profile: runProfile?.name })}\n`
+          `${formatRunsMarkdown(runs, { serverName, dashboardUrl, branch, names, profile: runProfile?.name, notStarted })}\n`
         );
       const pending = runs.filter((run) => !finished(run));
       if (pending.length > 0)
@@ -430,10 +427,22 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
             },
           ]
         );
-      failed = !runs.every((run) => run.pass === true);
+      failed = failed || !runs.every((run) => run.pass === true);
       return output.result(
-        { runs, dashboardUrl, ...(runProfile ? { profile: runProfile } : {}) },
-        runs.map((run) => formatReport(run, { names, dashboardUrl })).join("\n")
+        {
+          runs,
+          ...notStartedField,
+          dashboardUrl,
+          ...(runProfile ? { profile: runProfile } : {}),
+        },
+        [
+          ...runs.map((run) => formatReport(run, { names, dashboardUrl })),
+          ...(notStarted.length > 0
+            ? [
+                `${notStartedHeading(notStarted)}\n${formatNotStarted(notStarted)}`,
+              ]
+            : []),
+        ].join("\n")
       );
     }
     if (command === "runs") {
@@ -919,6 +928,18 @@ function cancelRunsOnSignal(
  * Poll runs until each finishes or the time runs out, and return them as
  * they stand; runs keep going on Cloud after a timeout.
  */
+/** "2 eval suites did not start:" */
+function notStartedHeading(notStarted: readonly UnstartedSuite[]): string {
+  return `✗ ${notStarted.length} eval suite${notStarted.length === 1 ? "" : "s"} did not start:`;
+}
+
+/** One line per suite that did not start, with its error. */
+function formatNotStarted(notStarted: readonly UnstartedSuite[]): string {
+  return notStarted
+    .map((suite) => `  ${plain(suite.name)}: ${plain(suite.error)}`)
+    .join("\n");
+}
+
 async function waitForRuns(
   api: EvalApi,
   runIds: readonly string[],

@@ -161,12 +161,12 @@ type UndocumentedErrorReply<K extends RouteKey> = {
   body?: unknown;
 };
 
-/** A reply the spec allows for route `K`. */
-export type CloudReply<K extends RouteKey> = (
-  | SuccessReply<K>
-  | DocumentedErrorReply<K>
-  | UndocumentedErrorReply<K>
-) & { headers?: Record<string, string> };
+/** A reply the spec allows for route `K`, or a dropped connection. */
+export type CloudReply<K extends RouteKey> =
+  | ((SuccessReply<K> | DocumentedErrorReply<K> | UndocumentedErrorReply<K>) & {
+      headers?: Record<string, string>;
+    })
+  | { reset: true };
 
 type PathParams<K extends RouteKey> = CloudRoutes[K]["data"] extends {
   path: infer P;
