@@ -1500,10 +1500,18 @@ describe("evals run when a start fails", () => {
       });
 
     const result = await cli.run(
-      ["evals", "run", "--all", "--wait", ...SCOPE],
-      {
-        env: FAST,
-      }
+      [
+        "evals",
+        "run",
+        "--all",
+        "--wait",
+        "--json-file",
+        "evals.json",
+        "--markdown-file",
+        "evals.md",
+        ...SCOPE,
+      ],
+      { env: FAST }
     );
 
     expect(result.exitCode).toBe(1);
@@ -1514,6 +1522,121 @@ describe("evals run when a start fails", () => {
           "Could not start any of the 2 eval suites:\n  Suite suite_1: suite_1 has no clients\n  Suite suite_2: suite_2 has no clients",
       },
     });
+    // The files still say why, so a CI report shows it.
+    expect(
+      JSON.parse(await readFile(join(cli.cwd, "evals.json"), "utf8"))
+    ).toMatchObject({
+      runs: [],
+      notStarted: [{ suiteId: "suite_1" }, { suiteId: "suite_2" }],
+    });
+    const markdown = await readFile(join(cli.cwd, "evals.md"), "utf8");
+    expect(markdown).toContain("2 suites · ⛔ 2 not started");
+    expect(markdown).toContain("suite\\_2 has no clients");
+    expect(markdown).not.toContain("| Suite | Result |");
+  });
+
+  test("when the first start stops the rest, its error is the command's and the JSON file lists every suite", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1", "suite_2"]);
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      status: 403,
+      body: { error: "Out of eval credits" },
+    });
+
+    const result = await cli.run(
+      ["evals", "run", "--all", "--json-file", "evals.json", ...SCOPE],
+      { env: FAST }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      error: { code: "forbidden", message: "Out of eval credits" },
+    });
+    expect(
+      JSON.parse(await readFile(join(cli.cwd, "evals.json"), "utf8"))
+    ).toMatchObject({
+      runs: [],
+      notStarted: [
+        { suiteId: "suite_1", attempts: 1 },
+        {
+          suiteId: "suite_2",
+          attempts: 0,
+          error: "Not attempted: Out of eval credits",
+        },
+      ],
+    });
+  });
+
+  test("with --profile, a run with another profile isn't taken for the lost start", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1"]);
+    profiles(cloud);
+    cloud.sequence("POST", `${SUITES}/suite_1/runs`, [
+      { reset: true },
+      {
+        body: {
+          ...started("run_1", "suite_1").body,
+          profileId: "profile_free",
+        },
+      },
+    ]);
+    // Before the start, no runs. After the reset, someone else's run with the
+    // server's own profile: new, but not this command's.
+    let lists = 0;
+    cloud.on("GET", RUNS, () => ({
+      body:
+        ++lists === 1
+          ? { items: [], total: 0 }
+          : {
+              items: [{ ...listed("run_other", "suite_1"), profileId: null }],
+              total: 1,
+            },
+    }));
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "--all",
+        "--wait",
+        "--profile",
+        "profile_free",
+        ...SCOPE,
+      ],
+      { env: FAST }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toMatchObject({ runs: [{ id: "run_1" }] });
+    expect(cloud.requestsTo("POST", `${SUITES}/suite_1/runs`)).toHaveLength(2);
+    expect(cloud.requestsTo("POST", `${RUNS}/run_other/cancel`)).toHaveLength(
+      0
+    );
+  });
+
+  test("Retry-After as an HTTP date is honored", async ({ cloud, cli }) => {
+    suites(cloud, ["suite_1"]);
+    cloud.sequence("POST", `${SUITES}/suite_1/runs`, [
+      {
+        status: 429,
+        headers: { "retry-after": new Date(Date.now() + 2000).toUTCString() },
+        body: { error: "Too many requests" },
+      },
+      started("run_1", "suite_1"),
+    ]);
+
+    const before = Date.now();
+    // No MCP_USE_POLL_INTERVAL_MS: the real waits apply.
+    const result = await cli.run(["evals", "run", "--all", ...SCOPE], {
+      env: SIGNED_IN,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(Date.now() - before).toBeGreaterThanOrEqual(1000);
   });
 });
 

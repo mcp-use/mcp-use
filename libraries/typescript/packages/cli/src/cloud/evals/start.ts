@@ -9,9 +9,11 @@
  *   suites are reported as not started.
  * - A dropped connection, a timeout or a 5xx may have reached Cloud, and a
  *   start is not idempotent. Before sending it again, the suite's runs are
- *   checked for one Cloud created after the first attempt, and that run is
- *   used instead. This is best effort: a run someone else starts for the same
- *   suite in that window would be taken for this one.
+ *   checked for one Cloud created after the first attempt (with the
+ *   `--profile` asked for, when one was), and that run is used instead. This
+ *   is best effort until Cloud takes an idempotency key: a run someone else
+ *   starts for the same suite in that window would be taken for this one, and
+ *   a start is sent again when Cloud can't be read or the run shows up late.
  * - A 429 never reached the handler, so it is retried after `Retry-After`.
  *
  * A suite gets {@link MAX_ATTEMPTS} attempts in all.
@@ -44,7 +46,10 @@ export interface StartApi {
     limit: number;
     skip: number;
     suiteId?: string | undefined;
-  }): Promise<{ items: ReadonlyArray<{ id: string; status: string }> }>;
+  }): Promise<{
+    // Cloud returns each run's `profileId` too, though the spec leaves it out.
+    items: ReadonlyArray<{ id: string; status: string; profileId?: unknown }>;
+  }>;
   cancel(runId: string): Promise<unknown>;
 }
 
@@ -188,9 +193,9 @@ async function startSuite(
           api,
           suiteId,
           known,
+          options.profile,
           waits.adoptPollMs
         );
-        // Not checked against --profile: an adopted run may not be this command's to cancel.
         if (found)
           return { run: { id: found.id, suiteId, status: found.status } };
       }
@@ -207,11 +212,18 @@ async function startSuite(
   };
 }
 
-/** A run of `suiteId` missing from `known`, polled for while a lost start may still be creating it. */
+/**
+ * A run of `suiteId` missing from `known`, polled for while a lost start may
+ * still be creating it. With `profile`, only a run with that profile counts:
+ * a run without it is someone else's, or one a Cloud without run profiles
+ * started, and neither may report results for the wrong account or be
+ * cancelled by this command.
+ */
 async function findStartedRun(
   api: StartApi,
   suiteId: string,
   known: ReadonlySet<string>,
+  profile: string | undefined,
   pollMs: number
 ): Promise<{ id: string; status: string } | undefined> {
   for (let poll = 0; poll < ADOPT_POLLS; poll++) {
@@ -222,7 +234,11 @@ async function findStartedRun(
         skip: 0,
         suiteId,
       });
-      const found = items.find((run) => !known.has(run.id));
+      const found = items.find(
+        (run) =>
+          !known.has(run.id) &&
+          (profile === undefined || run.profileId === profile)
+      );
       if (found) return found;
     } catch {
       // Cloud is still unreachable: keep looking until the window ends.

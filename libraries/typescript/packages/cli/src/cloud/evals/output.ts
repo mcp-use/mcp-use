@@ -328,18 +328,22 @@ export function formatRunsMarkdown(
       ""
     );
 
-  lines.push(
-    "| Suite | Result | Score | Executions |",
-    "| :-- | :-- | :-- | :-- |"
-  );
-  for (const run of runs) {
-    const executions = executionsOf(run);
-    const ok = executions.filter((execution) => execution.pass === true).length;
+  if (runs.length > 0) {
     lines.push(
-      `| [${cell(suiteName(run))}](${suiteUrl(run)}) | ${mark(run)} ${cell(verdict({ ...run, score: null }))} | ${run.score === null ? "—" : `${run.score}%`} | ${executions.length ? `${ok}/${executions.length} passed` : "—"} |`
+      "| Suite | Result | Score | Executions |",
+      "| :-- | :-- | :-- | :-- |"
     );
+    for (const run of runs) {
+      const executions = executionsOf(run);
+      const ok = executions.filter(
+        (execution) => execution.pass === true
+      ).length;
+      lines.push(
+        `| [${cell(suiteName(run))}](${suiteUrl(run)}) | ${mark(run)} ${cell(verdict({ ...run, score: null }))} | ${run.score === null ? "—" : `${run.score}%`} | ${executions.length ? `${ok}/${executions.length} passed` : "—"} |`
+      );
+    }
+    lines.push("");
   }
-  lines.push("");
 
   for (const run of runs) {
     const executions = executionsOf(run);

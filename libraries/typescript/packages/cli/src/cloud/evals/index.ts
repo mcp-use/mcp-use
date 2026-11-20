@@ -297,27 +297,43 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         profile,
         names,
       });
-      if (started.length === 0) {
-        // One error accounts for every suite when the first failure stopped the rest.
-        if (
-          firstError &&
-          notStarted.slice(1).every((suite) => suite.attempts === 0)
-        )
-          throw firstError;
-        throw new CommandError(
-          firstError?.code ?? "eval_start_failed",
-          `Could not start any of the ${notStarted.length} eval suites:\n${formatNotStarted(notStarted)}`,
-          { notStarted }
-        );
-      }
-      // Suites that didn't start fail the command once the started runs are reported.
-      if (notStarted.length > 0) failed = true;
-      const notStartedField = notStarted.length > 0 ? { notStarted } : {};
       // Lets CI read the result while the log keeps the readable report.
       const writeJson = async (value: unknown) => {
         if (jsonFile !== undefined)
           await writeFile(jsonFile, `${JSON.stringify(value)}\n`);
       };
+      const writeMarkdown = async (runs: readonly Run[]) => {
+        if (markdownFile !== undefined)
+          await writeFile(
+            markdownFile,
+            `${formatRunsMarkdown(runs, { serverName, dashboardUrl, branch, names, profile: runProfile?.name, notStarted })}\n`
+          );
+      };
+      if (started.length === 0) {
+        // The files still list every suite, so a CI report shows why none ran.
+        await writeJson({
+          runs: [],
+          notStarted,
+          dashboardUrl,
+          ...(runProfile ? { profile: runProfile } : {}),
+        });
+        if (values.wait === true) await writeMarkdown([]);
+        // One error accounts for every suite when the first failure stopped the rest.
+        const single =
+          firstError !== undefined &&
+          notStarted.slice(1).every((suite) => suite.attempts === 0);
+        throw new CommandError(
+          firstError?.code ?? "eval_start_failed",
+          single
+            ? firstError.message
+            : `Could not start any of the ${notStarted.length} eval suites:\n${formatNotStarted(notStarted)}`,
+          undefined,
+          single ? firstError.nextSteps : []
+        );
+      }
+      // Suites that didn't start fail the command once the started runs are reported.
+      if (notStarted.length > 0) failed = true;
+      const notStartedField = notStarted.length > 0 ? { notStarted } : {};
       if (values.wait !== true) {
         await writeJson({
           runs: started,
@@ -400,7 +416,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       stopCancellingOnSignal();
       if (!output.json)
         process.stdout.write(
-          `${printedEvents ? "\n" : ""}${live.summary(runs, Date.now())}\n\n${notStarted.length > 0 ? `${notStartedHeading(notStarted)}\n${formatNotStarted(notStarted)}\n\n` : ""}`
+          `${printedEvents ? "\n" : ""}${live.summary(runs, Date.now())}\n\n`
         );
       // On a timeout the files still get the runs as they stand.
       await writeJson({
@@ -409,11 +425,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         dashboardUrl,
         ...(runProfile ? { profile: runProfile } : {}),
       });
-      if (markdownFile !== undefined)
-        await writeFile(
-          markdownFile,
-          `${formatRunsMarkdown(runs, { serverName, dashboardUrl, branch, names, profile: runProfile?.name, notStarted })}\n`
-        );
+      await writeMarkdown(runs);
       const pending = runs.filter((run) => !finished(run));
       if (pending.length > 0)
         throw new CommandError(

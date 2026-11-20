@@ -170,10 +170,18 @@ function settle<T>(
   throw fail("cloud_api_error");
 }
 
-/** `Retry-After` in seconds, or the `retryAfterSec` Cloud mirrors in the body. */
+/**
+ * `Retry-After` in seconds (as seconds or an HTTP date), or the
+ * `retryAfterSec` Cloud mirrors in the body.
+ */
 function retryAfterSec(response: Response, body: unknown): number | undefined {
-  const header = Number(response.headers.get("retry-after") ?? Number.NaN);
-  if (Number.isFinite(header) && header >= 0) return header;
+  const value = response.headers.get("retry-after")?.trim();
+  if (value) {
+    if (/^\d+$/.test(value)) return Number(value);
+    const at = Date.parse(value);
+    if (Number.isFinite(at))
+      return Math.max(0, Math.ceil((at - Date.now()) / 1000));
+  }
   const mirrored =
     body !== null && typeof body === "object"
       ? (body as Record<string, unknown>).retryAfterSec
