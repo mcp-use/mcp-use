@@ -22,6 +22,7 @@ type Run =
 
 const SCOPE = ["--server", "weather", "--json"];
 const SUITES = "/api/v1/server-evals/srv_1/suites";
+const RUNS = "/api/v1/server-evals/srv_1/runs";
 
 function server(cloud: FakeCloud): void {
   signIn(cloud);
@@ -33,6 +34,8 @@ function server(cloud: FakeCloud): void {
       organizationId: "org_1",
     }),
   });
+  // `evals run` lists a suite's runs before starting it, to find a run a lost start created.
+  cloud.on("GET", RUNS, { body: { items: [], total: 0 } });
 }
 
 /** The organization's profiles, as `evals run --profile` looks them up for its output. */
@@ -1028,6 +1031,94 @@ describe("evals run", () => {
       ).toHaveLength(0);
     }
   );
+
+  test.skipIf(process.platform === "win32")(
+    "a cancel Cloud is slow to answer is reported as requested, not failed, and doesn't hide the others",
+    async ({ cloud, cli }) => {
+      server(cloud);
+      cloud.on("GET", SUITES, {
+        body: [
+          suite({ id: "suite_1", name: "Rome weather" }),
+          suite({ id: "suite_2", name: "Paris forecast" }),
+          suite({ id: "suite_3", name: "Oslo snow" }),
+        ],
+      });
+      for (const id of ["1", "2", "3"]) {
+        cloud.on("POST", `${SUITES}/suite_${id}/runs`, {
+          body: {
+            id: `run_${id}`,
+            suiteId: `suite_${id}`,
+            status: "running",
+            pass: null,
+            score: null,
+            profileId: null,
+          },
+        });
+        // Oslo snow finishes at once: its line shows the command is waiting.
+        cloud.on("GET", `${RUNS}/run_${id}`, {
+          body:
+            id === "3"
+              ? run({
+                  id: "run_3",
+                  suiteId: "suite_3",
+                  scenarios: [
+                    {
+                      executions: [
+                        {
+                          client: "inspector",
+                          modelName: "openai/gpt-5",
+                          status: "complete",
+                          pass: true,
+                          score: 100,
+                          error: null,
+                          judgement: null,
+                          judgeVerdict: null,
+                          toolAssertions: null,
+                        },
+                      ],
+                    },
+                  ],
+                })
+              : run({
+                  id: `run_${id}`,
+                  suiteId: `suite_${id}`,
+                  status: "running",
+                  pass: null,
+                  score: null,
+                }),
+        });
+      }
+      cloud.on("POST", `${RUNS}/run_1/cancel`, { body: { success: true } });
+      // Longer than the 5 s the command waits after a signal.
+      cloud.on("POST", `${RUNS}/run_2/cancel`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 7000));
+        return { body: { success: true } };
+      });
+
+      const result = await cli.run(
+        ["evals", "run", "--all", "--wait", "--server", "weather"],
+        {
+          env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "200" },
+          signal: {
+            name: "SIGINT",
+            when: ({ stdout }) => stdout.includes("✅ Oslo snow"),
+            times: 1,
+          },
+        }
+      );
+
+      expect(result.exitCode).toBe(130);
+      expect(result.stderr).toContain("Cancelled run_1 (Rome weather).");
+      expect(result.stderr).toContain(
+        "Cancel requested; Cloud hadn't answered before this command stopped waiting"
+      );
+      expect(result.stderr).toContain(
+        "  run_2 (Paris forecast)\nTo check: mcp-use evals report run_2"
+      );
+      expect(result.stderr).not.toContain("Could not");
+    },
+    20_000
+  );
   test("--profile starts each run with that profile", async ({
     cloud,
     cli,
@@ -1218,47 +1309,422 @@ describe("evals run", () => {
     );
     expect(result.exitCode).toBe(2);
   });
+});
 
-  test("a failed start names the runs that already started", async ({
+describe("evals run when a start fails", () => {
+  const FAST = { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" };
+  const started = (id: string, suiteId: string) => ({
+    body: {
+      id,
+      suiteId,
+      status: "running",
+      pass: null,
+      score: null,
+      profileId: null,
+    },
+  });
+  const listed = (id: string, suiteId: string) => ({
+    id,
+    suiteId,
+    status: "running",
+    pass: null,
+    score: null,
+    createdAt: "2026-11-20T20:05:00Z",
+  });
+  /** Suites `ids`, each finishing with a passing run `run_<n>` when polled. */
+  function suites(cloud: FakeCloud, ids: readonly string[]): void {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: ids.map((id) => suite({ id, name: `Suite ${id}` })),
+    });
+    for (const id of ids) {
+      const runId = id.replace("suite", "run");
+      cloud.on("GET", `${RUNS}/${runId}`, {
+        body: run({ id: runId, suiteId: id }),
+      });
+    }
+  }
+
+  test("a suite that can't start doesn't stop the others; they are reported and the command fails", async ({
     cloud,
     cli,
   }) => {
-    server(cloud);
-    cloud.on("GET", SUITES, {
-      body: [
-        suite({ id: "suite_1", name: "Rome weather" }),
-        suite({ id: "suite_2", name: "Checkout" }),
-      ],
-    });
+    suites(cloud, ["suite_1", "suite_2"]);
     cloud.on("POST", `${SUITES}/suite_1/runs`, {
-      body: {
-        id: "run_1",
-        suiteId: "suite_1",
-        status: "running",
-        pass: null,
-        score: null,
-        profileId: null,
-      },
+      status: 400,
+      body: { error: "No reachable URL for this server" },
     });
+    cloud.on("POST", `${SUITES}/suite_2/runs`, started("run_2", "suite_2"));
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "--all",
+        "--wait",
+        "--json-file",
+        "evals.json",
+        "--markdown-file",
+        "evals.md",
+        ...SCOPE,
+      ],
+      { env: FAST }
+    );
+
+    expect(result.exitCode).toBe(1);
+    const expected = {
+      runs: [{ id: "run_2", pass: true }],
+      notStarted: [
+        {
+          suiteId: "suite_1",
+          name: "Suite suite_1",
+          code: "validation_error",
+          error: "No reachable URL for this server",
+          attempts: 1,
+        },
+      ],
+    };
+    expect(result.json).toMatchObject(expected);
+    expect(
+      JSON.parse(await readFile(join(cli.cwd, "evals.json"), "utf8"))
+    ).toMatchObject(expected);
+    const markdown = await readFile(join(cli.cwd, "evals.md"), "utf8");
+    expect(markdown).toContain("2 suites · ✅ 1 passed · ⛔ 1 not started");
+    expect(markdown).toContain(
+      "> **1 suite did not start**, so it has no results in this report:"
+    );
+    expect(markdown).toContain(
+      `> - [Suite suite\\_1](${DASHBOARD}/suite_1): No reachable URL for this server`
+    );
+    // A suite's own error is not retried.
+    expect(cloud.requestsTo("POST", `${SUITES}/suite_1/runs`)).toHaveLength(1);
+  });
+
+  test("without --wait, the started runs are listed and the command still fails", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1", "suite_2"]);
+    cloud.on("POST", `${SUITES}/suite_1/runs`, started("run_1", "suite_1"));
+    cloud.on("POST", `${SUITES}/suite_2/runs`, {
+      status: 400,
+      body: { error: "Suite has no valid client configurations" },
+    });
+
+    const result = await cli.run(
+      ["evals", "run", "--all", "--server", "weather"],
+      {
+        env: FAST,
+      }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("✓ Started run run_1 (Suite suite_1)");
+    expect(result.stdout).toContain(
+      "✗ 1 eval suite did not start:\n  Suite suite_2: Suite has no valid client configurations"
+    );
+  });
+
+  test("running out of credits stops starting; the remaining suites are listed as not attempted", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1", "suite_2", "suite_3"]);
+    cloud.on("POST", `${SUITES}/suite_1/runs`, started("run_1", "suite_1"));
     cloud.on("POST", `${SUITES}/suite_2/runs`, {
       status: 403,
       body: { error: "Out of eval credits", code: "INSUFFICIENT_CREDITS" },
     });
+    // suite_3 has no start route: a request for it would fail the test.
 
     const result = await cli.run(
       ["evals", "run", "--all", "--wait", ...SCOPE],
-      { env: SIGNED_IN }
+      {
+        env: FAST,
+      }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      runs: [{ id: "run_1", pass: true }],
+      notStarted: [
+        {
+          suiteId: "suite_2",
+          code: "forbidden",
+          error: "Out of eval credits",
+          attempts: 1,
+        },
+        {
+          suiteId: "suite_3",
+          code: "forbidden",
+          error: "Not attempted: Out of eval credits",
+          attempts: 0,
+        },
+      ],
+    });
+  });
+
+  test("a dropped start is sent again when Cloud shows no run for it", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1"]);
+    cloud.sequence("POST", `${SUITES}/suite_1/runs`, [
+      { reset: true },
+      started("run_1", "suite_1"),
+    ]);
+
+    const result = await cli.run(
+      ["evals", "run", "--all", "--wait", ...SCOPE],
+      {
+        env: FAST,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toMatchObject({ runs: [{ id: "run_1", pass: true }] });
+    expect(result.json).not.toHaveProperty("notStarted");
+    // Before retrying, it looked for a run the lost start created.
+    expect(
+      cloud.requestsTo("GET", RUNS).map((request) => request.query)
+    ).toContainEqual({ limit: "5", skip: "0", suiteId: "suite_1" });
+  });
+
+  test("a dropped start that Cloud did create is used, not sent again", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1"]);
+    // A run from before this command, then the one the lost start created.
+    cloud.sequence("GET", RUNS, [
+      { body: { items: [listed("run_old", "suite_1")], total: 1 } },
+      { body: { items: [listed("run_old", "suite_1")], total: 1 } },
+      {
+        body: {
+          items: [listed("run_1", "suite_1"), listed("run_old", "suite_1")],
+          total: 2,
+        },
+      },
+    ]);
+    // One reply only: a second start would be unhandled and fail the test.
+    cloud.sequence("POST", `${SUITES}/suite_1/runs`, [{ reset: true }]);
+
+    const result = await cli.run(
+      ["evals", "run", "--all", "--wait", ...SCOPE],
+      {
+        env: FAST,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toMatchObject({ runs: [{ id: "run_1", pass: true }] });
+  });
+
+  test("a suite whose start keeps dropping is given up after 3 attempts, and the next suite still starts", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1", "suite_2"]);
+    cloud.on("POST", `${SUITES}/suite_1/runs`, { reset: true });
+    cloud.on("POST", `${SUITES}/suite_2/runs`, started("run_2", "suite_2"));
+
+    const result = await cli.run(
+      ["evals", "run", "--all", "--wait", ...SCOPE],
+      {
+        env: FAST,
+      }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      runs: [{ id: "run_2" }],
+      notStarted: [
+        {
+          suiteId: "suite_1",
+          code: "cloud_unreachable",
+          error: expect.stringContaining("(gave up after 3 start attempts)"),
+          attempts: 3,
+        },
+      ],
+    });
+    expect(cloud.requestsTo("POST", `${SUITES}/suite_1/runs`)).toHaveLength(3);
+  });
+
+  test("a rate-limited start is retried without looking for a run", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1"]);
+    cloud.sequence("POST", `${SUITES}/suite_1/runs`, [
+      {
+        status: 429,
+        headers: { "retry-after": "0" },
+        body: { error: "Too many requests", retryAfterSec: 0 },
+      },
+      started("run_1", "suite_1"),
+    ]);
+
+    const result = await cli.run(
+      ["evals", "run", "--all", "--wait", ...SCOPE],
+      {
+        env: FAST,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    // Only the list taken before the first start: a 429 never created a run.
+    expect(cloud.requestsTo("GET", RUNS)).toHaveLength(1);
+  });
+
+  test("when no suite starts, the command fails with every suite's error", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1", "suite_2"]);
+    for (const id of ["suite_1", "suite_2"])
+      cloud.on("POST", `${SUITES}/${id}/runs`, {
+        status: 400,
+        body: { error: `${id} has no clients` },
+      });
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "--all",
+        "--wait",
+        "--json-file",
+        "evals.json",
+        "--markdown-file",
+        "evals.md",
+        ...SCOPE,
+      ],
+      { env: FAST }
     );
 
     expect(result.exitCode).toBe(1);
     expect(result.json).toMatchObject({
       error: {
-        message: expect.stringMatching(
-          /Could not start “Checkout”: .*Out of eval credits[\s\S]*Already started, still running on Cloud: run_1 \(Rome weather\)\./
-        ),
-        nextSteps: [{ command: "mcp-use evals report run_1" }],
+        code: "validation_error",
+        message:
+          "Could not start any of the 2 eval suites:\n  Suite suite_1: suite_1 has no clients\n  Suite suite_2: suite_2 has no clients",
       },
     });
+    // The files still say why, so a CI report shows it.
+    expect(
+      JSON.parse(await readFile(join(cli.cwd, "evals.json"), "utf8"))
+    ).toMatchObject({
+      runs: [],
+      notStarted: [{ suiteId: "suite_1" }, { suiteId: "suite_2" }],
+    });
+    const markdown = await readFile(join(cli.cwd, "evals.md"), "utf8");
+    expect(markdown).toContain("2 suites · ⛔ 2 not started");
+    expect(markdown).toContain("suite\\_2 has no clients");
+    expect(markdown).not.toContain("| Suite | Result |");
+  });
+
+  test("when the first start stops the rest, its error is the command's and the JSON file lists every suite", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1", "suite_2"]);
+    cloud.on("POST", `${SUITES}/suite_1/runs`, {
+      status: 403,
+      body: { error: "Out of eval credits" },
+    });
+
+    const result = await cli.run(
+      ["evals", "run", "--all", "--json-file", "evals.json", ...SCOPE],
+      { env: FAST }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      error: { code: "forbidden", message: "Out of eval credits" },
+    });
+    expect(
+      JSON.parse(await readFile(join(cli.cwd, "evals.json"), "utf8"))
+    ).toMatchObject({
+      runs: [],
+      notStarted: [
+        { suiteId: "suite_1", attempts: 1 },
+        {
+          suiteId: "suite_2",
+          attempts: 0,
+          error: "Not attempted: Out of eval credits",
+        },
+      ],
+    });
+  });
+
+  test("with --profile, a run with another profile isn't taken for the lost start", async ({
+    cloud,
+    cli,
+  }) => {
+    suites(cloud, ["suite_1"]);
+    profiles(cloud);
+    cloud.sequence("POST", `${SUITES}/suite_1/runs`, [
+      { reset: true },
+      {
+        body: {
+          ...started("run_1", "suite_1").body,
+          profileId: "profile_free",
+        },
+      },
+    ]);
+    // Before the start, no runs. After the reset, someone else's run with the
+    // server's own profile: new, but not this command's.
+    let lists = 0;
+    cloud.on("GET", RUNS, () => ({
+      body:
+        ++lists === 1
+          ? { items: [], total: 0 }
+          : {
+              items: [{ ...listed("run_other", "suite_1"), profileId: null }],
+              total: 1,
+            },
+    }));
+
+    const result = await cli.run(
+      [
+        "evals",
+        "run",
+        "--all",
+        "--wait",
+        "--profile",
+        "profile_free",
+        ...SCOPE,
+      ],
+      { env: FAST }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toMatchObject({ runs: [{ id: "run_1" }] });
+    expect(cloud.requestsTo("POST", `${SUITES}/suite_1/runs`)).toHaveLength(2);
+    expect(cloud.requestsTo("POST", `${RUNS}/run_other/cancel`)).toHaveLength(
+      0
+    );
+  });
+
+  test("Retry-After as an HTTP date is honored", async ({ cloud, cli }) => {
+    suites(cloud, ["suite_1"]);
+    cloud.sequence("POST", `${SUITES}/suite_1/runs`, [
+      {
+        status: 429,
+        headers: { "retry-after": new Date(Date.now() + 2000).toUTCString() },
+        body: { error: "Too many requests" },
+      },
+      started("run_1", "suite_1"),
+    ]);
+
+    const before = Date.now();
+    // No MCP_USE_POLL_INTERVAL_MS: the real waits apply.
+    const result = await cli.run(["evals", "run", "--all", ...SCOPE], {
+      env: SIGNED_IN,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(Date.now() - before).toBeGreaterThanOrEqual(1000);
   });
 });
 
