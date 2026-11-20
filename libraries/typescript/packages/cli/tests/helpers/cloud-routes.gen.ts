@@ -413,6 +413,31 @@ export interface CloudRoutes {
       >;
     };
   };
+  "GET /api/v1/organizations/{id}/profile-sessions/{sessionId}": {
+    data: T.operations["getApiV1OrganizationsByIdProfileSessionsBySessionId"]["parameters"];
+    responses: {
+      200: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfileSessionsBySessionId"]["responses"][200]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfileSessionsBySessionId"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfileSessionsBySessionId"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfileSessionsBySessionId"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfileSessionsBySessionId"]["responses"][404]
+      >;
+      503: ResponseBody<
+        T.operations["getApiV1OrganizationsByIdProfileSessionsBySessionId"]["responses"][503]
+      >;
+    };
+  };
   "GET /api/v1/organizations/{id}/profiles": {
     data: T.operations["getApiV1OrganizationsByIdProfiles"]["parameters"];
     responses: {
@@ -1088,6 +1113,31 @@ export interface CloudRoutes {
       >;
     };
   };
+  "POST /api/v1/organizations/{id}/profile-sessions": {
+    data: T.operations["postApiV1OrganizationsByIdProfileSessions"]["parameters"];
+    responses: {
+      201: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdProfileSessions"]["responses"][201]
+      >;
+    };
+    errors: {
+      400: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdProfileSessions"]["responses"][400]
+      >;
+      401: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdProfileSessions"]["responses"][401]
+      >;
+      403: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdProfileSessions"]["responses"][403]
+      >;
+      404: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdProfileSessions"]["responses"][404]
+      >;
+      503: ResponseBody<
+        T.operations["postApiV1OrganizationsByIdProfileSessions"]["responses"][503]
+      >;
+    };
+  };
   "POST /api/v1/server-evals/{serverId}/runs/{runId}/cancel": {
     data: T.operations["postApiV1ServerEvalsByServerIdRunsByRunIdCancel"]["parameters"];
     responses: {
@@ -1384,6 +1434,7 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "GET /api/v1/organizations",
   "GET /api/v1/organizations/{id}/invitations",
   "GET /api/v1/organizations/{id}/members",
+  "GET /api/v1/organizations/{id}/profile-sessions/{sessionId}",
   "GET /api/v1/organizations/{id}/profiles",
   "GET /api/v1/server-evals/{serverId}/runs",
   "GET /api/v1/server-evals/{serverId}/runs/{runId}",
@@ -1414,6 +1465,7 @@ export const cloudRouteKeys: readonly (keyof CloudRoutes)[] = [
   "POST /api/v1/organizations/{id}/invitations",
   "POST /api/v1/organizations/{id}/invitations/{invitationId}/cancel",
   "POST /api/v1/organizations/{id}/logo",
+  "POST /api/v1/organizations/{id}/profile-sessions",
   "POST /api/v1/server-evals/{serverId}/runs/{runId}/cancel",
   "POST /api/v1/server-evals/{serverId}/suites",
   "POST /api/v1/server-evals/{serverId}/suites/{suiteId}/runs",
@@ -1452,6 +1504,7 @@ export const cloudRouteSuccessStatus: Readonly<
   "GET /api/v1/organizations": 200,
   "GET /api/v1/organizations/{id}/invitations": 200,
   "GET /api/v1/organizations/{id}/members": 200,
+  "GET /api/v1/organizations/{id}/profile-sessions/{sessionId}": 200,
   "GET /api/v1/organizations/{id}/profiles": 200,
   "GET /api/v1/server-evals/{serverId}/runs": 200,
   "GET /api/v1/server-evals/{serverId}/runs/{runId}": 200,
@@ -1482,6 +1535,7 @@ export const cloudRouteSuccessStatus: Readonly<
   "POST /api/v1/organizations/{id}/invitations": 201,
   "POST /api/v1/organizations/{id}/invitations/{invitationId}/cancel": 200,
   "POST /api/v1/organizations/{id}/logo": 200,
+  "POST /api/v1/organizations/{id}/profile-sessions": 201,
   "POST /api/v1/server-evals/{serverId}/runs/{runId}/cancel": 200,
   "POST /api/v1/server-evals/{serverId}/suites": 201,
   "POST /api/v1/server-evals/{serverId}/suites/{suiteId}/runs": 202,

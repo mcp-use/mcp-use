@@ -75,6 +75,7 @@ Cloud projects:
   alerts       Manage alert rules
   evals        Define and run eval suites
   checklist    Run publishing checks
+  profiles     Sign in and list saved MCP server credentials
 
 Account:
   login        Sign in to Manufact Cloud
@@ -235,6 +236,10 @@ export async function main(
   if (command === "evals") {
     const { runEvals } = await import("../cloud/evals/index.js");
     return runEvals(commandArgs);
+  }
+  if (command === "profiles") {
+    const { runProfiles } = await import("../cloud/profiles/index.js");
+    return runProfiles(commandArgs);
   }
   if (command === "checklist") {
     const { runChecklist } = await import("../cloud/checklist/index.js");

@@ -94,3 +94,26 @@ export function server(fields: Pick<Server, "id"> & Partial<Server>): Server {
     ...fields,
   };
 }
+
+/** A profile as `GET /api/v1/organizations/{id}/profiles` lists it. */
+type Profile =
+  operations["getApiV1OrganizationsByIdProfiles"]["responses"][200]["content"]["application/json"]["items"][number];
+
+/** An active, usable OAuth profile with neutral values for fields not in `fields`. */
+export function profile(
+  fields: Pick<Profile, "id"> & Partial<Profile>
+): Profile {
+  return {
+    label: null,
+    account: null,
+    kind: "oauth",
+    status: "active",
+    reason: null,
+    canUse: true,
+    sharing: "owner",
+    owner: { id: "user_1", name: "Ada" },
+    connectedAt: TIMESTAMP,
+    bindings: [],
+    ...fields,
+  };
+}

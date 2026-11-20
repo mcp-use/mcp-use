@@ -549,6 +549,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{id}/profile-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Create a 15-minute session in which the requesting user signs in to an MCP server with OAuth as a new standalone profile. Requires profile create permission, plus server read permission with serverId. The URL defaults to the server's production MCP connection URL. Returns a Cloud page URL to open in the user's signed-in browser; each call creates a new session. */
+        post: operations["postApiV1OrganizationsByIdProfileSessions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{id}/profile-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read a profile sign-in session. Only the user who created it can read it; anyone else gets 404. profileId is set once the session is authenticated. Polling does not extend the session. */
+        get: operations["getApiV1OrganizationsByIdProfileSessionsBySessionId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{id}/invitations": {
         parameters: {
             query?: never;
@@ -5593,6 +5627,33 @@ export interface operations {
                                 name: string | null;
                                 issuerHost: string;
                             } | null;
+                            /** @enum {string} */
+                            kind: "oauth" | "static" | "none";
+                            /** @enum {string} */
+                            status: "active" | "degraded" | "reauth_required" | "config_error" | "audience_mismatch";
+                            reason: string | null;
+                            /** @description Whether the requesting user may use or bind this profile (owner-only rule). */
+                            canUse: boolean;
+                            /** @enum {string} */
+                            sharing: "org" | "owner";
+                            owner: {
+                                id: string | null;
+                                name: string | null;
+                            };
+                            /** Format: date-time */
+                            connectedAt: string;
+                            bindings: {
+                                id: string;
+                                serverId: string;
+                                serverName: string | null;
+                                /**
+                                 * @description Where a binding applies: `production`; `preview`, every non-production environment (branch and per-deployment previews) without a binding of its own, so a new branch inherits it; `branch`, one branch.
+                                 * @enum {string}
+                                 */
+                                target: "production" | "preview" | "branch";
+                                /** @description The branch of target `branch`, else null. */
+                                branch: string | null;
+                            }[];
                         }[];
                     };
                 };
@@ -5641,6 +5702,239 @@ export interface operations {
             };
             /** @description Not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1OrganizationsByIdProfileSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Profile name. Omitted, null or blank leaves it unnamed. */
+                    label?: string | null;
+                    /**
+                     * Format: uri
+                     * @description MCP server URL to sign in to. Takes precedence over serverId.
+                     */
+                    url?: string;
+                    /**
+                     * Format: uuid
+                     * @description Server of the organization whose production MCP connection URL is used when url is omitted.
+                     */
+                    serverId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        sessionId: string;
+                        /** @constant */
+                        status: "pending";
+                        /**
+                         * Format: uri
+                         * @description Cloud dashboard page where the requesting user signs in.
+                         */
+                        authenticationUrl: string;
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1OrganizationsByIdProfileSessionsBySessionId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        sessionId: string;
+                        /** Format: uuid */
+                        organizationId: string;
+                        /** @enum {string} */
+                        status: "pending" | "authenticated" | "failed" | "expired";
+                        /** Format: uri */
+                        url: string;
+                        label: string | null;
+                        /** @description The signed-in profile once authenticated. */
+                        profileId: string | null;
+                        error: {
+                            code: string;
+                            message: string;
+                        } | null;
+                        completedAt: string | null;
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @constant */
+                        code: "VALIDATION_ERROR";
+                        details: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

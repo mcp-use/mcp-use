@@ -367,6 +367,48 @@ const pages: Record<string, Page> = {
       },
     },
   },
+  profiles: {
+    summary:
+      "Sign in to MCP servers with OAuth and list the organization's saved profiles. Pass a profile ID to checklist run or evals run with --profile.",
+    examples: [
+      "mcp-use profiles list",
+      "mcp-use profiles create",
+      "mcp-use profiles create --help",
+    ],
+    commands: {
+      list: {
+        summary:
+          "List profiles with their kind, status, account, whether you can use them, and server bindings. Secret values are never shown.",
+        options: [org, path],
+        examples: ["mcp-use profiles list --json"],
+      },
+      get: {
+        summary: "Show one profile.",
+        args: "<profileId>",
+        options: [org, path],
+        examples: ["mcp-use profiles get <profile-id>"],
+      },
+      create: {
+        summary:
+          "Sign in to an MCP server in your browser and save the OAuth credentials as a new profile. Signs in at the linked server's production MCP URL unless --url is given, and waits for the sign-in to finish (up to 15 minutes).",
+        options: [
+          ...project,
+          ["--name <label>", "Profile name (default: unnamed)"],
+          [
+            "--url <mcp-url>",
+            "Sign in at this https MCP URL instead, such as a preview or dev environment",
+          ],
+          ["--no-wait", "Print the sign-in URL and session ID without waiting"],
+          ["--no-open", "Print the sign-in URL without opening a browser"],
+        ],
+        examples: [
+          "mcp-use profiles create --name production",
+          "mcp-use profiles create --url https://my-app-git-feature.vercel.app/mcp --name preview",
+          "mcp-use profiles create --no-wait --json",
+        ],
+      },
+    },
+  },
   checklist: {
     summary: "Run and inspect a server's publishing checklist.",
     examples: ["mcp-use checklist run", "mcp-use checklist get --help"],

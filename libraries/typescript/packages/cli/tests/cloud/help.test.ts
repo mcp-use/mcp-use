@@ -10,6 +10,7 @@ for (const group of [
   "github",
   "checklist",
   "alerts",
+  "profiles",
 ]) {
   test(`${group} help lists described commands without mixing their options`, async ({
     cli,
@@ -44,6 +45,9 @@ for (const [args, included, excluded] of [
   [["alerts", "list"], "--limit", ["--file", "--yes"]],
   [["alerts", "create"], "--file", ["--limit", "--yes"]],
   [["checklist", "get"], "<run-id>", ["--branch", "--no-wait", "--limit"]],
+  [["profiles", "list"], "--org", ["--url", "--no-wait", "--server"]],
+  [["profiles", "get"], "<profileId>", ["--url", "--no-wait", "--server"]],
+  [["profiles", "create"], "--no-wait", ["--limit", "--yes"]],
 ] as const) {
   test(`${args.join(" ")} help explains only that operation`, async ({
     cli,

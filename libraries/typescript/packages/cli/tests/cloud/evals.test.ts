@@ -12,7 +12,10 @@ import { createLiveReport, duration } from "../../src/cloud/evals/output.js";
 import type { operations } from "../../src/cloud/api/generated/types.gen.js";
 import { test } from "../helpers/cli-test.js";
 import { signIn, SIGNED_IN } from "../helpers/cloud-auth.js";
-import { server as serverFixture } from "../helpers/cloud-fixtures.js";
+import {
+  profile as profileFixture,
+  server as serverFixture,
+} from "../helpers/cloud-fixtures.js";
 import type { FakeCloud } from "../helpers/fake-cloud.js";
 
 type Suite =
@@ -40,7 +43,7 @@ function profiles(cloud: FakeCloud): void {
   cloud.on("GET", "/api/v1/organizations/org_1/profiles", {
     body: {
       items: [
-        {
+        profileFixture({
           id: "profile_free",
           label: "Free tier",
           account: {
@@ -48,7 +51,7 @@ function profiles(cloud: FakeCloud): void {
             name: null,
             issuerHost: "auth.test",
           },
-        },
+        }),
       ],
     },
   });

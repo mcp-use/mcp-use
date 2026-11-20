@@ -9,6 +9,7 @@ Use `--json` on each command and inspect `--help` for exact argument positions.
 | GitHub | `github connect` prints an installation URL; `installations` and `repos` inspect access |
 | Domains | `domains get`, `set-subdomain`, `add`, `verify`, `rm` |
 | Publish checks | `checklist run`, `list`, `get`, `cancel` |
+| Profiles | `profiles list`, `get`, `create`; saved MCP sign-ins for `--profile` |
 
 A domain addition returns the CNAME target. Configure that exact DNS record
 with the domain's provider, then run `domains verify` and inspect its result.
@@ -22,6 +23,12 @@ Publishing checks assess a server for app directories. Start with
 Use `--no-wait` to retain the run ID and inspect it later through `checklist get`.
 A successful checklist run is evidence about those checks; publication itself
 remains a separate action.
+
+`profiles create` opens a Cloud page where the user signs in to the MCP server
+with OAuth, and waits up to 15 minutes. The sign-in needs the user's browser,
+so give them the printed URL. Without `--url` it signs in at the linked server's
+production MCP URL. Pass the resulting profile ID to `checklist run --profile`
+or `evals run --profile`. `profiles list` never prints secret values.
 
 For `github repos`, a single active installation is selected automatically.
 If there are several, pass `--installation` with the provider `installationId`

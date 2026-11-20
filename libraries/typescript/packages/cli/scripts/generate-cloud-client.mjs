@@ -71,6 +71,8 @@ const OPERATIONS = [
   "DELETE /api/v1/servers/{id}/alerts/rules/{ruleId}",
   "GET /api/v1/organizations/{id}/members",
   "GET /api/v1/organizations/{id}/profiles",
+  "POST /api/v1/organizations/{id}/profile-sessions",
+  "GET /api/v1/organizations/{id}/profile-sessions/{sessionId}",
   "GET /api/v1/organizations/{id}/invitations",
   "POST /api/v1/organizations/{id}/invitations",
   "POST /api/v1/organizations/{id}/invitations/{invitationId}/cancel",
@@ -101,11 +103,19 @@ const RESPONSE_FIELDS = {
   "GET /api/auth/get-session": ["user.email"],
   "POST /api/auth/api-key/create": ["id", "key", "name"],
   "POST /api/auth/api-key/delete": ["success"],
-  // Names a run's profile in evals output; never its secrets.
+  // Names a run's profile in evals output and lists profiles; never `static`.
   "GET /api/v1/organizations/{id}/profiles": [
     "items[].id",
     "items[].label",
     "items[].account",
+    "items[].kind",
+    "items[].status",
+    "items[].reason",
+    "items[].canUse",
+    "items[].sharing",
+    "items[].owner",
+    "items[].connectedAt",
+    "items[].bindings",
   ],
   "GET /api/v1/organizations": [
     "organizations[].id",

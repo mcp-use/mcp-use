@@ -41,6 +41,7 @@ const COMMANDS: Record<string, readonly string[]> = {
   github: ["connect", "installations", "repos"],
   alerts: ["list", "get", "create", "update", "rm", "options"],
   checklist: ["run", "list", "get", "cancel"],
+  profiles: ["list", "get", "create"],
   evals: [
     "push",
     "list",

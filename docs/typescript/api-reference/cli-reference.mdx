@@ -694,6 +694,45 @@ Cancel a checklist run.
 mcp-use checklist cancel <run-id> [options]
 ```
 
+## Profiles commands
+
+A profile is a saved set of credentials for an MCP server, shared within an organization. Pass a profile ID to `checklist run --profile` or `evals run --profile` to authenticate as that account.
+
+### `profiles list`
+
+List the organization's profiles with their kind, status, connected account, whether you can use them, and the servers they are bound to. Secret values are never printed.
+
+```bash
+mcp-use profiles list [options]
+```
+
+### `profiles get`
+
+Show one profile.
+
+```bash
+mcp-use profiles get <profileId> [options]
+```
+
+### `profiles create`
+
+Sign in to an MCP server with OAuth in your browser and save the credentials as a new profile.
+
+```bash
+mcp-use profiles create [--name <label>] [--url <mcp-url>] [--no-wait] [--no-open] [options]
+```
+
+The command creates a sign-in session in Cloud, opens its page in your browser, and prints the page's URL. Finish the sign-in there while signed in to Manufact. The command waits until the sign-in succeeds, fails, or expires after 15 minutes, then prints the new profile ID.
+
+Without `--url`, the sign-in uses the production MCP URL of the linked server, or the server given with `--server`. Pass `--url` to sign in at another `https` MCP URL, such as a preview or development environment. The URL can't contain a username or password.
+
+With `--no-wait`, the command prints the session ID and sign-in URL and exits. After you finish the sign-in, find the profile with `profiles list`.
+
+```bash
+mcp-use profiles create --url https://my-app-git-feature.vercel.app/mcp --name preview
+mcp-use checklist run --url https://my-app-git-feature.vercel.app/mcp --profile <profile-id>
+```
+
 ## Alerts commands
 
 ### `alerts list`
