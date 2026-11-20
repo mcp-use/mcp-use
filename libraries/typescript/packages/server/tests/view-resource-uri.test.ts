@@ -198,14 +198,14 @@ describe("view resource cache keys", () => {
     expect(after["chart"]).toBe(before["chart"]);
   });
 
-  it("keeps the URI when only server-side view config changes", async () => {
+  it("changes the URI when only the tool's view settings change", async () => {
+    const csp = { connectDomains: ["https://api.example.com"] };
     const before = await listedUris(makeServer());
-    const after = await listedUris(
-      makeServer(undefined, {
-        csp: { connectDomains: ["https://api.example.com"] },
-      })
-    );
-    expect(after["dashboard"]).toBe(before["dashboard"]);
+    const after = await listedUris(makeServer(undefined, { csp }));
+    const replica = await listedUris(makeServer(undefined, { csp }));
+    expect(after["dashboard"]).toMatch(VERSIONED_DASHBOARD);
+    expect(after["dashboard"]).not.toBe(before["dashboard"]);
+    expect(replica["dashboard"]).toBe(after["dashboard"]);
   });
 
   it("does not let views whose names share a prefix shadow each other", async () => {

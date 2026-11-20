@@ -421,7 +421,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   /**
    * Production `?v=` cache-key version per view, computed on first use from
-   * the view bundle. Cleared when views are primed.
+   * the view bundle and the bound tool's view settings. Cleared when views
+   * are primed or a tool binds a view.
    */
   #viewVersions: Map<string, string> | undefined;
   /** Whether build tooling asked for `?v=`-versioned view URIs. */
@@ -773,7 +774,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * `projectRoot` in dev so the `public/` route resolves against the user's
    * project directory rather than the CLI process cwd. Production build
    * tooling passes `versioned: true` to add a `?v=` cache key, hashed from
-   * each view's bundle, to its URI; development keeps bare URIs. A `buildId`
+   * each view's bundle and the view settings declared on its tool, to its
+   * URI; development keeps bare URIs. A `buildId`
    * from older build tooling also turns versioning on; its value is ignored.
    * @throws If views are already primed, or after the server has started.
    *
@@ -2069,6 +2071,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       toolName: definition.name,
       config: view,
     });
+    // The bound tool's view settings are part of the view's version.
+    this.#viewVersions = undefined;
   }
 
   #validateViewBindingsAtMount(): void {
@@ -2581,7 +2585,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   /**
    * `?v=` cache-key version for a view, or `undefined` when versioning is
    * off (development, or views primed without `versioned`) and for unknown
-   * views. Computed once per primed manifest.
+   * views. Hashes the view bundle and the bound tool's view settings; computed
+   * once and cleared when views are primed or a tool binds a view.
    */
   #viewVersion(viewName: string): string | undefined {
     if (!this.#viewsVersioned) {
@@ -2590,7 +2595,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     if (this.#viewVersions === undefined) {
       const versions = new Map<string, string>();
       for (const [name, entry] of this.#views) {
-        versions.set(name, computeViewVersion(entry));
+        versions.set(
+          name,
+          computeViewVersion(
+            entry,
+            this.#viewResourceFacts(this.#viewBindings.get(name)?.config)
+          )
+        );
       }
       this.#viewVersions = versions;
     }

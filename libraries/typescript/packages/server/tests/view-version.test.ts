@@ -41,11 +41,56 @@ describe("computeViewVersion", () => {
     ).toBe(sha256Hex("assets/view-a1b2.js\0assets/view-c3d4.css").slice(0, 8));
   });
 
-  it("ignores view config, which is not part of the bundle", () => {
+  it("ignores the frontend viewConfig captured in the manifest entry", () => {
     const entry = { kind: "inline", js: "x", css: "" } as const;
     expect(
       computeViewVersion({ ...entry, viewConfig: { displayModes: ["inline"] } })
     ).toBe(computeViewVersion(entry));
+  });
+
+  it("hashes the view settings declared on the bound tool", () => {
+    const entry = { kind: "inline", js: "x", css: "" } as const;
+    const bundleOnly = computeViewVersion(entry);
+    expect(bundleOnly).toBe("14f825b2");
+    expect(computeViewVersion(entry, {})).toBe(bundleOnly);
+
+    const withCsp = computeViewVersion(entry, {
+      csp: { connectDomains: ["https://api.example.com"] },
+    });
+    expect(withCsp).toBe("75c05d50");
+    expect(
+      computeViewVersion(entry, {
+        csp: { connectDomains: ["https://other.example.com"] },
+      })
+    ).toBe("bc758413");
+    expect(computeViewVersion(entry, { prefersBorder: true })).toBe("91c8e77a");
+    expect(
+      computeViewVersion(entry, { domain: "https://app.example.com" })
+    ).toBe("9d80c2f2");
+    expect(computeViewVersion(entry, { permissions: { camera: {} } })).toBe(
+      "ca5d279d"
+    );
+  });
+
+  it("gives equal settings the same version whatever their key order", () => {
+    const entry = { kind: "inline", js: "x", css: "" } as const;
+    expect(
+      computeViewVersion(entry, {
+        prefersBorder: true,
+        csp: {
+          resourceDomains: ["https://cdn.example.com"],
+          connectDomains: ["https://api.example.com"],
+        },
+      })
+    ).toBe(
+      computeViewVersion(entry, {
+        csp: {
+          connectDomains: ["https://api.example.com"],
+          resourceDomains: ["https://cdn.example.com"],
+        },
+        prefersBorder: true,
+      })
+    );
   });
 });
 
