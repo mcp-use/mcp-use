@@ -32,10 +32,10 @@ export interface OAuthGateOptions {
   /** Resolved schemes for a tool name, or `undefined` for an unknown tool. */
   toolSchemes: (name: string) => readonly ToolSecurityScheme[] | undefined;
   /**
-   * Resource URIs that `resources/read` serves signed out on a `mixedAuth`
-   * server: the tools' views.
+   * Whether `resources/read` serves this URI signed out on a `mixedAuth`
+   * server: any URI that resolves to a tool's view.
    */
-  openResourceUris: Iterable<string>;
+  isOpenResourceUri: (uri: string) => boolean;
 }
 
 /**
@@ -148,10 +148,8 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
     baselineScopes,
     mixedAuth,
     toolSchemes,
+    isOpenResourceUri,
   } = options;
-  const openResources = new Set(
-    [...options.openResourceUris].map(normalizeResourceUri)
-  );
 
   const open: Requirement = { required: false, scopes: [] };
   const signIn = (extra: readonly string[] = []): Requirement => ({
@@ -178,7 +176,7 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
       // is static UI; the data arrives in the tool result, which stays
       // gated by the tool's securitySchemes.
       const uri = stringParam(message.params, "uri");
-      if (uri !== undefined && openResources.has(normalizeResourceUri(uri))) {
+      if (uri !== undefined && isOpenResourceUri(normalizeResourceUri(uri))) {
         return open;
       }
     }

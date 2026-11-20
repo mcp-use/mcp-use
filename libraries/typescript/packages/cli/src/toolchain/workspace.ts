@@ -52,7 +52,11 @@ export const BUILD_MANIFEST_NAME = "manifest.json";
  * @internal
  */
 export interface BuildManifest {
-  /** Unique identifier for this build (random hex, regenerated per build). */
+  /**
+   * Unique identifier for this build artifact (random hex, regenerated per
+   * build). Current `mcp-use` servers version each view URI by that view's
+   * content and ignore this ID; older servers used it as the URI version.
+   */
   buildId: string;
   /**
    * Filename of the emitted server entry, relative to the build directory

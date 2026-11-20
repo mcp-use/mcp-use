@@ -508,7 +508,7 @@ Native View documents are generated MCP resources. Do not register
 | Production View bundles          | `${basePath}/_mcp-use/views/<name>/...` |
 | Public files                     | `${basePath}/_mcp-use/public/...`       |
 | View resource URI in development | `ui://views/<name>.html`                |
-| View resource URI in production  | `ui://views/<name>-<buildId>.html`      |
+| View resource URI in production  | `ui://views/<name>.html?v=<hash>`       |
 
 Move existing widget CSP domains to `view.csp`.
 
@@ -522,23 +522,30 @@ for legacy URL values, proxy configuration, and metadata precedence.
 
 v1 served widgets at `ui://widget/<name>.html`, and sometimes
 `ui://widget/<name>.<buildId>.html`. v2 uses `ui://views/<name>.html` in development
-and `ui://views/<name>-<buildId>.html` in production. Production builds version
-both external and inline View resources automatically. Replicas deployed from
-the same build share the same URI; rebuilding changes the cache key.
+and `ui://views/<name>.html?v=<hash>` in production, where `<hash>` is derived
+from the View's built bundle and the settings declared on its tool's `view`
+(`csp`, `permissions`, `domain`, and `prefersBorder`). Production builds version
+both external and inline View resources automatically. A View keeps its URI
+until its bundle or one of those settings changes, across rebuilds,
+backend-only deploys, and replicas.
 
 Read the URI advertised by the tool's `_meta.ui.resourceUri` or by
-`resources/list`. Remove hardcoded View URIs and legacy middleware that maps a
-v1 URI to `ui://views/<name>.html`: that unversioned URI is not registered in a
-production build. Do not strip a build ID or rewrite an old URI to the current
-build, because doing so serves changed HTML under a previously cached key.
+`resources/list`, and remove hardcoded View URIs. Refresh tool discovery after
+each deployment so hosts obtain a changed View's new URI.
 
-Refresh tool discovery after each deployment so hosts obtain the new URI.
+The `?v=` value only busts caches. A v2 server serves the current View for
+`ui://views/<name>.html` with any `?v=` value or none, and for the
+`ui://views/<name>-<build ID>.html` URIs advertised by mcp-use 2.12, so a host
+that reads a URI from an earlier v2 deployment gets the current View. A host
+that renders a copy it saved before the deployment can still fail once after a
+View change, because that copy requests external asset files the new build no
+longer serves; `mcp-use build --inline` avoids this. These URIs
+follow the same authorization rules as the current one: on an OAuth-protected
+server a request without authorization can receive HTTP 401 before the URI is
+resolved, and with `mixedAuth` only Views bound to a tool are readable signed
+out. v1 `ui://widget/...` URIs are not resolved.
 Published ChatGPT apps can retain tool metadata from their approved submission;
-submit an updated app version so the new metadata is approved and available.
-A deployment registers only its current build's View resources. If an old URI
-reaches resource lookup, it returns a resource-not-found error. On an
-OAuth-protected server, a request without authorization can receive HTTP 401
-before resource lookup.
+submit an updated app version so ChatGPT requests the v2 URIs.
 
 ## Update authentication, proxies, and security
 

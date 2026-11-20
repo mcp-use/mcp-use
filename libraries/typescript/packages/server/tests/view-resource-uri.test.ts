@@ -8,11 +8,32 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-function makeServer(options?: ViewRegistrationOptions) {
+interface ViewSource {
+  js?: string;
+  csp?: { connectDomains: string[] };
+}
+
+function makeServer(
+  options: ViewRegistrationOptions = { versioned: true },
+  source: ViewSource = {},
+  extraViews: Record<string, string> = {}
+) {
   const server = new MCPServer({ name: "versioned-view", version: "1" });
   servers.push(server);
   server[registerViews](
-    { dashboard: { kind: "inline", js: 'console.log("built view")', css: "" } },
+    {
+      dashboard: {
+        kind: "inline",
+        js: source.js ?? 'console.log("built view")',
+        css: "",
+      },
+      ...Object.fromEntries(
+        Object.entries(extraViews).map(([name, js]) => [
+          name,
+          { kind: "inline" as const, js, css: "" },
+        ])
+      ),
+    },
     options
   );
   server.tool(
@@ -20,7 +41,10 @@ function makeServer(options?: ViewRegistrationOptions) {
       name: "dashboard",
       inputSchema: z.object({ mode: z.string().optional() }),
       outputSchema: z.object({ ok: z.boolean() }),
-      view: { name: "dashboard" },
+      view: {
+        name: "dashboard",
+        ...(source.csp !== undefined && { csp: source.csp }),
+      },
       _meta: { ui: { resourceUri: "ui://spoofed.html" } },
     },
     async ({ mode }) => {
@@ -41,7 +65,27 @@ function makeServer(options?: ViewRegistrationOptions) {
       };
     }
   );
+  for (const name of Object.keys(extraViews)) {
+    server.tool(
+      {
+        name,
+        outputSchema: z.object({}),
+        view: { name },
+      },
+      async () => ({ content: [], structuredContent: {} })
+    );
+  }
   return server;
+}
+
+async function listedUris(server: MCPServer): Promise<Record<string, string>> {
+  const listed = await rpc(server, "resources/list");
+  return Object.fromEntries(
+    listed.result.resources.map((resource: { name: string; uri: string }) => [
+      resource.name,
+      resource.uri,
+    ])
+  );
 }
 
 async function rpc(
@@ -84,15 +128,19 @@ async function rpc(
   return response.json();
 }
 
+const VERSIONED_DASHBOARD = /^ui:\/\/views\/dashboard\.html\?v=[0-9a-f]{8}$/;
+
 describe("view resource cache keys", () => {
   it.each([
-    [{ buildId: "a1b2c3" }, "ui://views/dashboard-a1b2c3.html"],
-    [{ buildId: "a1b2c3", dev: true }, "ui://views/dashboard.html"],
-    [undefined, "ui://views/dashboard.html"],
+    ["production", undefined],
+    ["production with a legacy buildId", { buildId: "a1b2c3" }],
   ] as const)(
-    "uses the same URI throughout the wire with %j",
-    async (options, uri) => {
+    "uses one content-versioned URI throughout the wire in %s",
+    async (_label, options) => {
       const server = makeServer(options);
+      const { dashboard: uri } = await listedUris(server);
+      expect(uri).toMatch(VERSIONED_DASHBOARD);
+      expect(uri).not.toContain("a1b2c3");
       const tools = await rpc(server, "tools/list");
       const meta = { ui: { resourceUri: uri }, "ui/resourceUri": uri };
       expect(tools.result.tools[0]._meta).toMatchObject(meta);
@@ -101,10 +149,6 @@ describe("view resource cache keys", () => {
         ...meta,
         custom: "preserved",
       });
-      const listed = await rpc(server, "resources/list");
-      expect(listed.result.resources).toEqual([
-        expect.objectContaining({ uri }),
-      ]);
       const read = await rpc(server, "resources/read", { uri });
       expect(read.result.contents[0]).toMatchObject({
         uri,
@@ -116,33 +160,96 @@ describe("view resource cache keys", () => {
     }
   );
 
-  it("keeps replicas on one build key and changes the key on a new build", async () => {
-    const uris = [];
-    for (const buildId of ["a1b2c3", "a1b2c3", "d4e5f6"]) {
-      const listed = await rpc(makeServer({ buildId }), "resources/list");
-      uris.push(listed.result.resources[0].uri);
-    }
-    expect(uris).toEqual([
-      "ui://views/dashboard-a1b2c3.html",
-      "ui://views/dashboard-a1b2c3.html",
-      "ui://views/dashboard-d4e5f6.html",
-    ]);
+  it.each([
+    ["development", { dev: true, versioned: true }],
+    ["views primed without versioning", {}],
+  ] as const)("keeps unversioned URIs in %s", async (_label, options) => {
+    const server = makeServer(options);
+    expect(await listedUris(server)).toEqual({
+      dashboard: "ui://views/dashboard.html",
+    });
+    const tools = await rpc(server, "tools/list");
+    expect(tools.result.tools[0]._meta["ui/resourceUri"]).toBe(
+      "ui://views/dashboard.html"
+    );
   });
 
-  it("does not serve current HTML under an unversioned or previous build URI", async () => {
-    const server = makeServer({ buildId: "a1b2c3" });
-    for (const uri of [
-      "ui://views/dashboard.html",
-      "ui://views/dashboard-old.html",
-    ]) {
-      const read = await rpc(server, "resources/read", { uri });
-      expect(read.error.message).toContain("Resource not found");
-      expect(read).not.toHaveProperty("result");
+  it("gives identical sources the same URI across rebuilds and replicas", async () => {
+    const first = await listedUris(makeServer({ buildId: "a1b2c3" }));
+    const second = await listedUris(makeServer({ buildId: "d4e5f6" }));
+    const third = await listedUris(makeServer());
+    expect(second).toEqual(first);
+    expect(third).toEqual(first);
+  });
+
+  it("changes only the URI of the view whose content changed", async () => {
+    const before = await listedUris(
+      makeServer(undefined, {}, { chart: 'console.log("chart")' })
+    );
+    const after = await listedUris(
+      makeServer(
+        undefined,
+        { js: 'console.log("built view v2")' },
+        { chart: 'console.log("chart")' }
+      )
+    );
+    expect(after["dashboard"]).toMatch(VERSIONED_DASHBOARD);
+    expect(after["dashboard"]).not.toBe(before["dashboard"]);
+    expect(after["chart"]).toBe(before["chart"]);
+  });
+
+  it("changes the URI when only the tool's view settings change", async () => {
+    const csp = { connectDomains: ["https://api.example.com"] };
+    const before = await listedUris(makeServer());
+    const after = await listedUris(makeServer(undefined, { csp }));
+    const replica = await listedUris(makeServer(undefined, { csp }));
+    expect(after["dashboard"]).toMatch(VERSIONED_DASHBOARD);
+    expect(after["dashboard"]).not.toBe(before["dashboard"]);
+    expect(replica["dashboard"]).toBe(after["dashboard"]);
+  });
+
+  it("does not let views whose names share a prefix shadow each other", async () => {
+    const server = makeServer(
+      undefined,
+      {},
+      { "dashboard-wide": 'console.log("wide view")' }
+    );
+    const old = "ui://views/dashboard-wide-0123456789abcdef.html";
+    const read = await rpc(server, "resources/read", { uri: old });
+    expect(read.result.contents[0].uri).toBe(old);
+    expect(read.result.contents[0].text).toContain('console.log("wide view")');
+  });
+
+  it.each([
+    "ui://views/dashboard.html",
+    "ui://views/dashboard.html?v=0123abcd",
+    "ui://views/dashboard-0123456789abcdef.html",
+  ])(
+    "serves the current view under a URI from an earlier deployment: %s",
+    async (uri) => {
+      const read = await rpc(makeServer(), "resources/read", { uri });
+      expect(read.result.contents[0]).toMatchObject({
+        uri,
+        mimeType: "text/html;profile=mcp-app",
+      });
+      expect(read.result.contents[0].text).toContain(
+        'console.log("built view")'
+      );
     }
+  );
+
+  it.each([
+    "ui://views/missing.html?v=0123abcd",
+    "ui://views/missing-0123456789abcdef.html",
+    "ui://views/dashboard-old.html",
+  ])("returns resource-not-found for %s", async (uri) => {
+    const read = await rpc(makeServer(), "resources/read", { uri });
+    expect(read.error.message).toContain("Resource not found");
+    expect(read).not.toHaveProperty("result");
   });
 
   it.each(["error", "input"])("does not stamp %s results", async (mode) => {
-    const result = await rpc(makeServer({ buildId: "a1b2c3" }), "tools/call", {
+    const result = await rpc(makeServer(), "tools/call", {
       name: "dashboard",
       arguments: { mode },
     });

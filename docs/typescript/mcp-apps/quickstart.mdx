@@ -217,9 +217,15 @@ If the tool runs but no view appears, check that `view.name` exactly matches the
 
 ## View caching in production
 
-Production builds automatically include the build ID in each view resource URI, such as `ui://views/my-view-a1b2c3.html`. Hosts use this URI as a cache key, so rebuilding the app gives its views fresh keys. All replicas deployed from the same build share the same URIs. This applies to external assets and `mcp-use build --inline`, including Next.js and Vite framework integrations.
+Production builds add a version query to each view resource URI, such as `ui://views/my-view.html?v=3f9a1c0e`. Hosts use this URI as a cache key. The version is a hash of the view's built bundle and the settings declared on its tool's `view` (`csp`, `permissions`, `domain`, and `prefersBorder`), so it changes only when the view's JavaScript, CSS, or one of those settings changes. Rebuilding identical sources, a backend-only change, or another replica keeps the same URI. This applies to external assets and `mcp-use build --inline`, including Next.js and Vite framework integrations.
 
-Development keeps the unversioned URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list` when reading a view; avoid hardcoding production URIs. Refresh tool discovery after deployment so the host receives the new URI. A deployment serves only its current build's view URIs. When a read reaches resource lookup, unversioned and previous-build URIs return a resource-not-found error. OAuth-protected deployments can return HTTP 401 before lookup if the request lacks authorization. These old URIs never serve the current HTML under an old cache key.
+Development uses the bare URI, such as `ui://views/my-view.html`. Use the URI advertised by the tool or `resources/list`; avoid hardcoding production URIs. Refresh tool discovery after deployment so the host receives a changed view's new URI.
+
+The `?v=` value only busts caches; it does not select a view. The server answers `ui://views/my-view.html` with any `?v=` value, or none, with the current view. It also answers the `ui://views/my-view-<build ID>.html` URIs advertised by mcp-use 2.12. A host that reads a URI from an earlier deployment, for example a published ChatGPT app whose tool metadata is fixed by its approved submission, gets the current view instead of resource-not-found.
+
+A host can also render a copy of the view it saved before the deployment, without reading it again. With external assets, that copy requests JavaScript files the new build no longer serves, so its first render after a view change can fail until the host reads the view again. `mcp-use build --inline` embeds the assets in the view document and avoids this.
+
+These URIs follow the same authorization rules as the current one. On an OAuth-protected server, a request without authorization can receive HTTP 401 before the URI is resolved. With `mixedAuth`, only views bound to a tool are readable signed out.
 
 ## Next steps
 

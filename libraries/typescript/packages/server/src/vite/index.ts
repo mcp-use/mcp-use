@@ -111,7 +111,6 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
   const frontendConfigs = new Map<string, string | undefined>();
   let assets: EmbeddedViewAssets = {};
   let skills: SkillsSnapshot | undefined;
-  const buildId = randomBytes(8).toString("hex");
   const bridgePath = `/@mcp-use/${randomBytes(24).toString("hex")}`;
   const viewsPlugin = mcpUseViewsPlugin({
     getViews: () => views,
@@ -171,7 +170,9 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
         }
       server.__primeViews(
         dev ? devManifest : manifest,
-        dev ? { dev: true, projectRoot: config.root } : { assets, buildId }
+        dev
+          ? { dev: true, projectRoot: config.root }
+          : { assets, versioned: true }
       );
       server.__mount();
       return server;
@@ -537,7 +538,7 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
       await writeFile(
         join(outputDirectory, "index.js"),
         `import server from "./server.mjs";
-server.__primeViews(${JSON.stringify(manifest)}, {assets:${JSON.stringify(assets)},buildId:${JSON.stringify(buildId)}});
+server.__primeViews(${JSON.stringify(manifest)}, {assets:${JSON.stringify(assets)},versioned:true});
 server.__primeSkills(${JSON.stringify(skills)});
 export const handleMcpRequest = request => server.fetch(request);
 `
