@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 5.4.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 5.4.0
 
 ### Minor Changes
