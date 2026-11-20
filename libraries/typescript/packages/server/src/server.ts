@@ -1857,9 +1857,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           mixedAuth,
           toolSchemes: (name) => this.#tools.get(name)?.schemes,
           // Only views a tool binds; an unbound manifest entry stays gated.
-          openResourceUris: [...this.#viewBindings.keys()].map((name) =>
-            viewResourceUri(name, this.#viewBuildId)
-          ),
+          // The unversioned URI is served too (see #registerViewResource).
+          openResourceUris: [...this.#viewBindings.keys()].flatMap((name) => [
+            ...new Set([this.#viewUri(name), viewResourceUri(name)]),
+          ]),
         };
         // The gate and its challenge builder load on the first MCP request,
         // keeping them out of the static graph of servers without OAuth.
@@ -2534,6 +2535,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
   }
 
+  /** Wire URI declared for a view in tool metadata, results and listings. */
+  #viewUri(viewName: string): string {
+    return viewResourceUri(viewName, this.#viewBuildId);
+  }
+
   #registerViewResource(
     server: SdkMcpServer,
     viewName: string,
@@ -2541,7 +2547,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     metaOptions: { request?: Request; hmrWs?: boolean },
     basePath: string
   ): void {
-    const uri = viewResourceUri(viewName, this.#viewBuildId);
+    const uri = this.#viewUri(viewName);
     const frontendConfig = normalizeViewConfig(entry.viewConfig);
     const authorFacts = {
       ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),
@@ -2556,64 +2562,78 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       authorFacts,
       metaOptions
     );
-    server.registerResource(
-      viewName,
-      uri,
-      resourceConfig,
-      async (readUri, ctx) => {
-        const innerFn = async () => {
-          const req = ctx.http?.req;
-          const readOptions: BuildResourceUiMetaOptions =
-            req !== undefined
-              ? {
-                  request: req,
-                  ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
-                }
-              : metaOptions.hmrWs === true
-                ? { hmrWs: true }
-                : {};
-          const assetsBase =
-            req !== undefined
-              ? resolveAssetsBase(req)
-              : metaOptions.request !== undefined
-                ? resolveAssetsBase(metaOptions.request)
-                : "";
-          const html = synthesizeViewDocument(
-            entry,
-            assetsBase,
-            basePath,
-            viewName
-          );
-          // UI origin and MCP endpoint identity are separate. Claude hashes the
-          // full public endpoint, never the website or asset origin.
-          const meta = await applyClaudeResourceDomain(
-            buildResourceUiMeta(authorFacts, readOptions),
-            requestClientInfo(ctx),
-            (req ?? metaOptions.request)?.headers.get("user-agent"),
-            resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
-              authorFacts?.domain
-          );
-          return {
-            contents: [
-              {
-                uri: readUri.href,
-                mimeType: resourceConfig.mimeType,
-                text: html,
-                _meta: meta,
-              },
-            ],
-          };
+    const readView = async (readUri: URL, ctx: ServerContext) => {
+      const innerFn = async () => {
+        const req = ctx.http?.req;
+        const readOptions: BuildResourceUiMetaOptions =
+          req !== undefined
+            ? {
+                request: req,
+                ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
+              }
+            : metaOptions.hmrWs === true
+              ? { hmrWs: true }
+              : {};
+        const assetsBase =
+          req !== undefined
+            ? resolveAssetsBase(req)
+            : metaOptions.request !== undefined
+              ? resolveAssetsBase(metaOptions.request)
+              : "";
+        const html = synthesizeViewDocument(
+          entry,
+          assetsBase,
+          basePath,
+          viewName
+        );
+        // UI origin and MCP endpoint identity are separate. Claude hashes the
+        // full public endpoint, never the website or asset origin.
+        const meta = await applyClaudeResourceDomain(
+          buildResourceUiMeta(authorFacts, readOptions),
+          requestClientInfo(ctx),
+          (req ?? metaOptions.request)?.headers.get("user-agent"),
+          resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
+            authorFacts?.domain
+        );
+        return {
+          contents: [
+            {
+              uri: readUri.href,
+              mimeType: resourceConfig.mimeType,
+              text: html,
+              _meta: meta,
+            },
+          ],
         };
-        // Only tool-bound views are views to middleware; on a `mixedAuth`
-        // server these are the ones the OAuth gate serves signed out.
-        return await this.#hookResourceRead(
-          readUri,
-          ctx,
-          innerFn,
-          this.#viewBindings.has(viewName) ? { name: viewName } : undefined
+      };
+      // Only tool-bound views are views to middleware; on a `mixedAuth`
+      // server these are the ones the OAuth gate serves signed out.
+      return await this.#hookResourceRead(
+        readUri,
+        ctx,
+        innerFn,
+        this.#viewBindings.has(viewName) ? { name: viewName } : undefined
+      );
+    };
+    server.registerResource(viewName, uri, resourceConfig, readView);
+
+    // The build ID only versions the URI's query, so the resource path is
+    // stable across builds. Hosts that still hold tool metadata from a
+    // previous build (`?v=<oldBuildId>`) or from an unversioned release read
+    // the current view instead of getting "Resource not found". The aliases
+    // are not listed.
+    const stableUri = viewResourceUri(viewName);
+    if (uri !== stableUri) {
+      const aliases = [stableUri, `${stableUri}{?v}`];
+      for (const [index, template] of aliases.entries()) {
+        server.registerResource(
+          `${viewName}#versioned-alias-${index}`,
+          new ResourceTemplate(template, { list: undefined }),
+          resourceConfig,
+          (readUri, _variables, ctx) => readView(readUri, ctx)
         );
       }
-    );
+    }
   }
 
   #registerResource(

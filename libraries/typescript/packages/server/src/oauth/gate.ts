@@ -33,7 +33,8 @@ export interface OAuthGateOptions {
   toolSchemes: (name: string) => readonly ToolSecurityScheme[] | undefined;
   /**
    * Resource URIs that `resources/read` serves signed out on a `mixedAuth`
-   * server: the tools' views.
+   * server: the tools' views. A read whose only query is `?v=<buildId>` is
+   * open when the same URI without that query is listed.
    */
   openResourceUris: Iterable<string>;
 }
@@ -95,6 +96,21 @@ function isModernEnvelope(message: ParsedMessage): boolean {
 function normalizeResourceUri(uri: string): string {
   try {
     return new URL(uri).toString();
+  } catch {
+    return uri;
+  }
+}
+
+/**
+ * A view URI without its `?v=<buildId>` version, so reads of any build of an
+ * open view match the same entry. Other query shapes are returned unchanged.
+ */
+function unversionedResourceUri(uri: string): string {
+  try {
+    const url = new URL(uri);
+    if (!/^\?v=[^&]*$/.test(url.search)) return url.toString();
+    url.search = "";
+    return url.toString();
   } catch {
     return uri;
   }
@@ -178,7 +194,11 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
       // is static UI; the data arrives in the tool result, which stays
       // gated by the tool's securitySchemes.
       const uri = stringParam(message.params, "uri");
-      if (uri !== undefined && openResources.has(normalizeResourceUri(uri))) {
+      if (
+        uri !== undefined &&
+        (openResources.has(normalizeResourceUri(uri)) ||
+          openResources.has(unversionedResourceUri(uri)))
+      ) {
         return open;
       }
     }

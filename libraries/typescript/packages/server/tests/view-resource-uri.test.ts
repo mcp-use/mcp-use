@@ -86,7 +86,7 @@ async function rpc(
 
 describe("view resource cache keys", () => {
   it.each([
-    [{ buildId: "a1b2c3" }, "ui://views/dashboard-a1b2c3.html"],
+    [{ buildId: "a1b2c3" }, "ui://views/dashboard.html?v=a1b2c3"],
     [{ buildId: "a1b2c3", dev: true }, "ui://views/dashboard.html"],
     [undefined, "ui://views/dashboard.html"],
   ] as const)(
@@ -116,29 +116,58 @@ describe("view resource cache keys", () => {
     }
   );
 
-  it("keeps replicas on one build key and changes the key on a new build", async () => {
+  it("keeps replicas on one build key and changes only the query on a new build", async () => {
     const uris = [];
     for (const buildId of ["a1b2c3", "a1b2c3", "d4e5f6"]) {
       const listed = await rpc(makeServer({ buildId }), "resources/list");
       uris.push(listed.result.resources[0].uri);
     }
     expect(uris).toEqual([
-      "ui://views/dashboard-a1b2c3.html",
-      "ui://views/dashboard-a1b2c3.html",
-      "ui://views/dashboard-d4e5f6.html",
+      "ui://views/dashboard.html?v=a1b2c3",
+      "ui://views/dashboard.html?v=a1b2c3",
+      "ui://views/dashboard.html?v=d4e5f6",
     ]);
   });
 
-  it("does not serve current HTML under an unversioned or previous build URI", async () => {
-    const server = makeServer({ buildId: "a1b2c3" });
-    for (const uri of [
-      "ui://views/dashboard.html",
-      "ui://views/dashboard-old.html",
-    ]) {
-      const read = await rpc(server, "resources/read", { uri });
-      expect(read.error.message).toContain("Resource not found");
-      expect(read).not.toHaveProperty("result");
+  it.each([
+    "ui://views/dashboard.html",
+    "ui://views/dashboard.html?v=previous-build",
+  ])(
+    "serves the current view to hosts holding %s from tool metadata",
+    async (uri) => {
+      const read = await rpc(
+        makeServer({ buildId: "a1b2c3" }),
+        "resources/read",
+        { uri }
+      );
+      expect(read.result.contents[0]).toMatchObject({
+        uri,
+        mimeType: "text/html;profile=mcp-app",
+      });
+      expect(read.result.contents[0].text).toContain(
+        'console.log("built view")'
+      );
     }
+  );
+
+  it("does not list the stable aliases", async () => {
+    const server = makeServer({ buildId: "a1b2c3" });
+    const listed = await rpc(server, "resources/list");
+    expect(listed.result.resources).toHaveLength(1);
+  });
+
+  it.each([
+    "ui://views/dashboard-a1b2c3.html",
+    "ui://views/other.html?v=a1b2c3",
+    "ui://views/dashboard.html?v=a1b2c3&x=1",
+  ])("does not serve the view under %s", async (uri) => {
+    const read = await rpc(
+      makeServer({ buildId: "a1b2c3" }),
+      "resources/read",
+      { uri }
+    );
+    expect(read.error.message).toContain("Resource not found");
+    expect(read).not.toHaveProperty("result");
   });
 
   it.each(["error", "input"])("does not stamp %s results", async (mode) => {
