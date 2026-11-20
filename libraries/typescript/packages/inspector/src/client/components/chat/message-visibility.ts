@@ -1,6 +1,7 @@
 import type { Message, MessageAttachment } from "./types";
 
-function contentToText(content: Message["content"]): string {
+/** Flattens a message's `content` to plain text. */
+export function contentToText(content: Message["content"]): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content

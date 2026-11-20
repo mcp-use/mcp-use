@@ -29,14 +29,20 @@ interface NormalizedWidgetMessage {
  * Whether a content block should be shown to the user.
  *
  * MCP `annotations.audience` lists who the content is for. A block is hidden
- * from the conversation only when `audience` is an array that omits `"user"`;
- * a missing or malformed `audience` keeps the block visible.
+ * from the conversation only when `audience` is a valid role array
+ * (`"user"` / `"assistant"` entries only) that omits `"user"`. A missing or
+ * malformed `audience`, including one with unknown roles, keeps the block
+ * visible.
  */
 export function isVisibleToUser(block: MessageContentBlock): boolean {
   const annotations = (block as { annotations?: unknown }).annotations;
   if (!annotations || typeof annotations !== "object") return true;
   const audience = (annotations as { audience?: unknown }).audience;
-  return !Array.isArray(audience) || audience.includes("user");
+  if (!Array.isArray(audience)) return true;
+  if (audience.some((role) => role !== "user" && role !== "assistant")) {
+    return true;
+  }
+  return audience.includes("user");
 }
 
 export function validateWidgetImageSizes(sizes: readonly number[]): void {

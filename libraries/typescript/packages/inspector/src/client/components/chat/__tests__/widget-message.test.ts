@@ -84,6 +84,8 @@ describe("normalizeWidgetMessage", () => {
     ["a user audience", { audience: ["user"] }],
     ["a shared audience", { audience: ["user", "assistant"] }],
     ["a malformed audience", { audience: "assistant" }],
+    ["an unknown audience role", { audience: ["system"] }],
+    ["an unknown role next to assistant", { audience: ["assistant", 42] }],
   ])("shows text with %s", (_label, annotations) => {
     expect(
       normalizeWidgetMessage([{ type: "text", text: "Hi", annotations }])

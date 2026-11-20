@@ -6,7 +6,7 @@ import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
 import type { LLMConfig, Message, MessageAttachment } from "./types";
-import { getVisibleMessageContent } from "./message-visibility";
+import { contentToText, getVisibleMessageContent } from "./message-visibility";
 import { isViewTool } from "@mcp-use/client/react";
 import { buildMessageTokenMap, type InspectorTraceEvent } from "./trace";
 import { normalizeWidgetMessage } from "./widget-message";
@@ -147,18 +147,7 @@ export const MessageList = memo(
             );
           }
 
-          const contentStr =
-            typeof lastMessage.content === "string"
-              ? lastMessage.content
-              : Array.isArray(lastMessage.content)
-                ? lastMessage.content
-                    .map((item) =>
-                      typeof item === "string"
-                        ? item
-                        : item.text || JSON.stringify(item)
-                    )
-                    .join("")
-                : JSON.stringify(lastMessage.content);
+          const contentStr = contentToText(lastMessage.content);
 
           const hasContent = contentStr && contentStr.trim().length > 0;
           return !hasContent;
@@ -194,18 +183,7 @@ export const MessageList = memo(
     return (
       <div className="space-y-6 max-w-3xl mx-auto px-2">
         {messages.map((message) => {
-          const contentStr =
-            typeof message.content === "string"
-              ? message.content
-              : Array.isArray(message.content)
-                ? message.content
-                    .map((item) =>
-                      typeof item === "string"
-                        ? item
-                        : item.text || JSON.stringify(item)
-                    )
-                    .join("")
-                : JSON.stringify(message.content);
+          const contentStr = contentToText(message.content);
 
           if (message.role === "user") {
             const visible = getVisibleMessageContent(message);
