@@ -120,7 +120,9 @@ describe("mcp-use link", () => {
     expect(
       await readJsonFile(join(cli.cwd, ".manufact", "project.json"))
     ).toEqual({ orgId: "org_1", serverId: "srv_1" });
+    // The first lookup picks the organization; the second runs in it.
     expect(cloud.requestsTo("GET", "/api/v1/servers/weather")).toMatchObject([
+      { headers: { "x-api-key": "test_key" } },
       { headers: { "x-api-key": "test_key", "x-profile-id": "org_1" } },
     ]);
   });
@@ -320,7 +322,7 @@ describe("server resolution: --server, then MANUFACT_SERVER, then the link", () 
   );
 });
 
-describe("organization resolution: --org, MANUFACT_ORG, the link, the active organization, the account default", () => {
+describe("organization resolution: --org, MANUFACT_ORG, the link, the active organization, the server's organization, the account default", () => {
   test.for([
     [
       "--org (by slug)",
@@ -329,21 +331,22 @@ describe("organization resolution: --org, MANUFACT_ORG, the link, the active org
     ],
     ["MANUFACT_ORG", { env: "org_3", link: "org_4", active: "org_5" }, "org_3"],
     ["the link's organization", { link: "org_4", active: "org_5" }, "org_4"],
-    ["the active organization", { active: "org_5" }, "org_5"],
-    ["the account default", {}, "org_1"],
+    ["the active organization", { active: "org_5", owner: "org_2" }, "org_5"],
+    ["the server's organization", { owner: "org_2" }, "org_2"],
   ] as const)(
     "%s wins over everything after it",
     async ([, given, expected], { cloud, cli }) => {
-      signIn(cloud);
-      cloud.on("GET", "/api/v1/servers/srv_1", {
-        body: server({ id: "srv_1", organizationId: "org_1" }),
-      });
       const sources = given as {
         flag?: string;
         env?: string;
         link?: string;
         active?: string;
+        owner?: string;
       };
+      signIn(cloud);
+      cloud.on("GET", "/api/v1/servers/srv_1", {
+        body: server({ id: "srv_1", organizationId: sources.owner ?? "org_1" }),
+      });
       if (sources.link !== undefined) {
         await writeLink(cli.cwd, { orgId: sources.link, serverId: "srv_1" });
       }
@@ -372,11 +375,83 @@ describe("organization resolution: --org, MANUFACT_ORG, the link, the active org
       );
 
       expect(result.exitCode).toBe(0);
-      expect(cloud.requestsTo("GET", "/api/v1/servers/srv_1")).toMatchObject([
-        { headers: { "x-profile-id": expected } },
-      ]);
+      expect(
+        cloud.requestsTo("GET", "/api/v1/servers/srv_1").at(-1)
+      ).toMatchObject({ headers: { "x-profile-id": expected } });
     }
   );
+
+  test("the server's organization is looked up only when nothing else chose one", async ({
+    cloud,
+    cli,
+  }) => {
+    signIn(cloud);
+    cloud.on("GET", "/api/v1/servers/srv_1", {
+      body: server({ id: "srv_1", organizationId: "org_3" }),
+    });
+
+    const result = await cli.run(["link", "--server", "srv_1", "--json"], {
+      env: SIGNED_IN,
+    });
+
+    expect(result.exitCode).toBe(0);
+    const lookups = cloud.requestsTo("GET", "/api/v1/servers/srv_1");
+    expect(lookups).toHaveLength(2);
+    expect(lookups[0]!.headers["x-profile-id"]).toBeUndefined();
+    expect(lookups[1]).toMatchObject({ headers: { "x-profile-id": "org_3" } });
+    expect(cloud.requestsTo("GET", "/api/v1/user-preferences")).toHaveLength(0);
+  });
+
+  test.for([
+    ["is not found", { status: 404, body: { error: "Server not found" } }],
+    [
+      "belongs to an organization you are not in",
+      { body: server({ id: "srv_1", organizationId: "org_9" }) },
+    ],
+  ] as const)(
+    "the account default applies when the server %s",
+    async ([, firstReply], { cloud, cli }) => {
+      signIn(cloud);
+      cloud.sequence("GET", "/api/v1/servers/srv_1", [
+        firstReply,
+        { body: server({ id: "srv_1", organizationId: "org_1" }) },
+      ]);
+
+      const result = await cli.run(["link", "--server", "srv_1", "--json"], {
+        env: SIGNED_IN,
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(
+        cloud.requestsTo("GET", "/api/v1/servers/srv_1").at(-1)
+      ).toMatchObject({ headers: { "x-profile-id": "org_1" } });
+    }
+  );
+
+  test("a user in one organization acts in it without looking up the server", async ({
+    cloud,
+    cli,
+  }) => {
+    cloud.on("GET", "/api/v1/organizations", {
+      body: {
+        organizations: [
+          { id: "org_1", name: "Org 1", slug: "org-one", role: "owner" },
+        ],
+      },
+    });
+    cloud.on("GET", "/api/v1/servers/srv_1", {
+      body: server({ id: "srv_1", organizationId: "org_1" }),
+    });
+
+    const result = await cli.run(["link", "--server", "srv_1", "--json"], {
+      env: SIGNED_IN,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(cloud.requestsTo("GET", "/api/v1/servers/srv_1")).toMatchObject([
+      { headers: { "x-profile-id": "org_1" } },
+    ]);
+  });
 });
 
 describe("links written by older CLIs", () => {

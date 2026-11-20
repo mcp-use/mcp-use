@@ -42,8 +42,8 @@ the installed version's skills into `.agents/skills`, `.claude/skills`, and
 - Resolve project context before changing a server. `link --server <id-or-slug>`
   saves `.manufact/project.json`. Server selection is `--server`,
   `MANUFACT_SERVER`, then that link. Organization selection is `--org`,
-  `MANUFACT_ORG`, the link, the saved active organization, then the account
-  default. Use `org use <id-or-slug>` to change the active organization.
+  `MANUFACT_ORG`, the link, the saved active organization, the organization
+  that owns the server, then the account default. Use `org use <id-or-slug>` to change the active organization.
 - `deploy` waits for completion by default. With `--no-wait`, retain the
   returned deployment ID and inspect `deployments get <id> --json` later.
   Use `logs <id> --build` to diagnose a failed build or start.
