@@ -331,3 +331,42 @@ for (const [reply, code] of [
     expect(result.json).toMatchObject({ error: { code } });
   });
 }
+
+test("profiles create stops waiting once a pending session passes expiresAt", async ({
+  cloud,
+  cli,
+}) => {
+  signIn(cloud);
+  created(cloud);
+  const pending = session("pending");
+  cloud.sequence("GET", SESSION, [
+    { body: { ...pending.body, expiresAt: "2020-01-01T00:00:00Z" } },
+  ]);
+  const result = await cli.run(
+    [
+      "profiles",
+      "create",
+      "--url",
+      "https://preview.example.com/mcp",
+      "--json",
+    ],
+    { env: POLLING }
+  );
+  expect(result.exitCode).toBe(1);
+  expect(result.json).toMatchObject({
+    error: { code: "profile_sign_in_expired" },
+  });
+  expect(cloud.unhandled).toEqual([]);
+});
+
+test("profiles create without --url needs a linked server", async ({
+  cloud,
+  cli,
+}) => {
+  const result = await cli.run(["profiles", "create", "--json"], {
+    env: SIGNED_IN,
+  });
+  expect(result.exitCode).toBe(2);
+  expect(result.json).toMatchObject({ error: { code: "project_not_linked" } });
+  expect(cloud.requests).toEqual([]);
+});
