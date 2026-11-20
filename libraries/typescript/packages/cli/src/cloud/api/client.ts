@@ -164,10 +164,14 @@ interface CloudConnection {
 /**
  * Connect with the current credential (see `auth/store.ts`), scoped to
  * `options.organization` (an id or slug) when given, else the active
- * organization.
+ * organization. Without either, a user in several organizations acts in the
+ * one that owns `options.server`, when given and visible to them.
  */
 export async function connectCloud(
-  options: { organization?: string | undefined } = {}
+  options: {
+    organization?: string | undefined;
+    server?: string | undefined;
+  } = {}
 ): Promise<CloudConnection> {
   const credential = await requireCredential();
   const { apiKey } = credential;
@@ -179,6 +183,7 @@ export async function connectCloud(
   const organization = await chooseOrganization(api, organizations, {
     selector: options.organization,
     storedId: await savedOrganizationId(credential),
+    server: options.server,
   });
   if (organization === undefined) throw organizationRequired();
   return {

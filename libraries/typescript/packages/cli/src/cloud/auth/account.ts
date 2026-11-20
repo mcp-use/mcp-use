@@ -76,8 +76,9 @@ export async function defaultOrganizationId(api: Api): Promise<string | null> {
 
 /**
  * The organization a command acts on: `selector` (an id or slug) when given,
- * else the stored one, else the user's only organization, else their
- * dashboard default. `undefined` when none of those applies.
+ * else the stored one, else the user's only organization, else the
+ * organization that owns `server`, else their dashboard default. `undefined`
+ * when none of those applies.
  *
  * A selector or stored id that names no organization of the user's is an
  * error rather than a silent switch to another organization.
@@ -85,7 +86,12 @@ export async function defaultOrganizationId(api: Api): Promise<string | null> {
 export async function chooseOrganization(
   api: Api,
   organizations: readonly CloudOrganization[],
-  wanted: { selector?: string | undefined; storedId?: string | undefined }
+  wanted: {
+    selector?: string | undefined;
+    storedId?: string | undefined;
+    /** Server id or slug the command acts on, when known. */
+    server?: string | undefined;
+  }
 ): Promise<CloudOrganization | undefined> {
   if (wanted.selector !== undefined) {
     return findOrganization(organizations, wanted.selector);
@@ -103,8 +109,39 @@ export async function chooseOrganization(
     return stored;
   }
   if (organizations.length <= 1) return organizations[0];
+  if (wanted.server !== undefined) {
+    const owner = await serverOrganizationId(api, wanted.server);
+    const owning = organizations.find((item) => item.id === owner);
+    if (owning !== undefined) return owning;
+  }
   const defaultId = await defaultOrganizationId(api);
   return organizations.find((item) => item.id === defaultId);
+}
+
+/**
+ * The organization that owns `server` (an id or slug), or `undefined` when
+ * the user cannot see it. The command then reports the missing server
+ * itself, against the organization chosen without it.
+ */
+async function serverOrganizationId(
+  api: Api,
+  server: string
+): Promise<string | undefined> {
+  try {
+    const found = await api.call(
+      api.client.GET("/api/v1/servers/{id}", {
+        params: { path: { id: server } },
+      })
+    );
+    return found.organizationId;
+  } catch (error) {
+    if (
+      error instanceof CommandError &&
+      (error.code === "not_found" || error.code === "forbidden")
+    )
+      return undefined;
+    throw error;
+  }
 }
 
 /** The organization whose id or slug is `selector`. */
