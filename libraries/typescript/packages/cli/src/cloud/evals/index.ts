@@ -912,18 +912,42 @@ function cancelRunsOnSignal(
     process.stderr.write(
       `\nCancelling ${runs.length} eval run${runs.length === 1 ? "" : "s"}…\n`
     );
-    const cancels = Promise.allSettled(runs.map((run) => api.cancel(run.id)));
-    const timeout = delay(CANCEL_TIMEOUT_MS).then(() => undefined);
-    void Promise.race([cancels, timeout]).then((results) => {
-      const lines = runs.map((run, i) => {
-        const result = results?.[i];
-        const label = `${run.id} (${plain(run.name)})`;
-        if (result === undefined)
-          return `Could not confirm cancelling ${label}.`;
-        return result.status === "fulfilled"
-          ? `Cancelled ${label}.`
-          : `Could not cancel ${label}: ${messageOf(result.reason)}`;
+    // Each run's answer, kept as it arrives: one slow cancel doesn't hide the others.
+    const results: Array<PromiseSettledResult<unknown> | undefined> = runs.map(
+      () => undefined
+    );
+    const cancels = Promise.all(
+      runs.map((run, i) =>
+        api.cancel(run.id).then(
+          (value) => (results[i] = { status: "fulfilled", value }),
+          (reason: unknown) => (results[i] = { status: "rejected", reason })
+        )
+      )
+    );
+    const timeout = delay(CANCEL_TIMEOUT_MS);
+    void Promise.race([cancels, timeout]).then(() => {
+      const label = (run: { id: string; name: string }) =>
+        `${run.id} (${plain(run.name)})`;
+      const lines: string[] = [];
+      const unanswered: Array<{ id: string; name: string }> = [];
+      runs.forEach((run, i) => {
+        const result = results[i];
+        if (result === undefined) unanswered.push(run);
+        else if (result.status === "fulfilled")
+          lines.push(`Cancelled ${label(run)}.`);
+        else
+          lines.push(
+            `Could not cancel ${label(run)}: ${messageOf(result.reason)}`
+          );
       });
+      // Cloud's cancel can take longer than CI waits after a signal. The
+      // request was sent; it usually completes after the command exits.
+      if (unanswered.length > 0)
+        lines.push(
+          `Cancel requested; Cloud hadn't answered before this command stopped waiting (cancelling can take several seconds, and usually completes anyway):`,
+          ...unanswered.map((run) => `  ${label(run)}`),
+          `To check: mcp-use evals report ${unanswered.map((run) => run.id).join(" ")}`
+        );
       process.stderr.write(`${lines.join("\n")}\n`);
       exit();
     });

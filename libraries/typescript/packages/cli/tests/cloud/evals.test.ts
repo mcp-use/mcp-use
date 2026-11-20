@@ -1031,6 +1031,94 @@ describe("evals run", () => {
       ).toHaveLength(0);
     }
   );
+
+  test.skipIf(process.platform === "win32")(
+    "a cancel Cloud is slow to answer is reported as requested, not failed, and doesn't hide the others",
+    async ({ cloud, cli }) => {
+      server(cloud);
+      cloud.on("GET", SUITES, {
+        body: [
+          suite({ id: "suite_1", name: "Rome weather" }),
+          suite({ id: "suite_2", name: "Paris forecast" }),
+          suite({ id: "suite_3", name: "Oslo snow" }),
+        ],
+      });
+      for (const id of ["1", "2", "3"]) {
+        cloud.on("POST", `${SUITES}/suite_${id}/runs`, {
+          body: {
+            id: `run_${id}`,
+            suiteId: `suite_${id}`,
+            status: "running",
+            pass: null,
+            score: null,
+            profileId: null,
+          },
+        });
+        // Oslo snow finishes at once: its line shows the command is waiting.
+        cloud.on("GET", `${RUNS}/run_${id}`, {
+          body:
+            id === "3"
+              ? run({
+                  id: "run_3",
+                  suiteId: "suite_3",
+                  scenarios: [
+                    {
+                      executions: [
+                        {
+                          client: "inspector",
+                          modelName: "openai/gpt-5",
+                          status: "complete",
+                          pass: true,
+                          score: 100,
+                          error: null,
+                          judgement: null,
+                          judgeVerdict: null,
+                          toolAssertions: null,
+                        },
+                      ],
+                    },
+                  ],
+                })
+              : run({
+                  id: `run_${id}`,
+                  suiteId: `suite_${id}`,
+                  status: "running",
+                  pass: null,
+                  score: null,
+                }),
+        });
+      }
+      cloud.on("POST", `${RUNS}/run_1/cancel`, { body: { success: true } });
+      // Longer than the 5 s the command waits after a signal.
+      cloud.on("POST", `${RUNS}/run_2/cancel`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 7000));
+        return { body: { success: true } };
+      });
+
+      const result = await cli.run(
+        ["evals", "run", "--all", "--wait", "--server", "weather"],
+        {
+          env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "200" },
+          signal: {
+            name: "SIGINT",
+            when: ({ stdout }) => stdout.includes("✅ Oslo snow"),
+            times: 1,
+          },
+        }
+      );
+
+      expect(result.exitCode).toBe(130);
+      expect(result.stderr).toContain("Cancelled run_1 (Rome weather).");
+      expect(result.stderr).toContain(
+        "Cancel requested; Cloud hadn't answered before this command stopped waiting"
+      );
+      expect(result.stderr).toContain(
+        "  run_2 (Paris forecast)\nTo check: mcp-use evals report run_2"
+      );
+      expect(result.stderr).not.toContain("Could not");
+    },
+    20_000
+  );
   test("--profile starts each run with that profile", async ({
     cloud,
     cli,
