@@ -397,11 +397,16 @@ export function ChatTab({
   } = effectiveClientSide ? clientSideChat : serverSideChat;
 
   const sendWidgetMessage = useCallback(
-    (message: string, widgetAttachments?: MessageAttachment[]) =>
+    (
+      message: string,
+      widgetAttachments?: MessageAttachment[],
+      widgetOptions?: { displayContent?: string }
+    ) =>
       new Promise<void>((resolve, reject) => {
         void sendMessage(message, [], widgetAttachments, {
           throwOnError: true,
           onAccepted: resolve,
+          displayContent: widgetOptions?.displayContent,
         }).then(resolve, reject);
       }),
     [sendMessage]

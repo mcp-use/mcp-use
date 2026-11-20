@@ -5,40 +5,11 @@ import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
-import type { LLMConfig, MessageAttachment } from "./types";
+import type { LLMConfig, Message, MessageAttachment } from "./types";
+import { contentToText, getVisibleMessageContent } from "./message-visibility";
 import { isViewTool } from "@mcp-use/client/react";
 import { buildMessageTokenMap, type InspectorTraceEvent } from "./trace";
 import { normalizeWidgetMessage } from "./widget-message";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string | Array<{ index: number; type: string; text: string }>;
-  timestamp: number;
-  attachments?: MessageAttachment[];
-  parts?: Array<{
-    type: "text" | "tool-invocation";
-    text?: string;
-    toolInvocation?: {
-      toolCallId?: string;
-      toolName: string;
-      args: Record<string, unknown>;
-      result?: any;
-      state?:
-        | "pending"
-        | "streaming"
-        | "authorization-required"
-        | "result"
-        | "error";
-      partialArgs?: Record<string, unknown>;
-    };
-  }>;
-  toolCalls?: Array<{
-    toolName: string;
-    args: Record<string, unknown>;
-    result?: any;
-  }>;
-}
 
 interface MessageListProps {
   messages: Message[];
@@ -48,7 +19,8 @@ interface MessageListProps {
   tools?: any[];
   sendMessage?: (
     message: string,
-    attachments?: MessageAttachment[]
+    attachments?: MessageAttachment[],
+    options?: { displayContent?: string }
   ) => Promise<void>;
   /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
   serverBaseUrl?: string;
@@ -126,6 +98,9 @@ export const MessageList = memo(
             normalized.text,
             normalized.attachments.length > 0
               ? normalized.attachments
+              : undefined,
+            normalized.displayText !== undefined
+              ? { displayContent: normalized.displayText }
               : undefined
           );
         } finally {
@@ -172,18 +147,7 @@ export const MessageList = memo(
             );
           }
 
-          const contentStr =
-            typeof lastMessage.content === "string"
-              ? lastMessage.content
-              : Array.isArray(lastMessage.content)
-                ? lastMessage.content
-                    .map((item) =>
-                      typeof item === "string"
-                        ? item
-                        : item.text || JSON.stringify(item)
-                    )
-                    .join("")
-                : JSON.stringify(lastMessage.content);
+          const contentStr = contentToText(lastMessage.content);
 
           const hasContent = contentStr && contentStr.trim().length > 0;
           return !hasContent;
@@ -219,26 +183,20 @@ export const MessageList = memo(
     return (
       <div className="space-y-6 max-w-3xl mx-auto px-2">
         {messages.map((message) => {
-          const contentStr =
-            typeof message.content === "string"
-              ? message.content
-              : Array.isArray(message.content)
-                ? message.content
-                    .map((item) =>
-                      typeof item === "string"
-                        ? item
-                        : item.text || JSON.stringify(item)
-                    )
-                    .join("")
-                : JSON.stringify(message.content);
+          const contentStr = contentToText(message.content);
 
           if (message.role === "user") {
+            const visible = getVisibleMessageContent(message);
             return (
               <UserMessage
                 key={message.id}
-                content={contentStr}
+                content={visible.text}
                 timestamp={message.timestamp}
-                attachments={message.attachments}
+                attachments={
+                  visible.attachments.length > 0
+                    ? visible.attachments
+                    : undefined
+                }
                 inputTokens={messageTokenMap.get(message.id)?.inputTokens}
               />
             );

@@ -14,8 +14,35 @@ const SUPPORTED_WIDGET_IMAGE_TYPES = new Set([
 ]);
 
 interface NormalizedWidgetMessage {
+  /** Full model-facing text, including model-only blocks. */
   text: string;
+  /** All images; model-only ones carry `modelOnly: true`. */
   attachments: MessageAttachment[];
+  /**
+   * Text to show in the conversation. Present only when at least one text
+   * block is model-only; otherwise the whole `text` is shown.
+   */
+  displayText?: string;
+}
+
+/**
+ * Whether a content block should be shown to the user.
+ *
+ * MCP `annotations.audience` lists who the content is for. A block is hidden
+ * from the conversation only when `audience` is a valid role array
+ * (`"user"` / `"assistant"` entries only) that omits `"user"`. A missing or
+ * malformed `audience`, including one with unknown roles, keeps the block
+ * visible.
+ */
+export function isVisibleToUser(block: MessageContentBlock): boolean {
+  const annotations = (block as { annotations?: unknown }).annotations;
+  if (!annotations || typeof annotations !== "object") return true;
+  const audience = (annotations as { audience?: unknown }).audience;
+  if (!Array.isArray(audience)) return true;
+  if (audience.some((role) => role !== "user" && role !== "assistant")) {
+    return true;
+  }
+  return audience.includes("user");
 }
 
 export function validateWidgetImageSizes(sizes: readonly number[]): void {
@@ -57,6 +84,7 @@ export function normalizeWidgetMessage(
   }
 
   const textParts: string[] = [];
+  const visibleTextParts: string[] = [];
   const attachments: MessageAttachment[] = [];
 
   for (const [index, block] of content.entries()) {
@@ -65,6 +93,7 @@ export function normalizeWidgetMessage(
         throw new Error(`ui/message text block ${index} is invalid`);
       }
       textParts.push(block.text);
+      if (isVisibleToUser(block)) visibleTextParts.push(block.text);
       continue;
     }
 
@@ -91,6 +120,7 @@ export function normalizeWidgetMessage(
         mimeType: block.mimeType,
         name: `widget-image-${attachments.length + 1}`,
         size,
+        ...(isVisibleToUser(block) ? {} : { modelOnly: true }),
       });
       continue;
     }
@@ -105,5 +135,7 @@ export function normalizeWidgetMessage(
     throw new Error("ui/message must include text or an image");
   }
 
-  return { text, attachments };
+  return visibleTextParts.length === textParts.length
+    ? { text, attachments }
+    : { text, attachments, displayText: visibleTextParts.join("\n") };
 }

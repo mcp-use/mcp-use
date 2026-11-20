@@ -1,3 +1,7 @@
+import {
+  getVisibleMessageContent,
+  isHiddenFromUser,
+} from "@/client/components/chat/message-visibility";
 import type { Message } from "@/client/components/chat/types";
 import type {
   ChatSession,
@@ -40,12 +44,11 @@ function nowIso(): string {
 }
 
 function autoTitleFromMessages(messages: Message[]): string | undefined {
-  const firstUser = messages.find((m) => m.role === "user");
+  const firstUser = messages.find(
+    (m) => m.role === "user" && !isHiddenFromUser(m)
+  );
   if (!firstUser) return undefined;
-  const text =
-    typeof firstUser.content === "string"
-      ? firstUser.content.trim()
-      : String(firstUser.content ?? "").trim();
+  const text = getVisibleMessageContent(firstUser).text.trim();
   if (!text) return undefined;
   return text.length > AUTO_TITLE_MAX
     ? `${text.slice(0, AUTO_TITLE_MAX)}…`

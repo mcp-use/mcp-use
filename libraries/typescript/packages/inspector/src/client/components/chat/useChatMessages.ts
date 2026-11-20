@@ -198,6 +198,9 @@ export function useChatMessages({
           id: `user-${Date.now()}`,
           role: "user",
           content: userInput.trim(),
+          ...(options?.displayContent !== undefined
+            ? { displayContent: options.displayContent.trim() }
+            : {}),
           timestamp: Date.now(),
           attachments: allAttachments.length > 0 ? allAttachments : undefined,
         };

@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { isHiddenFromUser } from "./message-visibility";
 import { MessageList } from "./MessageList";
 import type { Message } from "./types";
 
@@ -41,7 +42,10 @@ export function FullscreenChatOverlay({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const latestUserMessageId = messages.reduce<string | null>(
-    (latestId, message) => (message.role === "user" ? message.id : latestId),
+    (latestId, message) =>
+      message.role === "user" && !isHiddenFromUser(message)
+        ? message.id
+        : latestId,
     null
   );
   const latestUserMessageIdRef = useRef(latestUserMessageId);
