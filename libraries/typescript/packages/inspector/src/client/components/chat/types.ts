@@ -6,12 +6,21 @@ export interface MessageAttachment {
   mimeType: string;
   name?: string;
   size?: number;
+  /** Sent to the model but not shown in the conversation (MCP `audience` without `"user"`). */
+  modelOnly?: boolean;
 }
 
 export interface Message {
   id: string;
   role: "user" | "assistant";
+  /** Full model-facing content. */
   content: string | Array<{ index: number; type: string; text: string }>;
+  /**
+   * Text shown in the conversation when part of `content` is model-only
+   * (MCP `annotations.audience` without `"user"`). Absent means all of
+   * `content` is shown.
+   */
+  displayContent?: string;
   timestamp: number;
   attachments?: MessageAttachment[];
   parts?: Array<{
@@ -60,6 +69,8 @@ export interface SendMessageOptions {
   onAccepted?: () => void;
   /** Internal: replay a persisted OAuth-interrupted turn without duplicating its user message. */
   resumeExistingTurn?: boolean;
+  /** User-visible text when part of the message is model-only. See {@link Message.displayContent}. */
+  displayContent?: string;
 }
 
 export interface LLMConfig {
