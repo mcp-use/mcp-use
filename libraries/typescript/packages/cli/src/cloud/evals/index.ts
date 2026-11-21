@@ -105,7 +105,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       );
     if (command === "run" && (values.all === true) === positionals.length > 0)
       throw new UsageError(
-        "Pass suites or --all, not both.\nUsage: mcp-use evals run <suite...>|--all"
+        "Pass suite IDs or --all, not both.\nUsage: mcp-use evals run <suite-id...>|--all"
       );
     const jsonFile =
       typeof values["json-file"] === "string" ? values["json-file"] : undefined;
@@ -141,12 +141,16 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
             })
           )
         : [];
-    // Suites named on the command line: IDs, names, or suite files.
-    const refs = ["get", "export", "update", "rm", "run"].includes(command!)
-      ? await suiteRefs(positionals, command === "run")
-      : typeof values.suite === "string"
-        ? await suiteRefs([values.suite], false)
-        : [];
+    // Suites named on the command line. `run` takes IDs only, since names
+    // aren't unique; the others also take a name or a suite file.
+    const refs =
+      command === "run"
+        ? positionals.map((id) => ({ label: id, idOnly: true }))
+        : ["get", "export", "update", "rm"].includes(command!)
+          ? await suiteRefs(positionals)
+          : typeof values.suite === "string"
+            ? await suiteRefs([values.suite])
+            : [];
     const file =
       typeof values.file === "string"
         ? await readEvalSuiteFile(values.file)
@@ -788,17 +792,15 @@ interface SuiteRef {
   label: string;
   /** The suite name read from a suite file. */
   fileName?: string;
+  /** Match `label` as a suite ID only, never as a name. */
+  idOnly?: boolean;
 }
 
 /**
  * Turn command-line suite references into refs. An existing file is read
- * for its suite name; a directory, where `directories` allows it, stands
- * for every suite file in it. Anything else is an ID or a name.
+ * for its suite name; anything else is an ID or a name.
  */
-async function suiteRefs(
-  args: readonly string[],
-  directories: boolean
-): Promise<SuiteRef[]> {
+async function suiteRefs(args: readonly string[]): Promise<SuiteRef[]> {
   const refs: SuiteRef[] = [];
   for (const arg of args) {
     const info = await stat(arg).catch(() => undefined);
@@ -806,21 +808,17 @@ async function suiteRefs(
       refs.push({ label: arg });
       continue;
     }
-    if (info.isDirectory() && !directories)
+    if (info.isDirectory())
       throw new UsageError(`${arg} is a directory; name one suite.`);
-    for (const path of await suiteFiles([arg]))
-      refs.push({
-        label: path,
-        fileName: (await readEvalSuiteFile(path)).name,
-      });
+    refs.push({ label: arg, fileName: (await readEvalSuiteFile(arg)).name });
   }
   return refs;
 }
 
 /**
- * The suites `refs` name, in order: a file by its suite name; otherwise an
- * ID, then an exact name, then a name ignoring case. Fails on no match or
- * on a name several suites share.
+ * The suites `refs` name, in order: a file by its suite name; an ID-only ref
+ * by its ID; otherwise an ID, then an exact name, then a name ignoring case.
+ * Fails on no match or on a name several suites share.
  */
 async function resolveSuites(
   api: EvalApi,
@@ -830,21 +828,25 @@ async function resolveSuites(
   return refs.map((ref) => {
     const name = ref.fileName ?? ref.label;
     const lower = name.toLowerCase();
-    const candidates = [
-      ref.fileName === undefined
-        ? suites.filter((suite) => suite.id === ref.label)
-        : [],
-      suites.filter((suite) => suite.name === name),
-      suites.filter((suite) => suite.name.toLowerCase() === lower),
-    ];
+    const candidates = ref.idOnly
+      ? [suites.filter((suite) => suite.id === ref.label)]
+      : [
+          ref.fileName === undefined
+            ? suites.filter((suite) => suite.id === ref.label)
+            : [],
+          suites.filter((suite) => suite.name === name),
+          suites.filter((suite) => suite.name.toLowerCase() === lower),
+        ];
     const matches = candidates.find((list) => list.length > 0) ?? [];
     if (matches.length === 1) return matches[0]!;
     if (matches.length === 0)
       throw new CommandError(
         "eval_suite_not_found",
-        ref.fileName === undefined
-          ? `No eval suite matches “${ref.label}”.`
-          : `No eval suite is named “${name}” (from ${ref.label}).`,
+        ref.idOnly
+          ? `No eval suite has the ID “${ref.label}”. Pass suite IDs; names and files aren't accepted.`
+          : ref.fileName === undefined
+            ? `No eval suite matches “${ref.label}”.`
+            : `No eval suite is named “${name}” (from ${ref.label}).`,
         undefined,
         [
           ref.fileName === undefined

@@ -785,9 +785,10 @@ resets every omitted field to its default. `evals models` lists model IDs for
 `clients.inspector.models`, and `evals options` lists the web apps and harnesses
 your organization can run, with their models.
 
-Commands that take a `<suite>` accept its ID, its name (exact, or ignoring
-case when unique), or the path of its suite file, which is matched by the
-`name` inside it. `evals run` also accepts a directory of suite files.
+`evals run` selects suites by ID only, because suite names aren't unique.
+`evals list` prints each suite's ID. The other commands that take a `<suite>`
+accept its ID, its name (exact, or ignoring case when unique), or the path of
+its suite file, which is matched by the `name` inside it.
 
 In CI, push the suites and wait for the results. `--wait` exits 1 unless every
 run passes:
@@ -862,10 +863,12 @@ mcp-use evals rm <suite> [--yes] [options]
 Start one run per suite against the server's production endpoint.
 
 ```bash
-mcp-use evals run [<suite...>] [--all] [--branch <name>] [--profile <id>] [--wait] [--timeout <seconds>] [--json-file <path>] [--markdown-file <path>] [options]
+mcp-use evals run [<suite-id...>] [--all] [--branch <name>] [--profile <id>] [--wait] [--timeout <seconds>] [--json-file <path>] [--markdown-file <path>] [options]
 ```
 
-`--all` runs every enabled suite, and `--branch` targets a branch environment.
+Pass suite IDs or `--all`. An argument that isn't a suite ID, such as a suite
+name or a file path, fails with `eval_suite_not_found`. `--all` runs every
+enabled suite, and `--branch` targets a branch environment.
 `--profile` signs in with that profile of the server's organization instead of
 the server's own, so the same suites can run as different accounts. It doesn't
 apply to native apps or to clients running the plugin lifecycle, which sign in

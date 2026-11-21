@@ -2149,22 +2149,15 @@ test("evals runs names each run's suite", async ({ cloud, cli }) => {
 });
 
 describe("suite references", () => {
-  test("run accepts IDs, names, suite files and directories", async ({
-    cloud,
-    cli,
-  }) => {
+  test("run selects suites by ID", async ({ cloud, cli }) => {
     server(cloud);
-    await mkdir(join(cli.cwd, "evals"));
-    await writeFile(join(cli.cwd, "evals", "rome.yaml"), ROME);
-    await writeFile(join(cli.cwd, "checkout.yaml"), CHECKOUT);
     cloud.on("GET", SUITES, {
       body: [
         suite({ id: "suite_rome", name: "Rome weather" }),
         suite({ id: "suite_checkout", name: "Checkout" }),
-        suite({ id: "suite_paris", name: "Paris weather" }),
       ],
     });
-    for (const id of ["suite_rome", "suite_checkout", "suite_paris"])
+    for (const id of ["suite_rome", "suite_checkout"])
       cloud.on("POST", `${SUITES}/${id}/runs`, {
         body: {
           id: `run_${id}`,
@@ -2180,9 +2173,8 @@ describe("suite references", () => {
       [
         "evals",
         "run",
-        "evals",
-        "checkout.yaml",
-        "paris WEATHER",
+        "suite_rome",
+        "suite_checkout",
         "suite_rome",
         "--server",
         "weather",
@@ -2191,18 +2183,52 @@ describe("suite references", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    // Duplicates collapse: the directory and the ID both name Rome.
+    // Duplicates collapse: the repeated ID runs once.
     expect(result.stdout).toBe(
       [
         "✓ Started run run_suite_rome (Rome weather)",
         "✓ Started run run_suite_checkout (Checkout)",
-        "✓ Started run run_suite_paris (Paris weather)",
         "",
-        "Results: mcp-use evals report run_suite_rome run_suite_checkout run_suite_paris",
+        "Results: mcp-use evals report run_suite_rome run_suite_checkout",
         "",
       ].join("\n")
     );
   });
+
+  test.for([
+    ["an exact name", "Rome weather"],
+    ["a name in another case", "rome WEATHER"],
+    ["a suite file named after the suite", "rome.yaml"],
+    ["a directory of suite files", "evals"],
+  ] as const)(
+    "run rejects %s and starts nothing",
+    async ([, arg], { cloud, cli }) => {
+      server(cloud);
+      await mkdir(join(cli.cwd, "evals"));
+      await writeFile(join(cli.cwd, "evals", "rome.yaml"), ROME);
+      await writeFile(join(cli.cwd, "rome.yaml"), ROME);
+      cloud.on("GET", SUITES, {
+        body: [suite({ id: "suite_rome", name: "Rome weather" })],
+      });
+
+      const result = await cli.run(["evals", "run", arg, ...SCOPE], {
+        env: SIGNED_IN,
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.json).toMatchObject({
+        error: {
+          code: "eval_suite_not_found",
+          nextSteps: [
+            { description: "List eval suites", command: "mcp-use evals list" },
+          ],
+        },
+      });
+      // The suite list was read, so a POST would have reached the fake too.
+      expect(cloud.requestsTo("GET", SUITES)).toHaveLength(1);
+      expect(cloud.requests.filter((r) => r.method === "POST")).toEqual([]);
+    }
+  );
 
   test("names what it cannot find or cannot tell apart, before writing", async ({
     cloud,
@@ -2226,7 +2252,7 @@ describe("suite references", () => {
         env: SIGNED_IN,
       }
     );
-    const twins = await cli.run(["evals", "run", "Twin", ...SCOPE], {
+    const twins = await cli.run(["evals", "get", "Twin", ...SCOPE], {
       env: SIGNED_IN,
     });
 

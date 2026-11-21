@@ -487,11 +487,11 @@ const pages: Record<string, Page> = {
   },
   evals: {
     summary:
-      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: name and flow are required; rubric, threshold (default 0.7), clients (default: Inspector with the default model), disallowedTools and enabled are optional, and omitted fields reset to their defaults. A <suite> is a suite ID, its name, or a suite file.",
+      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: name and flow are required; rubric, threshold (default 0.7), clients (default: Inspector with the default model), disallowedTools and enabled are optional, and omitted fields reset to their defaults. A <suite> is a suite ID, its name, or a suite file; run takes suite IDs only.",
     examples: [
       "mcp-use evals push evals/",
       "mcp-use evals run --all --wait",
-      "mcp-use evals run evals/checkout.yaml --wait",
+      "mcp-use evals run <suite-id> --wait",
     ],
     commands: {
       push: {
@@ -551,8 +551,8 @@ const pages: Record<string, Page> = {
       },
       run: {
         summary:
-          "Start one run per suite against the production endpoint, or a branch environment with --branch. Runs continue on Cloud.",
-        args: "[<suite...>]",
+          "Start one run per suite against the production endpoint, or a branch environment with --branch. Select suites by ID (see mcp-use evals list); names and files aren't accepted. Runs continue on Cloud.",
+        args: "[<suite-id...>]",
         options: [
           ...project,
           ["--all", "Run every enabled suite"],
@@ -577,8 +577,8 @@ const pages: Record<string, Page> = {
         ],
         examples: [
           "mcp-use evals run --all --wait",
-          "mcp-use evals run evals/ --wait",
-          'mcp-use evals run "Rome weather" --branch preview',
+          "mcp-use evals run <suite-id> <suite-id> --wait",
+          "mcp-use evals run <suite-id> --branch preview",
           "mcp-use evals run --all --wait --json-file evals.json --markdown-file evals.md",
           "mcp-use evals run --all --wait --profile <profile-id>",
         ],

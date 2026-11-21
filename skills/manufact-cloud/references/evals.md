@@ -10,9 +10,10 @@ mcp-use evals run --all --wait --json
 mcp-use evals report RUN_ID --json
 ```
 
-Commands that take a suite accept its ID, its name, or its suite file:
-`mcp-use evals run evals/rome.yaml --wait`, `mcp-use evals get "Rome weather"`.
-`evals run evals/` runs every suite defined in that directory.
+`evals run` takes suite IDs only (`mcp-use evals list --json` shows them), or
+`--all`: `mcp-use evals run SUITE_ID --wait`. A name or a file path fails with
+`eval_suite_not_found`. The other commands that take a suite also accept its
+name or its suite file: `mcp-use evals get "Rome weather"`.
 
 `push` matches suites by name: it replaces a suite with the file's name or
 creates one. A file is the suite's whole definition, so writing it resets every
