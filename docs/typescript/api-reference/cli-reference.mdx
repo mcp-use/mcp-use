@@ -658,6 +658,8 @@ Policy concerns, the findings under **Policy review**, count as warnings, as on 
 
 To keep the readable report in CI logs and still read the result from a script, pass `--json-file <path>`. The report prints as usual, and the same result `--json` would print is written to the file.
 
+The `--json` result of `checklist run`, `get` and `cancel` includes `fixPrompt`: Cloud's copyable prompt for fixing the run's failed checks, the same text as the dashboard's **Copy fix prompt**. It is `null` when the run isn't complete, has no failed checks, or Cloud doesn't provide one.
+
 Pass `--markdown-file <path>` to also write a Markdown report in the same format as the Manufact GitHub app's publishing check: an outcome title such as `Ready to submit` or `2 required fixes before submission`, a summary, tables of required fixes, policy concerns and recommendations (live tests excluded), a copyable fix prompt when Cloud returns one, and a dashboard link. The report always starts with the line `## Publishing checks`. Use it for pull request comments or CI job summaries. `checklist get` accepts it too.
 
 For an External URL server, two more options change what a run checks:

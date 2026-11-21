@@ -123,7 +123,7 @@ export function checklistRun(
   ] as const) {
     if (item[key] !== undefined) Object.assign(result, { [key]: item[key] });
   }
-  // Only reports use the fix prompt; the JSON result keeps its documented fields.
+  // run/get/cancel add it to their result as `fixPrompt: string | null`.
   if (presentation && typeof item.fixPrompt === "string" && item.fixPrompt)
     result.fixPrompt = item.fixPrompt;
   if (Array.isArray(item.checks)) {

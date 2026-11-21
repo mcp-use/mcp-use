@@ -544,9 +544,38 @@ test("checklist get --markdown-file writes the GitHub app's publishing-check rep
     `${expected.join("\n\n")}\n`
   );
   // The fix prompt is for the report; the JSON result keeps its documented fields.
-  expect(result.json).toMatchObject({ id: "run_1", status: "completed" });
-  expect(result.json).not.toHaveProperty("fixPrompt");
+  expect(result.json).toMatchObject({
+    id: "run_1",
+    status: "completed",
+    fixPrompt: "Fix these issues:\n```ts\nserver.tool({ description })\n```\n",
+  });
 });
+
+test.for([
+  ["null", { fixPrompt: null }],
+  ["missing", {}],
+] as const)(
+  "checklist get --json reports fixPrompt as null when Cloud's is %s",
+  async ([, extra], { cloud, cli }) => {
+    server(cloud);
+    cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+      body: { id: "run_1", status: "completed", checks: [], ...extra },
+    });
+    const result = await cli.run(
+      ["checklist", "get", "run_1", "--server", "weather", "--json"],
+      { env: SIGNED_IN }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toEqual({
+      id: "run_1",
+      status: "completed",
+      checks: [],
+      fixPrompt: null,
+      dashboardUrl:
+        "https://manufact.com/cloud/org-one/servers/srv_1/checklist",
+    });
+  }
+);
 
 test("checklist --markdown-file leaves the fix prompt out when Cloud has none", async ({
   cloud,

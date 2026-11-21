@@ -257,7 +257,11 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
       if (command === "run") failed = shouldFail(run, failOn);
       const serverName = found.name ?? found.slug ?? serverId;
       return {
-        value: { ...checklistRun(run), dashboardUrl },
+        value: {
+          ...checklistRun(run),
+          fixPrompt: run.fixPrompt ?? null,
+          dashboardUrl,
+        },
         markdown: formatChecklistMarkdown(run, { dashboardUrl }),
         human: formatChecklist(run, {
           verbose: values.verbose === true,
