@@ -10,23 +10,29 @@ mcp-use evals run --all --wait --json
 mcp-use evals report RUN_ID --json
 ```
 
-Commands that select an existing suite take its ID only, because names aren't
-unique: `get`, `export`, `update`, `rm`, `run` and `runs --suite`
-(`mcp-use evals list --json` shows the IDs). For example
-`mcp-use evals run SUITE_ID --wait` or `mcp-use evals get SUITE_ID`. A name or a
-file path fails with `eval_suite_not_found`. `evals run --all` runs every
+Every suite has a UUID and a slug (its ID within the server, such as
+`rome-weather`). A suite ID is either one. Commands that select an existing
+suite take a suite ID, never a name, because names aren't unique: `get`,
+`export`, `update`, `rm`, `run` and `runs --suite` (`mcp-use evals list --json`
+shows `id`, the UUID, and `slug`). For example
+`mcp-use evals run rome-weather --wait` or `mcp-use evals get SUITE_ID`. A name
+or a file path fails with `eval_suite_not_found`. `evals run --all` runs every
 enabled suite.
 
-`push` matches suites by name: it replaces a suite with the file's name or
-creates one. A file is the suite's whole definition, so writing it resets every
-omitted field to its default. `push` never deletes suites; use
+`push` matches files to suites by the file's `id` (the slug): it updates the
+suite with that slug or creates one with it, and prints `Created` or `Updated`
+per file. Renaming a suite in its file keeps the same suite. Two files with the
+same `id` fail the push (`eval_suite_duplicate_id`) before anything is written.
+A file is the suite's whole definition, so writing it resets every omitted
+field to its default. `push` never deletes suites; use
 `mcp-use evals rm SUITE_ID --yes` when a file is removed. To start from a
-suite built in the dashboard, run
-`mcp-use evals export SUITE_ID --out evals/name.yaml`.
+suite built in the dashboard, run `mcp-use evals export SUITE_ID --out evals/`,
+which writes `evals/<slug>.yaml`.
 
 ## File format
 
 ```yaml
+id: rome-weather
 name: Rome weather
 flow:
   - kind: user
@@ -46,7 +52,12 @@ disallowedTools: [delete_city]
 enabled: true
 ```
 
-- `name` and `flow` are required, and `flow` needs at least one `user` step.
+- `id`, `name` and `flow` are required. `id` is the suite's slug: lowercase
+  letters and digits in groups joined by single hyphens, at most 64
+  characters, unique per server. It is never derived from `name`; a file
+  without one fails, and the error suggests one. `name` is only the display
+  name.
+- `flow` needs at least one `user` step.
   Steps use the dashboard's shape: `kind: user` with `content`,
   `kind: tool_call` with `name` and optional `args` (a call the model must
   make before the next user turn), and `kind: assistant_text` with an optional

@@ -693,7 +693,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all eval suites for a server, each with its latest run. */
+        /** @description List suites with their latest run. Server-bound CI tokens receive only the ID, slug, name and enabled flag for suite selection. */
         get: operations["getApiV1ServerEvalsByServerIdSuites"];
         put?: never;
         /** @description Create a new eval suite for a server. */
@@ -746,7 +746,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List eval runs for a server. Optional filter by suiteId. */
+        /** @description List eval runs for a server. Optional filter by suiteId (the suite's UUID or slug). */
         get: operations["getApiV1ServerEvalsByServerIdRuns"];
         put?: never;
         post?: never;
@@ -2561,7 +2561,7 @@ export interface operations {
                         }[];
                         measures: {
                             /**
-                             * @description Measure. ≈ = approximate (sketch). events (count): Events (requests); tool_calls (count): tools/call events; errors (count): Error events: transport errors plus failed tool results; error_rate (ratio): errors / events (0..1); transport_errors (count): HTTP/transport errors, excluding neutral lifecycle signals; tool_result_errors (count): tools/call results with isError; tool_outcome_events (count): Events with a known tool outcome (tool_call_success not NULL); tool_result_error_rate (ratio): tool_result_errors / tool_outcome_events (0..1); neutral_events (count): Expected capability signals (optional SSE 405, protocol probe); success_events (count): Successful events; avg_duration_ms (ms): Mean duration_ms over events with a duration; min_duration_ms (ms): Minimum duration_ms; max_duration_ms (ms): Maximum duration_ms; p50_duration_ms (ms, ≈): p50 of duration_ms (t-digest); p90_duration_ms (ms, ≈): p90 of duration_ms (t-digest); p95_duration_ms (ms, ≈): p95 of duration_ms (t-digest); p99_duration_ms (ms, ≈): p99 of duration_ms (t-digest); sessions (count, ≈): Distinct sessions (interaction_id); actors (count, ≈): Distinct actors; verified_actors (count, ≈): Distinct actors identified by conversation, token or account; approximate_actors (count, ≈): Distinct IP-derived actors; output_tokens (tokens): Sum of estimated output tokens; token_events (count): Events with an output token estimate; avg_request_bytes (bytes): Mean request body bytes; avg_response_bytes (bytes): Mean response body bytes; sessions_with_tool (count): Distinct sessions with at least one matching tools/call (exact, tool index); active_interactions_5m (count): Distinct sessions with an event in the last 5 minutes (exact, raw); first_seen (timestamp): First event time; last_seen (timestamp): Last event time
+                             * @description Measure. ≈ = approximate (sketch). events (count): Events (requests); tool_calls (count): tools/call events; errors (count): Error events: transport errors plus failed tool results; error_rate (ratio): errors / events (0..1); transport_errors (count): HTTP/transport errors, excluding neutral lifecycle signals; tool_result_errors (count): tools/call results with isError; tool_outcome_events (count): Events with a known tool outcome (tool_call_success not NULL); tool_result_error_rate (ratio): tool_result_errors / tool_outcome_events (0..1); neutral_events (count): Expected capability signals (optional SSE 405, protocol probe); success_events (count): Successful events; avg_duration_ms (ms): Mean duration_ms over events with a duration; min_duration_ms (ms): Minimum duration_ms; max_duration_ms (ms): Maximum duration_ms; p50_duration_ms (ms, ≈): p50 of duration_ms (t-digest); p90_duration_ms (ms, ≈): p90 of duration_ms (t-digest); p95_duration_ms (ms, ≈): p95 of duration_ms (t-digest); p99_duration_ms (ms, ≈): p99 of duration_ms (t-digest); sessions (count, ≈): Distinct traces (interaction_id); actors (count, ≈): Distinct actors; verified_actors (count, ≈): Distinct actors identified by conversation, token or account; approximate_actors (count, ≈): Distinct IP-derived actors; output_tokens (tokens): Sum of estimated output tokens; token_events (count): Events with an output token estimate; avg_request_bytes (bytes): Mean request body bytes; avg_response_bytes (bytes): Mean response body bytes; sessions_with_tool (count): Distinct traces with at least one matching tools/call (exact, tool index); active_interactions_5m (count): Distinct traces with an event in the last 5 minutes (exact, raw); first_seen (timestamp): First event time; last_seen (timestamp): Last event time
                              * @enum {string}
                              */
                             name: "events" | "tool_calls" | "errors" | "error_rate" | "transport_errors" | "tool_result_errors" | "tool_outcome_events" | "tool_result_error_rate" | "neutral_events" | "success_events" | "avg_duration_ms" | "min_duration_ms" | "max_duration_ms" | "p50_duration_ms" | "p90_duration_ms" | "p95_duration_ms" | "p99_duration_ms" | "sessions" | "actors" | "verified_actors" | "approximate_actors" | "output_tokens" | "token_events" | "avg_request_bytes" | "avg_response_bytes" | "sessions_with_tool" | "active_interactions_5m" | "first_seen" | "last_seen";
@@ -2579,7 +2579,7 @@ export interface operations {
                         }[];
                         dimensions: {
                             /**
-                             * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): Session (interaction) id: one conversation or connection; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
+                             * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): ID of the trace grouping related gateway events; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
                              * @enum {string}
                              */
                             name: "mcp_method" | "method_family" | "resource" | "health_resource" | "resource_name" | "resource_type" | "tool" | "client_name" | "client_version" | "protocol_version" | "country" | "subdomain" | "http_method" | "status" | "status_code" | "error_code" | "transport_error_kind" | "transport_mode" | "auth_method" | "actor_source" | "actor_trust" | "traffic_class" | "actor_id" | "interaction_id" | "error_reason" | "deployment_id";
@@ -2644,7 +2644,7 @@ export interface operations {
                                 granularity?: "minute" | "hour" | "day" | "week" | "month" | "auto";
                                 filters?: {
                                     /**
-                                     * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): Session (interaction) id: one conversation or connection; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
+                                     * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): ID of the trace grouping related gateway events; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
                                      * @enum {string}
                                      */
                                     dimension: "mcp_method" | "method_family" | "resource" | "health_resource" | "resource_name" | "resource_type" | "tool" | "client_name" | "client_version" | "protocol_version" | "country" | "subdomain" | "http_method" | "status" | "status_code" | "error_code" | "transport_error_kind" | "transport_mode" | "auth_method" | "actor_source" | "actor_trust" | "traffic_class" | "actor_id" | "interaction_id" | "error_reason" | "deployment_id";
@@ -2655,7 +2655,7 @@ export interface operations {
                                 segments?: ("mcp_traffic" | "method_allowlist" | "non_discovery" | "all")[];
                                 /** @description Include Manufact's own clients (default false; forced by an eq/in client_name filter). */
                                 includeInternal?: boolean;
-                                /** @description Sessions using these tools */
+                                /** @description Traces using these tools */
                                 sessionTools?: string[];
                                 /** @description Preview branch; omit for all environments. */
                                 branch?: string;
@@ -2663,7 +2663,7 @@ export interface operations {
                                 compare?: "previous_period";
                                 topN?: {
                                     /**
-                                     * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): Session (interaction) id: one conversation or connection; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
+                                     * @description Dimension. mcp_method: JSON-RPC method (tools/call, tools/list, initialize, ...); method_family: First path segment of the method (tools, resources, prompts, initialize, ...); resource: Breakdown key: resource_name, else resource_type, else the method (tool-breakdown card); health_resource: Health key: resource_name, else the method (health card); resource_name: Tool, prompt or resource name the method targets (resources/* URIs: credentials redacted); resource_type: tool, prompt or resource; tool: Tool name of tools/call events (NULL for other methods); client_name: MCP client display name from initialize ('Unknown Client' when missing); client_version: MCP client version ('unknown' when missing); protocol_version: Negotiated MCP protocol version ('unknown' when missing); country: Caller country, ISO 3166-1 alpha-2 ('Unknown' when missing); subdomain: Gateway subdomain: the server slug for production, <slug>--br-<branch> for previews; http_method: HTTP method; status: success or error; status_code: HTTP status code; error_code: JSON-RPC error code; transport_error_kind: Transport failure class; transport_mode: Transport (streamable-http, sse, ...); auth_method: How the caller authenticated; actor_source: How actor_id was derived (sdk-conversation, auth-token, openai-subject, platform-user, ip-anon); actor_trust: verified (person or conversation), approximate (IP-derived) or none; traffic_class: non_mcp, discovery, allowlisted or other_mcp; actor_id (raw events only): Org-salted actor hash (linkable across servers of one organization); interaction_id (raw events only): ID of the trace grouping related gateway events; error_reason (raw events only): Error message with secrets redacted (at most 500 characters); deployment_id (raw events only): Deployment that served the request
                                      * @enum {string}
                                      */
                                     dimension: "mcp_method" | "method_family" | "resource" | "health_resource" | "resource_name" | "resource_type" | "tool" | "client_name" | "client_version" | "protocol_version" | "country" | "subdomain" | "http_method" | "status" | "status_code" | "error_code" | "transport_error_kind" | "transport_mode" | "auth_method" | "actor_source" | "actor_trust" | "traffic_class" | "actor_id" | "interaction_id" | "error_reason" | "deployment_id";
@@ -2852,7 +2852,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description One ClickHouse SELECT (or UNION) over the analytics relations: events: Raw gateway events, one row per request. Drill-down only: each query may read at most 20M rows (about one day of the busiest server). Use the rollups for aggregates. metrics_hourly: Hourly cube of every event ingredient (100 days). Additive columns are sums: use sum(events), never count(). Sketch columns need their -Merge function. metrics_daily: Daily cube of every event ingredient (400 days), same columns as metrics_hourly. sessions_daily: Narrow daily rollup for headline sessions and actors by client, country and branch. Segments map to traffic_class. sessions_hourly: Narrow hourly rollup for headline sessions and actors by client and branch (100 days, no country). Prefer it to metrics_hourly for windows up to 2 days. clients_daily: Narrow daily rollup for headline sessions, actors and latency by client, client and protocol version and branch (no country). The narrowest daily relation for headline numbers. tool_health_daily: Narrow daily rollup for per-tool and per-client health and tokens: error classes, latency digests and output tokens by method, resource and client. tool_interactions: Exact tool index: one row per (server, tool, hour, interaction). Answers 'sessions that used tool X' exactly at any window: uniqExact(interaction_id). actors_hourly: Account or token actor activity on tools/call events, by client, tool and branch. Full-period user rankings use sums and merged session sketches. actors_daily: Account or token actor activity on tools/call events, by client, tool and branch. Full-period user rankings use sums and merged session sketches. */
+                    /** @description One ClickHouse SELECT (or UNION) over the analytics relations: events: Raw gateway events, one row per request. Drill-down only: each query may read at most 20M rows (about one day of the busiest server). Use the rollups for aggregates. metrics_hourly: Hourly cube of every event ingredient (100 days). Additive columns are sums: use sum(events), never count(). Sketch columns need their -Merge function. metrics_daily: Daily cube of every event ingredient (400 days), same columns as metrics_hourly. sessions_daily: Narrow daily rollup for headline traces and actors by client, country and branch. Segments map to traffic_class. sessions_hourly: Narrow hourly rollup for headline traces and actors by client and branch (100 days, no country). Prefer it to metrics_hourly for windows up to 2 days. clients_daily: Narrow daily rollup for headline traces, actors and latency by client, client and protocol version and branch (no country). The narrowest daily relation for headline numbers. tool_health_daily: Narrow daily rollup for per-tool and per-client health and tokens: error classes, latency digests and output tokens by method, resource and client. tool_interactions: Exact tool index: one row per (server, tool, hour, trace). Answers 'traces that used tool X' exactly at any window: uniqExact(interaction_id). actors_hourly: Account or token actor activity on tools/call events, by client, tool and branch. Full-period user rankings use sums and merged trace-count sketches. actors_daily: Account or token actor activity on tools/call events, by client, tool and branch. Full-period user rankings use sums and merged trace-count sketches. */
                     sql: string;
                     /** @description Default 7d; bound as {from} and {to}. */
                     timeRange?: {
@@ -6520,6 +6520,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         id: string;
+                        slug: string;
                         name: string;
                         enabled: boolean;
                         threshold: number;
@@ -6613,6 +6614,8 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /** @description The suite's ID within its server, unique per server. Generated from the name when omitted; renaming a suite keeps it. */
+                    slug?: string;
                     /** @default [] */
                     flow?: ({
                         /** @constant */
@@ -6655,6 +6658,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         id: string;
+                        slug: string;
                         name: string;
                     };
                 };
@@ -6723,6 +6727,7 @@ export interface operations {
             header?: never;
             path: {
                 serverId: string;
+                /** @description The suite's UUID or its slug. */
                 suiteId: string;
             };
             cookie?: never;
@@ -6804,6 +6809,7 @@ export interface operations {
             header?: never;
             path: {
                 serverId: string;
+                /** @description The suite's UUID or its slug. */
                 suiteId: string;
             };
             cookie?: never;
@@ -6812,6 +6818,8 @@ export interface operations {
             content: {
                 "application/json": {
                     name?: string;
+                    /** @description The suite's ID within its server, unique per server. Generated from the name when omitted; renaming a suite keeps it. */
+                    slug?: string;
                     flow?: ({
                         /** @constant */
                         kind: "user";
@@ -6847,6 +6855,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         id: string;
+                        slug: string;
                         name: string;
                     };
                 };
@@ -6920,6 +6929,7 @@ export interface operations {
             header?: never;
             path: {
                 serverId: string;
+                /** @description The suite's UUID or its slug. */
                 suiteId: string;
             };
             cookie?: never;
@@ -7004,6 +7014,7 @@ export interface operations {
         parameters: {
             query?: {
                 activeOnly?: "true" | "false";
+                /** @description The suite's UUID or its slug. */
                 suiteId?: string;
                 limit?: number;
                 take?: number;

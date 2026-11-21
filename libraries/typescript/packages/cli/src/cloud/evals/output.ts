@@ -67,7 +67,7 @@ export function formatSuiteList(
           latest
             ? `${verdict(latest)} · ${age(latest.createdAt) ?? ""}`
             : "Never run",
-          suite.id,
+          suite.slug || suite.id,
         ];
       })
     ),
@@ -85,7 +85,7 @@ export function formatSuite(suite: Suite, yaml: string): string {
         "Latest run",
         latest ? `${verdict(latest)} (${latest.id})` : "Never run",
       ],
-      ["ID", suite.id],
+      ["UUID", suite.id],
     ]),
   ].join("\n");
 }

@@ -1,6 +1,11 @@
 /**
  * Eval suite files: one YAML (or JSON) document per suite.
  *
+ * `id` is the suite's slug, its ID within the server (Cloud also gives every
+ * suite a UUID). Push matches files to suites by it, so renaming a suite in
+ * its file keeps the same suite. It is required and never derived from
+ * `name`: names aren't unique.
+ *
  * Flow steps use the same shape the dashboard and API store (`kind: user`,
  * `tool_call`, `assistant_text`). `clients` has one key per kind of client,
  * since each takes different options: `inspector` (models), `runtimes`
@@ -28,6 +33,24 @@ const WEB_CLIENTS = ["chatgpt", "claude"] as const;
 /** Cloud's limits: runtime executions per suite, models per web app. */
 const MAX_RUNTIMES = 12;
 const MAX_WEB_MODELS = 10;
+
+/** A suite slug, as Cloud validates it. */
+const SUITE_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const SUITE_SLUG_MAX_LENGTH = 64;
+
+/**
+ * Cloud's slug for a suite name: lowercase, runs of other characters become
+ * one `-`, at most 64 characters, `suite` when nothing is left.
+ */
+function slugifySuiteName(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, SUITE_SLUG_MAX_LENGTH)
+    .replace(/-+$/, "");
+  return slug || "suite";
+}
 
 const modelId = z.string().trim().min(1).max(200);
 const toolName = z.string().trim().min(1).max(255);
@@ -101,6 +124,13 @@ const clients = z
   );
 
 const fileSchema = z.strictObject({
+  id: z
+    .string()
+    .max(SUITE_SLUG_MAX_LENGTH)
+    .regex(
+      SUITE_SLUG_PATTERN,
+      "A suite ID is lowercase letters and digits in groups joined by single hyphens, such as rome-weather."
+    ),
   name: z.string().trim().min(1).max(255),
   flow: z
     .array(step)
@@ -148,6 +178,14 @@ export function parseEvalSuiteFile(
     value = document.toJSON();
   } catch {
     throw new UsageError(`${path} could not be decoded as YAML.`);
+  }
+  const fields = value !== null && typeof value === "object" ? value : {};
+  if (!Array.isArray(fields) && !("id" in fields)) {
+    const name = (fields as { name?: unknown }).name;
+    throw new UsageError(
+      `${path}: add the suite's ID as a top-level \`id:\`, such as \`id: ${slugifySuiteName(typeof name === "string" ? name : "")}\`. Push matches files to suites by ID, not by name.`,
+      { code: "eval_suite_id_missing" }
+    );
   }
   const result = fileSchema.safeParse(value);
   if (!result.success) {
@@ -205,6 +243,7 @@ export function suiteBody(
   } = record(options.existingClientSettings);
   return {
     name: file.name,
+    slug: file.id,
     flow: file.flow.map(savedStep),
     threshold: file.threshold,
     disallowedTools: file.disallowedTools,
@@ -248,6 +287,8 @@ function savedStep(item: Step): SavedStep {
 
 /** A saved suite, as Cloud returns it. */
 export interface SavedSuite {
+  /** Missing from Clouds that predate slugs. */
+  slug?: string;
   name: string;
   enabled: boolean;
   threshold: number;
@@ -310,6 +351,7 @@ export function suiteFile(suite: SavedSuite): Record<string, unknown> {
     ),
   };
   return {
+    ...(suite.slug ? { id: suite.slug } : {}),
     name: suite.name,
     flow: savedFlow(suite),
     ...(suite.rubric ? { rubric: suite.rubric } : {}),
