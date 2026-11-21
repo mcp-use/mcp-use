@@ -343,7 +343,7 @@ test("evals create refuses a name that already exists", async ({
   });
 });
 
-test("evals update replaces the suite it names, including its name", async ({
+test("evals update replaces the suite with the given ID, including its name", async ({
   cloud,
   cli,
 }) => {
@@ -360,7 +360,7 @@ test("evals update replaces the suite it names, including its name", async ({
   });
 
   const result = await cli.run(
-    ["evals", "update", "old NAME", "--file", "rome.yaml", ...SCOPE],
+    ["evals", "update", "suite_1", "--file", "rome.yaml", ...SCOPE],
     { env: SIGNED_IN }
   );
 
@@ -2149,22 +2149,15 @@ test("evals runs names each run's suite", async ({ cloud, cli }) => {
 });
 
 describe("suite references", () => {
-  test("run accepts IDs, names, suite files and directories", async ({
-    cloud,
-    cli,
-  }) => {
+  test("run selects suites by ID", async ({ cloud, cli }) => {
     server(cloud);
-    await mkdir(join(cli.cwd, "evals"));
-    await writeFile(join(cli.cwd, "evals", "rome.yaml"), ROME);
-    await writeFile(join(cli.cwd, "checkout.yaml"), CHECKOUT);
     cloud.on("GET", SUITES, {
       body: [
         suite({ id: "suite_rome", name: "Rome weather" }),
         suite({ id: "suite_checkout", name: "Checkout" }),
-        suite({ id: "suite_paris", name: "Paris weather" }),
       ],
     });
-    for (const id of ["suite_rome", "suite_checkout", "suite_paris"])
+    for (const id of ["suite_rome", "suite_checkout"])
       cloud.on("POST", `${SUITES}/${id}/runs`, {
         body: {
           id: `run_${id}`,
@@ -2180,9 +2173,8 @@ describe("suite references", () => {
       [
         "evals",
         "run",
-        "evals",
-        "checkout.yaml",
-        "paris WEATHER",
+        "suite_rome",
+        "suite_checkout",
         "suite_rome",
         "--server",
         "weather",
@@ -2191,72 +2183,114 @@ describe("suite references", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    // Duplicates collapse: the directory and the ID both name Rome.
+    // Duplicates collapse: the repeated ID runs once.
     expect(result.stdout).toBe(
       [
         "✓ Started run run_suite_rome (Rome weather)",
         "✓ Started run run_suite_checkout (Checkout)",
-        "✓ Started run run_suite_paris (Paris weather)",
         "",
-        "Results: mcp-use evals report run_suite_rome run_suite_checkout run_suite_paris",
+        "Results: mcp-use evals report run_suite_rome run_suite_checkout",
         "",
       ].join("\n")
     );
   });
 
-  test("names what it cannot find or cannot tell apart, before writing", async ({
+  test.for([
+    ["an exact name", "Rome weather"],
+    ["a name in another case", "rome WEATHER"],
+    ["a suite file named after the suite", "rome.yaml"],
+    ["a directory of suite files", "evals"],
+  ] as const)(
+    "run rejects %s and starts nothing",
+    async ([, arg], { cloud, cli }) => {
+      server(cloud);
+      await mkdir(join(cli.cwd, "evals"));
+      await writeFile(join(cli.cwd, "evals", "rome.yaml"), ROME);
+      await writeFile(join(cli.cwd, "rome.yaml"), ROME);
+      cloud.on("GET", SUITES, {
+        body: [suite({ id: "suite_rome", name: "Rome weather" })],
+      });
+
+      const result = await cli.run(["evals", "run", arg, ...SCOPE], {
+        env: SIGNED_IN,
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.json).toMatchObject({
+        error: {
+          code: "eval_suite_not_found",
+          nextSteps: [
+            { description: "List eval suites", command: "mcp-use evals list" },
+          ],
+        },
+      });
+      // The suite list was read, so a POST would have reached the fake too.
+      expect(cloud.requestsTo("GET", SUITES)).toHaveLength(1);
+      expect(cloud.requests.filter((r) => r.method === "POST")).toEqual([]);
+    }
+  );
+
+  test.for([
+    ["get", ["get", "Rome weather"]],
+    ["export", ["export", "Rome weather"]],
+    ["update", ["update", "Rome weather", "--file", "rome.yaml"]],
+    ["rm", ["rm", "Rome weather", "--yes"]],
+    ["runs --suite", ["runs", "--suite", "Rome weather"]],
+    ["get with a suite file", ["get", "rome.yaml"]],
+    ["rm with a suite file", ["rm", "rome.yaml", "--yes"]],
+    ["runs --suite with a suite file", ["runs", "--suite", "rome.yaml"]],
+  ] as const)(
+    "%s doesn't select a suite by name or file",
+    async ([, args], { cloud, cli }) => {
+      server(cloud);
+      await writeFile(join(cli.cwd, "rome.yaml"), ROME);
+      cloud.on("GET", SUITES, {
+        body: [suite({ id: "suite_rome", name: "Rome weather" })],
+      });
+
+      const result = await cli.run(["evals", ...args, ...SCOPE], {
+        env: SIGNED_IN,
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.json).toEqual({
+        error: {
+          code: "eval_suite_not_found",
+          message: `No eval suite has the ID “${args[args[0] === "runs" ? 2 : 1]}”. Pass suite IDs; names and files aren't accepted.`,
+          nextSteps: [
+            { description: "List eval suites", command: "mcp-use evals list" },
+          ],
+        },
+      });
+      // The suite list was read, and nothing after it: no runs listed,
+      // no suite written or deleted.
+      expect(cloud.requestsTo("GET", SUITES)).toHaveLength(1);
+      expect(cloud.requestsTo("GET", RUNS)).toEqual([]);
+      expect(cloud.requests.filter((r) => r.method !== "GET")).toEqual([]);
+    }
+  );
+
+  test("runs --suite lists the runs of the suite with the given ID", async ({
     cloud,
     cli,
   }) => {
     server(cloud);
-    await writeFile(join(cli.cwd, "rome.yaml"), ROME);
     cloud.on("GET", SUITES, {
-      body: [
-        suite({ id: "suite_1", name: "Twin" }),
-        suite({ id: "suite_2", name: "Twin" }),
-      ],
+      body: [suite({ id: "suite_rome", name: "Rome weather" })],
     });
-
-    const missing = await cli.run(["evals", "get", "Nope", ...SCOPE], {
-      env: SIGNED_IN,
-    });
-    const file = await cli.run(
-      ["evals", "rm", "rome.yaml", "--yes", ...SCOPE],
-      {
-        env: SIGNED_IN,
-      }
+    const result = await cli.run(
+      ["evals", "runs", "--suite", "suite_rome", ...SCOPE],
+      { env: SIGNED_IN }
     );
-    const twins = await cli.run(["evals", "run", "Twin", ...SCOPE], {
-      env: SIGNED_IN,
-    });
 
-    expect(missing.json).toEqual({
-      error: {
-        code: "eval_suite_not_found",
-        message: "No eval suite matches “Nope”.",
-        nextSteps: [
-          { description: "List eval suites", command: "mcp-use evals list" },
-        ],
-      },
-    });
-    expect(file.json).toMatchObject({
-      error: {
-        code: "eval_suite_not_found",
-        message: "No eval suite is named “Rome weather” (from rome.yaml).",
-        nextSteps: [{ command: "mcp-use evals push rome.yaml" }],
-      },
-    });
-    expect(twins.json).toMatchObject({
-      error: {
-        code: "eval_suite_ambiguous",
-        message:
-          "2 eval suites are named “Twin”: suite_1, suite_2. Pass an ID instead.",
-      },
-    });
-    expect(twins.exitCode).toBe(1);
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toEqual({ items: [], total: 0 });
+    expect(cloud.requestsTo("GET", RUNS)).toMatchObject([
+      { query: { suiteId: "suite_rome" } },
+    ]);
   });
 
-  test("rm deletes the suite a name points to", async ({ cloud, cli }) => {
+  test("rm deletes the suite with the given ID", async ({ cloud, cli }) => {
     server(cloud);
     cloud.on("GET", SUITES, {
       body: [suite({ id: "suite_1", name: "Rome weather" })],
@@ -2264,7 +2298,7 @@ describe("suite references", () => {
     cloud.on("DELETE", `${SUITES}/suite_1`, { body: { success: true } });
 
     const result = await cli.run(
-      ["evals", "rm", "Rome weather", "--yes", "--server", "weather"],
+      ["evals", "rm", "suite_1", "--yes", "--server", "weather"],
       { env: SIGNED_IN }
     );
 

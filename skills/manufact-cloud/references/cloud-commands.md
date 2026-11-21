@@ -43,7 +43,8 @@ The human report uses each check's severity: a raw `fail` can be an advisory
 warning rather than a blocking error. JSON preserves the existing raw statuses;
 use the human report to inspect severity and remediation rather than treating
 every raw failure as a blocker. Dynamic policy concerns are called out separately
-from technical warnings. The score weights check severity and is not a count of
+from technical warnings. In `--json`, run/get/cancel also return `fixPrompt`,
+a ready-made prompt for fixing the failed checks, or `null` when there is none. The score weights check severity and is not a count of
 all passed checks.
 
 **Client Readiness** reports Cloud's ChatGPT and Claude readiness flags. A
