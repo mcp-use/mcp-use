@@ -258,7 +258,7 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
       const serverName = found.name ?? found.slug ?? serverId;
       return {
         value: { ...checklistRun(run), dashboardUrl },
-        markdown: formatChecklistMarkdown(run, { serverName, dashboardUrl }),
+        markdown: formatChecklistMarkdown(run, { dashboardUrl }),
         human: formatChecklist(run, {
           verbose: values.verbose === true,
           serverName,
@@ -273,7 +273,7 @@ export async function runChecklist(argv: readonly string[]): Promise<number> {
     // Lets CI read the result while the log keeps the readable report.
     if (typeof values["json-file"] === "string")
       await writeFile(values["json-file"], `${JSON.stringify(result.value)}\n`);
-    // A dashboard-style report for pull request comments and job summaries.
+    // The GitHub app's publishing-check report, for pull request comments and job summaries.
     if (typeof values["markdown-file"] === "string") {
       if (values["markdown-file"] === values["json-file"])
         throw new UsageError(

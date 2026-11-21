@@ -395,7 +395,7 @@ const pages: Record<string, Page> = {
           ],
           [
             "--markdown-file <path>",
-            "Also write a Markdown report, laid out like the dashboard",
+            "Also write a Markdown report in the Manufact GitHub app's publishing-check format",
           ],
           ["--verbose", "Show every check and full finding details"],
         ],
@@ -419,7 +419,7 @@ const pages: Record<string, Page> = {
           ["--verbose", "Show every check and full finding details"],
           [
             "--markdown-file <path>",
-            "Also write a Markdown report, laid out like the dashboard",
+            "Also write a Markdown report in the Manufact GitHub app's publishing-check format",
           ],
         ],
         examples: ["mcp-use checklist get run_123"],

@@ -1,5 +1,8 @@
 import { expect, test } from "vitest";
-import { formatChecklist } from "../../src/cloud/checklist/output.js";
+import {
+  formatChecklist,
+  formatChecklistMarkdown,
+} from "../../src/cloud/checklist/output.js";
 
 const options = {
   serverName: "Weather",
@@ -90,4 +93,121 @@ test("unknown and warning statuses remain visible and failures retain their reas
   expect(output).toContain("? New check");
   expect(output).toContain("1 warning · 1 unknown");
   expect(output).not.toContain("NaN");
+});
+
+const pass = (checkId: string, category = "connectivity") => ({
+  checkId,
+  checkName: checkId,
+  status: "pass",
+  severity: "error",
+  category,
+});
+const policyDone = pass("policy-review-summary", "policy-conformance");
+
+test.for([
+  ["pending", [], "Publishing checks queued"],
+  ["running", [], "Publishing checks running"],
+  ["cancelled", [], "Publishing checks cancelled"],
+  ["canceled", [], "Publishing checks cancelled"],
+  ["failed", [], "Publishing checks could not finish"],
+  ["not_ready", [], "Not ready to test"],
+  [
+    "completed",
+    [
+      { ...pass("a"), status: "fail" },
+      { ...pass("b"), status: "fail" },
+    ],
+    "2 required fixes before submission",
+  ],
+  [
+    "completed",
+    [{ ...pass("a"), status: "fail" }],
+    "1 required fix before submission",
+  ],
+  [
+    "completed",
+    [{ ...pass("a"), status: "pending" }],
+    "Publishing checks incomplete",
+  ],
+  [
+    "completed",
+    [{ ...pass("a"), status: "skip" }],
+    "Publishing checks incomplete",
+  ],
+  [
+    "completed",
+    [
+      pass("a"),
+      { ...pass("p", "policy-conformance"), status: "fail" },
+      policyDone,
+    ],
+    "Policy concerns need review",
+  ],
+  [
+    "completed",
+    [pass("a")],
+    "Technical checks passed · policy review incomplete",
+  ],
+  ["completed", [pass("a"), policyDone], "Ready to submit"],
+  // A failed live test doesn't block submission.
+  [
+    "completed",
+    [pass("a"), policyDone, { ...pass("e", "e2e"), status: "fail" }],
+    "Ready to submit",
+  ],
+  // A check that doesn't apply to the server doesn't leave the run incomplete.
+  [
+    "completed",
+    [
+      pass("a"),
+      policyDone,
+      {
+        ...pass("views", "tool-metadata"),
+        status: "skip",
+        message: "No view resources found — view checks skipped",
+      },
+    ],
+    "Ready to submit",
+  ],
+] as const)("a %s run with %j is titled %s", ([status, checks, title]) => {
+  const markdown = formatChecklistMarkdown(
+    { id: "run_1", status, checks: [...checks] },
+    { dashboardUrl: "https://example.test/publish" }
+  );
+  expect(markdown.startsWith(`## Publishing checks\n\n${title}\n`)).toBe(true);
+  expect(
+    markdown.endsWith("\n\n[View dashboard](https://example.test/publish)")
+  ).toBe(true);
+});
+
+test("a run that isn't ready says why and links to the dashboard", () => {
+  expect(
+    formatChecklistMarkdown(
+      { id: "run_1", status: "not_ready", errorMessage: "Sign in first." },
+      { dashboardUrl: "https://example.test/publish" }
+    )
+  ).toBe(
+    [
+      "## Publishing checks",
+      "Not ready to test",
+      "Sign in first.",
+      "[Authenticate or reconnect in Manufact](https://example.test/publish)",
+      "[View dashboard](https://example.test/publish)",
+    ].join("\n\n")
+  );
+});
+
+test("findings tables show ten rows and count the rest", () => {
+  const checks = Array.from({ length: 12 }, (_, i) => ({
+    ...pass(`check-${i + 1}`),
+    status: "fail",
+  }));
+  const markdown = formatChecklistMarkdown(
+    { id: "run_1", status: "completed", checks },
+    { dashboardUrl: "https://example.test/publish" }
+  );
+  expect(markdown.match(/<tr><td /g)).toHaveLength(10);
+  expect(markdown).toContain("<strong>check-10</strong>");
+  expect(markdown).not.toContain("<strong>check-11</strong>");
+  expect(markdown).toContain("</table>\n\n2 more in the checklist.\n\n");
 });

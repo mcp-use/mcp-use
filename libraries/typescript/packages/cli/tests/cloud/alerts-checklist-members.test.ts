@@ -439,22 +439,19 @@ test("checklist run --json-file prints the readable report and writes the JSON r
   });
 });
 
-test("checklist get --markdown-file writes a dashboard-style report", async ({
+test("checklist get --markdown-file writes the GitHub app's publishing-check report", async ({
   cloud,
   cli,
 }) => {
   server(cloud);
+  // Checklist routes aren't in the published spec, so the reply is untyped.
   cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
     body: {
       id: "run_1",
       status: "completed",
-      gitBranch: null,
-      score: 84,
       targetUrl: "https://weather.test/mcp",
-      isReadyForChatgpt: false,
-      isReadyForClaudeai: true,
-      startedAt: "2026-11-17T23:45:19Z",
-      completedAt: "2026-11-17T23:49:51Z",
+      fixPrompt:
+        "Fix these issues:\n```ts\nserver.tool({ description })\n```\n",
       checks: [
         {
           checkId: "server-responds",
@@ -466,22 +463,30 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
           message: "MCP modern negotiation succeeded in 1098ms",
         },
         {
+          checkId: "tool-description",
+          checkName: "Tools have descriptions",
+          status: "fail",
+          severity: "error",
+          category: "tool-metadata",
+          platforms: ["chatgpt", "claudeai"],
+          message: "search_fruits has no <description>",
+          hint: { text: "Add a description.\nAsk @octocat." },
+        },
+        {
           checkId: "tool-title-present",
           checkName: "All tools have a display title",
-          status: "pass",
-          severity: "error",
+          status: "fail",
+          severity: "warning",
           category: "client-compatibility",
-          platforms: ["claudeai"],
-          message: "All tools have a display title",
+          message: "2 tools have no title:\n  search, fetch",
         },
         {
           checkId: "policy-review-summary",
-          checkName: "Policy review partial",
-          status: "fail",
+          checkName: "Policy review complete",
+          status: "pass",
           severity: "warning",
           category: "policy-conformance",
           platforms: [],
-          message: "Accepted 1 policy finding(s)",
         },
         {
           checkId: "policy-review-71cf55ed7c53",
@@ -492,12 +497,83 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
           platforms: ["chatgpt"],
           message: "create_alert | advertises destructiveHint <false>",
           hint: { text: "Set destructiveHint to true." },
-          details: [
-            {
-              label: "policy URL",
-              value: "https://developers.openai.com/plugins/deploy/app-review",
-            },
-          ],
+        },
+        {
+          // Live tests don't count toward publishing readiness.
+          checkId: "e2e-search",
+          checkName: "Search works end to end",
+          status: "fail",
+          severity: "error",
+          category: "e2e",
+          platforms: [],
+          message: "Timed out",
+        },
+      ],
+    },
+  });
+  const result = await cli.run(
+    [
+      "checklist",
+      "get",
+      "run_1",
+      "--server",
+      "weather",
+      "--json",
+      "--markdown-file",
+      "report.md",
+    ],
+    { env: SIGNED_IN }
+  );
+  const expected = [
+    "## Publishing checks",
+    "1 required fix before submission",
+    "2 / 5 checks passed. 1 recommendations.",
+    "Required errors block submission for the affected clients.",
+    "Policy findings may lead to rejection or additional manual review; they are not a final store decision.",
+    "### Required fixes",
+    '<table><thead><tr><th align="left" valign="top" style="vertical-align:top">Check</th><th align="left" valign="top" style="vertical-align:top">Client</th><th align="left" valign="top" style="vertical-align:top">Feedback</th></tr></thead><tbody><tr><td align="left" valign="top" style="vertical-align:top"><strong>Tools have descriptions</strong></td><td align="left" valign="top" style="vertical-align:top">ChatGPT / Codex, Claude</td><td align="left" valign="top" style="vertical-align:top">search_fruits has no &lt;description&gt;<br><br><strong>Fix:</strong> Add a description. Ask &#64;octocat.</td></tr></tbody></table>',
+    "### Policy concerns",
+    '<table><thead><tr><th align="left" valign="top" style="vertical-align:top">Check</th><th align="left" valign="top" style="vertical-align:top">Client</th><th align="left" valign="top" style="vertical-align:top">Feedback</th></tr></thead><tbody><tr><td align="left" valign="top" style="vertical-align:top"><strong>Enabled alert creation can send notifications</strong></td><td align="left" valign="top" style="vertical-align:top">ChatGPT / Codex</td><td align="left" valign="top" style="vertical-align:top">create_alert | advertises destructiveHint &lt;false&gt;<br><br><strong>Fix:</strong> Set destructiveHint to true.</td></tr></tbody></table>',
+    "### Recommendations",
+    '<table><thead><tr><th align="left" valign="top" style="vertical-align:top">Check</th><th align="left" valign="top" style="vertical-align:top">Client</th><th align="left" valign="top" style="vertical-align:top">Feedback</th></tr></thead><tbody><tr><td align="left" valign="top" style="vertical-align:top"><strong>All tools have a display title</strong></td><td align="left" valign="top" style="vertical-align:top">All clients</td><td align="left" valign="top" style="vertical-align:top">2 tools have no title: search, fetch</td></tr></tbody></table>',
+    "<details><summary>Prompt for AI agents</summary>\n\n````text\nFix these issues:\n```ts\nserver.tool({ description })\n```\n````\n\n</details>",
+    "[View dashboard](https://manufact.com/cloud/org-one/servers/srv_1/checklist)",
+  ];
+  expect(result.exitCode).toBe(0);
+  expect(await readFile(join(cli.cwd, "report.md"), "utf8")).toBe(
+    `${expected.join("\n\n")}\n`
+  );
+  // The fix prompt is for the report; the JSON result keeps its documented fields.
+  expect(result.json).toMatchObject({ id: "run_1", status: "completed" });
+  expect(result.json).not.toHaveProperty("fixPrompt");
+});
+
+test("checklist --markdown-file leaves the fix prompt out when Cloud has none", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.onUndocumented("GET", "/api/v1/server-audits/srv_1/audits/run_1", {
+    body: {
+      id: "run_1",
+      status: "completed",
+      fixPrompt: null,
+      checks: [
+        {
+          checkId: "server-responds",
+          checkName: "MCP negotiation succeeds (v1/v2)",
+          status: "pass",
+          severity: "error",
+          category: "connectivity",
+          platforms: [],
+        },
+        {
+          checkId: "policy-review-summary",
+          checkName: "Policy review complete",
+          status: "pass",
+          severity: "warning",
+          category: "policy-conformance",
+          platforms: [],
         },
       ],
     },
@@ -515,43 +591,14 @@ test("checklist get --markdown-file writes a dashboard-style report", async ({
     { env: SIGNED_IN }
   );
   expect(result.exitCode).toBe(0);
-  const markdown = await readFile(join(cli.cwd, "report.md"), "utf8");
-  for (const line of [
-    "## Manufact Publishing Checks · Weather",
-    "Production · 4m 32s",
-    "[View in dashboard ↗](",
-    "| **84** /100 | ✅ 2 passed | ❌ Not ready | ✅ Ready |",
-    "> **May require additional review** · 1 policy concern<br>",
-    "<details><summary><b>Protocol</b> &nbsp; ✅ Pass · 1/1</summary>",
-    "| ✅ | **MCP negotiation succeeds (v1/v2)**<br>MCP modern negotiation succeeded in 1098ms |",
-    "<details open><summary><b>Policy review</b> &nbsp; ❌ Issues · 0/2</summary>",
-    "| 🛑 | **Enabled alert creation can send notifications**<br>error · ChatGPT · [Policy text ↗](https://developers.openai.com/plugins/deploy/app-review)<br>create_alert \\| advertises destructiveHint &lt;false&gt;<br><b>How to fix:</b> Set destructiveHint to true. |",
-    "| ⚠️ | **Policy review partial**<br>warning<br>Accepted 1 policy finding(s) |",
-  ])
-    expect(markdown).toContain(line);
-  // The dashboard's fix prompt, collapsed and copyable. Text inside the code
-  // block is not HTML-escaped, and the policy summary meta-check is left out.
-  expect(markdown).toContain(
-    "<details><summary>Prompt for AI agents</summary>\n\n```text\nYou are an MCP server developer. Your server at https://weather.test/mcp has 1 issue(s) to fix before it will pass automated platform compatibility checks.\n"
-  );
-  expect(markdown).toContain(
-    "### [ERROR] policy-review-71cf55ed7c53\ncreate_alert | advertises destructiveHint <false>\nAffected:\n- policy URL: https://developers.openai.com/plugins/deploy/app-review\nFix: Set destructiveHint to true.\n"
-  );
-  expect(markdown).not.toContain("policy-review-summary");
-  expect(markdown).toContain(
-    "For each issue above, locate the relevant code in your MCP server implementation and apply the fix described. Validate inputs with proper error messages, not raw schema validation errors.\n```\n\n</details>"
-  );
-  // Every section is a two-column table; tags sit inside the check cell.
-  expect(markdown).toContain("| | Check |\n| :-: | :-- |\n");
-  expect(markdown).not.toContain("| | Check | |");
-  // The footer is just the dashboard link, without the run ID.
-  expect(markdown).not.toContain("run_1");
-  // Sections follow the dashboard's order.
-  expect(markdown.indexOf("<b>Protocol</b>")).toBeLessThan(
-    markdown.indexOf("<b>Client compatibility</b>")
-  );
-  expect(markdown.indexOf("<b>Client compatibility</b>")).toBeLessThan(
-    markdown.indexOf("<b>Policy review</b>")
+  expect(await readFile(join(cli.cwd, "report.md"), "utf8")).toBe(
+    [
+      "## Publishing checks",
+      "Ready to submit",
+      "2 / 2 checks passed. 0 recommendations.",
+      "Store approval remains subject to the store's review.",
+      "[View dashboard](https://manufact.com/cloud/org-one/servers/srv_1/checklist)\n",
+    ].join("\n\n")
   );
 });
 
