@@ -557,7 +557,7 @@ const pages: Record<string, Page> = {
       },
       run: {
         summary:
-          "Start one run per suite against the production endpoint, or a branch environment with --branch. Runs continue on Cloud.",
+          "Start one run per suite, selected by suite ID (UUID or slug), against the production endpoint, or a branch environment with --branch. Runs continue on Cloud.",
         args: "[<suite-id...>]",
         options: [
           ...project,

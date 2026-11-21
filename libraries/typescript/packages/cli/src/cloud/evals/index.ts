@@ -106,7 +106,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       );
     if (command === "run" && (values.all === true) === positionals.length > 0)
       throw new UsageError(
-        "Pass suite IDs or --all, not both.\nUsage: mcp-use evals run <suite-id...>|--all"
+        "Pass suite IDs (UUID or slug) or --all, not both.\nUsage: mcp-use evals run <suite-id...>|--all"
       );
     const jsonFile =
       typeof values["json-file"] === "string" ? values["json-file"] : undefined;
@@ -197,7 +197,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
           .map((result) =>
             "error" in result
               ? `✗ ${plain(result.path)}\n  ${plain(result.error)}`
-              : `✓ ${result.action === "created" ? "Created" : "Updated"} ${plain(result.id)} (“${plain(result.name)}”) from ${plain(result.path)}`
+              : `✓ ${result.action === "created" ? "Created" : "Updated"} ${plain(result.slug)} (“${plain(result.name)}”) from ${plain(result.path)}`
           )
           .join("\n")
       );
@@ -810,7 +810,7 @@ async function push(
     | {
         path: string;
         action: "created" | "updated";
-        id: string;
+        slug: string;
         suiteId: string;
         name: string;
       }
@@ -827,7 +827,7 @@ async function push(
       results.push({
         path,
         action: existing ? "updated" : "created",
-        id: saved.slug,
+        slug: saved.slug,
         suiteId: saved.id,
         name: saved.name,
       });

@@ -205,14 +205,14 @@ describe("evals push", () => {
         {
           path: join("evals", "checkout.yml"),
           action: "updated",
-          id: "checkout",
+          slug: "checkout",
           suiteId: "suite_checkout",
           name: "Checkout",
         },
         {
           path: join("evals", "rome.yaml"),
           action: "created",
-          id: "rome-weather",
+          slug: "rome-weather",
           suiteId: "suite_rome",
           name: "Rome weather",
         },
