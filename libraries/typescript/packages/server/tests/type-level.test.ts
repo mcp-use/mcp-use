@@ -24,6 +24,7 @@ import {
   createMcpMiddlewareEntry,
   inputRequired,
   MCPServer,
+  object,
   text,
 } from "../src/index.js";
 import type {
@@ -49,6 +50,20 @@ import type {
 } from "../src/index.js";
 import { useViewState } from "../src/react/index.js";
 import type { FileMetadata, UseFilesResult } from "../src/react/index.js";
+
+describe("legacy object helper types", () => {
+  it("preserves object and array payload inference from the public export", () => {
+    expectTypeOf(object({ id: 1 }).structuredContent).toEqualTypeOf<
+      { id: number } | undefined
+    >();
+    expectTypeOf(object([1, 2]).structuredContent).toEqualTypeOf<
+      number[] | undefined
+    >();
+    expectTypeOf(object([{ id: 1 }]).structuredContent).toEqualTypeOf<
+      { id: number }[] | undefined
+    >();
+  });
+});
 
 describe("server branding config", () => {
   it("uses the official MCP Icon shape", () => {
