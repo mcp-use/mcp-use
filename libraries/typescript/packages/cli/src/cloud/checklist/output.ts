@@ -262,6 +262,28 @@ function escapeText(value: string): string {
 const TABLE_CELL_ATTR = 'align="left" valign="top" style="vertical-align:top"';
 /** Rows per findings table; the rest are counted. */
 const MAX_ROWS = 10;
+/** GitHub's limit on check output, which the app's report keeps under. */
+const MAX_BYTES = 50_000;
+/** Room for the commit line the action inserts after the heading. */
+const COMMIT_RESERVE = 64;
+const MORE_FINDINGS = "More findings in the checklist.";
+const PROMPT_TRUNCATED =
+  "The prompt is shortened to fit this report. Copy the full prompt from the dashboard, or read `fixPrompt` in the `--json` result.";
+
+const PROMPT_OMITTED =
+  "The prompt for AI agents doesn't fit in this report. Copy it from the dashboard, or read `fixPrompt` in the `--json` result.";
+
+function bytes(blocks: readonly string[]): number {
+  return Buffer.byteLength(blocks.join("\n\n"), "utf8");
+}
+
+/** The longest start of `value` that fits in `limit` UTF-8 bytes, without splitting a character. */
+function clip(value: string, limit: number): string {
+  return Buffer.from(value, "utf8")
+    .subarray(0, Math.max(0, limit))
+    .toString("utf8")
+    .replace(/\uFFFD+$/, "");
+}
 
 /**
  * Render a run as GitHub-flavored Markdown in the Manufact GitHub app's
@@ -354,14 +376,19 @@ export function formatChecklistMarkdown(
   }
 
   const text = ["## Publishing checks", summary.join("\n\n")];
+  // Everything before the dashboard link stays within this many bytes, so the
+  // report with the action's commit line stays under GitHub's limit.
+  const link = `[View dashboard](${options.dashboardUrl})`;
+  const budget = MAX_BYTES - COMMIT_RESERVE - bytes(["", link]);
+  let truncated = false;
   if (completed)
     for (const [label, rows] of [
       ["Required fixes", errors],
       ["Policy concerns", policy],
       ["Recommendations", recommendations],
     ] as const) {
-      if (!rows.length) continue;
-      text.push(`### ${label}`);
+      if (!rows.length || truncated) continue;
+      const heading = `### ${label}`;
       const table = [
         "<table><thead><tr>",
         ...["Check", "Client", "Feedback"].map(
@@ -369,6 +396,7 @@ export function formatChecklistMarkdown(
         ),
         "</tr></thead><tbody>",
       ];
+      let shown = 0;
       for (const row of rows.slice(0, MAX_ROWS)) {
         const clients = row.platforms?.length
           ? row.platforms
@@ -389,18 +417,35 @@ export function formatChecklistMarkdown(
         ]
           .filter(Boolean)
           .join("<br><br>");
-        table.push(
-          `<tr><td ${TABLE_CELL_ATTR}><strong>${escapeText(row.checkName)}</strong></td><td ${TABLE_CELL_ATTR}>${escapeText(clients)}</td><td ${TABLE_CELL_ATTR}>${feedback || "See the checklist for details."}</td></tr>`
-        );
+        const line = `<tr><td ${TABLE_CELL_ATTR}><strong>${escapeText(row.checkName)}</strong></td><td ${TABLE_CELL_ATTR}>${escapeText(clients)}</td><td ${TABLE_CELL_ATTR}>${feedback || "See the checklist for details."}</td></tr>`;
+        // Stop before a row that, with the notes that may follow it, would
+        // push the report over the limit.
+        const candidate = [
+          ...text,
+          heading,
+          [...table, line, "</tbody></table>"].join(""),
+          `${rows.length} more in the checklist.`,
+          MORE_FINDINGS,
+        ];
+        if (bytes(candidate) > budget) {
+          truncated = true;
+          break;
+        }
+        table.push(line);
+        shown++;
       }
-      table.push("</tbody></table>");
-      text.push(table.join(""));
-      if (rows.length > MAX_ROWS)
+      if (shown) {
+        table.push("</tbody></table>");
+        text.push(heading, table.join(""));
+      }
+      if (truncated) text.push(MORE_FINDINGS);
+      else if (rows.length > MAX_ROWS)
         text.push(`${rows.length - MAX_ROWS} more in the checklist.`);
     }
 
   // Cloud's fix prompt, collapsed and copyable. GitHub renders a copy button
-  // on the code block; the fence outgrows any backticks in the prompt.
+  // on the code block; the fence outgrows any backticks in the prompt. A
+  // prompt that doesn't fit what's left is shortened, with a note.
   const prompt = run.fixPrompt?.trim();
   if (prompt) {
     const longest = Math.max(
@@ -408,18 +453,26 @@ export function formatChecklistMarkdown(
       ...[...prompt.matchAll(/`+/g)].map((m) => m[0].length)
     );
     const fence = "`".repeat(Math.max(3, longest + 1));
-    text.push(
+    const block = (body: string, note?: string) =>
       [
         "<details><summary>Prompt for AI agents</summary>",
         "",
         `${fence}text`,
-        prompt,
+        body,
         fence,
         "",
+        ...(note ? [note, ""] : []),
         "</details>",
-      ].join("\n")
-    );
+      ].join("\n");
+    const left = budget - bytes([...text, ""]);
+    if (bytes([block(prompt)]) <= left) text.push(block(prompt));
+    else {
+      const room = left - bytes([block("", PROMPT_TRUNCATED)]);
+      const clipped = clip(prompt, room).trimEnd();
+      if (clipped) text.push(block(clipped, PROMPT_TRUNCATED));
+      else if (bytes([PROMPT_OMITTED]) <= left) text.push(PROMPT_OMITTED);
+    }
   }
-  text.push(`[View dashboard](${options.dashboardUrl})`);
+  text.push(link);
   return text.join("\n\n");
 }
