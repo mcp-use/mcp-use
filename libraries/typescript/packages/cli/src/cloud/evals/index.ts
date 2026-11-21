@@ -1,5 +1,5 @@
-import { readdir, stat, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { extname, join, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseArgs } from "node:util";
 
@@ -10,6 +10,7 @@ import { fields, plain } from "../../core/format.js";
 import { confirm } from "../../core/prompt.js";
 import { withProgress } from "../../core/progress.js";
 import { cloudWebUrl } from "../cloud-api.js";
+import { CloudResponseError } from "../api/client.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
 import { startRuns, type UnstartedSuite } from "./start.js";
 import {
@@ -105,7 +106,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       );
     if (command === "run" && (values.all === true) === positionals.length > 0)
       throw new UsageError(
-        "Pass suite IDs or --all, not both.\nUsage: mcp-use evals run <suite-id...>|--all"
+        "Pass suite IDs (UUID or slug) or --all, not both.\nUsage: mcp-use evals run <suite-id...>|--all"
       );
     const jsonFile =
       typeof values["json-file"] === "string" ? values["json-file"] : undefined;
@@ -141,7 +142,13 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
             })
           )
         : [];
-    // Suites selected on the command line, by ID only: names aren't unique.
+    const duplicate = duplicateSuiteId(files);
+    if (duplicate)
+      throw new UsageError(
+        `${duplicate.paths.map(plain).join(" and ")} have the same suite ID “${plain(duplicate.id)}”. Give each file its own id; nothing was pushed.`,
+        { code: "eval_suite_duplicate_id" }
+      );
+    // Suites selected on the command line by ID (UUID or slug): names aren't unique.
     const ids = ["get", "export", "update", "rm", "run"].includes(command!)
       ? positionals
       : typeof values.suite === "string"
@@ -190,7 +197,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
           .map((result) =>
             "error" in result
               ? `✗ ${plain(result.path)}\n  ${plain(result.error)}`
-              : `✓ ${result.action === "created" ? "Created" : "Updated"} “${plain(result.name)}” from ${plain(result.path)}\n  ${result.suiteId}`
+              : `✓ ${result.action === "created" ? "Created" : "Updated"} ${plain(result.slug)} (“${plain(result.name)}”) from ${plain(result.path)}`
           )
           .join("\n")
       );
@@ -212,54 +219,85 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         );
       if (typeof values.out !== "string")
         return output.result({ id: suite.id, yaml }, yaml.trimEnd());
+      // A directory gets the file `<slug>.yaml`.
+      const toDirectory =
+        values.out.endsWith("/") ||
+        values.out.endsWith(sep) ||
+        (await stat(values.out).then(
+          (found) => found.isDirectory(),
+          () => false
+        ));
+      const out = toDirectory
+        ? join(values.out, `${requireSlug(suite)}.yaml`)
+        : values.out;
       try {
-        await writeFile(values.out, yaml);
+        if (toDirectory) await mkdir(values.out, { recursive: true });
+        await writeFile(out, yaml);
       } catch (error) {
         throw new CommandError(
           "write_failed",
-          `Could not write ${values.out}: ${(error as NodeJS.ErrnoException).code ?? messageOf(error)}.`
+          `Could not write ${out}: ${(error as NodeJS.ErrnoException).code ?? messageOf(error)}.`
         );
       }
       return output.result(
-        { id: suite.id, path: values.out },
-        `✓ Wrote ${plain(values.out)}`
+        { id: suite.id, path: out },
+        `✓ Wrote ${plain(out)}`
       );
     }
     if (command === "create") {
       const existing = (await api.suites()).find(
-        (suite) => suite.name === file!.name
+        (suite) => suite.slug === file!.id
       );
       if (existing)
         throw new CommandError(
           "eval_suite_exists",
-          `An eval suite named “${file!.name}” already exists (${existing.id}).`,
+          `An eval suite with the ID “${file!.id}” already exists (“${existing.name}”).`,
           undefined,
           [
             {
               description: "Replace it",
-              command: `mcp-use evals update ${existing.id} --file ${String(values.file)}`,
+              command: `mcp-use evals update ${file!.id} --file ${String(values.file)}`,
             },
           ]
         );
       const created = await api.save(file!, undefined);
       return output.result(
-        { id: created.id, name: created.name, dashboardUrl },
-        `✓ Created eval suite “${plain(created.name)}”\n${fields([["ID", created.id]])}`
+        {
+          id: created.id,
+          slug: created.slug,
+          name: created.name,
+          dashboardUrl,
+        },
+        `✓ Created eval suite “${plain(created.name)}”\n${fields([
+          ["ID", created.slug],
+          ["UUID", created.id],
+        ])}`
       );
     }
     if (command === "update") {
       const updated = await api.save(file!, suites[0]);
       return output.result(
-        { id: updated.id, name: updated.name, dashboardUrl },
-        `✓ Updated eval suite “${plain(updated.name)}”\n${fields([["ID", updated.id]])}`
+        {
+          id: updated.id,
+          slug: updated.slug,
+          name: updated.name,
+          dashboardUrl,
+        },
+        `✓ Updated eval suite “${plain(updated.name)}”\n${fields([
+          ["ID", updated.slug],
+          ["UUID", updated.id],
+        ])}`
       );
     }
     if (command === "rm") {
-      const { id, name } = suites[0]!;
+      const { id, slug, name } = suites[0]!;
       await api.remove(id);
       return output.result(
-        { id, name, deleted: true },
-        `✓ Deleted eval suite “${plain(name)}”\n${fields([["ID", id]])}`
+        { id, slug, name, deleted: true },
+        `✓ Deleted eval suite “${plain(name)}”\n${fields([
+          ["ID", slug],
+          ["UUID", id],
+        ])}`
       );
     }
     if (command === "run") {
@@ -581,6 +619,40 @@ function evalApi(cloud: Cloud, serverId: string) {
     },
   };
   let defaultModel: string | undefined;
+  /** Create a suite from `body`, or replace `existing` with it. */
+  async function write(
+    file: EvalSuiteFile,
+    body: ReturnType<typeof suiteBody>,
+    existing: Suite | undefined
+  ) {
+    if (existing !== undefined)
+      return cloud.call(
+        cloud.client.PATCH("/api/v1/server-evals/{serverId}/suites/{suiteId}", {
+          params: { path: { ...path, suiteId: existing.id } },
+          body: {
+            ...body,
+            rubric: file.rubric ?? null,
+            enabled: file.enabled,
+          },
+        }),
+        suiteNotFound
+      );
+    const created = await cloud.call(
+      cloud.client.POST("/api/v1/server-evals/{serverId}/suites", {
+        params: { path },
+        body: { ...body, ...(file.rubric ? { rubric: file.rubric } : {}) },
+      })
+    );
+    // Cloud creates suites enabled; the create body has no `enabled`.
+    if (!file.enabled)
+      await cloud.call(
+        cloud.client.PATCH("/api/v1/server-evals/{serverId}/suites/{suiteId}", {
+          params: { path: { ...path, suiteId: created.id } },
+          body: { enabled: false },
+        })
+      );
+    return created;
+  }
   const api = {
     suites: () =>
       cloud.call(
@@ -600,39 +672,26 @@ function evalApi(cloud: Cloud, serverId: string) {
         defaultModel: defaultModel ?? "",
         existingClientSettings: existing?.clientSettings,
       });
-      if (existing !== undefined)
-        return cloud.call(
-          cloud.client.PATCH(
-            "/api/v1/server-evals/{serverId}/suites/{suiteId}",
-            {
-              params: { path: { ...path, suiteId: existing.id } },
-              body: {
-                ...body,
-                rubric: file.rubric ?? null,
-                enabled: file.enabled,
-              },
-            }
-          ),
-          suiteNotFound
+      let saved: Awaited<ReturnType<typeof write>>;
+      try {
+        saved = await write(file, body, existing);
+      } catch (error) {
+        if (error instanceof CloudResponseError && error.status === 409)
+          throw new CommandError(
+            "eval_suite_id_taken",
+            `Another eval suite on this server already has the ID “${file.id}”.`,
+            undefined,
+            [{ description: "List eval suites", command: "mcp-use evals list" }]
+          );
+        throw error;
+      }
+      // A Cloud that predates suite IDs drops the slug; the next push would
+      // then create the suite again.
+      if (typeof saved.slug !== "string")
+        throw idsUnsupported(
+          `Saved suite ${saved.id} without its ID “${file.id}”.`
         );
-      const created = await cloud.call(
-        cloud.client.POST("/api/v1/server-evals/{serverId}/suites", {
-          params: { path },
-          body: { ...body, ...(file.rubric ? { rubric: file.rubric } : {}) },
-        })
-      );
-      // Cloud creates suites enabled; the create body has no `enabled`.
-      if (!file.enabled)
-        await cloud.call(
-          cloud.client.PATCH(
-            "/api/v1/server-evals/{serverId}/suites/{suiteId}",
-            {
-              params: { path: { ...path, suiteId: created.id } },
-              body: { enabled: false },
-            }
-          )
-        );
-      return created;
+      return saved;
     },
     remove: (suiteId: string) =>
       cloud.call(
@@ -736,16 +795,22 @@ function evalApi(cloud: Cloud, serverId: string) {
 }
 type EvalApi = ReturnType<typeof evalApi>;
 
-/** Create or replace one suite per file, matched by name. Every file is attempted. */
+/**
+ * Create or replace one suite per file, matched by suite ID (the slug). Every
+ * file is attempted.
+ */
 async function push(
   api: EvalApi,
   files: ReadonlyArray<{ path: string; file?: EvalSuiteFile; error?: string }>
 ) {
   const suites = files.some((item) => item.file) ? await api.suites() : [];
+  // Matching needs every suite's slug, or a file would create a duplicate.
+  suites.forEach(requireSlug);
   const results: Array<
     | {
         path: string;
         action: "created" | "updated";
+        slug: string;
         suiteId: string;
         name: string;
       }
@@ -756,41 +821,73 @@ async function push(
       results.push({ path, error: error ?? "Invalid suite file." });
       continue;
     }
-    const matches = suites.filter((suite) => suite.name === file.name);
-    if (matches.length > 1) {
-      results.push({
-        path,
-        error: `${matches.length} suites are named “${file.name}”. Replace one by ID: mcp-use evals update <suite-id> --file ${path}`,
-      });
-      continue;
-    }
+    const existing = suites.find((suite) => suite.slug === file.id);
     try {
-      const saved = await api.save(file, matches[0]);
+      const saved = await api.save(file, existing);
       results.push({
         path,
-        action: matches[0] ? "updated" : "created",
+        action: existing ? "updated" : "created",
+        slug: saved.slug,
         suiteId: saved.id,
         name: saved.name,
       });
     } catch (failure) {
+      if (
+        failure instanceof CommandError &&
+        failure.code === "eval_suite_ids_unsupported"
+      )
+        throw failure;
       results.push({ path, error: messageOf(failure) });
     }
   }
   return results;
 }
 
-/** The suites `ids` select, in order. Fails on an ID no suite has. */
+/** The first suite ID that two of the files share, with their paths. */
+function duplicateSuiteId(
+  files: ReadonlyArray<{ path: string; file?: EvalSuiteFile }>
+): { id: string; paths: string[] } | undefined {
+  const paths = new Map<string, string[]>();
+  for (const { path, file } of files) {
+    if (file === undefined) continue;
+    const seen = paths.get(file.id) ?? [];
+    seen.push(path);
+    paths.set(file.id, seen);
+    if (seen.length > 1) return { id: file.id, paths: seen };
+  }
+  return undefined;
+}
+
+/** A suite's slug; fails on a Cloud that predates suite IDs. */
+function requireSlug(suite: Pick<Suite, "id" | "slug">): string {
+  if (typeof suite.slug === "string" && suite.slug !== "") return suite.slug;
+  throw idsUnsupported(`Suite ${suite.id} has no ID.`);
+}
+
+function idsUnsupported(detail: string): CommandError {
+  return new CommandError(
+    "eval_suite_ids_unsupported",
+    `${detail} This Manufact Cloud doesn't support suite IDs (slugs) yet, so files can't be matched to suites. Select suites by UUID until it does.`
+  );
+}
+
+/**
+ * The suites `ids` select, in order. A suite ID is a UUID or a slug; a UUID
+ * match wins. Fails on an ID no suite has.
+ */
 async function resolveSuites(
   api: EvalApi,
   ids: readonly string[]
 ): Promise<Suite[]> {
   const suites = await api.suites();
   return ids.map((id) => {
-    const found = suites.find((suite) => suite.id === id);
+    const found =
+      suites.find((suite) => suite.id === id) ??
+      suites.find((suite) => suite.slug === id);
     if (found) return found;
     throw new CommandError(
       "eval_suite_not_found",
-      `No eval suite has the ID “${id}”. Pass suite IDs; names and files aren't accepted.`,
+      `No eval suite has the ID “${id}”. Pass suite IDs (UUID or slug); names and files aren't accepted.`,
       undefined,
       [{ description: "List eval suites", command: "mcp-use evals list" }]
     );
@@ -990,9 +1087,11 @@ async function models(argv: readonly string[]): Promise<[unknown, string]> {
 
 /** A suite as a suite file plus the fields only Cloud knows. */
 function publicSuite(suite: Suite) {
+  const { id: _slug, ...file } = suiteFile(suite);
   return {
     id: suite.id,
-    ...suiteFile(suite),
+    slug: suite.slug,
+    ...file,
     enabled: suite.enabled,
     latestRun: suite.runs?.[0] ?? null,
   };
