@@ -787,10 +787,12 @@ resets every omitted field to its default. `evals models` lists model IDs for
 `clients.inspector.models`, and `evals options` lists the web apps and harnesses
 your organization can run, with their models.
 
-`evals run` selects suites by ID only, because suite names aren't unique.
-`evals list` prints each suite's ID. The other commands that take a `<suite>`
-accept its ID, its name (exact, or ignoring case when unique), or the path of
-its suite file, which is matched by the `name` inside it.
+Commands that select an existing suite (`get`, `export`, `update`, `rm`,
+`run` and `runs --suite`) take its ID only, because suite names aren't unique.
+`evals list` prints each suite's ID. An argument that isn't a suite ID, such as
+a suite name or a file path, fails with `eval_suite_not_found`. Suite files
+only supply a suite's content, through `push`, `create --file` and
+`update --file`.
 
 In CI, push the suites and wait for the results. `--wait` exits 1 unless every
 run passes:
@@ -824,7 +826,7 @@ mcp-use evals list [options]
 Show a suite as YAML with its latest run.
 
 ```bash
-mcp-use evals get <suite> [options]
+mcp-use evals get <suite-id> [options]
 ```
 
 ### `evals export`
@@ -833,7 +835,7 @@ Print a suite as a file that `evals push` accepts, for example to move a suite
 built in the dashboard into your repository.
 
 ```bash
-mcp-use evals export <suite> [--out <path>] [options]
+mcp-use evals export <suite-id> [--out <path>] [options]
 ```
 
 ### `evals create`
@@ -849,7 +851,7 @@ mcp-use evals create --file <suite.yaml> [options]
 Replace a suite with a file's definition, including its name.
 
 ```bash
-mcp-use evals update <suite> --file <suite.yaml> [options]
+mcp-use evals update <suite-id> --file <suite.yaml> [options]
 ```
 
 ### `evals rm`
@@ -857,7 +859,7 @@ mcp-use evals update <suite> --file <suite.yaml> [options]
 Delete a suite and all of its runs. Runs in progress are cancelled.
 
 ```bash
-mcp-use evals rm <suite> [--yes] [options]
+mcp-use evals rm <suite-id> [--yes] [options]
 ```
 
 ### `evals run`
@@ -868,9 +870,7 @@ Start one run per suite against the server's production endpoint.
 mcp-use evals run [<suite-id...>] [--all] [--branch <name>] [--profile <id>] [--wait] [--timeout <seconds>] [--json-file <path>] [--markdown-file <path>] [options]
 ```
 
-Pass suite IDs or `--all`. An argument that isn't a suite ID, such as a suite
-name or a file path, fails with `eval_suite_not_found`. `--all` runs every
-enabled suite, and `--branch` targets a branch environment.
+Pass suite IDs or `--all`. `--all` runs every enabled suite, and `--branch` targets a branch environment.
 `--profile` signs in with that profile of the server's organization instead of
 the server's own, so the same suites can run as different accounts. It doesn't
 apply to native apps or to clients running the plugin lifecycle, which sign in
@@ -909,7 +909,7 @@ files still get the runs as they stand before the command fails.
 List eval runs, newest first.
 
 ```bash
-mcp-use evals runs [--suite <suite>] [--limit <n>] [--skip <n>] [options]
+mcp-use evals runs [--suite <suite-id>] [--limit <n>] [--skip <n>] [options]
 ```
 
 ### `evals report`

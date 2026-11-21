@@ -10,17 +10,19 @@ mcp-use evals run --all --wait --json
 mcp-use evals report RUN_ID --json
 ```
 
-`evals run` takes suite IDs only (`mcp-use evals list --json` shows them), or
-`--all`: `mcp-use evals run SUITE_ID --wait`. A name or a file path fails with
-`eval_suite_not_found`. The other commands that take a suite also accept its
-name or its suite file: `mcp-use evals get "Rome weather"`.
+Commands that select an existing suite take its ID only, because names aren't
+unique: `get`, `export`, `update`, `rm`, `run` and `runs --suite`
+(`mcp-use evals list --json` shows the IDs). For example
+`mcp-use evals run SUITE_ID --wait` or `mcp-use evals get SUITE_ID`. A name or a
+file path fails with `eval_suite_not_found`. `evals run --all` runs every
+enabled suite.
 
 `push` matches suites by name: it replaces a suite with the file's name or
 creates one. A file is the suite's whole definition, so writing it resets every
 omitted field to its default. `push` never deletes suites; use
-`mcp-use evals rm "Suite name" --yes` when a file is removed. To start from a
+`mcp-use evals rm SUITE_ID --yes` when a file is removed. To start from a
 suite built in the dashboard, run
-`mcp-use evals export "Suite name" --out evals/name.yaml`.
+`mcp-use evals export SUITE_ID --out evals/name.yaml`.
 
 ## File format
 

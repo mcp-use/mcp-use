@@ -141,29 +141,22 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
             })
           )
         : [];
-    // Suites named on the command line. `run` takes IDs only, since names
-    // aren't unique; the others also take a name or a suite file.
-    const refs =
-      command === "run"
-        ? positionals.map((id) => ({ label: id, idOnly: true }))
-        : ["get", "export", "update", "rm"].includes(command!)
-          ? await suiteRefs(positionals)
-          : typeof values.suite === "string"
-            ? await suiteRefs([values.suite])
-            : [];
+    // Suites selected on the command line, by ID only: names aren't unique.
+    const ids = ["get", "export", "update", "rm", "run"].includes(command!)
+      ? positionals
+      : typeof values.suite === "string"
+        ? [values.suite]
+        : [];
     const file =
       typeof values.file === "string"
         ? await readEvalSuiteFile(values.file)
         : undefined;
     if (
       (command === "rm" &&
-        !(await confirm(
-          `Delete eval suite “${refs[0]!.label}” and all of its runs?`,
-          {
-            yes: values.yes === true,
-            json: output.json,
-          }
-        ))) ||
+        !(await confirm(`Delete eval suite ${ids[0]} and all of its runs?`, {
+          yes: values.yes === true,
+          json: output.json,
+        }))) ||
       (command === "cancel" &&
         !(await confirm(
           `Cancel the remaining executions of run ${positionals[0]}?`,
@@ -186,7 +179,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
     const serverName = found.name ?? found.slug ?? serverId;
     const dashboardUrl = `${cloudWebUrl()}/cloud/${encodeURIComponent(cloud.organization.slug ?? cloud.organization.id)}/servers/${encodeURIComponent(serverId)}/evals/suites`;
     const api = evalApi(cloud, serverId);
-    const suites = refs.length > 0 ? await resolveSuites(api, refs) : [];
+    const suites = ids.length > 0 ? await resolveSuites(api, ids) : [];
 
     if (command === "push") {
       const results = await push(api, files);
@@ -786,80 +779,20 @@ async function push(
   return results;
 }
 
-/** A suite named on the command line: by the name in a suite file, or by ID or name. */
-interface SuiteRef {
-  /** What the user typed, for messages. */
-  label: string;
-  /** The suite name read from a suite file. */
-  fileName?: string;
-  /** Match `label` as a suite ID only, never as a name. */
-  idOnly?: boolean;
-}
-
-/**
- * Turn command-line suite references into refs. An existing file is read
- * for its suite name; anything else is an ID or a name.
- */
-async function suiteRefs(args: readonly string[]): Promise<SuiteRef[]> {
-  const refs: SuiteRef[] = [];
-  for (const arg of args) {
-    const info = await stat(arg).catch(() => undefined);
-    if (info === undefined) {
-      refs.push({ label: arg });
-      continue;
-    }
-    if (info.isDirectory())
-      throw new UsageError(`${arg} is a directory; name one suite.`);
-    refs.push({ label: arg, fileName: (await readEvalSuiteFile(arg)).name });
-  }
-  return refs;
-}
-
-/**
- * The suites `refs` name, in order: a file by its suite name; an ID-only ref
- * by its ID; otherwise an ID, then an exact name, then a name ignoring case.
- * Fails on no match or on a name several suites share.
- */
+/** The suites `ids` select, in order. Fails on an ID no suite has. */
 async function resolveSuites(
   api: EvalApi,
-  refs: readonly SuiteRef[]
+  ids: readonly string[]
 ): Promise<Suite[]> {
   const suites = await api.suites();
-  return refs.map((ref) => {
-    const name = ref.fileName ?? ref.label;
-    const lower = name.toLowerCase();
-    const candidates = ref.idOnly
-      ? [suites.filter((suite) => suite.id === ref.label)]
-      : [
-          ref.fileName === undefined
-            ? suites.filter((suite) => suite.id === ref.label)
-            : [],
-          suites.filter((suite) => suite.name === name),
-          suites.filter((suite) => suite.name.toLowerCase() === lower),
-        ];
-    const matches = candidates.find((list) => list.length > 0) ?? [];
-    if (matches.length === 1) return matches[0]!;
-    if (matches.length === 0)
-      throw new CommandError(
-        "eval_suite_not_found",
-        ref.idOnly
-          ? `No eval suite has the ID “${ref.label}”. Pass suite IDs; names and files aren't accepted.`
-          : ref.fileName === undefined
-            ? `No eval suite matches “${ref.label}”.`
-            : `No eval suite is named “${name}” (from ${ref.label}).`,
-        undefined,
-        [
-          ref.fileName === undefined
-            ? { description: "List eval suites", command: "mcp-use evals list" }
-            : {
-                description: "Create it",
-                command: `mcp-use evals push ${ref.label}`,
-              },
-        ]
-      );
+  return ids.map((id) => {
+    const found = suites.find((suite) => suite.id === id);
+    if (found) return found;
     throw new CommandError(
-      "eval_suite_ambiguous",
-      `${matches.length} eval suites are named “${name}”: ${matches.map((suite) => suite.id).join(", ")}. Pass an ID instead.`
+      "eval_suite_not_found",
+      `No eval suite has the ID “${id}”. Pass suite IDs; names and files aren't accepted.`,
+      undefined,
+      [{ description: "List eval suites", command: "mcp-use evals list" }]
     );
   });
 }
