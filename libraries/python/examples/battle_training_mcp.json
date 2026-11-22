@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+      "battle_training": {
+          "url": "https://api.battle.training/mcp"
+      }
+  }
+}
