@@ -508,7 +508,7 @@ Native View documents are generated MCP resources. Do not register
 | Production View bundles          | `${basePath}/_mcp-use/views/<name>/...` |
 | Public files                     | `${basePath}/_mcp-use/public/...`       |
 | View resource URI in development | `ui://views/<name>.html`                |
-| View resource URI in production  | `ui://views/<name>.html?v=<hash>`       |
+| View resource URI in production  | `ui://views/<name>.html?v=<buildId>`    |
 
 Move existing widget CSP domains to `view.csp`.
 
@@ -522,16 +522,14 @@ for legacy URL values, proxy configuration, and metadata precedence.
 
 v1 served widgets at `ui://widget/<name>.html`, and sometimes
 `ui://widget/<name>.<buildId>.html`. v2 uses `ui://views/<name>.html` in development
-and `ui://views/<name>.html?v=<hash>` in production, where `<hash>` is derived
-from the View's built bundle and the settings declared on its tool's `view`
-(`csp`, `permissions`, `domain`, and `prefersBorder`). Production builds version
-both external and inline View resources automatically. A View keeps its URI
-until its bundle or one of those settings changes, across rebuilds,
-backend-only deploys, and replicas.
+and `ui://views/<name>.html?v=<buildId>` in production. Production builds
+version both external and inline View resources automatically. Replicas
+deployed from the same build share the same URI; rebuilding changes the `v`
+query, so hosts get a fresh cache key while the resource path stays the same.
 
 Read the URI advertised by the tool's `_meta.ui.resourceUri` or by
 `resources/list`, and remove hardcoded View URIs. Refresh tool discovery after
-each deployment so hosts obtain a changed View's new URI.
+each deployment so hosts obtain the new URI.
 
 The `?v=` value only busts caches. A v2 server serves the current View for
 `ui://views/<name>.html` with any `?v=` value or none, and for the

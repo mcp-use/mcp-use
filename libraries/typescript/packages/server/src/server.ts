@@ -164,7 +164,6 @@ import {
   viewResourceConfig,
   viewResourceUri,
   resolveViewResourceUri,
-  computeViewVersion,
   applyClaudeResourceDomain,
   buildResourceUiMeta,
   buildToolResultUiMeta,
@@ -419,14 +418,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   /** When true, resource CSP emission includes the HMR websocket origin. */
   #viewsDevMode = false;
 
-  /**
-   * Production `?v=` cache-key version per view, computed on first use from
-   * the view bundle and the bound tool's view settings. Cleared when views
-   * are primed or a tool binds a view.
-   */
-  #viewVersions: Map<string, string> | undefined;
-  /** Whether build tooling asked for `?v=`-versioned view URIs. */
-  #viewsVersioned = false;
+  /** Immutable build identity used by every view URI on this instance. */
+  #viewBuildId: string | undefined;
   /** Project root for filesystem-backed view bundle and public routes. */
   #viewsProjectRoot = process.cwd();
 
@@ -772,11 +765,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * emission appends the serving origin's websocket variant to
    * `connectDomains` so Vite HMR passes host-enforced CSP. Pass
    * `projectRoot` in dev so the `public/` route resolves against the user's
-   * project directory rather than the CLI process cwd. Production build
-   * tooling passes `versioned: true` to add a `?v=` cache key, hashed from
-   * each view's bundle and the view settings declared on its tool, to its
-   * URI; development keeps bare URIs. A `buildId`
-   * from older build tooling also turns versioning on; its value is ignored.
+   * project directory rather than the CLI process cwd. Production builds pass
+   * an immutable `buildId`, sent as the `?v=` cache key of every view
+   * resource URI and shared by all replicas of the build; development
+   * ignores it and keeps bare URIs.
    * @throws If views are already primed, or after the server has started.
    *
    * @internal
@@ -804,10 +796,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
     }
     this.#viewsDevMode = options?.dev === true;
-    this.#viewsVersioned =
-      !this.#viewsDevMode &&
-      (options?.versioned === true || options?.buildId !== undefined);
-    this.#viewVersions = undefined;
+    this.#viewBuildId = this.#viewsDevMode ? undefined : options?.buildId;
     this.#embeddedViewAssets = options?.assets;
     if (options?.projectRoot !== undefined) {
       this.#viewsProjectRoot = options.projectRoot;
@@ -2071,8 +2060,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       toolName: definition.name,
       config: view,
     });
-    // The bound tool's view settings are part of the view's version.
-    this.#viewVersions = undefined;
   }
 
   #validateViewBindingsAtMount(): void {
@@ -2472,7 +2459,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       view?.name,
       definition.visibility,
       buildEntrypointMeta(definition),
-      view === undefined ? undefined : this.#viewVersion(view.name)
+      this.#viewBuildId
     );
     const uiMeta = entry.mentions
       ? finalizeMentionsMeta(definition, serializedUiMeta)
@@ -2507,7 +2494,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     };
     const wireResultMeta =
       view !== undefined
-        ? buildToolResultUiMeta(view.name, this.#viewVersion(view.name))
+        ? buildToolResultUiMeta(view.name, this.#viewBuildId)
         : undefined;
 
     const inputSchema = resolveToolInputSchema(definition);
@@ -2564,50 +2551,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
   }
 
-  /**
-   * Resource facts for a view: the bound tool's view config plus the display
-   * modes from the frontend `viewConfig` export.
-   */
-  #viewAuthorFacts(
-    viewName: string,
-    entry: ViewManifestEntry
-  ): ViewResourceFacts {
-    const frontendConfig = normalizeViewConfig(entry.viewConfig);
-    return {
-      ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),
-      displayModes: frontendConfig.displayModes,
-      ...(frontendConfig.preferredDisplayMode !== undefined && {
-        preferredDisplayMode: frontendConfig.preferredDisplayMode,
-      }),
-    };
-  }
-
-  /**
-   * `?v=` cache-key version for a view, or `undefined` when versioning is
-   * off (development, or views primed without `versioned`) and for unknown
-   * views. Hashes the view bundle and the bound tool's view settings; computed
-   * once and cleared when views are primed or a tool binds a view.
-   */
-  #viewVersion(viewName: string): string | undefined {
-    if (!this.#viewsVersioned) {
-      return undefined;
-    }
-    if (this.#viewVersions === undefined) {
-      const versions = new Map<string, string>();
-      for (const [name, entry] of this.#views) {
-        versions.set(
-          name,
-          computeViewVersion(
-            entry,
-            this.#viewResourceFacts(this.#viewBindings.get(name)?.config)
-          )
-        );
-      }
-      this.#viewVersions = versions;
-    }
-    return this.#viewVersions.get(viewName);
-  }
-
   #registerViewResource(
     server: SdkMcpServer,
     viewName: string,
@@ -2615,8 +2558,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     metaOptions: { request?: Request; hmrWs?: boolean },
     basePath: string
   ): ViewResourceReader {
-    const uri = viewResourceUri(viewName, this.#viewVersion(viewName));
-    const authorFacts = this.#viewAuthorFacts(viewName, entry);
+    const uri = viewResourceUri(viewName, this.#viewBuildId);
+    const frontendConfig = normalizeViewConfig(entry.viewConfig);
+    const authorFacts = {
+      ...this.#viewResourceFacts(this.#viewBindings.get(viewName)?.config),
+      displayModes: frontendConfig.displayModes,
+      ...(frontendConfig.preferredDisplayMode !== undefined && {
+        preferredDisplayMode: frontendConfig.preferredDisplayMode,
+      }),
+    };
     const resourceConfig = viewResourceConfig(
       viewName,
       entry,

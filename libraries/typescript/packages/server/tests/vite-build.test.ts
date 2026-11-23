@@ -174,7 +174,7 @@ console.log(JSON.stringify({config, assets, skill, logo, view, uri}));
         { cwd: root }
       );
       const result = JSON.parse(stdout.trim().split("\n").at(-1)!);
-      expect(result.uri).toMatch(/^ui:\/\/views\/card\.html\?v=[0-9a-f]{8}$/);
+      expect(result.uri).toMatch(/^ui:\/\/views\/card\.html\?v=[0-9a-f]{16}$/);
       expect(result.view.result.contents[0].uri).toBe(result.uri);
       expect(result.view.result.contents[0]._meta["openai/ui"]).toEqual({
         availableDisplayModes: ["inline", "fullscreen"],

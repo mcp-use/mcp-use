@@ -473,12 +473,12 @@ async function assertScenario(connection, example, origin) {
         ?._meta?.ui?.resourceUri;
       if (
         typeof resourceUri !== "string" ||
-        !/^ui:\/\/views\/next-status-card\.html\?v=[0-9a-f]{8}$/.test(
+        !/^ui:\/\/views\/next-status-card\.html\?v=[0-9a-f]{16}$/.test(
           resourceUri
         )
       )
         throw new Error(
-          "Next.js status tool did not advertise a content-versioned view URI."
+          "Next.js status tool did not advertise a build-versioned view URI."
         );
       const view = await connection.readResource(resourceUri);
       const document =

@@ -21,5 +21,4 @@ export {
   type BuildResourceUiMetaOptions,
 } from "./wire.js";
 export { resolveViewResourceUri, viewResourceUri } from "./constants.js";
-export { computeViewVersion } from "./version.js";
 export { applyClaudeResourceDomain } from "./claude-domain.js";

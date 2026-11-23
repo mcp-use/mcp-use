@@ -80,25 +80,27 @@ describe("createNextHandler", () => {
       expect(prime).toHaveBeenCalledOnce();
       expect(prime).toHaveBeenCalledWith(manifest, {
         projectRoot,
-        ...(mode === "production" && { versioned: true }),
+        ...(mode === "production" && { buildId: "test" }),
       });
       expect(fetch).toHaveBeenCalledTimes(2);
     }
   );
 
-  it.each([null, 42, "", "a1b2c3"])(
-    "ignores the manifest build ID %j left by older build tooling",
+  it.each([null, 42, true, {}, [], "", " "])(
+    "rejects malformed build ID %j before priming or fetching",
     async (buildId) => {
       const projectRoot = await makeProject({}, buildId);
       vi.spyOn(process, "cwd").mockReturnValue(projectRoot);
       const prime = vi.fn();
-      const fetch = vi.fn(async () => new Response("ok"));
+      const fetch = vi.fn();
       const server = { __primeViews: prime, fetch } as unknown as MCPServer;
       const { GET } = createNextHandler(server);
 
-      const response = await GET(new Request("http://localhost/api/mcp"));
-      expect(await response.text()).toBe("ok");
-      expect(prime).toHaveBeenCalledWith({}, { projectRoot, versioned: true });
+      await expect(
+        GET(new Request("http://localhost/api/mcp"))
+      ).rejects.toThrow(/Invalid mcp-use build manifest/);
+      expect(prime).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
     }
   );
 

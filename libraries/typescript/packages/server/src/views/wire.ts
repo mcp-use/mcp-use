@@ -31,8 +31,8 @@ import {
  * definition's top-level `visibility` field.
  * @param existingMetadata - Optional author-supplied definition metadata. Other
  * keys pass through, while framework-owned resource URI and visibility keys
- * are derived exclusively from `viewName`, `version`, and `visibility`.
- * @param version - Production cache-key version of the view; omit in development.
+ * are derived exclusively from `viewName`, `buildId`, and `visibility`.
+ * @param buildId - Immutable production build ID; omit in development.
  * @returns Wire metadata for the tool listing, or `undefined` when there is
  * nothing to emit.
  */
@@ -40,7 +40,7 @@ export function buildToolUiMeta(
   viewName: string | undefined,
   visibility: "model" | "app" | undefined,
   existingMetadata?: MetaObject,
-  version?: string
+  buildId?: string
 ): MetaObject | undefined {
   if (
     viewName === undefined &&
@@ -59,7 +59,7 @@ export function buildToolUiMeta(
   const ui: MetaObject = existingUiIsObject ? { ...existingUi } : {};
 
   if (viewName !== undefined) {
-    const resourceUri = viewResourceUri(viewName, version);
+    const resourceUri = viewResourceUri(viewName, buildId);
     ui["resourceUri"] = resourceUri;
     meta[UI_RESOURCE_URI_META_KEY] = resourceUri;
   } else {
@@ -99,14 +99,14 @@ export function buildToolUiMeta(
  * never enters model context.
  *
  * @param viewName - Bound view directory / registry key.
- * @param version - Production cache-key version of the view; omit in development.
+ * @param buildId - Immutable production build ID; omit in development.
  * @returns Nested and legacy resource-URI wire keys.
  */
 export function buildToolResultUiMeta(
   viewName: string,
-  version?: string
+  buildId?: string
 ): Record<string, unknown> {
-  const resourceUri = viewResourceUri(viewName, version);
+  const resourceUri = viewResourceUri(viewName, buildId);
   return {
     [UI_META_KEY]: { resourceUri },
     [UI_RESOURCE_URI_META_KEY]: resourceUri,

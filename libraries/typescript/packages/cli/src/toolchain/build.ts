@@ -144,9 +144,7 @@ async function writeWrapperEntry(
             `import { __withLandingData } from "mcp-use/landing";`,
             `import { fileURLToPath } from "node:url";`,
           ]),
-      // `buildId` only keeps an older `mcp-use` (for example under a global
-      // CLI install) on versioned URIs; current servers ignore its value.
-      `server[registerViews](${manifestJson}, { versioned: true, buildId: ${JSON.stringify(buildId)} });`,
+      `server[registerViews](${manifestJson}, { buildId: ${JSON.stringify(buildId)} });`,
       `server[registerSkills](${skillsJson});`,
       ...(landing === undefined
         ? []

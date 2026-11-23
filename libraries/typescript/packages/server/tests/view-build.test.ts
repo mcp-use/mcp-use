@@ -21,33 +21,28 @@ afterEach(async () => {
 
 describe("production CLI view cache keys", () => {
   it.each([false, true])(
-    "versions deployed view URIs by view content (inline=%s)",
+    "embeds the manifest build ID in deployed views (inline=%s)",
     async (inline) => {
       root = await mkdtemp(join(import.meta.dirname, ".view-build-"));
       await mkdir(join(root, "views/dashboard"), { recursive: true });
       await mkdir(join(root, "node_modules"));
       await symlink(serverRoot, join(root, "node_modules/mcp-use"));
       await writeFile(join(root, "package.json"), '{"type":"module"}');
-      const writeEntry = (extraTool = "") =>
-        writeFile(
-          join(root!, "index.ts"),
-          `
+      await writeFile(
+        join(root, "index.ts"),
+        `
 import { MCPServer } from "mcp-use";
 import { z } from "zod";
 const server = new MCPServer({name:"built-view",version:"1"});
 server.tool({name:"dashboard",outputSchema:z.object({}),view:{name:"dashboard"}},
   async () => ({content:[],structuredContent:{}}));
-${extraTool}
 export default server;
 `
-        );
-      const writeView = (label: string) =>
-        writeFile(
-          join(root!, "views/dashboard/view.tsx"),
-          `export default function Dashboard() { return <div>${label}</div>; }`
-        );
-      await writeEntry();
-      await writeView("Dashboard");
+      );
+      await writeFile(
+        join(root, "views/dashboard/view.tsx"),
+        "export default function Dashboard() { return <div>Dashboard</div>; }"
+      );
       const build = () =>
         execute(
           process.execPath,
@@ -83,36 +78,27 @@ await server.close();
         );
         return JSON.parse(stdout.trim().split("\n").at(-1)!);
       };
-      const advertisedUri = async () => {
-        const result = await inspect();
-        const uri = result.result.tools[0]._meta.ui.resourceUri;
-        expect(result.result.tools[0]._meta["ui/resourceUri"]).toBe(uri);
-        return uri as string;
-      };
-
       await build();
-      const first = await advertisedUri();
-      expect(first).toMatch(/^ui:\/\/views\/dashboard\.html\?v=[0-9a-f]{8}$/);
-      // Another replica of the same artifact advertises the same URI.
-      expect(await advertisedUri()).toBe(first);
-
-      // Rebuilding identical sources keeps the URI.
-      await build();
-      expect(await advertisedUri()).toBe(first);
-
-      // A backend-only change keeps the URI.
-      await writeEntry(
-        `server.tool({name:"ping"}, async () => ({content:[{type:"text",text:"pong"}]}));`
+      const manifest = JSON.parse(
+        await readFile(join(root, ".mcp-use/build/manifest.json"), "utf8")
       );
+      expect(manifest.buildId).toMatch(/^[0-9a-f]{16}$/);
+      const expectedUri = `ui://views/dashboard.html?v=${manifest.buildId}`;
+      for (let replica = 0; replica < 2; replica++) {
+        const result = await inspect();
+        expect(result.result.tools[0]._meta.ui.resourceUri).toBe(expectedUri);
+        expect(result.result.tools[0]._meta["ui/resourceUri"]).toBe(
+          expectedUri
+        );
+      }
       await build();
-      expect(await advertisedUri()).toBe(first);
-
-      // Changing the view changes its URI.
-      await writeView("Dashboard v2");
-      await build();
-      const changed = await advertisedUri();
-      expect(changed).toMatch(/^ui:\/\/views\/dashboard\.html\?v=[0-9a-f]{8}$/);
-      expect(changed).not.toBe(first);
+      const rebuilt = JSON.parse(
+        await readFile(join(root, ".mcp-use/build/manifest.json"), "utf8")
+      );
+      expect(rebuilt.buildId).not.toBe(manifest.buildId);
+      expect((await inspect()).result.tools[0]._meta.ui.resourceUri).toBe(
+        `ui://views/dashboard.html?v=${rebuilt.buildId}`
+      );
     }
   );
 });

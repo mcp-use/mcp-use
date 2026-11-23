@@ -8,14 +8,8 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-interface ViewSource {
-  js?: string;
-  csp?: { connectDomains: string[] };
-}
-
 function makeServer(
-  options: ViewRegistrationOptions = { versioned: true },
-  source: ViewSource = {},
+  options: ViewRegistrationOptions = { buildId: "a1b2c3" },
   extraViews: Record<string, string> = {}
 ) {
   const server = new MCPServer({ name: "versioned-view", version: "1" });
@@ -24,7 +18,7 @@ function makeServer(
     {
       dashboard: {
         kind: "inline",
-        js: source.js ?? 'console.log("built view")',
+        js: 'console.log("built view")',
         css: "",
       },
       ...Object.fromEntries(
@@ -41,10 +35,7 @@ function makeServer(
       name: "dashboard",
       inputSchema: z.object({ mode: z.string().optional() }),
       outputSchema: z.object({ ok: z.boolean() }),
-      view: {
-        name: "dashboard",
-        ...(source.csp !== undefined && { csp: source.csp }),
-      },
+      view: { name: "dashboard" },
       _meta: { ui: { resourceUri: "ui://spoofed.html" } },
     },
     async ({ mode }) => {
@@ -128,41 +119,30 @@ async function rpc(
   return response.json();
 }
 
-const VERSIONED_DASHBOARD = /^ui:\/\/views\/dashboard\.html\?v=[0-9a-f]{8}$/;
-
 describe("view resource cache keys", () => {
-  it.each([
-    ["production", undefined],
-    ["production with a legacy buildId", { buildId: "a1b2c3" }],
-  ] as const)(
-    "uses one content-versioned URI throughout the wire in %s",
-    async (_label, options) => {
-      const server = makeServer(options);
-      const { dashboard: uri } = await listedUris(server);
-      expect(uri).toMatch(VERSIONED_DASHBOARD);
-      expect(uri).not.toContain("a1b2c3");
-      const tools = await rpc(server, "tools/list");
-      const meta = { ui: { resourceUri: uri }, "ui/resourceUri": uri };
-      expect(tools.result.tools[0]._meta).toMatchObject(meta);
-      const called = await rpc(server, "tools/call", { name: "dashboard" });
-      expect(called.result._meta).toMatchObject({
-        ...meta,
-        custom: "preserved",
-      });
-      const read = await rpc(server, "resources/read", { uri });
-      expect(read.result.contents[0]).toMatchObject({
-        uri,
-        mimeType: "text/html;profile=mcp-app",
-      });
-      expect(read.result.contents[0].text).toContain(
-        'console.log("built view")'
-      );
-    }
-  );
+  it("uses one build-versioned URI throughout the wire in production", async () => {
+    const server = makeServer();
+    const uri = "ui://views/dashboard.html?v=a1b2c3";
+    expect(await listedUris(server)).toEqual({ dashboard: uri });
+    const tools = await rpc(server, "tools/list");
+    const meta = { ui: { resourceUri: uri }, "ui/resourceUri": uri };
+    expect(tools.result.tools[0]._meta).toMatchObject(meta);
+    const called = await rpc(server, "tools/call", { name: "dashboard" });
+    expect(called.result._meta).toMatchObject({
+      ...meta,
+      custom: "preserved",
+    });
+    const read = await rpc(server, "resources/read", { uri });
+    expect(read.result.contents[0]).toMatchObject({
+      uri,
+      mimeType: "text/html;profile=mcp-app",
+    });
+    expect(read.result.contents[0].text).toContain('console.log("built view")');
+  });
 
   it.each([
-    ["development", { dev: true, versioned: true }],
-    ["views primed without versioning", {}],
+    ["development", { dev: true, buildId: "a1b2c3" }],
+    ["views primed without a build ID", {}],
   ] as const)("keeps unversioned URIs in %s", async (_label, options) => {
     const server = makeServer(options);
     expect(await listedUris(server)).toEqual({
@@ -174,46 +154,22 @@ describe("view resource cache keys", () => {
     );
   });
 
-  it("gives identical sources the same URI across rebuilds and replicas", async () => {
-    const first = await listedUris(makeServer({ buildId: "a1b2c3" }));
-    const second = await listedUris(makeServer({ buildId: "d4e5f6" }));
-    const third = await listedUris(makeServer());
-    expect(second).toEqual(first);
-    expect(third).toEqual(first);
-  });
-
-  it("changes only the URI of the view whose content changed", async () => {
-    const before = await listedUris(
-      makeServer(undefined, {}, { chart: 'console.log("chart")' })
-    );
-    const after = await listedUris(
-      makeServer(
-        undefined,
-        { js: 'console.log("built view v2")' },
-        { chart: 'console.log("chart")' }
-      )
-    );
-    expect(after["dashboard"]).toMatch(VERSIONED_DASHBOARD);
-    expect(after["dashboard"]).not.toBe(before["dashboard"]);
-    expect(after["chart"]).toBe(before["chart"]);
-  });
-
-  it("changes the URI when only the tool's view settings change", async () => {
-    const csp = { connectDomains: ["https://api.example.com"] };
-    const before = await listedUris(makeServer());
-    const after = await listedUris(makeServer(undefined, { csp }));
-    const replica = await listedUris(makeServer(undefined, { csp }));
-    expect(after["dashboard"]).toMatch(VERSIONED_DASHBOARD);
-    expect(after["dashboard"]).not.toBe(before["dashboard"]);
-    expect(replica["dashboard"]).toBe(after["dashboard"]);
+  it("keeps replicas on one build key and changes only the query on a new build", async () => {
+    const uris = [];
+    for (const buildId of ["a1b2c3", "a1b2c3", "d4e5f6"]) {
+      uris.push((await listedUris(makeServer({ buildId })))["dashboard"]);
+    }
+    expect(uris).toEqual([
+      "ui://views/dashboard.html?v=a1b2c3",
+      "ui://views/dashboard.html?v=a1b2c3",
+      "ui://views/dashboard.html?v=d4e5f6",
+    ]);
   });
 
   it("does not let views whose names share a prefix shadow each other", async () => {
-    const server = makeServer(
-      undefined,
-      {},
-      { "dashboard-wide": 'console.log("wide view")' }
-    );
+    const server = makeServer(undefined, {
+      "dashboard-wide": 'console.log("wide view")',
+    });
     const old = "ui://views/dashboard-wide-0123456789abcdef.html";
     const read = await rpc(server, "resources/read", { uri: old });
     expect(read.result.contents[0].uri).toBe(old);

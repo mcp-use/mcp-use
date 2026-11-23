@@ -21,14 +21,15 @@ export const UI_RESOURCE_URI_META_KEY = "ui/resourceUri" as const;
 const LEGACY_PATH_VERSION_PATTERN = /^[0-9a-f]{16}$/;
 
 /**
- * Build a view resource URI. Production adds the view's cache-key version as
- * a `?v=` query; the path stays `ui://views/<name>.html`.
+ * Build a view resource URI. Production adds the build ID as a `?v=` cache
+ * key; the path stays `ui://views/<name>.html`.
  *
  * @param viewName - View directory / registry key.
- * @param version - Production cache-key version; omit for the bare URI.
+ * @param buildId - Immutable production build ID; omit for the bare URI.
  */
-export function viewResourceUri(viewName: string, version?: string): string {
-  const query = version === undefined ? "" : `?v=${version}`;
+export function viewResourceUri(viewName: string, buildId?: string): string {
+  const query =
+    buildId === undefined ? "" : `?v=${encodeURIComponent(buildId)}`;
   return `${UI_RESOURCE_URI_PREFIX}${viewName}.html${query}`;
 }
 

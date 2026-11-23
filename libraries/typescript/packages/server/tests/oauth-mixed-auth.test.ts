@@ -286,7 +286,7 @@ function shopServer(options: { requiredScopes?: readonly string[] } = {}) {
     {
       "catalog-card": { kind: "external", entry: "assets/card.js", css: [] },
     },
-    { versioned: true }
+    { buildId: "a1b2c3" }
   );
   server.__primeSkills(undefined);
   return server;
@@ -694,9 +694,7 @@ describe("mixed auth: resources, prompts, and views", () => {
     const catalogUri = result.resources.find(
       (item) => item.name === "catalog-card"
     )?.uri;
-    expect(catalogUri).toMatch(
-      /^ui:\/\/views\/catalog-card\.html\?v=[0-9a-f]{8}$/
-    );
+    expect(catalogUri).toBe("ui://views/catalog-card.html?v=a1b2c3");
     const catalog = await shop.fetch(read(catalogUri!));
     expect(catalog.status).toBe(200);
     expect(await resourceText(catalog)).toContain("<!doctype html>");
