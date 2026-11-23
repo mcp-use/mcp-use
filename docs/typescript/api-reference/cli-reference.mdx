@@ -789,6 +789,11 @@ Commands that take a `<suite>` accept its ID, its name (exact, or ignoring
 case when unique), or the path of its suite file, which is matched by the
 `name` inside it. `evals run` also accepts a directory of suite files.
 
+<Warning>
+  Running evals in CI/CD is experimental and subject to change. Commands,
+  flags, and the suite file format may change between releases.
+</Warning>
+
 In CI, push the suites and wait for the results. `--wait` exits 1 unless every
 run passes:
 
