@@ -1,420 +1,479 @@
 /**
- * Eval suite files: one YAML (or JSON) document per suite.
+ * Eval suite files: one YAML (or JSON) document per suite, kept in a
+ * repository and pushed by the CLI. The evals section of the CLI reference
+ * shows an example.
  *
- * Flow steps use the same shape the dashboard and API store (`kind: user`,
- * `tool_call`, `assistant_text`). `clients` has one key per kind of client,
- * since each takes different options: `inspector` (models), `runtimes`
- * (harness, model, provider) and the `chatgpt` / `claude` web apps (their
- * default model, or chosen models). The CLI parses and validates a file locally
- * and maps it onto Cloud's suite fields, like `alerts`. A file is a suite's
- * whole definition: writing it over an existing suite resets every omitted
- * field to its default.
+ * The file format belongs to the CLI, like `alerts`: Cloud's API takes a
+ * suite as JSON, so the CLI parses and validates each file here and maps it
+ * onto Cloud's suite fields. Every key the format defines is kebab-case; keys
+ * under `args` are the tool's own parameter names. A client takes `model` or
+ * `models`, not both, and `clients` is required. A file is the suite's whole
+ * definition: an omitted field gets its default. The experimental clients (`cursor`, the native apps) and plugin lifecycle have
+ * no key; a push keeps what the suite has for them.
  */
 import { readFile } from "node:fs/promises";
 // Bundled validation used by the CLI.
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { z } from "zod";
+
+import type { operations } from "../api/generated/types.gen.js";
 import { parseDocument } from "../../skills/vendor/yaml-2.8.3.min.js";
-import { UsageError } from "../../core/errors.js";
-import { record } from "../../core/format.js";
 
 /** Largest accepted suite file. */
 const MAX_BYTES = 256 * 1024;
 const DEFAULT_THRESHOLD = 0.7;
-/** Agent harnesses a `clients.runtimes` entry can name. */
+/** Agent harnesses `evals options --harness` filters by. */
 export const HARNESSES = ["pi", "codex", "claude-code", "cursor"] as const;
-const PROVIDERS = ["openrouter", "openai", "anthropic", "cursor"] as const;
-const WEB_CLIENTS = ["chatgpt", "claude"] as const;
-/** Cloud's limits: runtime executions per suite, models per web app. */
-const MAX_RUNTIMES = 12;
+
+/** A suite slug, as Cloud validates it. */
+const SUITE_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const SUITE_SLUG_MAX_LENGTH = 64;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Cloud's limits: required tools, harness executions, models per web app. */
+const MAX_REQUIRED_TOOLS = 50;
+const MAX_HARNESS_CLIENTS = 12;
 const MAX_WEB_MODELS = 10;
+const MAX_CLIENTS = 64;
+
+/** Cloud's request body that creates a suite. */
+export type CreateBody =
+  operations["postApiV1ServerEvalsByServerIdSuites"]["requestBody"]["content"]["application/json"];
+/** Cloud's request body that updates a suite. */
+export type UpdateBody =
+  operations["patchApiV1ServerEvalsByServerIdSuitesBySuiteId"]["requestBody"]["content"]["application/json"];
+/** One execution of a suite: a client and the model it runs. */
+export type SuiteClient = NonNullable<CreateBody["clients"]>[number];
+type RequiredTool = NonNullable<CreateBody["requiredTools"]>[number];
+
+/** File keys under `clients`, and the Cloud client each one runs. */
+const FILE_CLIENTS = {
+  "manufact-inspector": "inspector",
+  "claude-code": "claude-code",
+  codex: "codex",
+  pi: "pi",
+  "chatgpt-web": "chatgpt",
+  "claude-web": "claude",
+} as const satisfies Record<string, SuiteClient["client"]>;
+type FileClientKey = keyof typeof FILE_CLIENTS;
+const FILE_CLIENT_KEYS = Object.keys(FILE_CLIENTS) as FileClientKey[];
+const WEB_FILE_CLIENTS = new Set<FileClientKey>(["chatgpt-web", "claude-web"]);
+const HARNESS_CLIENTS = new Set<string>(HARNESSES);
+/** A web app's own default model. */
+const DEFAULT_MODEL = "default";
+/** Why a file without clients fails: the CLI never relies on Cloud's default model. */
+const CLIENTS_REQUIRED =
+  "list at least one client, such as `manufact-inspector: { model: <model id> }`";
+
+/**
+ * Clients a file can't name (`cursor`, the native apps). A push keeps the
+ * ones a suite has, since sending `clients` replaces the whole list.
+ */
+export function isExperimentalClient(client: string): boolean {
+  return !Object.values<string>(FILE_CLIENTS).includes(client);
+}
 
 const modelId = z.string().trim().min(1).max(200);
-const toolName = z.string().trim().min(1).max(255);
 
-/** A flow step, in the shape the dashboard and API store. */
-const step = z.discriminatedUnion("kind", [
-  z.strictObject({
-    kind: z.literal("user"),
-    content: z.string().trim().min(1).max(10_000),
-  }),
-  z.strictObject({
-    kind: z.literal("tool_call"),
-    name: toolName,
-    args: z.record(z.string(), z.unknown()).optional(),
-  }),
-  z.strictObject({
-    kind: z.literal("assistant_text"),
-    note: z.string().max(10_000).optional(),
-  }),
-]);
-
-const uniqueModels = (max: number) =>
+const fileClient = (key: FileClientKey) =>
   z
-    .array(modelId)
-    .min(1)
-    .max(max)
+    .strictObject({
+      model: modelId.optional(),
+      models: z.array(modelId).min(1).optional(),
+      ...(key === "claude-code"
+        ? { "tool-search": z.boolean().optional() }
+        : {}),
+    })
     .refine(
-      (models) => new Set(models).size === models.length,
-      "Model IDs must be unique."
+      (value) => (value.model === undefined) !== (value.models === undefined),
+      { message: "Give `model` or `models`, not both" }
+    )
+    .refine(
+      (value) =>
+        WEB_FILE_CLIENTS.has(key) ||
+        ![value.model, ...(value.models ?? [])].includes(DEFAULT_MODEL),
+      { message: `\`${DEFAULT_MODEL}\` is only for chatgpt-web and claude-web` }
     );
-
-const runtime = z.strictObject({
-  harness: z.enum(HARNESSES),
-  model: modelId,
-  provider: z.enum(PROVIDERS).optional(),
-});
-
-/** A web app: `true` runs its default model, `{ models }` runs each model. */
-const webApp = z
-  .union([
-    z.boolean(),
-    z.strictObject({ models: uniqueModels(MAX_WEB_MODELS) }),
-  ])
-  .default(false);
-
-const clients = z
-  .strictObject({
-    inspector: z
-      .strictObject({ models: uniqueModels(Number.MAX_SAFE_INTEGER) })
-      .optional(),
-    runtimes: z
-      .array(runtime)
-      .max(MAX_RUNTIMES)
-      .default([])
-      .refine(
-        (items) =>
-          new Set(items.map((item) => JSON.stringify(item))).size ===
-          items.length,
-        "Runtimes must be unique."
-      ),
-    chatgpt: webApp,
-    claude: webApp,
-  })
-  .refine(
-    (value) =>
-      value.inspector !== undefined ||
-      value.runtimes.length > 0 ||
-      value.chatgpt !== false ||
-      value.claude !== false,
-    "Select at least one client."
-  );
+type FileClient = {
+  model?: string | undefined;
+  models?: string[] | undefined;
+  "tool-search"?: unknown;
+};
 
 const fileSchema = z.strictObject({
-  name: z.string().trim().min(1).max(255),
-  flow: z
-    .array(step)
+  id: z
+    .string()
+    .trim()
     .min(1)
-    .refine(
-      (steps) => steps.some((item) => item.kind === "user"),
-      "Add at least one user step."
-    ),
-  rubric: z.string().trim().min(1).max(10_000).optional(),
+    .max(SUITE_SLUG_MAX_LENGTH)
+    .refine((id) => UUID_PATTERN.test(id) || SUITE_SLUG_PATTERN.test(id), {
+      message:
+        "An id is the suite's UUID or a slug: lowercase letters and digits in groups joined by single hyphens, such as rome-weather",
+    }),
+  name: z.string().trim().min(1).max(255),
+  task: z.string().trim().min(1).max(10_000),
+  judge: z.string().trim().min(1).max(10_000).optional(),
   threshold: z.number().min(0).max(1).default(DEFAULT_THRESHOLD),
-  clients: clients.optional(),
-  disallowedTools: z.array(toolName).default([]),
+  "required-tools": z
+    .array(
+      z.strictObject({
+        name: z.string().trim().min(1).max(255),
+        args: z.record(z.string(), z.unknown()).optional(),
+      })
+    )
+    .max(MAX_REQUIRED_TOOLS)
+    .default([]),
+  clients: z
+    .strictObject(
+      Object.fromEntries(
+        FILE_CLIENT_KEYS.map((key) => [key, fileClient(key).optional()])
+      ) as {
+        [K in FileClientKey]: z.ZodOptional<ReturnType<typeof fileClient>>;
+      },
+      {
+        error: (issue) =>
+          issue.input === undefined || issue.input === null
+            ? CLIENTS_REQUIRED
+            : undefined,
+      }
+    )
+    .refine((value) => Object.values(value).some(Boolean), {
+      message: CLIENTS_REQUIRED,
+    }),
   enabled: z.boolean().default(true),
 });
 
-/** A validated suite file. */
-export type EvalSuiteFile = z.output<typeof fileSchema>;
-type Step = z.output<typeof step>;
+/** A validated suite file, as Cloud's suite fields. */
+export type SuiteFile = {
+  /** The suite's UUID or slug. */
+  id: string;
+  /** Whether `id` is a UUID (it must name an existing suite) rather than a slug. */
+  idIsUuid: boolean;
+  name: string;
+  task: string;
+  judge: string | null;
+  threshold: number;
+  requiredTools: RequiredTool[];
+  clients: SuiteClient[];
+  enabled: boolean;
+};
 
-/** Read and validate a YAML or JSON suite file. JSON is valid YAML. */
-export async function readEvalSuiteFile(path: string): Promise<EvalSuiteFile> {
-  let source: string;
-  try {
-    source = await readFile(path, "utf8");
-  } catch {
-    throw new UsageError(`Could not read ${path}.`);
-  }
-  return parseEvalSuiteFile(source, path);
+/** A suite file that can't be used; the message names the field. */
+export class SuiteFileError extends Error {}
+
+/** Matcher keys the file spells in kebab-case, and Cloud's names for them. */
+const MATCHER_KEYS: Record<string, string> = {
+  "require-present": "requirePresent",
+};
+const MATCHER_FILE_KEYS = Object.fromEntries(
+  Object.entries(MATCHER_KEYS).map(([file, cloud]) => [cloud, file])
+);
+
+/** An `{ any, require-present }` matcher with its keys renamed; other values as they are. */
+function renameMatcherKeys(
+  args: Record<string, unknown>,
+  names: Record<string, string>
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(args).map(([arg, matcher]) => {
+      if (!matcher || typeof matcher !== "object" || Array.isArray(matcher))
+        return [arg, matcher];
+      const keys = Object.keys(matcher);
+      if (
+        !keys.includes("any") ||
+        !keys.every((key) => key === "any" || key in names)
+      )
+        return [arg, matcher];
+      return [
+        arg,
+        Object.fromEntries(
+          Object.entries(matcher).map(([key, value]) => [
+            names[key] ?? key,
+            value,
+          ])
+        ),
+      ];
+    })
+  );
 }
 
-/** Validate suite file text; `path` names the file in error messages. */
-export function parseEvalSuiteFile(
-  source: string,
-  path: string
-): EvalSuiteFile {
+/** Read one suite file's text. */
+export async function readSuiteFileText(path: string): Promise<string> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    throw new SuiteFileError(`Could not read ${path}.`);
+  }
+}
+
+/** Parse and validate suite file text. Errors name the field; the caller adds the path. */
+export function parseSuiteFile(source: string): SuiteFile {
   if (Buffer.byteLength(source) > MAX_BYTES)
-    throw new UsageError(`${path}: a suite file must be at most 256 KiB.`);
+    throw new SuiteFileError("a suite file must be at most 256 KiB");
   const document = parseDocument(source, { prettyErrors: false });
   if (document.errors.length > 0)
-    throw new UsageError(
-      `${path}: invalid YAML: ${document.errors[0]!.message.split("\n")[0]}`
+    throw new SuiteFileError(
+      `invalid YAML: ${document.errors[0]!.message.split("\n")[0]}`
     );
   let value: unknown;
   try {
     value = document.toJSON();
   } catch {
-    throw new UsageError(`${path} could not be decoded as YAML.`);
+    throw new SuiteFileError("the file could not be decoded as YAML");
   }
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new SuiteFileError(
+      "a suite file is a mapping of fields, starting with `id:`"
+    );
+  if (!("id" in value))
+    throw new SuiteFileError(
+      "add the suite's ID as a top-level `id:` (its slug, such as `id: rome-weather`, or its UUID)"
+    );
   const result = fileSchema.safeParse(value);
   if (!result.success) {
     const issue = result.error.issues[0]!;
-    throw new UsageError(
-      `${path}: invalid eval suite at ${issue.path.join(".") || "file"}: ${issue.message}`
+    throw new SuiteFileError(
+      `${issue.path.join(".") || "file"}: ${issue.message}`
     );
   }
-  return result.data;
+  const file = result.data;
+  const clients = fileClients(file.clients);
+  return {
+    id: file.id,
+    idIsUuid: UUID_PATTERN.test(file.id),
+    name: file.name,
+    task: file.task,
+    judge: file.judge ?? null,
+    threshold: file.threshold,
+    requiredTools: file["required-tools"].map((tool) => ({
+      name: tool.name,
+      ...(tool.args
+        ? { args: renameMatcherKeys(tool.args, MATCHER_KEYS) }
+        : {}),
+    })),
+    clients,
+    enabled: file.enabled,
+  };
 }
 
-/** Steps as Cloud stores them. */
-type SavedStep =
-  | { kind: "user"; content: string }
-  | { kind: "tool_call"; name: string; args?: Record<string, unknown> }
-  | { kind: "assistant_text"; note?: string };
+/** A file's `clients` map as Cloud's list: one entry per model, checked against Cloud's limits. */
+function fileClients(
+  map: Partial<Record<FileClientKey, FileClient | undefined>>
+): SuiteClient[] {
+  const clients: SuiteClient[] = [];
+  const seen = new Set<string>();
+  for (const key of FILE_CLIENT_KEYS) {
+    const spec = map[key];
+    if (!spec) continue;
+    const toolSearch =
+      typeof spec["tool-search"] === "boolean"
+        ? spec["tool-search"]
+        : undefined;
+    for (const model of spec.models ?? [spec.model!]) {
+      if (seen.has(`${key}\u0000${model}`))
+        throw new SuiteFileError(
+          `clients: ${key} lists ${model === DEFAULT_MODEL ? "its default model" : model} twice`
+        );
+      seen.add(`${key}\u0000${model}`);
+      clients.push({
+        client: FILE_CLIENTS[key],
+        model: model === DEFAULT_MODEL ? null : model,
+        ...(toolSearch !== undefined ? { toolSearch } : {}),
+      });
+    }
+  }
+  if (clients.length > MAX_CLIENTS)
+    throw new SuiteFileError(`clients: at most ${MAX_CLIENTS} executions`);
+  if (
+    clients.filter((entry) => HARNESS_CLIENTS.has(entry.client)).length >
+    MAX_HARNESS_CLIENTS
+  )
+    throw new SuiteFileError(
+      `clients: at most ${MAX_HARNESS_CLIENTS} agent harness executions per suite`
+    );
+  for (const key of WEB_FILE_CLIENTS)
+    if (
+      clients.filter((entry) => entry.client === FILE_CLIENTS[key]).length >
+      MAX_WEB_MODELS
+    )
+      throw new SuiteFileError(
+        `clients: at most ${MAX_WEB_MODELS} ${key} models`
+      );
+  return clients;
+}
 
-/**
- * The Cloud request body that stores `file` as a suite's whole definition.
- * Client selection is spread across `clientTargets`, `clientSettings`, and
- * the legacy `models` / `disallowedTools` fields; all are written together,
- * as the dashboard does. Settings a file cannot express (plugin lifecycle)
- * are kept from `existingClientSettings`.
- */
-export function suiteBody(
-  file: EvalSuiteFile,
-  options: { defaultModel: string; existingClientSettings?: unknown }
-) {
-  const selected = file.clients ?? {
-    inspector: { models: [options.defaultModel] },
-    runtimes: [],
-    chatgpt: false,
-    claude: false,
-  };
-  const inspectorModels = selected.inspector?.models ?? [];
-  const executors = selected.runtimes.map(({ harness, model, provider }) => ({
-    harness,
-    model,
-    ...(provider === undefined ? {} : { provider }),
-  }));
-  const apps = WEB_CLIENTS.filter((app) => selected[app] !== false);
-  const webModels = Object.fromEntries(
-    WEB_CLIENTS.flatMap((app) => {
-      const setting = selected[app];
-      return typeof setting === "object"
-        ? [[app, { models: setting.models.map((id) => ({ id, name: "" })) }]]
-        : [];
-    })
-  );
-  const {
-    inspector: _inspector,
-    runtime: _runtime,
-    web: _web,
-    ...preserved
-  } = record(options.existingClientSettings);
+/** The request that creates the suite a file describes, with the file's `id` as its slug. */
+export function createBody(file: SuiteFile): CreateBody {
   return {
     name: file.name,
-    flow: file.flow.map(savedStep),
+    slug: file.id,
+    task: file.task,
+    judge: file.judge,
     threshold: file.threshold,
-    disallowedTools: file.disallowedTools,
-    models: inspectorModels,
-    clientTargets: [
-      ...(inspectorModels.length > 0 ? ["inspector"] : []),
-      ...apps,
-      ...new Set(executors.map((entry) => entry.harness)),
-    ],
-    clientSettings: {
-      ...preserved,
-      ...(inspectorModels.length > 0
-        ? {
-            inspector: {
-              modelIds: inspectorModels,
-              disallowedToolNames: file.disallowedTools,
-            },
-          }
-        : {}),
-      ...(executors.length > 0 ? { runtime: { executors } } : {}),
-      ...(Object.keys(webModels).length > 0 ? { web: webModels } : {}),
-    },
+    requiredTools: file.requiredTools,
+    clients: file.clients,
+    enabled: file.enabled,
   };
-}
-
-/** A step with absent optional fields omitted rather than `undefined`. */
-function savedStep(item: Step): SavedStep {
-  if (item.kind === "tool_call")
-    return {
-      kind: item.kind,
-      name: item.name,
-      ...(item.args === undefined ? {} : { args: item.args }),
-    };
-  if (item.kind === "assistant_text")
-    return {
-      kind: item.kind,
-      ...(item.note === undefined ? {} : { note: item.note }),
-    };
-  return item;
-}
-
-/** A saved suite, as Cloud returns it. */
-export interface SavedSuite {
-  name: string;
-  enabled: boolean;
-  threshold: number;
-  prompt: string | null;
-  flow: unknown;
-  requiredTools: unknown;
-  rubric: string | null;
-  models: unknown;
-  disallowedTools: unknown;
-  clientTargets: unknown;
-  clientSettings: unknown;
 }
 
 /**
- * Read a saved suite back into the file shape. Legacy columns are read the
- * way runs read them: `clientSettings` wins over `models` and
- * `disallowedTools`, and a suite saved before flows existed becomes a flow
- * of its prompt and required tools.
+ * The request that makes `existing` what a file describes. Every definition
+ * field is sent, so an omitted one is reset to its default. `clients`
+ * replaces the whole list, so the experimental clients `existing` has are
+ * sent too.
  */
-export function suiteFile(suite: SavedSuite): Record<string, unknown> {
-  const settings = record(suite.clientSettings);
-  const inspector =
-    settings.inspector === undefined ? undefined : record(settings.inspector);
-  const known = new Set<string>(["inspector", ...WEB_CLIENTS, ...HARNESSES]);
-  const listed = strings(suite.clientTargets).filter((target) =>
-    known.has(target)
-  );
-  const targets = listed.length > 0 ? listed : ["inspector"];
-  const inspectorModels = inspector
-    ? strings(inspector.modelIds)
-    : strings(suite.models);
-  const disallowedTools = inspector
-    ? strings(inspector.disallowedToolNames)
-    : strings(suite.disallowedTools);
-  const runtimes = list(record(settings.runtime).executors)
-    .map(record)
-    .filter(
-      (item) =>
-        typeof item.harness === "string" &&
-        typeof item.model === "string" &&
-        targets.includes(item.harness)
-    )
-    .map(({ harness, model, provider }) => ({
-      harness,
-      model,
-      ...(typeof provider === "string" ? { provider } : {}),
-    }));
-  const selected: Record<string, unknown> = {
-    ...(targets.includes("inspector") && inspectorModels.length > 0
-      ? { inspector: { models: inspectorModels } }
-      : {}),
-    ...(runtimes.length > 0 ? { runtimes } : {}),
-    ...Object.fromEntries(
-      WEB_CLIENTS.filter((app) => targets.includes(app)).map((app) => {
-        const models = list(record(record(settings.web)[app]).models)
-          .map((model) => record(model).id)
-          .filter((id): id is string => typeof id === "string" && id !== "");
-        return [app, models.length > 0 ? { models } : true];
-      })
-    ),
-  };
+export function updateBody(
+  file: SuiteFile,
+  existing: { clients?: readonly SuiteClient[] }
+): UpdateBody {
   return {
-    name: suite.name,
-    flow: savedFlow(suite),
-    ...(suite.rubric ? { rubric: suite.rubric } : {}),
-    threshold: suite.threshold,
-    ...(Object.keys(selected).length > 0 ? { clients: selected } : {}),
-    ...(disallowedTools.length > 0 ? { disallowedTools } : {}),
-    ...(suite.enabled ? {} : { enabled: false }),
+    name: file.name,
+    task: file.task,
+    judge: file.judge,
+    threshold: file.threshold,
+    requiredTools: file.requiredTools,
+    clients: [
+      ...file.clients,
+      ...(existing.clients ?? [])
+        .filter((entry) => isExperimentalClient(entry.client))
+        .map(clientEntry),
+    ],
+    enabled: file.enabled,
   };
 }
 
-function savedFlow(suite: SavedSuite): SavedStep[] {
-  const flow = list(suite.flow).flatMap((value): SavedStep[] => {
-    const item = record(value);
-    if (item.kind === "user" && typeof item.content === "string")
-      return [{ kind: "user", content: item.content }];
-    if (item.kind === "tool_call" && typeof item.name === "string")
-      return [
-        {
-          kind: "tool_call",
-          name: item.name,
-          ...(item.args === undefined ? {} : { args: record(item.args) }),
-        },
-      ];
-    if (item.kind === "assistant_text")
-      return [
-        {
-          kind: "assistant_text",
-          ...(typeof item.note === "string" ? { note: item.note } : {}),
-        },
-      ];
-    return [];
-  });
-  if (flow.length > 0 || !suite.prompt?.trim()) return flow;
-  const tools = list(suite.requiredTools).flatMap((tool): SavedStep[] => {
-    const item = record(tool);
-    if (typeof item.name !== "string" || item.name === "") return [];
-    const args = item.args === undefined ? undefined : record(item.args);
-    return [{ kind: "tool_call", name: item.name, ...(args ? { args } : {}) }];
-  });
-  return [{ kind: "user", content: suite.prompt.trim() }, ...tools];
+/**
+ * A saved client entry with only the keys Cloud's request schema defines:
+ * suite bodies are strict, so anything else would be rejected.
+ */
+function clientEntry({
+  client,
+  model,
+  name,
+  provider,
+  toolSearch,
+}: SuiteClient): SuiteClient {
+  return {
+    client,
+    model,
+    ...(name !== undefined ? { name } : {}),
+    ...(provider !== undefined ? { provider } : {}),
+    ...(toolSearch !== undefined ? { toolSearch } : {}),
+  };
+}
+
+/** A suite as Cloud returns it, with the fields a file holds. */
+export type SuiteDefinition = {
+  slug: string;
+  name: string;
+  task: string | null;
+  judge: string | null;
+  threshold: number;
+  requiredTools: ReadonlyArray<{
+    name: string;
+    args?: Record<string, unknown>;
+  }>;
+  clients: readonly SuiteClient[];
+  enabled: boolean;
+};
+
+/**
+ * Why a suite's file can't be pushed back as written: it runs only on
+ * experimental clients, which a file leaves out, so it has no `clients`.
+ */
+export function exportWarning(suite: SuiteDefinition): string | undefined {
+  if (suite.clients.some((entry) => !isExperimentalClient(entry.client)))
+    return undefined;
+  return "This suite runs only on clients a suite file can't name (cursor, the native apps), so the file has no clients and push rejects it. Add a client to push it; push keeps the suite's experimental clients next to it.";
 }
 
 /**
- * Serialize JSON data as block YAML. Strings that YAML could read as
- * another type are written as JSON strings, which YAML reads verbatim.
+ * A suite as file text: its slug as `id`, without the experimental clients.
+ * Client entries and argument matchers are written on one line each. A suite
+ * with only experimental clients starts with a comment saying why the file
+ * needs a client before it can be pushed.
  */
-export function toYaml(value: unknown): string {
-  return `${block(value, "").replace(/^\n/, "")}\n`;
-}
-
-function block(value: unknown, indent: string): string {
-  if (Array.isArray(value)) {
-    if (value.length === 0) return " []";
-    return value
-      .map((item) => {
-        const body = block(item, `${indent}  `);
-        return isMapping(item) && Object.keys(item).length > 0
-          ? `\n${indent}- ${body.trimStart()}`
-          : `\n${indent}-${body}`;
-      })
-      .join("");
-  }
-  if (isMapping(value)) {
-    const entries = Object.entries(value).filter(
-      ([, item]) => item !== undefined
+export function suiteFileText(suite: SuiteDefinition): string {
+  const clients: Record<string, Record<string, unknown>> = {};
+  for (const key of FILE_CLIENT_KEYS) {
+    const entries = suite.clients.filter(
+      (entry) => entry.client === FILE_CLIENTS[key]
     );
-    if (entries.length === 0) return " {}";
-    return entries
-      .map(
-        ([key, item]) =>
-          `\n${indent}${scalar(key)}:${block(item, `${indent}  `)}`
-      )
-      .join("");
+    if (entries.length === 0) continue;
+    const models = entries.map((entry) => entry.model ?? DEFAULT_MODEL);
+    const toolSearch = entries.find(
+      (entry) => entry.toolSearch !== undefined
+    )?.toolSearch;
+    clients[key] = {
+      ...(models.length === 1 ? { model: models[0] } : { models }),
+      ...(key === "claude-code" && toolSearch !== undefined
+        ? { "tool-search": toolSearch }
+        : {}),
+    };
   }
-  return ` ${scalar(value)}`;
+  const file = {
+    id: suite.slug,
+    name: suite.name,
+    task: suite.task ?? "",
+    ...(suite.judge ? { judge: suite.judge } : {}),
+    threshold: suite.threshold,
+    ...(suite.requiredTools.length > 0
+      ? {
+          "required-tools": suite.requiredTools.map((tool) => ({
+            name: tool.name,
+            ...(tool.args
+              ? { args: renameMatcherKeys(tool.args, MATCHER_FILE_KEYS) }
+              : {}),
+          })),
+        }
+      : {}),
+    ...(Object.keys(clients).length > 0 ? { clients } : {}),
+    enabled: suite.enabled,
+  };
+  const document = parseDocument("");
+  const root = document.createNode(file);
+  document.contents = root;
+  for (const pair of pairs(root)) {
+    if (pair.key === "clients")
+      for (const client of pairs(pair.value)) setFlow(client.value);
+    if (pair.key === "required-tools")
+      for (const tool of pair.value?.items ?? [])
+        for (const field of pairs(tool as Node))
+          if (field.key === "args")
+            for (const arg of pairs(field.value)) setFlow(arg.value);
+  }
+  const warning = exportWarning(suite);
+  const text = document.toString({ lineWidth: 0 });
+  return warning ? `${commentLines(warning)}${text}` : text;
 }
 
-function scalar(value: unknown): string {
-  if (value === null) return "null";
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value);
-  const text = String(value);
-  const ambiguous =
-    text === "" ||
-    text !== text.trim() ||
-    /^(?:true|false|yes|no|on|off|null|~|[-+]?(?:\.inf|\.nan)|[-+.\d][\d._:eE+-]*)$/i.test(
-      text
-    ) ||
-    /^[-?:,[\]{}#&*!|>'"%@`]/.test(text) ||
-    // Control characters need JSON escapes to survive a round trip.
-    // eslint-disable-next-line no-control-regex
-    /: |\s#|[\n\t\\]|[\x00-\x1f\x7f]/.test(text);
-  return ambiguous ? JSON.stringify(text) : text;
+/** `text` as YAML comment lines of about 78 characters. */
+function commentLines(text: string): string {
+  const lines: string[] = [];
+  let line = "#";
+  for (const word of text.split(" ")) {
+    if (line.length > 1 && line.length + word.length + 1 > 78) {
+      lines.push(line);
+      line = "#";
+    }
+    line += ` ${word}`;
+  }
+  return `${[...lines, line].join("\n")}\n`;
 }
 
-function isMapping(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+type Node = { flow?: boolean; items?: unknown[] } | undefined;
+
+/** A map node's pairs, with plain keys. */
+function pairs(node: Node): Array<{ key: unknown; value: Node }> {
+  return (node?.items ?? []).flatMap((item) => {
+    const pair = item as { key?: { value?: unknown }; value?: Node };
+    return pair && typeof pair === "object" && "key" in pair
+      ? [{ key: pair.key?.value, value: pair.value }]
+      : [];
+  });
 }
 
-function list(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function strings(value: unknown): string[] {
-  return list(value).filter(
-    (item): item is string => typeof item === "string" && item.length > 0
-  );
+/** Write a map or sequence node on one line; scalars are left alone. */
+function setFlow(node: Node): void {
+  if (node && Array.isArray(node.items)) node.flow = true;
 }

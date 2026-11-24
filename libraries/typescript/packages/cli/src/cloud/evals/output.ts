@@ -67,7 +67,7 @@ export function formatSuiteList(
           latest
             ? `${verdict(latest)} · ${age(latest.createdAt) ?? ""}`
             : "Never run",
-          suite.id,
+          suite.slug || suite.id,
         ];
       })
     ),
@@ -85,7 +85,7 @@ export function formatSuite(suite: Suite, yaml: string): string {
         "Latest run",
         latest ? `${verdict(latest)} (${latest.id})` : "Never run",
       ],
-      ["ID", suite.id],
+      ["UUID", suite.id],
     ]),
   ].join("\n");
 }
@@ -239,15 +239,20 @@ export function formatRuntimeOptions(
       ? []
       : [
           [
-            "Inspector (clients.inspector.models)",
+            "Inspector (clients.manufact-inspector)",
             "  Ready (models: mcp-use evals models)",
           ],
         ]),
     ...(web.length > 0
-      ? [["Web apps (clients.chatgpt, clients.claude)", ...web]]
+      ? [["Web apps (clients.chatgpt-web, clients.claude-web)", ...web]]
       : []),
     ...(harnesses.length > 0
-      ? [["Harnesses (clients.runtimes)", ...harnesses]]
+      ? [
+          [
+            "Harnesses (clients.<harness>; cursor can't be set in files yet)",
+            ...harnesses,
+          ],
+        ]
       : []),
   ];
   return filtered && web.length === 0 && harnesses.length === 0

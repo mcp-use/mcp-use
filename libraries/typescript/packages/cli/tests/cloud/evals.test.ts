@@ -2,12 +2,6 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test as unit } from "vitest";
 
-import {
-  parseEvalSuiteFile,
-  suiteBody,
-  suiteFile,
-  toYaml,
-} from "../../src/cloud/evals/config.js";
 import { createLiveReport, duration } from "../../src/cloud/evals/output.js";
 import type { operations } from "../../src/cloud/api/generated/types.gen.js";
 import { test } from "../helpers/cli-test.js";
@@ -21,6 +15,9 @@ type Run =
   operations["getApiV1ServerEvalsByServerIdRunsByRunId"]["responses"][200]["content"]["application/json"];
 
 const SCOPE = ["--server", "weather", "--json"];
+const ROME_UUID = "0b9a3f0e-4c8d-4f6e-9a51-2f7d1c3e8a10";
+const CHECKOUT_UUID = "7c2e1d4a-93b0-4b8e-8f2a-5d6c0e1b9f37";
+const CART_UUID = "3f6a2b9c-1d4e-4a7b-8c5d-9e0f1a2b3c4d";
 const SUITES = "/api/v1/server-evals/srv_1/suites";
 const RUNS = "/api/v1/server-evals/srv_1/runs";
 
@@ -57,18 +54,16 @@ function profiles(cloud: FakeCloud): void {
   });
 }
 
+/** A suite; its slug defaults to its ID with dashes for underscores. */
 function suite(fields: Pick<Suite, "id" | "name"> & Partial<Suite>): Suite {
   return {
+    slug: fields.id.replaceAll("_", "-"),
     enabled: true,
     threshold: 0.7,
-    prompt: null,
-    flow: [{ kind: "user", content: "Weather in Rome?" }],
+    task: "Weather in Rome?",
+    judge: null,
     requiredTools: [],
-    rubric: null,
-    models: ["openai/gpt-5"],
-    disallowedTools: [],
-    clientTargets: ["inspector"],
-    clientSettings: {},
+    clients: [{ client: "inspector", model: "openai/gpt-5" }],
     runs: [],
     ...fields,
   };
@@ -120,30 +115,31 @@ function run(
   };
 }
 
-const ROME = `name: Rome weather
-flow:
-  - kind: user
-    content: What's the weather in Rome?
-  - kind: tool_call
-    name: get_weather
-    args: { city: { contains: rome } }
+const ROME = `id: rome-weather
+name: Rome weather
+task: What's the weather in Rome?
+required-tools:
+  - name: get_weather
+    args: { city: { contains: rome }, date: { any: true, require-present: true } }
+clients:
+  manufact-inspector: { model: openai/gpt-5 }
 `;
 
-const CHECKOUT = `name: Checkout
-flow:
-  - kind: user
-    content: Buy a shirt
-rubric: Confirms the order.
+const CHECKOUT = `id: checkout
+name: Checkout
+task: Buy a shirt
+judge: Confirms the order.
 threshold: 0.8
 clients:
-  inspector: { models: [anthropic/claude-sonnet-5.5] }
-  runtimes: [{ harness: claude-code, model: anthropic/claude-sonnet-5.5 }]
-  claude: true
-disallowedTools: [delete_account]
+  manufact-inspector: { models: [anthropic/claude-sonnet-5.5] }
+  claude-code: { model: anthropic/claude-sonnet-5.5, tool-search: true }
+  claude-web: { model: default }
 `;
 
+const CART = `{ "id": "cart", "name": "Cart", "task": "Show my cart", "clients": { "codex": { "model": "openai/gpt-5" } } }\n`;
+
 describe("evals push", () => {
-  test("creates new suites, replaces suites matched by name, and reports invalid files", async ({
+  test("creates suites for new slugs and updates the suites existing IDs name", async ({
     cloud,
     cli,
   }) => {
@@ -152,160 +148,370 @@ describe("evals push", () => {
     await mkdir(dir);
     await writeFile(join(dir, "rome.yaml"), ROME);
     await writeFile(join(dir, "checkout.yml"), CHECKOUT);
-    await writeFile(join(dir, "broken.yaml"), "name: Broken\nflow: []\n");
+    await writeFile(join(dir, "cart.json"), CART);
     await writeFile(join(dir, "notes.txt"), "ignored");
     cloud.on("GET", SUITES, {
       body: [
         suite({
-          id: "suite_checkout",
-          name: "Checkout",
-          rubric: "Old rubric",
-          clientSettings: { lifecycle: { kind: "plugin" }, judge: {} },
+          id: CHECKOUT_UUID,
+          slug: "checkout",
+          name: "Old checkout",
+          clients: [
+            { client: "inspector", model: "openai/gpt-5" },
+            { client: "cursor", model: "cursor/auto" },
+            { client: "windows-codex", model: null },
+          ],
+        }),
+        suite({
+          id: CART_UUID,
+          slug: "cart",
+          name: "Cart",
+          judge: "Old judge",
+          requiredTools: [{ name: "show_cart" }],
+          clients: [{ client: "codex", model: "openai/gpt-5" }],
         }),
       ],
     });
-    cloud.on("GET", "/api/v1/models", {
-      body: {
-        defaultModelId: "openai/gpt-5",
-        models: [{ id: "openai/gpt-5", name: "GPT-5", provider: "openai" }],
-      },
-    });
     cloud.on("POST", SUITES, {
-      body: { id: "suite_rome", name: "Rome weather" },
+      body: { id: ROME_UUID, slug: "rome-weather", name: "Rome weather" },
     });
-    cloud.on("PATCH", `${SUITES}/suite_checkout`, {
-      body: { id: "suite_checkout", name: "Checkout" },
+    cloud.on("PATCH", `${SUITES}/${CHECKOUT_UUID}`, {
+      body: { id: CHECKOUT_UUID, slug: "checkout", name: "Checkout" },
+    });
+    cloud.on("PATCH", `${SUITES}/${CART_UUID}`, {
+      body: { id: CART_UUID, slug: "cart", name: "Cart" },
     });
 
     const result = await cli.run(["evals", "push", "evals", ...SCOPE], {
       env: SIGNED_IN,
     });
 
-    expect(result.exitCode).toBe(1);
-    expect(result.json).toMatchObject({
-      dashboardUrl: expect.stringMatching(
-        /\/cloud\/org-one\/servers\/srv_1\/evals\/suites$/
-      ),
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toEqual({
+      dryRun: false,
+      dashboardUrl: DASHBOARD,
       results: [
         {
-          path: join("evals", "broken.yaml"),
-          error: expect.stringContaining("flow"),
+          path: join("evals", "cart.json"),
+          action: "updated",
+          suite: { id: CART_UUID, slug: "cart", name: "Cart" },
         },
         {
           path: join("evals", "checkout.yml"),
           action: "updated",
-          suiteId: "suite_checkout",
+          suite: { id: CHECKOUT_UUID, slug: "checkout", name: "Checkout" },
         },
         {
           path: join("evals", "rome.yaml"),
           action: "created",
-          suiteId: "suite_rome",
+          suite: { id: ROME_UUID, slug: "rome-weather", name: "Rome weather" },
         },
       ],
     });
+    // A new suite gets the file's id as its slug.
     expect(cloud.requestsTo("POST", SUITES).map((r) => r.body)).toEqual([
       {
         name: "Rome weather",
-        flow: [
-          { kind: "user", content: "What's the weather in Rome?" },
+        slug: "rome-weather",
+        task: "What's the weather in Rome?",
+        judge: null,
+        threshold: 0.7,
+        requiredTools: [
           {
-            kind: "tool_call",
             name: "get_weather",
-            args: { city: { contains: "rome" } },
+            args: {
+              city: { contains: "rome" },
+              date: { any: true, requirePresent: true },
+            },
           },
         ],
-        threshold: 0.7,
-        disallowedTools: [],
-        models: ["openai/gpt-5"],
-        clientTargets: ["inspector"],
-        clientSettings: {
-          inspector: { modelIds: ["openai/gpt-5"], disallowedToolNames: [] },
-        },
+        clients: [{ client: "inspector", model: "openai/gpt-5" }],
+        enabled: true,
       },
     ]);
-    // A file is the whole definition: the old rubric is cleared, and settings
-    // a file cannot express (lifecycle) are kept.
+    // An update sends the whole definition, and keeps the experimental clients.
     expect(
-      cloud.requestsTo("PATCH", `${SUITES}/suite_checkout`).map((r) => r.body)
+      cloud.requestsTo("PATCH", `${SUITES}/${CHECKOUT_UUID}`).map((r) => r.body)
     ).toEqual([
       {
         name: "Checkout",
-        flow: [{ kind: "user", content: "Buy a shirt" }],
-        rubric: "Confirms the order.",
+        task: "Buy a shirt",
+        judge: "Confirms the order.",
         threshold: 0.8,
+        requiredTools: [],
+        clients: [
+          { client: "inspector", model: "anthropic/claude-sonnet-5.5" },
+          {
+            client: "claude-code",
+            model: "anthropic/claude-sonnet-5.5",
+            toolSearch: true,
+          },
+          { client: "claude", model: null },
+          { client: "cursor", model: "cursor/auto" },
+          { client: "windows-codex", model: null },
+        ],
         enabled: true,
-        disallowedTools: ["delete_account"],
-        models: ["anthropic/claude-sonnet-5.5"],
-        clientTargets: ["inspector", "claude", "claude-code"],
-        clientSettings: {
-          lifecycle: { kind: "plugin" },
-          judge: {},
-          inspector: {
-            modelIds: ["anthropic/claude-sonnet-5.5"],
-            disallowedToolNames: ["delete_account"],
-          },
-          runtime: {
-            executors: [
-              { harness: "claude-code", model: "anthropic/claude-sonnet-5.5" },
-            ],
-          },
-        },
+      },
+    ]);
+    // Omitted fields are reset.
+    expect(
+      cloud.requestsTo("PATCH", `${SUITES}/${CART_UUID}`).map((r) => r.body)
+    ).toEqual([
+      {
+        name: "Cart",
+        task: "Show my cart",
+        judge: null,
+        threshold: 0.7,
+        requiredTools: [],
+        clients: [{ client: "codex", model: "openai/gpt-5" }],
+        enabled: true,
       },
     ]);
   });
 
-  test("clears an omitted rubric and disables a new suite marked disabled", async ({
-    cloud,
-    cli,
-  }) => {
-    server(cloud);
-    await writeFile(
-      join(cli.cwd, "a.yaml"),
-      `${CHECKOUT.replace("rubric: Confirms the order.\n", "")}enabled: false\n`
-    );
-    cloud.on("GET", SUITES, { body: [] });
-    cloud.on("POST", SUITES, { body: { id: "suite_new", name: "Checkout" } });
-    cloud.on("PATCH", `${SUITES}/suite_new`, {
-      body: { id: "suite_new", name: "Checkout" },
-    });
-
-    const result = await cli.run(["evals", "push", "a.yaml", ...SCOPE], {
-      env: SIGNED_IN,
-    });
-
-    expect(result.exitCode).toBe(0);
-    expect(cloud.requestsTo("POST", SUITES)[0]?.body).not.toHaveProperty(
-      "rubric"
-    );
-    expect(
-      cloud.requestsTo("PATCH", `${SUITES}/suite_new`).map((r) => r.body)
-    ).toEqual([{ enabled: false }]);
-  });
-
-  test("refuses to guess between suites that share a name", async ({
+  test("prints Created or Updated with each file's suite ID", async ({
     cloud,
     cli,
   }) => {
     server(cloud);
     await writeFile(join(cli.cwd, "rome.yaml"), ROME);
+    await writeFile(join(cli.cwd, "checkout.yaml"), CHECKOUT);
     cloud.on("GET", SUITES, {
-      body: [
-        suite({ id: "suite_1", name: "Rome weather" }),
-        suite({ id: "suite_2", name: "Rome weather" }),
-      ],
+      body: [suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome" })],
+    });
+    cloud.on("PATCH", `${SUITES}/${ROME_UUID}`, {
+      body: { id: ROME_UUID, slug: "rome-weather", name: "Rome weather" },
+    });
+    cloud.on("POST", SUITES, {
+      body: { id: CHECKOUT_UUID, slug: "checkout", name: "Checkout" },
+    });
+
+    const result = await cli.run(
+      ["evals", "push", "rome.yaml", "checkout.yaml", "--server", "weather"],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(
+      [
+        "✓ Updated rome-weather (“Rome weather”) from rome.yaml",
+        "✓ Created checkout (“Checkout”) from checkout.yaml",
+        "",
+      ].join("\n")
+    );
+  });
+
+  test("an id that is a UUID updates that suite", async ({ cloud, cli }) => {
+    server(cloud);
+    await writeFile(
+      join(cli.cwd, "rome.yaml"),
+      ROME.replace("id: rome-weather", `id: ${ROME_UUID}`)
+    );
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: ROME_UUID, slug: "rome", name: "Rome" })],
+    });
+    cloud.on("PATCH", `${SUITES}/${ROME_UUID}`, {
+      body: { id: ROME_UUID, slug: "rome", name: "Rome weather" },
     });
 
     const result = await cli.run(["evals", "push", "rome.yaml", ...SCOPE], {
       env: SIGNED_IN,
     });
 
-    expect(result.exitCode).toBe(1);
+    expect(result.exitCode).toBe(0);
     expect(result.json).toMatchObject({
-      results: [{ error: expect.stringContaining("evals update <suite-id>") }],
+      results: [{ action: "updated", suite: { id: ROME_UUID, slug: "rome" } }],
     });
+    // The slug stays the suite's own.
+    expect(
+      cloud.requestsTo("PATCH", `${SUITES}/${ROME_UUID}`)[0]?.body
+    ).not.toHaveProperty("slug");
+  });
+
+  test("--dry-run checks every file and says what would change, writing nothing", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    await writeFile(join(cli.cwd, "rome.yaml"), ROME);
+    await writeFile(join(cli.cwd, "checkout.yaml"), CHECKOUT);
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome" })],
+    });
+
+    const human = await cli.run(
+      [
+        "evals",
+        "push",
+        "rome.yaml",
+        "checkout.yaml",
+        "--dry-run",
+        "--server",
+        "weather",
+      ],
+      { env: SIGNED_IN }
+    );
+    const json = await cli.run(
+      ["evals", "push", "rome.yaml", "checkout.yaml", "--dry-run", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+
+    expect(human.exitCode).toBe(0);
+    expect(human.stdout).toBe(
+      [
+        "✓ Would update rome-weather (“Rome weather”) from rome.yaml",
+        "✓ Would create checkout (“Checkout”) from checkout.yaml",
+        "",
+      ].join("\n")
+    );
+    expect(json.json).toEqual({
+      dryRun: true,
+      dashboardUrl: DASHBOARD,
+      results: [
+        {
+          path: "rome.yaml",
+          action: "updated",
+          suite: { id: ROME_UUID, slug: "rome-weather", name: "Rome weather" },
+        },
+        {
+          path: "checkout.yaml",
+          action: "created",
+          suite: { id: null, slug: "checkout", name: "Checkout" },
+        },
+      ],
+    });
+    // Only the suite list was read; no POST or PATCH routes are registered.
+    expect(cloud.requests.map((r) => r.method)).not.toContain("POST");
+    expect(cloud.requests.map((r) => r.method)).not.toContain("PATCH");
+  });
+
+  test("reports every invalid file and writes nothing", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    await writeFile(join(cli.cwd, "a.yaml"), ROME);
+    // The same suite by UUID: two files can't name one suite.
+    await writeFile(
+      join(cli.cwd, "b.yaml"),
+      ROME.replace("id: rome-weather", `id: ${ROME_UUID}`)
+    );
+    await writeFile(join(cli.cwd, "c.yaml"), "name: No ID\ntask: Hi\n");
+    await writeFile(
+      join(cli.cwd, "d.yaml"),
+      CART.replace('"cart"', `"${CHECKOUT_UUID}"`)
+    );
+    await writeFile(
+      join(cli.cwd, "e.yaml"),
+      CART.replace('"codex"', '"pi"').replace('"openai/gpt-5"', '"default"')
+    );
+    await writeFile(join(cli.cwd, "f.yaml"), CHECKOUT);
+    // A file names its clients; Cloud's default model is never assumed.
+    await writeFile(
+      join(cli.cwd, "g.yaml"),
+      "id: no-clients\nname: No clients\ntask: Hi\n"
+    );
+    cloud.on("GET", SUITES, {
+      body: [suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome" })],
+    });
+
+    const json = await cli.run(
+      [
+        "evals",
+        "push",
+        "a.yaml",
+        "b.yaml",
+        "c.yaml",
+        "d.yaml",
+        "e.yaml",
+        "f.yaml",
+        "g.yaml",
+        ...SCOPE,
+      ],
+      { env: SIGNED_IN }
+    );
+
+    expect(json.exitCode).toBe(1);
+    expect(json.json).toEqual({
+      results: [
+        { path: "b.yaml", message: "id: a.yaml already names this suite" },
+        {
+          path: "c.yaml",
+          message:
+            "add the suite's ID as a top-level `id:` (its slug, such as `id: rome-weather`, or its UUID)",
+        },
+        {
+          path: "d.yaml",
+          message: `id: no suite on this server has the UUID ${CHECKOUT_UUID}`,
+        },
+        {
+          path: "e.yaml",
+          message:
+            "clients.pi: `default` is only for chatgpt-web and claude-web",
+        },
+        {
+          path: "g.yaml",
+          message:
+            "clients: list at least one client, such as `manufact-inspector: { model: <model id> }`",
+        },
+      ],
+      written: false,
+      dashboardUrl: DASHBOARD,
+    });
+    expect(cloud.requests.map((r) => r.method)).not.toContain("POST");
+    expect(cloud.requests.map((r) => r.method)).not.toContain("PATCH");
+  });
+
+  test("a suite Cloud rejects is reported, and the other files are still written", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    await writeFile(join(cli.cwd, "checkout.yaml"), CHECKOUT);
+    await writeFile(join(cli.cwd, "rome.yaml"), ROME);
+    cloud.on("GET", SUITES, { body: [] });
+    cloud.sequence("POST", SUITES, [
+      {
+        status: 400,
+        body: {
+          error: "Unknown model anthropic/claude-sonnet-5.5",
+          code: "VALIDATION_ERROR",
+          details: null,
+        },
+      },
+      { body: { id: ROME_UUID, slug: "rome-weather", name: "Rome weather" } },
+    ]);
+
+    const json = await cli.run(
+      ["evals", "push", "checkout.yaml", "rome.yaml", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+
+    expect(json.exitCode).toBe(1);
+    expect(json.json).toEqual({
+      dryRun: false,
+      dashboardUrl: DASHBOARD,
+      results: [
+        {
+          path: "checkout.yaml",
+          code: "validation_error",
+          message: "Unknown model anthropic/claude-sonnet-5.5",
+        },
+        {
+          path: "rome.yaml",
+          action: "created",
+          suite: { id: ROME_UUID, slug: "rome-weather", name: "Rome weather" },
+        },
+      ],
+    });
+    expect(cloud.requestsTo("POST", SUITES).map((r) => r.body)).toMatchObject([
+      { slug: "checkout" },
+      { slug: "rome-weather" },
+    ]);
   });
 
   test("fails before contacting Cloud when a path is missing", async ({
+    cloud,
     cli,
   }) => {
     const result = await cli.run(["evals", "push", "missing", ...SCOPE], {
@@ -316,17 +522,18 @@ describe("evals push", () => {
     expect(result.json).toMatchObject({
       error: { message: "No such file or directory: missing" },
     });
+    expect(cloud.requests).toEqual([]);
   });
 });
 
-test("evals create refuses a name that already exists", async ({
+test("evals create refuses an ID that already exists", async ({
   cloud,
   cli,
 }) => {
   server(cloud);
   await writeFile(join(cli.cwd, "rome.yaml"), ROME);
   cloud.on("GET", SUITES, {
-    body: [suite({ id: "suite_1", name: "Rome weather" })],
+    body: [suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome" })],
   });
 
   const result = await cli.run(
@@ -338,109 +545,422 @@ test("evals create refuses a name that already exists", async ({
   expect(result.json).toMatchObject({
     error: {
       code: "eval_suite_exists",
-      nextSteps: [{ command: "mcp-use evals update suite_1 --file rome.yaml" }],
+      nextSteps: [
+        { command: "mcp-use evals update rome-weather --file rome.yaml" },
+      ],
     },
   });
+  expect(cloud.requests.map((r) => r.method)).not.toContain("POST");
 });
 
-test("evals update replaces the suite it names, including its name", async ({
+test("evals create creates a suite with the file's id as its slug", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  await writeFile(join(cli.cwd, "checkout.yaml"), CHECKOUT);
+  cloud.on("GET", SUITES, { body: [] });
+  cloud.on("POST", SUITES, {
+    body: { id: CHECKOUT_UUID, slug: "checkout", name: "Checkout" },
+  });
+
+  const result = await cli.run(
+    ["evals", "create", "--file", "checkout.yaml", ...SCOPE],
+    { env: SIGNED_IN }
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(result.json).toEqual({
+    id: CHECKOUT_UUID,
+    slug: "checkout",
+    name: "Checkout",
+    dashboardUrl: DASHBOARD,
+  });
+  expect(cloud.requestsTo("POST", SUITES).map((r) => r.body)).toEqual([
+    {
+      name: "Checkout",
+      slug: "checkout",
+      task: "Buy a shirt",
+      judge: "Confirms the order.",
+      threshold: 0.8,
+      requiredTools: [],
+      clients: [
+        { client: "inspector", model: "anthropic/claude-sonnet-5.5" },
+        {
+          client: "claude-code",
+          model: "anthropic/claude-sonnet-5.5",
+          toolSearch: true,
+        },
+        { client: "claude", model: null },
+      ],
+      enabled: true,
+    },
+  ]);
+});
+
+test("evals create reports an invalid file before contacting Cloud", async ({
+  cloud,
+  cli,
+}) => {
+  await writeFile(
+    join(cli.cwd, "rome.yaml"),
+    ROME.replace(
+      "manufact-inspector: { model: openai/gpt-5 }",
+      "manufact-inspector: { model: a, models: [b] }"
+    )
+  );
+
+  const result = await cli.run(
+    ["evals", "create", "--file", "rome.yaml", ...SCOPE],
+    { env: SIGNED_IN }
+  );
+
+  expect(result.exitCode).toBe(2);
+  expect(result.json).toMatchObject({ error: { code: "usage_error" } });
+  expect(cloud.requests).toEqual([]);
+});
+
+test("evals update replaces the suite the file's ID names", async ({
   cloud,
   cli,
 }) => {
   server(cloud);
   await writeFile(join(cli.cwd, "rome.yaml"), ROME);
   cloud.on("GET", SUITES, {
-    body: [suite({ id: "suite_1", name: "Old name" })],
+    body: [suite({ id: ROME_UUID, slug: "rome-weather", name: "Old name" })],
   });
-  cloud.on("GET", "/api/v1/models", {
-    body: { defaultModelId: "openai/gpt-5", models: [] },
-  });
-  cloud.on("PATCH", `${SUITES}/suite_1`, {
-    body: { id: "suite_1", name: "Rome weather" },
+  cloud.on("PATCH", `${SUITES}/${ROME_UUID}`, {
+    body: { id: ROME_UUID, slug: "rome-weather", name: "Rome weather" },
   });
 
   const result = await cli.run(
-    ["evals", "update", "old NAME", "--file", "rome.yaml", ...SCOPE],
+    ["evals", "update", ROME_UUID, "--file", "rome.yaml", ...SCOPE],
     { env: SIGNED_IN }
   );
 
   expect(result.exitCode).toBe(0);
-  expect(result.json).toMatchObject({ id: "suite_1", name: "Rome weather" });
-  expect(cloud.requestsTo("PATCH", `${SUITES}/suite_1`)[0]?.body).toMatchObject(
-    { name: "Rome weather", rubric: null }
-  );
+  expect(result.json).toEqual({
+    id: ROME_UUID,
+    slug: "rome-weather",
+    name: "Rome weather",
+    dashboardUrl: DASHBOARD,
+  });
+  expect(
+    cloud.requestsTo("PATCH", `${SUITES}/${ROME_UUID}`).map((r) => r.body)
+  ).toMatchObject([
+    { name: "Rome weather", task: "What's the weather in Rome?" },
+  ]);
 });
 
-test("evals export writes a file that push accepts", async ({ cloud, cli }) => {
+test("evals update refuses a file whose ID names another suite", async ({
+  cloud,
+  cli,
+}) => {
   server(cloud);
+  await writeFile(join(cli.cwd, "rome.yaml"), ROME);
   cloud.on("GET", SUITES, {
     body: [
-      suite({
-        id: "suite_1",
-        name: "Legacy",
-        // Saved before flows existed: one prompt and its required tools.
-        flow: [],
-        prompt: "Weather in Rome?",
-        requiredTools: [{ name: "get_weather", args: { city: "Rome" } }],
-        clientTargets: ["inspector", "chatgpt", "claude", "pi"],
-        clientSettings: {
-          inspector: { modelIds: ["openai/gpt-5"], disallowedToolNames: ["x"] },
-          web: {
-            claude: {
-              models: [
-                { id: "claude-sonnet-5.5", name: "Sonnet" },
-                { id: "claude-opus-5.5", name: "Opus" },
-              ],
-            },
-          },
-          runtime: {
-            executors: [
-              { harness: "pi", model: "openai/gpt-5", provider: "openrouter" },
-            ],
-          },
-        },
-        enabled: false,
-      }),
+      suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome" }),
+      suite({ id: CHECKOUT_UUID, slug: "checkout", name: "Checkout" }),
     ],
   });
 
   const result = await cli.run(
-    ["evals", "export", "suite_1", "--out", "legacy.yaml", ...SCOPE],
+    ["evals", "update", "checkout", "--file", "rome.yaml", ...SCOPE],
+    { env: SIGNED_IN }
+  );
+
+  expect(result.exitCode).toBe(2);
+  expect(result.json).toMatchObject({ error: { code: "usage_error" } });
+  expect(cloud.requests.map((r) => r.method)).not.toContain("PATCH");
+});
+
+test("evals list shows each suite's slug next to its UUID", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.on("GET", SUITES, {
+    body: [
+      suite({
+        id: ROME_UUID,
+        slug: "rome-weather",
+        name: "Rome weather",
+        requiredTools: [{ name: "get_weather" }],
+        clients: [
+          { client: "inspector", model: "openai/gpt-5" },
+          { client: "claude-code", model: null, toolSearch: true },
+        ],
+      }),
+    ],
+  });
+
+  const json = await cli.run(["evals", "list", ...SCOPE], { env: SIGNED_IN });
+  const human = await cli.run(["evals", "list", "--server", "weather"], {
+    env: SIGNED_IN,
+  });
+
+  expect(json.exitCode).toBe(0);
+  expect(json.json).toEqual({
+    suites: [
+      {
+        id: ROME_UUID,
+        slug: "rome-weather",
+        name: "Rome weather",
+        task: "Weather in Rome?",
+        judge: null,
+        threshold: 0.7,
+        requiredTools: [{ name: "get_weather" }],
+        clients: [
+          { client: "inspector", model: "openai/gpt-5" },
+          { client: "claude-code", model: null, toolSearch: true },
+        ],
+        enabled: true,
+        latestRun: null,
+      },
+    ],
+    dashboardUrl: DASHBOARD,
+  });
+  expect(human.stdout).toContain("rome-weather");
+  expect(human.stdout).not.toContain(ROME_UUID);
+});
+
+describe("evals export", () => {
+  test("writes the suite as a file push accepts, without the experimental clients", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [
+        suite({
+          id: ROME_UUID,
+          slug: "legacy",
+          name: "Legacy",
+          task: "Weather in Rome?",
+          judge: "Gives the temperature.",
+          threshold: 0.8,
+          requiredTools: [
+            {
+              name: "get_weather",
+              args: {
+                city: "Rome",
+                date: { any: true, requirePresent: true },
+              },
+            },
+          ],
+          clients: [
+            { client: "inspector", model: "openai/gpt-5" },
+            { client: "inspector", model: "anthropic/claude-sonnet-5.5" },
+            { client: "claude-code", model: "anthropic/claude-sonnet-5.5" },
+            { client: "chatgpt", model: null },
+            { client: "cursor", model: "cursor/auto" },
+          ],
+          enabled: false,
+        }),
+      ],
+    });
+
+    const result = await cli.run(
+      ["evals", "export", "legacy", "--out", "out.yaml", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toEqual({ id: ROME_UUID, path: "out.yaml" });
+    expect(await readFile(join(cli.cwd, "out.yaml"), "utf8")).toBe(
+      `id: legacy
+name: Legacy
+task: Weather in Rome?
+judge: Gives the temperature.
+threshold: 0.8
+required-tools:
+  - name: get_weather
+    args:
+      city: Rome
+      date: { any: true, require-present: true }
+clients:
+  manufact-inspector: { models: [ openai/gpt-5, anthropic/claude-sonnet-5.5 ] }
+  claude-code: { model: anthropic/claude-sonnet-5.5 }
+  chatgpt-web: { model: default }
+enabled: false
+`
+    );
+  });
+
+  test("an exported file pushes back onto the same suite unchanged", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    const task = `Plan a trip to ${"Rome, Paris and Berlin. ".repeat(8).trim()}`;
+    const exported = suite({
+      id: ROME_UUID,
+      slug: "rome-weather",
+      name: "Rome weather",
+      task,
+      requiredTools: [
+        { name: "get_weather", args: { city: { contains: "rome" } } },
+      ],
+      clients: [
+        ...[
+          "openai/gpt-5",
+          "openai/gpt-5-mini",
+          "anthropic/claude-sonnet-5.5",
+          "anthropic/claude-haiku-5.5",
+          "google/gemini-2.5-pro",
+          "x-ai/grok-4",
+        ].map((model) => ({ client: "inspector" as const, model })),
+        {
+          client: "claude-code",
+          model: "anthropic/claude-sonnet-5.5",
+          toolSearch: false,
+        },
+        { client: "cursor", model: "cursor/auto" },
+      ],
+    });
+    cloud.on("GET", SUITES, { body: [exported] });
+    cloud.on("PATCH", `${SUITES}/${ROME_UUID}`, {
+      body: { id: ROME_UUID, slug: "rome-weather", name: "Rome weather" },
+    });
+
+    const exportResult = await cli.run(
+      ["evals", "export", "rome-weather", "--out", "rome.yaml", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+    const text = await readFile(join(cli.cwd, "rome.yaml"), "utf8");
+    const push = await cli.run(["evals", "push", "rome.yaml", ...SCOPE], {
+      env: SIGNED_IN,
+    });
+
+    expect(exportResult.exitCode).toBe(0);
+    // Long values stay on one line each.
+    expect(text.split("\n")).toContain(`task: ${task}`);
+    expect(push.exitCode).toBe(0);
+    expect(
+      cloud.requestsTo("PATCH", `${SUITES}/${ROME_UUID}`).map((r) => r.body)
+    ).toEqual([
+      {
+        name: "Rome weather",
+        task,
+        judge: null,
+        threshold: 0.7,
+        requiredTools: [
+          { name: "get_weather", args: { city: { contains: "rome" } } },
+        ],
+        clients: exported.clients,
+        enabled: true,
+      },
+    ]);
+  });
+
+  test.for([
+    ["an existing directory", "evals"],
+    ["a path ending in a slash", "new-dir/"],
+  ] as const)(
+    "names the file <slug>.yaml when --out is %s",
+    async ([, out], { cloud, cli }) => {
+      server(cloud);
+      await mkdir(join(cli.cwd, "evals"));
+      cloud.on("GET", SUITES, {
+        body: [
+          suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome weather" }),
+        ],
+      });
+
+      const result = await cli.run(
+        ["evals", "export", ROME_UUID, "--out", out, ...SCOPE],
+        { env: SIGNED_IN }
+      );
+
+      const path = join(out, "rome-weather.yaml");
+      expect(result.exitCode).toBe(0);
+      expect(result.json).toEqual({ id: ROME_UUID, path });
+      expect(await readFile(join(cli.cwd, path), "utf8")).toMatch(
+        /^id: rome-weather\n/
+      );
+    }
+  );
+});
+
+test("evals export flags a suite with only experimental clients, whose file push rejects", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.on("GET", SUITES, {
+    body: [
+      suite({
+        id: ROME_UUID,
+        slug: "native",
+        name: "Native",
+        clients: [
+          { client: "windows-codex", model: null },
+          { client: "cursor", model: "cursor/auto" },
+        ],
+      }),
+    ],
+  });
+
+  const exported = await cli.run(
+    ["evals", "export", "native", "--out", "native.yaml", ...SCOPE],
+    { env: SIGNED_IN }
+  );
+  const text = await readFile(join(cli.cwd, "native.yaml"), "utf8");
+  const push = await cli.run(["evals", "push", "native.yaml", ...SCOPE], {
+    env: SIGNED_IN,
+  });
+
+  expect(exported.exitCode).toBe(0);
+  expect(exported.json).toMatchObject({
+    id: ROME_UUID,
+    path: "native.yaml",
+    warning: expect.stringContaining("push rejects it"),
+  });
+  expect(text).toMatch(/^# This suite runs only on clients a suite file/);
+  expect(text).not.toContain("clients:");
+  // The file needs a client first; the suite isn't touched.
+  expect(push.exitCode).toBe(1);
+  expect(push.json).toEqual({
+    results: [
+      {
+        path: "native.yaml",
+        message:
+          "clients: list at least one client, such as `manufact-inspector: { model: <model id> }`",
+      },
+    ],
+    written: false,
+    dashboardUrl: DASHBOARD,
+  });
+  expect(cloud.requests.map((r) => r.method)).not.toContain("PATCH");
+});
+
+test("evals get shows the suite as a file with its latest run", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.on("GET", SUITES, {
+    body: [suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome" })],
+  });
+
+  const result = await cli.run(
+    ["evals", "get", "rome-weather", "--server", "weather"],
     { env: SIGNED_IN }
   );
 
   expect(result.exitCode).toBe(0);
-  const yaml = await readFile(join(cli.cwd, "legacy.yaml"), "utf8");
-  expect(yaml).toBe(`name: Legacy
-flow:
-  - kind: user
-    content: Weather in Rome?
-  - kind: tool_call
-    name: get_weather
-    args:
-      city: Rome
-threshold: 0.7
-clients:
-  inspector:
-    models:
-      - openai/gpt-5
-  runtimes:
-    - harness: pi
-      model: openai/gpt-5
-      provider: openrouter
-  chatgpt: true
-  claude:
-    models:
-      - claude-sonnet-5.5
-      - claude-opus-5.5
-disallowedTools:
-  - x
-enabled: false
-`);
-  expect(parseEvalSuiteFile(yaml, "legacy.yaml")).toMatchObject({
-    name: "Legacy",
-    enabled: false,
-  });
+  expect(result.stdout).toContain(
+    [
+      "id: rome-weather",
+      "name: Rome",
+      "task: Weather in Rome?",
+      "threshold: 0.7",
+      "clients:",
+      "  manufact-inspector: { model: openai/gpt-5 }",
+      "enabled: true",
+    ].join("\n")
+  );
 });
 
 describe("evals run", () => {
@@ -2073,11 +2593,11 @@ describe("evals options", () => {
     expect(all.stdout).not.toContain("Inspector");
     expect(query.stdout).toBe(
       [
-        "Web apps (clients.chatgpt, clients.claude)",
+        "Web apps (clients.chatgpt-web, clients.claude-web)",
         "  claude  Unavailable: Enabled on request.",
         "    claude-haiku-5.5  Haiku 5.5",
         "",
-        "Harnesses (clients.runtimes)",
+        "Harnesses (clients.<harness>; cursor can't be set in files yet)",
         "  pi  Ready",
         "    anthropic/claude-haiku-5.5  provider: openrouter",
         "",
@@ -2149,22 +2669,15 @@ test("evals runs names each run's suite", async ({ cloud, cli }) => {
 });
 
 describe("suite references", () => {
-  test("run accepts IDs, names, suite files and directories", async ({
-    cloud,
-    cli,
-  }) => {
+  test("run selects suites by UUID or slug", async ({ cloud, cli }) => {
     server(cloud);
-    await mkdir(join(cli.cwd, "evals"));
-    await writeFile(join(cli.cwd, "evals", "rome.yaml"), ROME);
-    await writeFile(join(cli.cwd, "checkout.yaml"), CHECKOUT);
     cloud.on("GET", SUITES, {
       body: [
-        suite({ id: "suite_rome", name: "Rome weather" }),
-        suite({ id: "suite_checkout", name: "Checkout" }),
-        suite({ id: "suite_paris", name: "Paris weather" }),
+        suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome weather" }),
+        suite({ id: CHECKOUT_UUID, slug: "checkout", name: "Checkout" }),
       ],
     });
-    for (const id of ["suite_rome", "suite_checkout", "suite_paris"])
+    for (const id of [ROME_UUID, CHECKOUT_UUID])
       cloud.on("POST", `${SUITES}/${id}/runs`, {
         body: {
           id: `run_${id}`,
@@ -2180,10 +2693,9 @@ describe("suite references", () => {
       [
         "evals",
         "run",
-        "evals",
-        "checkout.yaml",
-        "paris WEATHER",
-        "suite_rome",
+        "rome-weather",
+        CHECKOUT_UUID,
+        ROME_UUID,
         "--server",
         "weather",
       ],
@@ -2191,72 +2703,156 @@ describe("suite references", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    // Duplicates collapse: the directory and the ID both name Rome.
+    // A suite named twice, by slug and by UUID, runs once.
     expect(result.stdout).toBe(
       [
-        "✓ Started run run_suite_rome (Rome weather)",
-        "✓ Started run run_suite_checkout (Checkout)",
-        "✓ Started run run_suite_paris (Paris weather)",
+        `✓ Started run run_${ROME_UUID} (Rome weather)`,
+        `✓ Started run run_${CHECKOUT_UUID} (Checkout)`,
         "",
-        "Results: mcp-use evals report run_suite_rome run_suite_checkout run_suite_paris",
+        `Results: mcp-use evals report run_${ROME_UUID} run_${CHECKOUT_UUID}`,
         "",
       ].join("\n")
     );
+    expect(
+      cloud.requests
+        .filter((request) => request.method === "POST")
+        .map((request) => request.path)
+    ).toEqual([
+      `${SUITES}/${ROME_UUID}/runs`,
+      `${SUITES}/${CHECKOUT_UUID}/runs`,
+    ]);
   });
 
-  test("names what it cannot find or cannot tell apart, before writing", async ({
+  test("a UUID wins over a slug that looks the same", async ({
     cloud,
     cli,
   }) => {
     server(cloud);
-    await writeFile(join(cli.cwd, "rome.yaml"), ROME);
     cloud.on("GET", SUITES, {
       body: [
-        suite({ id: "suite_1", name: "Twin" }),
-        suite({ id: "suite_2", name: "Twin" }),
+        suite({ id: "suite_other", slug: ROME_UUID, name: "Lookalike" }),
+        suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome weather" }),
       ],
     });
-
-    const missing = await cli.run(["evals", "get", "Nope", ...SCOPE], {
-      env: SIGNED_IN,
-    });
-    const file = await cli.run(
-      ["evals", "rm", "rome.yaml", "--yes", ...SCOPE],
-      {
-        env: SIGNED_IN,
-      }
-    );
-    const twins = await cli.run(["evals", "run", "Twin", ...SCOPE], {
-      env: SIGNED_IN,
+    cloud.on("POST", `${SUITES}/${ROME_UUID}/runs`, {
+      body: {
+        id: "run_1",
+        suiteId: ROME_UUID,
+        status: "pending",
+        pass: null,
+        score: null,
+        profileId: null,
+      },
     });
 
-    expect(missing.json).toEqual({
-      error: {
-        code: "eval_suite_not_found",
-        message: "No eval suite matches “Nope”.",
-        nextSteps: [
-          { description: "List eval suites", command: "mcp-use evals list" },
-        ],
-      },
+    const result = await cli.run(["evals", "run", ROME_UUID, ...SCOPE], {
+      env: SIGNED_IN,
     });
-    expect(file.json).toMatchObject({
-      error: {
-        code: "eval_suite_not_found",
-        message: "No eval suite is named “Rome weather” (from rome.yaml).",
-        nextSteps: [{ command: "mcp-use evals push rome.yaml" }],
-      },
-    });
-    expect(twins.json).toMatchObject({
-      error: {
-        code: "eval_suite_ambiguous",
-        message:
-          "2 eval suites are named “Twin”: suite_1, suite_2. Pass an ID instead.",
-      },
-    });
-    expect(twins.exitCode).toBe(1);
+
+    expect(result.exitCode).toBe(0);
+    expect(
+      cloud.requestsTo("POST", `${SUITES}/${ROME_UUID}/runs`)
+    ).toHaveLength(1);
   });
 
-  test("rm deletes the suite a name points to", async ({ cloud, cli }) => {
+  test.for([
+    ["an exact name", "Rome weather"],
+    ["a name in another case", "rome WEATHER"],
+    ["a suite file named after the suite", "rome.yaml"],
+    ["a directory of suite files", "evals"],
+  ] as const)(
+    "run rejects %s and starts nothing",
+    async ([, arg], { cloud, cli }) => {
+      server(cloud);
+      await mkdir(join(cli.cwd, "evals"));
+      await writeFile(join(cli.cwd, "evals", "rome.yaml"), ROME);
+      await writeFile(join(cli.cwd, "rome.yaml"), ROME);
+      cloud.on("GET", SUITES, {
+        body: [suite({ id: "suite_rome", name: "Rome weather" })],
+      });
+
+      const result = await cli.run(["evals", "run", arg, ...SCOPE], {
+        env: SIGNED_IN,
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.json).toMatchObject({
+        error: {
+          code: "eval_suite_not_found",
+          nextSteps: [
+            { description: "List eval suites", command: "mcp-use evals list" },
+          ],
+        },
+      });
+      // The suite list was read, so a POST would have reached the fake too.
+      expect(cloud.requestsTo("GET", SUITES)).toHaveLength(1);
+      expect(cloud.requests.filter((r) => r.method === "POST")).toEqual([]);
+    }
+  );
+
+  test.for([
+    ["get", ["get", "Rome weather"]],
+    ["export", ["export", "Rome weather"]],
+    ["update", ["update", "Rome weather", "--file", "rome.yaml"]],
+    ["rm", ["rm", "Rome weather", "--yes"]],
+    ["runs --suite", ["runs", "--suite", "Rome weather"]],
+    ["get with a suite file", ["get", "rome.yaml"]],
+    ["rm with a suite file", ["rm", "rome.yaml", "--yes"]],
+    ["runs --suite with a suite file", ["runs", "--suite", "rome.yaml"]],
+  ] as const)(
+    "%s doesn't select a suite by name or file",
+    async ([, args], { cloud, cli }) => {
+      server(cloud);
+      await writeFile(join(cli.cwd, "rome.yaml"), ROME);
+      cloud.on("GET", SUITES, {
+        body: [suite({ id: "suite_rome", name: "Rome weather" })],
+      });
+
+      const result = await cli.run(["evals", ...args, ...SCOPE], {
+        env: SIGNED_IN,
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.json).toEqual({
+        error: {
+          code: "eval_suite_not_found",
+          message: `No eval suite has the ID “${args[args[0] === "runs" ? 2 : 1]}”. Pass suite IDs (UUID or slug); names and files aren't accepted.`,
+          nextSteps: [
+            { description: "List eval suites", command: "mcp-use evals list" },
+          ],
+        },
+      });
+      // The suite list was read, and nothing after it: no runs listed,
+      // no suite written or deleted.
+      expect(cloud.requestsTo("GET", SUITES)).toHaveLength(1);
+      expect(cloud.requestsTo("GET", RUNS)).toEqual([]);
+      expect(cloud.requests.filter((r) => r.method !== "GET")).toEqual([]);
+    }
+  );
+
+  test("runs --suite lists the runs of the suite with the given slug", async ({
+    cloud,
+    cli,
+  }) => {
+    server(cloud);
+    cloud.on("GET", SUITES, {
+      body: [
+        suite({ id: "suite_rome", slug: "rome-weather", name: "Rome weather" }),
+      ],
+    });
+    const result = await cli.run(
+      ["evals", "runs", "--suite", "rome-weather", ...SCOPE],
+      { env: SIGNED_IN }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toEqual({ items: [], total: 0 });
+    expect(cloud.requestsTo("GET", RUNS)).toMatchObject([
+      { query: { suiteId: "suite_rome" } },
+    ]);
+  });
+
+  test("rm deletes the suite with the given ID", async ({ cloud, cli }) => {
     server(cloud);
     cloud.on("GET", SUITES, {
       body: [suite({ id: "suite_1", name: "Rome weather" })],
@@ -2264,13 +2860,13 @@ describe("suite references", () => {
     cloud.on("DELETE", `${SUITES}/suite_1`, { body: { success: true } });
 
     const result = await cli.run(
-      ["evals", "rm", "Rome weather", "--yes", "--server", "weather"],
+      ["evals", "rm", "suite_1", "--yes", "--server", "weather"],
       { env: SIGNED_IN }
     );
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
-      "✓ Deleted eval suite “Rome weather”\nID  suite_1\n"
+      "✓ Deleted eval suite “Rome weather”\nID    suite-1\nUUID  suite_1\n"
     );
   });
 });
@@ -2282,140 +2878,5 @@ test("evals rm requires --yes without a terminal", async ({ cli }) => {
   expect(result.exitCode).toBe(2);
   expect(result.json).toMatchObject({
     error: { message: expect.stringContaining("--yes") },
-  });
-});
-
-describe("suite files", () => {
-  unit("rejects unknown fields and names the path", () => {
-    expect(() =>
-      parseEvalSuiteFile(`${ROME}treshold: 0.9\n`, "rome.yaml")
-    ).toThrow(/rome\.yaml: invalid eval suite at file: .*treshold/);
-    expect(() =>
-      parseEvalSuiteFile(
-        "name: x\nflow:\n  - kind: tool_call\n    name: t\n",
-        "x.yaml"
-      )
-    ).toThrow(
-      "x.yaml: invalid eval suite at flow: Add at least one user step."
-    );
-  });
-
-  unit("names the step or client setting it cannot read", () => {
-    const flow = "flow:\n  - kind: user\n    content: Hi\n";
-    const parse = (clients: string) =>
-      parseEvalSuiteFile(`name: x\n${flow}clients: ${clients}\n`, "x.yaml");
-    expect(() =>
-      parseEvalSuiteFile(
-        `name: x\nflow:\n  - kind: tool_call\n    tool: t\n`,
-        "x.yaml"
-      )
-    ).toThrow(/x\.yaml: invalid eval suite at flow\.0/);
-    expect(() => parse("{}")).toThrow(
-      "x.yaml: invalid eval suite at clients: Select at least one client."
-    );
-    expect(() =>
-      parse("{ runtimes: [{ harness: inspector, model: a/b }] }")
-    ).toThrow(/at clients\.runtimes\.0\.harness: /);
-    expect(() =>
-      parse("{ inspector: { models: [a/b], provider: openai } }")
-    ).toThrow(/at clients\.inspector: .*provider/);
-    expect(() => parse("{ claude: { models: [m, m] } }")).toThrow(
-      "at clients.claude.models: Model IDs must be unique."
-    );
-    expect(() =>
-      parse(
-        "{ runtimes: [{ harness: pi, model: a/b }, { harness: pi, model: a/b }] }"
-      )
-    ).toThrow("at clients.runtimes: Runtimes must be unique.");
-  });
-
-  unit("maps clients onto Cloud's client fields", () => {
-    const file = parseEvalSuiteFile(
-      `name: x
-flow:
-  - kind: user
-    content: Hi
-  - kind: assistant_text
-    note: Says hello.
-clients:
-  inspector: { models: [openai/gpt-5, anthropic/claude-haiku-5.5] }
-  runtimes: [{ harness: codex, model: openai/gpt-5, provider: openai }]
-  chatgpt: true
-  claude: { models: [claude-sonnet-5.5] }
-disallowedTools: [rm]
-`,
-      "x.yaml"
-    );
-    expect(
-      suiteBody(file, {
-        defaultModel: "unused/model",
-        existingClientSettings: { lifecycle: { on: true }, web: { stale: 1 } },
-      })
-    ).toEqual({
-      name: "x",
-      flow: [
-        { kind: "user", content: "Hi" },
-        { kind: "assistant_text", note: "Says hello." },
-      ],
-      threshold: 0.7,
-      disallowedTools: ["rm"],
-      models: ["openai/gpt-5", "anthropic/claude-haiku-5.5"],
-      clientTargets: ["inspector", "chatgpt", "claude", "codex"],
-      clientSettings: {
-        lifecycle: { on: true },
-        inspector: {
-          modelIds: ["openai/gpt-5", "anthropic/claude-haiku-5.5"],
-          disallowedToolNames: ["rm"],
-        },
-        runtime: {
-          executors: [
-            { harness: "codex", model: "openai/gpt-5", provider: "openai" },
-          ],
-        },
-        web: { claude: { models: [{ id: "claude-sonnet-5.5", name: "" }] } },
-      },
-    });
-  });
-
-  unit("toYaml round-trips strings YAML would otherwise retype", () => {
-    const value = {
-      name: "yes",
-      flow: [
-        { kind: "user", content: "Price: 10 # not a comment\nnext line" },
-        {
-          kind: "tool_call",
-          name: "lookup",
-          args: { id: "0123", flag: "true", empty: "", nested: [], obj: {} },
-        },
-        { kind: "assistant_text", note: "" },
-      ],
-      threshold: 0.5,
-      clients: { inspector: { models: ["-dash", "a: b"] } },
-    };
-    expect(parseEvalSuiteFile(toYaml(value), "x.yaml")).toMatchObject(value);
-  });
-
-  unit("reads legacy columns when clientSettings is absent", () => {
-    expect(
-      suiteFile({
-        name: "Old",
-        enabled: true,
-        threshold: 0.7,
-        prompt: null,
-        flow: [{ kind: "user", content: "Hi" }],
-        requiredTools: [],
-        rubric: null,
-        models: ["openai/gpt-5"],
-        disallowedTools: ["rm"],
-        clientTargets: [],
-        clientSettings: null,
-      })
-    ).toEqual({
-      name: "Old",
-      flow: [{ kind: "user", content: "Hi" }],
-      threshold: 0.7,
-      clients: { inspector: { models: ["openai/gpt-5"] } },
-      disallowedTools: ["rm"],
-    });
   });
 });
