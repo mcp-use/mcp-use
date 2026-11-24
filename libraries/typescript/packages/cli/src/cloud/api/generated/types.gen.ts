@@ -696,8 +696,41 @@ export interface paths {
         /** @description List suites with their latest run. Server-bound CI tokens receive only the ID, slug, name and enabled flag for suite selection. */
         get: operations["getApiV1ServerEvalsByServerIdSuites"];
         put?: never;
-        /** @description Create a new eval suite for a server. */
-        post: operations["postApiV1ServerEvalsByServerIdSuites"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/suites/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Create or update suites from suite files (YAML). Each file's `id` is the suite's UUID, which must exist, or its slug, which updates that suite or creates one with it. A file is the suite's whole definition. Every file is validated before anything is written, and all writes happen together; suites without a file are left alone. */
+        post: operations["postApiV1ServerEvalsByServerIdSuitesFiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/server-evals/{serverId}/suites/{suiteId}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A suite as a suite file (YAML), with its slug as `id`. Experimental clients (Cursor, native apps) and plugin lifecycle settings are left out; pushing the file back keeps them. */
+        get: operations["getApiV1ServerEvalsByServerIdSuitesBySuiteIdFile"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -718,8 +751,7 @@ export interface paths {
         delete: operations["deleteApiV1ServerEvalsByServerIdSuitesBySuiteId"];
         options?: never;
         head?: never;
-        /** @description Update an eval suite. */
-        patch: operations["patchApiV1ServerEvalsByServerIdSuitesBySuiteId"];
+        patch?: never;
         trace?: never;
     };
     "/api/v1/server-evals/{serverId}/suites/{suiteId}/runs": {
@@ -2561,7 +2593,7 @@ export interface operations {
                         }[];
                         measures: {
                             /**
-                             * @description Measure. ≈ = approximate (sketch). events (count): Events (requests); tool_calls (count): tools/call events; errors (count): Error events: transport errors plus failed tool results; error_rate (ratio): errors / events (0..1); transport_errors (count): HTTP/transport errors, excluding neutral lifecycle signals; tool_result_errors (count): tools/call results with isError; tool_outcome_events (count): Events with a known tool outcome (tool_call_success not NULL); tool_result_error_rate (ratio): tool_result_errors / tool_outcome_events (0..1); neutral_events (count): Expected capability signals (optional SSE 405, protocol probe); success_events (count): Successful events; avg_duration_ms (ms): Mean duration_ms over events with a duration; min_duration_ms (ms): Minimum duration_ms; max_duration_ms (ms): Maximum duration_ms; p50_duration_ms (ms, ≈): p50 of duration_ms (t-digest); p90_duration_ms (ms, ≈): p90 of duration_ms (t-digest); p95_duration_ms (ms, ≈): p95 of duration_ms (t-digest); p99_duration_ms (ms, ≈): p99 of duration_ms (t-digest); sessions (count, ≈): Distinct traces (interaction_id); actors (count, ≈): Distinct actors; verified_actors (count, ≈): Distinct actors identified by conversation, token or account; approximate_actors (count, ≈): Distinct IP-derived actors; output_tokens (tokens): Sum of estimated output tokens; token_events (count): Events with an output token estimate; avg_request_bytes (bytes): Mean request body bytes; avg_response_bytes (bytes): Mean response body bytes; sessions_with_tool (count): Distinct traces with at least one matching tools/call (exact, tool index); active_interactions_5m (count): Distinct traces with an event in the last 5 minutes (exact, raw); first_seen (timestamp): First event time; last_seen (timestamp): Last event time
+                             * @description Measure. ≈ = approximate (sketch). events (count): Events (requests); tool_calls (count): tools/call events; errors (count): Error events: transport errors plus failed tool results; error_rate (ratio): errors / events (0..1); transport_errors (count): HTTP/transport errors, excluding neutral lifecycle signals; tool_result_errors (count): tools/call results with isError; tool_outcome_events (count): Events with a known tool outcome (tool_call_success not NULL); tool_result_error_rate (ratio): tool_result_errors / tool_outcome_events (0..1); neutral_events (count): Events that are not failures: client cancellations and expected capability signals; success_events (count): Successful events; avg_duration_ms (ms): Mean duration_ms over events with a duration; min_duration_ms (ms): Minimum duration_ms; max_duration_ms (ms): Maximum duration_ms; p50_duration_ms (ms, ≈): p50 of duration_ms (t-digest); p90_duration_ms (ms, ≈): p90 of duration_ms (t-digest); p95_duration_ms (ms, ≈): p95 of duration_ms (t-digest); p99_duration_ms (ms, ≈): p99 of duration_ms (t-digest); sessions (count, ≈): Distinct traces (interaction_id); actors (count, ≈): Distinct actors; verified_actors (count, ≈): Distinct actors identified by conversation, token or account; approximate_actors (count, ≈): Distinct IP-derived actors; output_tokens (tokens): Sum of estimated output tokens; token_events (count): Events with an output token estimate; avg_request_bytes (bytes): Mean request body bytes; avg_response_bytes (bytes): Mean response body bytes; sessions_with_tool (count): Distinct traces with at least one matching tools/call (exact, tool index); active_interactions_5m (count): Distinct traces with an event in the last 5 minutes (exact, raw); first_seen (timestamp): First event time; last_seen (timestamp): Last event time
                              * @enum {string}
                              */
                             name: "events" | "tool_calls" | "errors" | "error_rate" | "transport_errors" | "tool_result_errors" | "tool_outcome_events" | "tool_result_error_rate" | "neutral_events" | "success_events" | "avg_duration_ms" | "min_duration_ms" | "max_duration_ms" | "p50_duration_ms" | "p90_duration_ms" | "p95_duration_ms" | "p99_duration_ms" | "sessions" | "actors" | "verified_actors" | "approximate_actors" | "output_tokens" | "token_events" | "avg_request_bytes" | "avg_response_bytes" | "sessions_with_tool" | "active_interactions_5m" | "first_seen" | "last_seen";
@@ -6524,14 +6556,27 @@ export interface operations {
                         name: string;
                         enabled: boolean;
                         threshold: number;
-                        prompt: string | null;
-                        flow: unknown;
-                        requiredTools: unknown;
-                        rubric: string | null;
-                        models: unknown;
-                        disallowedTools: unknown;
-                        clientTargets: unknown;
-                        clientSettings: unknown;
+                        /** @description What the model is asked. */
+                        task: string | null;
+                        /** @description The judge's passing criteria. */
+                        judge: string | null;
+                        /** @description Tools the model must call at least once, anywhere in the run, with matching arguments. */
+                        requiredTools: {
+                            name: string;
+                            args?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        /** @description Where the suite runs: one entry per execution. */
+                        clients: {
+                            /** @enum {string} */
+                            client: "inspector" | "chatgpt" | "claude" | "windows-codex" | "android-chatgpt" | "windows-claude" | "pi" | "codex" | "claude-code" | "cursor";
+                            model: string | null;
+                            name?: string;
+                            /** @enum {string} */
+                            provider?: "openrouter" | "openai" | "anthropic" | "cursor";
+                            toolSearch?: boolean;
+                        }[];
                         runs?: {
                             id: string;
                             status: string;
@@ -6601,7 +6646,7 @@ export interface operations {
             };
         };
     };
-    postApiV1ServerEvalsByServerIdSuites: {
+    postApiV1ServerEvalsByServerIdSuitesFiles: {
         parameters: {
             query?: never;
             header?: never;
@@ -6613,53 +6658,121 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    name: string;
-                    /** @description The suite's ID within its server, unique per server. Generated from the name when omitted; renaming a suite keeps it. */
-                    slug?: string;
-                    /** @default [] */
-                    flow?: ({
-                        /** @constant */
-                        kind: "user";
+                    files: {
+                        /** @description The file's path, used in errors and results. */
+                        path: string;
+                        /** @description The file's YAML (or JSON) text. */
                         content: string;
-                    } | {
-                        /** @constant */
-                        kind: "tool_call";
-                        name: string;
-                        args?: {
-                            [key: string]: unknown;
-                        };
-                    } | {
-                        /** @constant */
-                        kind: "assistant_text";
-                        note?: string;
-                    })[];
-                    rubric?: string;
-                    /** @default 0.7 */
-                    threshold?: number;
-                    /** @default [] */
-                    disallowedTools?: string[];
-                    models?: string[];
-                    /**
-                     * @default [
-                     *       "inspector"
-                     *     ]
-                     */
-                    clientTargets?: string[];
-                    clientSettings?: unknown;
+                    }[];
+                    /** @description Validate and report what would change without writing anything. */
+                    dryRun?: boolean;
                 };
             };
         };
         responses: {
-            /** @description Created */
-            201: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        id: string;
-                        slug: string;
-                        name: string;
+                        dryRun: boolean;
+                        results: {
+                            path: string;
+                            /** @enum {string} */
+                            action: "created" | "updated";
+                            suite: {
+                                id: string | null;
+                                slug: string;
+                                name: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        /** @description Stable application error code, when available. */
+                        code?: string;
+                        details?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ServerEvalsByServerIdSuitesBySuiteIdFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                serverId: string;
+                /** @description The suite's UUID or its slug. */
+                suiteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description A suggested file name: the suite's slug with `.yaml`. */
+                        path: string;
+                        /** @description The suite as a suite file. */
+                        content: string;
                     };
                 };
             };
@@ -6742,121 +6855,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         success: boolean;
-                    };
-                };
-            };
-            /** @description Validation error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        /** @constant */
-                        code: "VALIDATION_ERROR";
-                        details: unknown;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        /** @description Stable application error code, when available. */
-                        code?: string;
-                        details?: unknown;
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        /** @description Stable application error code, when available. */
-                        code?: string;
-                        details?: unknown;
-                    };
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        /** @description Stable application error code, when available. */
-                        code?: string;
-                        details?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    patchApiV1ServerEvalsByServerIdSuitesBySuiteId: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                serverId: string;
-                /** @description The suite's UUID or its slug. */
-                suiteId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name?: string;
-                    /** @description The suite's ID within its server, unique per server. Generated from the name when omitted; renaming a suite keeps it. */
-                    slug?: string;
-                    flow?: ({
-                        /** @constant */
-                        kind: "user";
-                        content: string;
-                    } | {
-                        /** @constant */
-                        kind: "tool_call";
-                        name: string;
-                        args?: {
-                            [key: string]: unknown;
-                        };
-                    } | {
-                        /** @constant */
-                        kind: "assistant_text";
-                        note?: string;
-                    })[];
-                    rubric?: string | null;
-                    threshold?: number;
-                    disallowedTools?: string[];
-                    models?: string[];
-                    clientTargets?: string[];
-                    clientSettings?: unknown;
-                    enabled?: boolean;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        slug: string;
-                        name: string;
                     };
                 };
             };

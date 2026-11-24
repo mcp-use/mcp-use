@@ -756,46 +756,51 @@ Use the [dashboard YAML format](https://docs.manufact.com/dashboard/alerts). Cho
 ## Evals commands
 
 Keep eval suites in your repository as YAML files, push them to Manufact Cloud,
-and run them against a deployed server. The CLI validates each file locally,
-like `alerts`, and sends the suite to Cloud as JSON.
+and run them against a deployed server. The CLI sends each file's text; Cloud
+parses and validates it, so the dashboard, the API and the CLI share one format
+and one set of errors.
 
 ```yaml evals/rome-weather.yaml
-id: rome-weather             # required; the suite's ID, which push matches suites by
+id: rome-weather             # required; the suite's UUID or slug
 name: Rome weather           # required; the display name
-flow:                        # required; at least one user step
-  - kind: user
-    content: What's the weather in Rome?
-  - kind: tool_call          # the model must call this tool
-    name: get_weather
-    args: { city: { contains: rome } }
-  - kind: assistant_text     # optional note on the reply, not scored
-    note: States the temperature.
-rubric: Gives the current temperature in Rome.
+task: What's the weather in Rome right now?   # required; what the model is asked
+judge: States the current temperature in Rome. # passing criteria (default scoring when omitted)
 threshold: 0.7               # 0–1 (default: 0.7)
+required-tools:              # each must be called at least once, anywhere in the run
+  - name: get_weather
+    args:
+      city: { contains: rome }                   # also: a plain value, any, { pattern }
+      date: { any: true, require-present: true }
 clients:                     # default: Inspector with the default model
-  inspector:                 # Manufact's hosted chat; one execution per model
-    models: [openai/gpt-5]
-  runtimes:                  # coding agents in a sandbox: pi, codex, claude-code, cursor
-    - { harness: claude-code, model: anthropic/claude-sonnet-5.5 }
-  claude: true               # the web app with its default model
-  chatgpt: { models: [<id>] }   # or chosen models from `evals options`
-disallowedTools: [delete_city]
+  manufact-inspector: { models: [openai/gpt-5, anthropic/claude-sonnet-5.5] }
+  claude-code: { model: anthropic/claude-sonnet-5.5, tool-search: true }
+  codex: { model: openai/gpt-5 }
+  pi: { model: openai/gpt-5-mini }
+  chatgpt-web: { model: default }   # the app's default model, or model IDs from `evals options`
+  claude-web: { models: [<id>, <id>] }
 enabled: true                # false excludes the suite from run --all
 ```
 
-A file is the suite's whole definition. Writing it over an existing suite
-resets every omitted field to its default.
+Every key the format defines is kebab-case; keys under `args` are your tool's
+own parameter names. Each client takes `model` or `models` (not both), and
+every model runs as its own execution. A file is the suite's whole definition:
+writing it over an existing suite resets every omitted field to its default.
+Unknown keys are rejected, so a typo fails instead of being ignored.
+Experimental clients (Cursor, the native apps) and plugin lifecycle settings
+have no key yet; a push keeps what the suite already has for them, and
+`export` leaves them out.
 
 Every suite has a UUID and a slug, its ID within the server. A **suite ID** is
-either one. In a file, `id` is the slug: lowercase letters and digits in groups
-joined by single hyphens, at most 64 characters, unique per server. It is
-never taken from `name`, because names aren't unique, so renaming a suite in
-its file keeps the same suite. A file without `id` fails, and the error
-suggests one made from the name. Cloud gives suites created elsewhere (the
-dashboard, the API) a slug made from their name; `evals list` shows it, and
-`evals export` writes it. `evals models` lists model IDs for
-`clients.inspector.models`, and `evals options` lists the web apps and harnesses
-your organization can run, with their models.
+either one. In a file, `id` names the suite to write: a UUID must belong to a
+suite on the server, and a slug updates the suite with that slug or creates
+one with it. A slug is lowercase letters and digits in groups joined by single
+hyphens, at most 64 characters, unique per server. It is never taken from
+`name`, because names aren't unique, so renaming a suite in its file keeps the
+same suite. Cloud gives suites created elsewhere (the dashboard, the API) a
+slug made from their name; `evals list` shows it, and `evals export` writes it.
+`evals models` lists model IDs for `clients.manufact-inspector`, and
+`evals options` lists the web apps and harnesses your organization can run,
+with their models.
 
 Commands that select an existing suite (`get`, `export`, `update`, `rm`,
 `run` and `runs --suite`) take its suite ID, the UUID or the slug, because
@@ -813,22 +818,22 @@ mcp-use evals push evals/ && mcp-use evals run --all --wait
 
 ### `evals push`
 
-Update the suite whose slug is the file's `id`, or create one with that slug.
-Prints `Created` or `Updated` for each file.
+Update the suite each file's `id` names, or create one with that slug. Prints
+`Created` or `Updated` for each file.
 
 ```bash
-mcp-use evals push <path...> [options]
+mcp-use evals push <path...> [--dry-run] [options]
 ```
 
 Directories contribute their `.yaml`, `.yml`, and `.json` files, not
-subdirectories. If two files have the same `id`, push fails with
-`eval_suite_duplicate_id` before contacting Cloud. Otherwise every file is
-attempted, and the command exits 1 if any fails, for example a file whose
-`id` another suite took in the meantime. Deleting a file does not
-delete its suite; use `evals rm`.
+subdirectories. Cloud validates every file before writing any: if a file is
+invalid, or two files name the same suite, push lists every file's error,
+writes nothing, and exits 1. `--dry-run` validates the files and prints what
+would be created or updated without writing. Deleting a file does not delete
+its suite; use `evals rm`.
 
-Push needs a Manufact Cloud that supports suite IDs. Against an older one it
-fails with `eval_suite_ids_unsupported` instead of creating duplicates.
+Push needs a Manufact Cloud that accepts suite files. Against an older one it
+fails with `eval_suite_files_unsupported`.
 
 ### `evals list`
 
@@ -849,7 +854,8 @@ mcp-use evals get <suite-id> [options]
 ### `evals export`
 
 Print a suite as a file that `evals push` accepts, for example to move a suite
-built in the dashboard into your repository. The file starts with `id: <slug>`.
+built in the dashboard into your repository. Cloud renders the file, which
+starts with `id: <slug>`.
 
 ```bash
 mcp-use evals export <suite-id> [--out <path>] [options]
@@ -869,9 +875,8 @@ mcp-use evals create --file <suite.yaml> [options]
 
 ### `evals update`
 
-Replace a suite with a file's definition, including its name and slug: the
-file's `id` becomes the suite's slug. Fails with `eval_suite_id_taken` if
-another suite has that slug.
+Replace a suite with a file's definition, including its name. The file's `id`
+must name that suite; to write another suite, use `push`.
 
 ```bash
 mcp-use evals update <suite-id> --file <suite.yaml> [options]

@@ -239,15 +239,20 @@ export function formatRuntimeOptions(
       ? []
       : [
           [
-            "Inspector (clients.inspector.models)",
+            "Inspector (clients.manufact-inspector)",
             "  Ready (models: mcp-use evals models)",
           ],
         ]),
     ...(web.length > 0
-      ? [["Web apps (clients.chatgpt, clients.claude)", ...web]]
+      ? [["Web apps (clients.chatgpt-web, clients.claude-web)", ...web]]
       : []),
     ...(harnesses.length > 0
-      ? [["Harnesses (clients.runtimes)", ...harnesses]]
+      ? [
+          [
+            "Harnesses (clients.<harness>; cursor can't be set in files yet)",
+            ...harnesses,
+          ],
+        ]
       : []),
   ];
   return filtered && web.length === 0 && harnesses.length === 0

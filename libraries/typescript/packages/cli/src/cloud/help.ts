@@ -487,7 +487,7 @@ const pages: Record<string, Page> = {
   },
   evals: {
     summary:
-      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: id (the suite's slug, such as rome-weather), name and flow are required; rubric, threshold (default 0.7), clients (default: Inspector with the default model), disallowedTools and enabled are optional, and omitted fields reset to their defaults. Commands select suites by suite ID (UUID or slug; see mcp-use evals list), never by name, because names aren't unique.",
+      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: id (the suite's UUID or slug, such as rome-weather), name and task are required; judge, threshold (default 0.7), required-tools, clients (default: Inspector with the default model) and enabled are optional, and omitted fields reset to their defaults. Cloud validates the files. Commands select suites by suite ID (UUID or slug; see mcp-use evals list), never by name, because names aren't unique.",
     examples: [
       "mcp-use evals push evals/",
       "mcp-use evals run --all --wait",
@@ -496,11 +496,15 @@ const pages: Record<string, Page> = {
     commands: {
       push: {
         summary:
-          "Update the suite whose slug is each file's id, or create one with it; prints Created or Updated per file. Fails before writing anything if two files share an id. Directories contribute their .yaml, .yml and .json files (not subdirectories). Every file is attempted; exits 1 if any fails.",
+          "Update the suite each file's id names (a UUID, which must exist, or a slug), or create one with that slug; prints Created or Updated per file. Cloud validates every file first: if any is invalid (or two share an id), it lists each file's error, writes nothing and exits 1. Directories contribute their .yaml, .yml and .json files (not subdirectories).",
         args: "<path...>",
-        options: project,
+        options: [
+          ...project,
+          ["--dry-run", "Validate and print what would change; write nothing"],
+        ],
         examples: [
           "mcp-use evals push evals/",
+          "mcp-use evals push evals/ --dry-run",
           "mcp-use evals push evals/checkout.yaml",
         ],
       },

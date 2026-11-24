@@ -19,12 +19,14 @@ shows `id`, the UUID, and `slug`). For example
 or a file path fails with `eval_suite_not_found`. `evals run --all` runs every
 enabled suite.
 
-`push` matches files to suites by the file's `id` (the slug): it updates the
-suite with that slug or creates one with it, and prints `Created` or `Updated`
-per file. Renaming a suite in its file keeps the same suite. Two files with the
-same `id` fail the push (`eval_suite_duplicate_id`) before anything is written.
-A file is the suite's whole definition, so writing it resets every omitted
-field to its default. `push` never deletes suites; use
+`push` sends each file to Cloud, which validates every file before writing
+any: a file's `id` is a UUID (that suite must exist) or a slug (it updates the
+suite with that slug or creates one with it), and `push` prints `Created` or
+`Updated` per file. Renaming a suite in its file keeps the same suite. If any
+file is invalid, or two name the same suite, `push` lists every file's error,
+writes nothing and exits 1. `push --dry-run` validates and prints what would
+change. A file is the suite's whole definition, so writing it resets every
+omitted field to its default. `push` never deletes suites; use
 `mcp-use evals rm SUITE_ID --yes` when a file is removed. To start from a
 suite built in the dashboard, run `mcp-use evals export SUITE_ID --out evals/`,
 which writes `evals/<slug>.yaml`.
@@ -34,50 +36,45 @@ which writes `evals/<slug>.yaml`.
 ```yaml
 id: rome-weather
 name: Rome weather
-flow:
-  - kind: user
-    content: What's the weather in Rome?
-  - kind: tool_call
-    name: get_weather
-    args: { city: { contains: rome } }
-  - kind: assistant_text
-    note: States the temperature. Not scored.
-rubric: Gives the current temperature in Rome.
+task: What's the weather in Rome right now?
+judge: Gives the current temperature in Rome.
 threshold: 0.7
+required-tools:
+  - name: get_weather
+    args:
+      city: { contains: rome }
+      date: { any: true, require-present: true }
 clients:
-  inspector: { models: [openai/gpt-5] }
-  runtimes: [{ harness: claude-code, model: anthropic/claude-sonnet-5.5 }]
-  claude: true
-disallowedTools: [delete_city]
+  manufact-inspector: { models: [openai/gpt-5] }
+  claude-code: { model: anthropic/claude-sonnet-5.5, tool-search: true }
+  claude-web: { model: default }
 enabled: true
 ```
 
-- `id`, `name` and `flow` are required. `id` is the suite's slug: lowercase
-  letters and digits in groups joined by single hyphens, at most 64
-  characters, unique per server. It is never derived from `name`; a file
-  without one fails, and the error suggests one. `name` is only the display
-  name.
-- `flow` needs at least one `user` step.
-  Steps use the dashboard's shape: `kind: user` with `content`,
-  `kind: tool_call` with `name` and optional `args` (a call the model must
-  make before the next user turn), and `kind: assistant_text` with an optional
-  `note` on the expected reply (not scored).
-- Tool arguments match as follows: a string matches case-insensitively, and
-  `"any"` accepts any value. `{ contains }`, `{ pattern }` (a case-insensitive
-  regex), and `{ any: true, requirePresent: true }` are supported. Other values
-  must match exactly.
-- `clients` defaults to Inspector with the default model. Each key is one
-  kind of client, and each model or entry runs as its own execution:
-  - `inspector.models`: OpenRouter IDs for Manufact's hosted chat
-    (`mcp-use evals models --json` lists them);
-  - `runtimes`: `{ harness, model, provider? }` coding agents in a sandbox
-    (`mcp-use evals options --harness claude-code --json` lists harnesses and
-    models; add `--query` to search);
-  - `chatgpt` / `claude`: `true` runs the web app's default model, and
-    `{ models: [...] }` runs chosen ones. `evals options` says whether this
-    organization can run them and lists their model IDs.
-- `disallowedTools` applies to Inspector and runtimes only.
+- `id`, `name` and `task` are required. `id` is the suite's UUID or slug: a
+  slug is lowercase letters and digits in groups joined by single hyphens, at
+  most 64 characters, unique per server. It is never derived from `name`.
+  `name` is only the display name.
+- `task` is what the model is asked; `judge` is the passing criteria (default
+  scoring when omitted); `threshold` is the passing score, 0 to 1.
+- `required-tools`: each tool must be called at least once, anywhere in the
+  run. Arguments match as follows: a string matches case-insensitively, and
+  `any` accepts any value. `{ contains }`, `{ pattern }` (a case-insensitive
+  regex) and `{ any: true, require-present: true }` are supported. Other
+  values must match exactly.
+- `clients` defaults to Inspector with the default model. Keys:
+  `manufact-inspector` (OpenRouter IDs; `mcp-use evals models --json` lists
+  them), `claude-code`, `codex`, `pi` (coding agents in a sandbox;
+  `mcp-use evals options --harness claude-code --json` lists their models),
+  `chatgpt-web` and `claude-web` (`model: default` runs the app's default
+  model; `evals options` lists chosen-model IDs). Each takes `model` or
+  `models`, and each model runs as its own execution. `tool-search` is for
+  `claude-code` only.
+- Every key the format defines is kebab-case; `args` keys are the tool's own
+  parameter names.
 - Unknown fields are rejected, so a typo fails instead of being ignored.
+- Cursor, the native apps and plugin lifecycle can't be set in files yet; a
+  push keeps what the suite has for them.
 
 ## Running
 
