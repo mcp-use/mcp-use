@@ -148,7 +148,7 @@ import {
   type SkillsSnapshot,
 } from "./skills/types.js";
 import { supportsViews } from "./views/capabilities.js";
-import { resolveMcpEndpoint } from "./views/origin.js";
+import { resolveMcpEndpoint, resolveServerOrigin } from "./views/origin.js";
 import type {
   EmbeddedViewAssets,
   ViewRegistrationOptions,
@@ -2567,12 +2567,17 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         preferredDisplayMode: frontendConfig.preferredDisplayMode,
       }),
     };
-    const resourceConfig = viewResourceConfig(
-      viewName,
-      entry,
-      authorFacts,
-      metaOptions
-    );
+    // Dev view documents load Vite modules that only the dev server serves,
+    // so an `MCP_ASSETS_URL` CDN prefix (often set in `.env` for production)
+    // must not apply to their asset URLs or CSP.
+    const devAssetsBase = (request: Request | undefined) =>
+      this.#viewsDevMode && request !== undefined
+        ? { assetsBase: resolveServerOrigin(request) }
+        : {};
+    const resourceConfig = viewResourceConfig(viewName, entry, authorFacts, {
+      ...metaOptions,
+      ...devAssetsBase(metaOptions.request),
+    });
     const read: ViewResourceReader = async (readUri, ctx) => {
       const innerFn = async () => {
         const req = ctx.http?.req;
@@ -2581,16 +2586,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             ? {
                 request: req,
                 ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
+                ...devAssetsBase(req),
               }
             : metaOptions.hmrWs === true
               ? { hmrWs: true }
               : {};
+        const assetsRequest = req ?? metaOptions.request;
         const assetsBase =
-          req !== undefined
-            ? resolveAssetsBase(req)
-            : metaOptions.request !== undefined
-              ? resolveAssetsBase(metaOptions.request)
-              : "";
+          assetsRequest === undefined
+            ? ""
+            : this.#viewsDevMode
+              ? resolveServerOrigin(assetsRequest)
+              : resolveAssetsBase(assetsRequest);
         const html = synthesizeViewDocument(
           entry,
           assetsBase,

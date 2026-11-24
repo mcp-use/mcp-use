@@ -1902,6 +1902,76 @@ describe("views env URL / CSP (e2e)", () => {
     expect(csp?.resourceDomains).not.toContain("https://server.example.com");
   });
 
+  it("ignores MCP_ASSETS_URL for dev views, whose modules only the dev server serves", async () => {
+    delete process.env.MCP_URL;
+    process.env.MCP_ASSETS_URL = "https://cdn.example.com/widgets";
+    delete process.env.CSP_URLS;
+
+    const server = new MCPServer({ name: "dev-assets-test", version: "1.0.0" });
+    server[registerViews](
+      {
+        "product-search-result": {
+          kind: "external",
+          entry: "/@id/__x00__virtual:mcp-use/views/product-search-result",
+          css: [],
+          scripts: ["/@vite/client"],
+        },
+      },
+      { dev: true }
+    );
+    server.tool(
+      {
+        name: "search",
+        inputSchema: z.object({}),
+        outputSchema: z.object({ ok: z.boolean() }),
+        view: { name: "product-search-result" },
+      },
+      async () => ({
+        structuredContent: { ok: true },
+        content: [{ type: "text", text: "ok" }],
+      })
+    );
+
+    const handler = server.fetch;
+    const readBody = await handlerMcp(handler, "resources/read", {
+      uri: "ui://views/product-search-result.html",
+    });
+    const content = (
+      readBody["result"] as {
+        contents: {
+          text: string;
+          _meta?: { ui?: { csp?: Record<string, string[]> } };
+        }[];
+      }
+    ).contents[0]!;
+    expect(content.text).toContain(
+      '<script type="module" src="http://127.0.0.1:3000/@vite/client"></script>'
+    );
+    expect(content.text).toContain(
+      '<script type="module" src="http://127.0.0.1:3000/@id/__x00__virtual:mcp-use/views/product-search-result"></script>'
+    );
+    expect(content.text).toContain('"/":"http://127.0.0.1:3000/"');
+    expect(content.text).not.toContain("https://cdn.example.com");
+    expect(content._meta?.ui?.csp?.resourceDomains).toEqual([
+      "http://127.0.0.1:3000",
+    ]);
+
+    const listBody = await handlerMcp(handler, "resources/list");
+    const listed = (
+      listBody["result"] as {
+        resources: {
+          uri: string;
+          _meta?: { ui?: { csp?: Record<string, string[]> } };
+        }[];
+      }
+    ).resources.find(
+      (resource) => resource.uri === "ui://views/product-search-result.html"
+    );
+    expect(listed?._meta?.ui?.csp?.resourceDomains).toEqual([
+      "http://127.0.0.1:3000",
+    ]);
+  });
+
   it("applies CSP_URLS to connect and resource domains before MCP auto-append", async () => {
     process.env.MCP_URL = "https://server.example.com";
     process.env.CSP_URLS = "https://platform.example.com";
