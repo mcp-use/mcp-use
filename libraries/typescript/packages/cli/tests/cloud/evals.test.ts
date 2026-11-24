@@ -121,6 +121,8 @@ task: What's the weather in Rome?
 required-tools:
   - name: get_weather
     args: { city: { contains: rome }, date: { any: true, require-present: true } }
+clients:
+  manufact-inspector: { model: openai/gpt-5 }
 `;
 
 const CHECKOUT = `id: checkout
@@ -134,7 +136,7 @@ clients:
   claude-web: { model: default }
 `;
 
-const CART = `{ "id": "cart", "name": "Cart", "task": "Show my cart" }\n`;
+const CART = `{ "id": "cart", "name": "Cart", "task": "Show my cart", "clients": { "codex": { "model": "openai/gpt-5" } } }\n`;
 
 describe("evals push", () => {
   test("creates suites for new slugs and updates the suites existing IDs name", async ({
@@ -206,7 +208,7 @@ describe("evals push", () => {
         },
       ],
     });
-    // A new suite gets the file's id as its slug; without clients, Cloud's default.
+    // A new suite gets the file's id as its slug.
     expect(cloud.requestsTo("POST", SUITES).map((r) => r.body)).toEqual([
       {
         name: "Rome weather",
@@ -223,6 +225,7 @@ describe("evals push", () => {
             },
           },
         ],
+        clients: [{ client: "inspector", model: "openai/gpt-5" }],
         enabled: true,
       },
     ]);
@@ -250,7 +253,7 @@ describe("evals push", () => {
         enabled: true,
       },
     ]);
-    // Omitted fields are reset; a file without clients keeps the suite's clients.
+    // Omitted fields are reset.
     expect(
       cloud.requestsTo("PATCH", `${SUITES}/${CART_UUID}`).map((r) => r.body)
     ).toEqual([
@@ -260,6 +263,7 @@ describe("evals push", () => {
         judge: null,
         threshold: 0.7,
         requiredTools: [],
+        clients: [{ client: "codex", model: "openai/gpt-5" }],
         enabled: true,
       },
     ]);
@@ -399,9 +403,14 @@ describe("evals push", () => {
     );
     await writeFile(
       join(cli.cwd, "e.yaml"),
-      `${CART.trimEnd().slice(0, -1)}, "clients": { "pi": { "model": "default" } } }\n`
+      CART.replace('"codex"', '"pi"').replace('"openai/gpt-5"', '"default"')
     );
     await writeFile(join(cli.cwd, "f.yaml"), CHECKOUT);
+    // A file names its clients; Cloud's default model is never assumed.
+    await writeFile(
+      join(cli.cwd, "g.yaml"),
+      "id: no-clients\nname: No clients\ntask: Hi\n"
+    );
     cloud.on("GET", SUITES, {
       body: [suite({ id: ROME_UUID, slug: "rome-weather", name: "Rome" })],
     });
@@ -416,6 +425,7 @@ describe("evals push", () => {
         "d.yaml",
         "e.yaml",
         "f.yaml",
+        "g.yaml",
         ...SCOPE,
       ],
       { env: SIGNED_IN }
@@ -438,6 +448,11 @@ describe("evals push", () => {
           path: "e.yaml",
           message:
             "clients.pi: `default` is only for chatgpt-web and claude-web",
+        },
+        {
+          path: "g.yaml",
+          message:
+            "clients: list at least one client, such as `manufact-inspector: { model: <model id> }`",
         },
       ],
       written: false,
@@ -589,7 +604,10 @@ test("evals create reports an invalid file before contacting Cloud", async ({
 }) => {
   await writeFile(
     join(cli.cwd, "rome.yaml"),
-    `${ROME}clients:\n  manufact-inspector: { model: a, models: [b] }\n`
+    ROME.replace(
+      "manufact-inspector: { model: openai/gpt-5 }",
+      "manufact-inspector: { model: a, models: [b] }"
+    )
   );
 
   const result = await cli.run(
@@ -863,6 +881,58 @@ enabled: false
       );
     }
   );
+});
+
+test("evals export flags a suite with only experimental clients, whose file push rejects", async ({
+  cloud,
+  cli,
+}) => {
+  server(cloud);
+  cloud.on("GET", SUITES, {
+    body: [
+      suite({
+        id: ROME_UUID,
+        slug: "native",
+        name: "Native",
+        clients: [
+          { client: "windows-codex", model: null },
+          { client: "cursor", model: "cursor/auto" },
+        ],
+      }),
+    ],
+  });
+
+  const exported = await cli.run(
+    ["evals", "export", "native", "--out", "native.yaml", ...SCOPE],
+    { env: SIGNED_IN }
+  );
+  const text = await readFile(join(cli.cwd, "native.yaml"), "utf8");
+  const push = await cli.run(["evals", "push", "native.yaml", ...SCOPE], {
+    env: SIGNED_IN,
+  });
+
+  expect(exported.exitCode).toBe(0);
+  expect(exported.json).toMatchObject({
+    id: ROME_UUID,
+    path: "native.yaml",
+    warning: expect.stringContaining("push rejects it"),
+  });
+  expect(text).toMatch(/^# This suite runs only on clients a suite file/);
+  expect(text).not.toContain("clients:");
+  // The file needs a client first; the suite isn't touched.
+  expect(push.exitCode).toBe(1);
+  expect(push.json).toEqual({
+    results: [
+      {
+        path: "native.yaml",
+        message:
+          "clients: list at least one client, such as `manufact-inspector: { model: <model id> }`",
+      },
+    ],
+    written: false,
+    dashboardUrl: DASHBOARD,
+  });
+  expect(cloud.requests.map((r) => r.method)).not.toContain("PATCH");
 });
 
 test("evals get shows the suite as a file with its latest run", async ({

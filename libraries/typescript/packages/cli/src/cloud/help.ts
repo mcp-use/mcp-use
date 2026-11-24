@@ -487,7 +487,7 @@ const pages: Record<string, Page> = {
   },
   evals: {
     summary:
-      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: id (the suite's UUID or slug, such as rome-weather), name and task are required; judge, threshold (default 0.7), required-tools, clients (default for a new suite: Inspector with the default model) and enabled are optional. Omitted fields reset to their defaults, except clients: a file without clients keeps an existing suite's clients. The CLI validates the files and writes each suite through Cloud's API. Commands select suites by suite ID (UUID or slug; see mcp-use evals list), never by name, because names aren't unique.",
+      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: id (the suite's UUID or slug, such as rome-weather), name, task and clients (at least one) are required; judge, threshold (default 0.7), required-tools and enabled are optional, and omitted fields reset to their defaults. The CLI validates the files and writes each suite through Cloud's API. Commands select suites by suite ID (UUID or slug; see mcp-use evals list), never by name, because names aren't unique.",
     examples: [
       "mcp-use evals push evals/",
       "mcp-use evals run --all --wait",
@@ -638,7 +638,7 @@ const pages: Record<string, Page> = {
       },
       models: {
         summary:
-          "List model IDs for clients.inspector.models, most popular first.",
+          "List model IDs for clients.manufact-inspector, most popular first.",
         options: [
           org,
           ["--query <text>", "Match the model ID or name"],

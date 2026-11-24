@@ -7,9 +7,8 @@
  * suite as JSON, so the CLI parses and validates each file here and maps it
  * onto Cloud's suite fields. Every key the format defines is kebab-case; keys
  * under `args` are the tool's own parameter names. A client takes `model` or
- * `models`, not both. A file is the suite's whole definition: an omitted field
- * gets its default, except `clients`, which an existing suite keeps. The
- * experimental clients (`cursor`, the native apps) and plugin lifecycle have
+ * `models`, not both, and `clients` is required. A file is the suite's whole
+ * definition: an omitted field gets its default. The experimental clients (`cursor`, the native apps) and plugin lifecycle have
  * no key; a push keeps what the suite has for them.
  */
 import { readFile } from "node:fs/promises";
@@ -62,6 +61,9 @@ const WEB_FILE_CLIENTS = new Set<FileClientKey>(["chatgpt-web", "claude-web"]);
 const HARNESS_CLIENTS = new Set<string>(HARNESSES);
 /** A web app's own default model. */
 const DEFAULT_MODEL = "default";
+/** Why a file without clients fails: the CLI never relies on Cloud's default model. */
+const CLIENTS_REQUIRED =
+  "list at least one client, such as `manufact-inspector: { model: <model id> }`";
 
 /**
  * Clients a file can't name (`cursor`, the native apps). A push keeps the
@@ -127,12 +129,17 @@ const fileSchema = z.strictObject({
         FILE_CLIENT_KEYS.map((key) => [key, fileClient(key).optional()])
       ) as {
         [K in FileClientKey]: z.ZodOptional<ReturnType<typeof fileClient>>;
+      },
+      {
+        error: (issue) =>
+          issue.input === undefined || issue.input === null
+            ? CLIENTS_REQUIRED
+            : undefined,
       }
     )
     .refine((value) => Object.values(value).some(Boolean), {
-      message: "Select at least one client",
-    })
-    .optional(),
+      message: CLIENTS_REQUIRED,
+    }),
   enabled: z.boolean().default(true),
 });
 
@@ -147,8 +154,7 @@ export type SuiteFile = {
   judge: string | null;
   threshold: number;
   requiredTools: RequiredTool[];
-  /** Unset when the file names no clients. */
-  clients: SuiteClient[] | undefined;
+  clients: SuiteClient[];
   enabled: boolean;
 };
 
@@ -231,7 +237,7 @@ export function parseSuiteFile(source: string): SuiteFile {
     );
   }
   const file = result.data;
-  const clients = file.clients ? fileClients(file.clients) : undefined;
+  const clients = fileClients(file.clients);
   return {
     id: file.id,
     idIsUuid: UUID_PATTERN.test(file.id),
@@ -305,7 +311,7 @@ export function createBody(file: SuiteFile): CreateBody {
     judge: file.judge,
     threshold: file.threshold,
     requiredTools: file.requiredTools,
-    ...(file.clients ? { clients: file.clients } : {}),
+    clients: file.clients,
     enabled: file.enabled,
   };
 }
@@ -314,7 +320,7 @@ export function createBody(file: SuiteFile): CreateBody {
  * The request that makes `existing` what a file describes. Every definition
  * field is sent, so an omitted one is reset to its default. `clients`
  * replaces the whole list, so the experimental clients `existing` has are
- * sent too; a file without `clients` keeps the suite's list as it is.
+ * sent too.
  */
 export function updateBody(
   file: SuiteFile,
@@ -326,16 +332,12 @@ export function updateBody(
     judge: file.judge,
     threshold: file.threshold,
     requiredTools: file.requiredTools,
-    ...(file.clients
-      ? {
-          clients: [
-            ...file.clients,
-            ...(existing.clients ?? []).filter((entry) =>
-              isExperimentalClient(entry.client)
-            ),
-          ],
-        }
-      : {}),
+    clients: [
+      ...file.clients,
+      ...(existing.clients ?? []).filter((entry) =>
+        isExperimentalClient(entry.client)
+      ),
+    ],
     enabled: file.enabled,
   };
 }
@@ -356,8 +358,20 @@ export type SuiteDefinition = {
 };
 
 /**
+ * Why a suite's file can't be pushed back as written: it runs only on
+ * experimental clients, which a file leaves out, so it has no `clients`.
+ */
+export function exportWarning(suite: SuiteDefinition): string | undefined {
+  if (suite.clients.some((entry) => !isExperimentalClient(entry.client)))
+    return undefined;
+  return "This suite runs only on clients a suite file can't name (cursor, the native apps), so the file has no clients and push rejects it. Add a client to push it; push keeps the suite's experimental clients next to it.";
+}
+
+/**
  * A suite as file text: its slug as `id`, without the experimental clients.
- * Client entries and argument matchers are written on one line each.
+ * Client entries and argument matchers are written on one line each. A suite
+ * with only experimental clients starts with a comment saying why the file
+ * needs a client before it can be pushed.
  */
 export function suiteFileText(suite: SuiteDefinition): string {
   const clients: Record<string, Record<string, unknown>> = {};
@@ -408,7 +422,23 @@ export function suiteFileText(suite: SuiteDefinition): string {
           if (field.key === "args")
             for (const arg of pairs(field.value)) setFlow(arg.value);
   }
-  return document.toString({ lineWidth: 0 });
+  const warning = exportWarning(suite);
+  const text = document.toString({ lineWidth: 0 });
+  return warning ? `${commentLines(warning)}${text}` : text;
+}
+
+/** `text` as YAML comment lines of about 78 characters. */
+function commentLines(text: string): string {
+  const lines: string[] = [];
+  let line = "#";
+  for (const word of text.split(" ")) {
+    if (line.length > 1 && line.length + word.length + 1 > 78) {
+      lines.push(line);
+      line = "#";
+    }
+    line += ` ${word}`;
+  }
+  return `${[...lines, line].join("\n")}\n`;
 }
 
 type Node = { flow?: boolean; items?: unknown[] } | undefined;

@@ -29,8 +29,7 @@ two name the same suite, `push` lists every file's error, writes nothing and
 exits 1. If Cloud rejects one suite, `push` reports it with its error `code`,
 writes the others and exits 1. `push --dry-run` runs the checks and prints
 what would change. A file is the suite's whole definition, so writing it
-resets every omitted field to its default, except `clients`: a file without
-`clients` keeps the suite's clients. `push` never deletes suites; use
+resets every omitted field to its default. `push` never deletes suites; use
 `mcp-use evals rm SUITE_ID --yes` when a file is removed. To start from a
 suite built in the dashboard, run `mcp-use evals export SUITE_ID --out evals/`,
 which writes `evals/<slug>.yaml`.
@@ -55,7 +54,7 @@ clients:
 enabled: true
 ```
 
-- `id`, `name` and `task` are required. `id` is the suite's UUID or slug: a
+- `id`, `name`, `task` and `clients` are required. `id` is the suite's UUID or slug: a
   slug is lowercase letters and digits in groups joined by single hyphens, at
   most 64 characters, unique per server. It is never derived from `name`.
   `name` is only the display name.
@@ -66,8 +65,10 @@ enabled: true
   `any` accepts any value. `{ contains }`, `{ pattern }` (a case-insensitive
   regex) and `{ any: true, require-present: true }` are supported. Other
   values must match exactly.
-- `clients` defaults to Inspector with the default model for a new suite; an
-  existing suite keeps its clients when the file has none. Keys:
+- `clients` is required, with at least one client; a file without it fails
+  before anything is written. A suite that runs only on Cursor or the native
+  apps exports without `clients` and needs one added before it can be pushed.
+  Keys:
   `manufact-inspector` (OpenRouter IDs; `mcp-use evals models --json` lists
   them), `claude-code`, `codex`, `pi` (coding agents in a sandbox;
   `mcp-use evals options --harness claude-code --json` lists their models),

@@ -14,6 +14,7 @@ import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
 import { startRuns, type UnstartedSuite } from "./start.js";
 import {
   createBody,
+  exportWarning,
   HARNESSES,
   parseSuiteFile,
   readSuiteFileText,
@@ -275,8 +276,11 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
           { suite: publicSuite(suite), dashboardUrl },
           formatSuite(suite, yaml)
         );
+      // The YAML starts with the same warning as a comment.
+      const warning = exportWarning(readableSuite(suite));
+      const warned = warning === undefined ? {} : { warning };
       if (typeof values.out !== "string")
-        return output.result({ id: suite.id, yaml }, yaml.trimEnd());
+        return output.result({ id: suite.id, yaml, ...warned }, yaml.trimEnd());
       // A directory gets the file `<slug>.yaml`.
       const toDirectory =
         values.out.endsWith("/") ||
@@ -298,8 +302,8 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         );
       }
       return output.result(
-        { id: suite.id, path: out },
-        `✓ Wrote ${plain(out)}`
+        { id: suite.id, path: out, ...warned },
+        `✓ Wrote ${plain(out)}${warning === undefined ? "" : `\n! ${plain(warning)}`}`
       );
     }
     if (command === "create" || command === "update") {

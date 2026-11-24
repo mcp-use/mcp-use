@@ -771,7 +771,7 @@ required-tools:              # each must be called at least once, anywhere in th
     args:
       city: { contains: rome }                   # also: a plain value, any, { pattern }
       date: { any: true, require-present: true }
-clients:                     # a new suite's default: Inspector with the default model
+clients:                     # required; at least one client
   manufact-inspector: { models: [openai/gpt-5, anthropic/claude-sonnet-5.5] }
   claude-code: { model: anthropic/claude-sonnet-5.5, tool-search: true }
   codex: { model: openai/gpt-5 }
@@ -783,10 +783,10 @@ enabled: true                # false excludes the suite from run --all
 
 Every key the format defines is kebab-case; keys under `args` are your tool's
 own parameter names. Each client takes `model` or `models` (not both), and
-every model runs as its own execution. A file is the suite's whole definition:
-writing it over an existing suite resets every omitted field to its default,
-except `clients`: a file without `clients` keeps the suite's clients as they
-are.
+every model runs as its own execution. `clients` is required: a file without
+it fails, for a new suite and an existing one alike, so a push never depends
+on Cloud's default model. A file is the suite's whole definition: writing it
+over an existing suite resets every omitted field to its default.
 Unknown keys are rejected, so a typo fails instead of being ignored.
 Experimental clients (Cursor, the native apps) and plugin lifecycle settings
 have no key yet; a push keeps what the suite already has for them, and
@@ -857,7 +857,10 @@ mcp-use evals get <suite-id> [options]
 
 Print a suite as a file that `evals push` accepts, for example to move a suite
 built in the dashboard into your repository. The file starts with
-`id: <slug>` and leaves out the experimental clients, which `push` keeps.
+`id: <slug>` and leaves out the experimental clients, which `push` keeps. A
+suite that runs only on experimental clients exports without `clients`, so the
+file starts with a comment (and the output with a warning) saying to add a
+client before pushing it.
 
 ```bash
 mcp-use evals export <suite-id> [--out <path>] [options]
@@ -962,7 +965,8 @@ mcp-use evals cancel <run-id> [--yes] [options]
 ### `evals options`
 
 Show the web apps and agent harnesses this organization can run, with the model
-IDs for `clients.chatgpt`, `clients.claude` and `clients.runtimes`.
+IDs for `clients.chatgpt-web`, `clients.claude-web` and the harness keys
+(`claude-code`, `codex`, `pi`).
 
 ```bash
 mcp-use evals options [--harness <id>] [--query <text>] [options]
@@ -975,7 +979,7 @@ filtered output lists every match.
 
 ### `evals models`
 
-List model IDs for `clients.inspector.models`, most popular first.
+List model IDs for `clients.manufact-inspector`, most popular first.
 
 ```bash
 mcp-use evals models [--query <text>] [--provider <name>] [--limit <n>] [--skip <n>] [--org <id-or-slug>]
