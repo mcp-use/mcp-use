@@ -127,7 +127,7 @@ function skillUri(skillsRoot: string, skillRoot: string, file: string): string {
 }
 
 function frontmatter(path: string): Record<string, unknown> {
-  const source = readFileSync(path, "utf8");
+  const source = readFileSync(path, "utf8").replace(/^\uFEFF/, "");
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(source);
   if (match?.[1] === undefined) {
     throw new Error(`${path}: SKILL.md must begin with YAML frontmatter`);
