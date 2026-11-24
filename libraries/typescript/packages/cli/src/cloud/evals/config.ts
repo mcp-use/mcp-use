@@ -334,11 +334,31 @@ export function updateBody(
     requiredTools: file.requiredTools,
     clients: [
       ...file.clients,
-      ...(existing.clients ?? []).filter((entry) =>
-        isExperimentalClient(entry.client)
-      ),
+      ...(existing.clients ?? [])
+        .filter((entry) => isExperimentalClient(entry.client))
+        .map(clientEntry),
     ],
     enabled: file.enabled,
+  };
+}
+
+/**
+ * A saved client entry with only the keys Cloud's request schema defines:
+ * suite bodies are strict, so anything else would be rejected.
+ */
+function clientEntry({
+  client,
+  model,
+  name,
+  provider,
+  toolSearch,
+}: SuiteClient): SuiteClient {
+  return {
+    client,
+    model,
+    ...(name !== undefined ? { name } : {}),
+    ...(provider !== undefined ? { provider } : {}),
+    ...(toolSearch !== undefined ? { toolSearch } : {}),
   };
 }
 
