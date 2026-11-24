@@ -134,6 +134,29 @@ describe("skill discovery", () => {
     ).toThrow(/within the project root/);
   });
 
+  it("discovers skills whose SKILL.md starts with a UTF-8 BOM", () => {
+    const cwd = project();
+    const cases = [
+      ["plain-lf", "---\nname: plain-lf\ndescription: Plain LF file\n---\n"],
+      ["bom-lf", "\uFEFF---\nname: bom-lf\ndescription: BOM LF file\n---\n"],
+      [
+        "bom-crlf",
+        "\uFEFF---\r\nname: bom-crlf\r\ndescription: BOM CRLF file\r\n---\r\n",
+      ],
+    ] as const;
+    for (const [name, content] of cases) {
+      const directory = join(cwd, "skills", name);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, "SKILL.md"), content);
+    }
+    const snapshot = discoverConfiguredSkills(true, cwd);
+    expect(snapshot?.skills.map((skill) => skill.frontmatter.name)).toEqual([
+      "bom-crlf",
+      "bom-lf",
+      "plain-lf",
+    ]);
+  });
+
   it("preserves frontmatter, nests manifests, hashes bytes, and excludes symlinks", () => {
     const cwd = project();
     const parent = writeSkill(
