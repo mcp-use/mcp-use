@@ -35,6 +35,62 @@ try {
 }
 ```
 
+## Call an authenticated remote tool from Node.js
+
+Use `authToken` to send a bearer token with requests to a remote Streamable
+HTTP server. This example searches a handbook and reads the source URLs from
+`structuredContent`. It uses [ClickHouse Loom](https://github.com/ClickHouse/loom).
+
+Set `LOOM_MCP_URL` to your Loom server's HTTPS endpoint with
+`/mcp?toolset=assistant`. Set `LOOM_NAMESPACE` to the indexed handbook's
+namespace and `LOOM_VIEWER_TOKEN` to a viewer token scoped to that namespace.
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const url = process.env.LOOM_MCP_URL;
+const authToken = process.env.LOOM_VIEWER_TOKEN;
+const namespace = process.env.LOOM_NAMESPACE;
+if (!url || !authToken || !namespace) {
+  throw new Error("Set LOOM_MCP_URL, LOOM_VIEWER_TOKEN, and LOOM_NAMESPACE");
+}
+
+const client = new MCPClient({
+  mcpServers: { loom: { url, authToken } },
+});
+
+try {
+  const conn = await client.connect("loom");
+  const result = await conn.callTool("loom_knowledge_search", {
+    namespace,
+    namespace_scope: "this",
+    query: "When does the deployment freeze start?",
+    search_mode: "lexical",
+    rerank: "none",
+    top_k: 3,
+  });
+  if (result.isError) throw new Error("Loom document search failed");
+
+  const data = result.structuredContent;
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("results" in data) ||
+    !Array.isArray(data.results)
+  ) {
+    throw new Error("Expected structured search results");
+  }
+  for (const hit of data.results) {
+    if (typeof hit?.source_uri === "string") console.log(hit.source_uri);
+  }
+} finally {
+  await client.close();
+}
+```
+
+See [Authentication](/typescript/client/authentication#bearer-tokens) for more
+ways to configure credentials.
+
 ## Timeouts
 
 Pass MCP request options as the third argument:
