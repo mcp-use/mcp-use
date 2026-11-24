@@ -77,6 +77,62 @@ if __name__ == "__main__":
 ```
 </CodeGroup>
 
+## Call a remote tool with a bearer token
+
+To check a Streamable HTTP connection before handing it to an agent, open a
+session with `auth` and call a known tool. This example searches an indexed
+handbook in [ClickHouse Loom](https://github.com/ClickHouse/loom) and prints the
+source URLs.
+
+Set `LOOM_MCP_URL` to your Loom server's HTTPS endpoint with
+`/mcp?toolset=assistant`, `LOOM_NAMESPACE` to the handbook namespace, and
+`LOOM_VIEWER_TOKEN` to a viewer token scoped to that namespace. See
+[Bearer Token](/python/client/authentication/bearer) for token configuration.
+
+```python
+import asyncio
+import os
+
+from mcp_use import MCPClient
+
+
+async def main():
+    config = {
+        "mcpServers": {
+            "loom": {
+                "url": os.environ["LOOM_MCP_URL"],
+                "auth": os.environ["LOOM_VIEWER_TOKEN"],
+            }
+        }
+    }
+    client = MCPClient(config)
+
+    try:
+        session = await client.create_session("loom")
+        result = await session.call_tool(
+            name="loom_knowledge_search",
+            arguments={
+                "namespace": os.environ["LOOM_NAMESPACE"],
+                "namespace_scope": "this",
+                "query": "When does the deployment freeze start?",
+                "search_mode": "lexical",
+                "rerank": "none",
+                "top_k": 3,
+            },
+        )
+        if result.isError or result.structuredContent is None:
+            raise RuntimeError("Loom did not return a search result")
+
+        for hit in result.structuredContent["results"]:
+            print(hit["source_uri"])
+    finally:
+        await client.close_all_sessions()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 ## Working with Tool Results
 
 The `call_tool` method returns a `CallToolResult` object with the following attributes:
