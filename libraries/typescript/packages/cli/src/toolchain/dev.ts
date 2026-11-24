@@ -1396,7 +1396,8 @@ export async function runDev(options: DevOptions): Promise<void> {
     );
   }
   const assetsUrl = process.env["MCP_ASSETS_URL"]?.trim();
-  if (assetsUrl !== undefined && assetsUrl !== "") {
+  // The server ignores a value that isn't a URL, so only announce real ones.
+  if (assetsUrl !== undefined && URL.canParse(assetsUrl)) {
     console.log(
       `[mcp-use] MCP_ASSETS_URL is ignored in dev: views load from this dev ` +
         `server. Run \`mcp-use build && mcp-use start\` to test assets ` +

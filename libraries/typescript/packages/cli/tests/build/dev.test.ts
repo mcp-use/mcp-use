@@ -1377,6 +1377,28 @@ describe("runDev (views)", () => {
     );
   }, 30_000);
 
+  it("prints no MCP_ASSETS_URL notice when the value isn't a URL", async () => {
+    const originalAssetsUrl = process.env["MCP_ASSETS_URL"];
+    delete process.env["MCP_ASSETS_URL"];
+    cleanups.push(() => {
+      if (originalAssetsUrl === undefined) {
+        delete process.env["MCP_ASSETS_URL"];
+      } else {
+        process.env["MCP_ASSETS_URL"] = originalAssetsUrl;
+      }
+    });
+    const cwd = copyFixture("dev-assets-url-invalid", "views");
+    cleanups.push(() => removeDir(cwd));
+    writeFileSync(join(cwd, ".env"), "MCP_ASSETS_URL=not-a-url\n");
+
+    const dev = await startDev(cwd, await getFreePort());
+    cleanups.push(dev.stop);
+    expect(process.env["MCP_ASSETS_URL"]).toBe("not-a-url");
+    expect(dev.logs.some((line) => line.includes("MCP_ASSETS_URL"))).toBe(
+      false
+    );
+  }, 30_000);
+
   it("shuts down with active MCP subscriptions and HMR WebSockets", async () => {
     const cwd = copyFixture("dev-active-connections-shutdown", "views");
     cleanups.push(() => removeDir(cwd));
