@@ -756,9 +756,9 @@ Use the [dashboard YAML format](https://docs.manufact.com/dashboard/alerts). Cho
 ## Evals commands
 
 Keep eval suites in your repository as YAML files, push them to Manufact Cloud,
-and run them against a deployed server. The CLI sends each file's text; Cloud
-parses and validates it, so the dashboard, the API and the CLI share one format
-and one set of errors.
+and run them against a deployed server. The file format belongs to the CLI:
+it validates each file and writes the suite through Cloud's API, which takes
+suites as JSON, the same way `alerts create --file` works.
 
 ```yaml evals/rome-weather.yaml
 id: rome-weather             # required; the suite's UUID or slug
@@ -771,7 +771,7 @@ required-tools:              # each must be called at least once, anywhere in th
     args:
       city: { contains: rome }                   # also: a plain value, any, { pattern }
       date: { any: true, require-present: true }
-clients:                     # default: Inspector with the default model
+clients:                     # a new suite's default: Inspector with the default model
   manufact-inspector: { models: [openai/gpt-5, anthropic/claude-sonnet-5.5] }
   claude-code: { model: anthropic/claude-sonnet-5.5, tool-search: true }
   codex: { model: openai/gpt-5 }
@@ -784,7 +784,9 @@ enabled: true                # false excludes the suite from run --all
 Every key the format defines is kebab-case; keys under `args` are your tool's
 own parameter names. Each client takes `model` or `models` (not both), and
 every model runs as its own execution. A file is the suite's whole definition:
-writing it over an existing suite resets every omitted field to its default.
+writing it over an existing suite resets every omitted field to its default,
+except `clients`: a file without `clients` keeps the suite's clients as they
+are.
 Unknown keys are rejected, so a typo fails instead of being ignored.
 Experimental clients (Cursor, the native apps) and plugin lifecycle settings
 have no key yet; a push keeps what the suite already has for them, and
@@ -826,14 +828,14 @@ mcp-use evals push <path...> [--dry-run] [options]
 ```
 
 Directories contribute their `.yaml`, `.yml`, and `.json` files, not
-subdirectories. Cloud validates every file before writing any: if a file is
-invalid, or two files name the same suite, push lists every file's error,
-writes nothing, and exits 1. `--dry-run` validates the files and prints what
+subdirectories. Push checks every file before writing any, against the
+server's suites: if a file is invalid, its `id` is a UUID no suite has, or two
+files name the same suite, push lists every file's error, writes nothing, and
+exits 1. It then creates or updates one suite per file. If Cloud rejects a
+suite (an unknown model, for example), push reports that file, still writes
+the others, and exits 1. `--dry-run` runs the same checks and prints what
 would be created or updated without writing. Deleting a file does not delete
 its suite; use `evals rm`.
-
-Push needs a Manufact Cloud that accepts suite files. Against an older one it
-fails with `eval_suite_files_unsupported`.
 
 ### `evals list`
 
@@ -854,8 +856,8 @@ mcp-use evals get <suite-id> [options]
 ### `evals export`
 
 Print a suite as a file that `evals push` accepts, for example to move a suite
-built in the dashboard into your repository. Cloud renders the file, which
-starts with `id: <slug>`.
+built in the dashboard into your repository. The file starts with
+`id: <slug>` and leaves out the experimental clients, which `push` keeps.
 
 ```bash
 mcp-use evals export <suite-id> [--out <path>] [options]

@@ -19,14 +19,18 @@ shows `id`, the UUID, and `slug`). For example
 or a file path fails with `eval_suite_not_found`. `evals run --all` runs every
 enabled suite.
 
-`push` sends each file to Cloud, which validates every file before writing
-any: a file's `id` is a UUID (that suite must exist) or a slug (it updates the
-suite with that slug or creates one with it), and `push` prints `Created` or
-`Updated` per file. Renaming a suite in its file keeps the same suite. If any
-file is invalid, or two name the same suite, `push` lists every file's error,
-writes nothing and exits 1. `push --dry-run` validates and prints what would
-change. A file is the suite's whole definition, so writing it resets every
-omitted field to its default. `push` never deletes suites; use
+The CLI owns the file format: `push` validates every file locally and checks
+each `id` against the server's suites before writing any, then creates or
+updates one suite per file through Cloud's JSON API. A file's `id` is a UUID
+(that suite must exist) or a slug (it updates the suite with that slug or
+creates one with it), and `push` prints `Created` or `Updated` per file.
+Renaming a suite in its file keeps the same suite. If any file is invalid, or
+two name the same suite, `push` lists every file's error, writes nothing and
+exits 1. If Cloud rejects one suite, `push` reports it with its error `code`,
+writes the others and exits 1. `push --dry-run` runs the checks and prints
+what would change. A file is the suite's whole definition, so writing it
+resets every omitted field to its default, except `clients`: a file without
+`clients` keeps the suite's clients. `push` never deletes suites; use
 `mcp-use evals rm SUITE_ID --yes` when a file is removed. To start from a
 suite built in the dashboard, run `mcp-use evals export SUITE_ID --out evals/`,
 which writes `evals/<slug>.yaml`.
@@ -62,7 +66,8 @@ enabled: true
   `any` accepts any value. `{ contains }`, `{ pattern }` (a case-insensitive
   regex) and `{ any: true, require-present: true }` are supported. Other
   values must match exactly.
-- `clients` defaults to Inspector with the default model. Keys:
+- `clients` defaults to Inspector with the default model for a new suite; an
+  existing suite keeps its clients when the file has none. Keys:
   `manufact-inspector` (OpenRouter IDs; `mcp-use evals models --json` lists
   them), `claude-code`, `codex`, `pi` (coding agents in a sandbox;
   `mcp-use evals options --harness claude-code --json` lists their models),

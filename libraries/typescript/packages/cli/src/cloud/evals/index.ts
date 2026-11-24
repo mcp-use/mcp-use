@@ -1,5 +1,5 @@
 import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { basename, extname, join, sep } from "node:path";
+import { extname, join, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseArgs } from "node:util";
 
@@ -12,7 +12,18 @@ import { withProgress } from "../../core/progress.js";
 import { cloudWebUrl } from "../cloud-api.js";
 import { connectProject, PROJECT_OPTIONS } from "../project/resolve.js";
 import { startRuns, type UnstartedSuite } from "./start.js";
-import { HARNESSES, readSuiteFile, type SuiteFileText } from "./config.js";
+import {
+  createBody,
+  HARNESSES,
+  parseSuiteFile,
+  readSuiteFileText,
+  SuiteFileError,
+  suiteFileText,
+  updateBody,
+  type CreateBody,
+  type SuiteFile,
+  type UpdateBody,
+} from "./config.js";
 import {
   createLiveReport,
   duration,
@@ -121,11 +132,12 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
     )
       throw new UsageError("Pass --file <suite.yaml>.");
 
-    // Read every file before connecting, so a usage error never reaches Cloud.
-    // Cloud validates their contents, all of them before writing any.
+    // Read and validate every file before connecting, so a missing path
+    // never reaches Cloud. Push reports invalid files once it has also
+    // checked each `id` against the server's suites.
     const files =
       command === "push"
-        ? await Promise.all((await suiteFiles(positionals)).map(readSuiteFile))
+        ? await Promise.all((await suiteFiles(positionals)).map(loadSuiteFile))
         : [];
     // Suites selected on the command line by ID (UUID or slug): names aren't unique.
     const ids = ["get", "export", "update", "rm", "run"].includes(command!)
@@ -135,7 +147,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
         : [];
     const file =
       typeof values.file === "string"
-        ? await readSuiteFile(values.file)
+        ? await requireSuiteFile(values.file)
         : undefined;
     if (
       (command === "rm" &&
@@ -169,14 +181,14 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
 
     if (command === "push") {
       const dryRun = values["dry-run"] === true;
-      const pushed = await api.push(files, dryRun);
-      if ("invalid" in pushed) {
-        // Cloud wrote nothing: every file is listed with its error.
+      const { plans, errors } = planWrites(files, await api.suites());
+      if (errors.length > 0) {
+        // Nothing is written until every file is valid and names its own suite.
         failed = true;
         return output.result(
-          { results: pushed.invalid, written: false, dashboardUrl },
+          { results: errors, written: false, dashboardUrl },
           [
-            ...pushed.invalid.map(
+            ...errors.map(
               (result) => `✗ ${plain(result.path)}\n  ${plain(result.message)}`
             ),
             "",
@@ -192,14 +204,60 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
           : action === "created"
             ? "Created"
             : "Updated";
+      // Each suite is its own request: one Cloud rejects doesn't stop the rest.
+      const results: PushResult[] = [];
+      for (const plan of plans) {
+        const action = plan.target ? "updated" : "created";
+        if (dryRun) {
+          results.push({
+            path: plan.path,
+            action,
+            suite: {
+              id: plan.target?.id ?? null,
+              slug: plan.target?.slug ?? plan.file.id,
+              name: plan.file.name,
+            },
+          });
+          continue;
+        }
+        try {
+          const saved = plan.target
+            ? await api.update(
+                plan.target.id,
+                updateBody(plan.file, plan.target)
+              )
+            : await api.create(createBody(plan.file));
+          results.push({
+            path: plan.path,
+            action,
+            suite: { id: saved.id, slug: saved.slug, name: saved.name },
+          });
+        } catch (error) {
+          if (!(error instanceof CommandError)) throw error;
+          failed = true;
+          results.push({
+            path: plan.path,
+            code: error.code,
+            message: error.message,
+          });
+        }
+      }
+      const notPushed = results.filter((result) => "message" in result).length;
       return output.result(
-        { results: pushed.results, dryRun, dashboardUrl },
-        pushed.results
-          .map(
-            (result) =>
-              `✓ ${verb(result.action)} ${plain(result.suite.slug)} (“${plain(result.suite.name)}”) from ${plain(result.path)}`
-          )
-          .join("\n")
+        { results, dryRun, dashboardUrl },
+        [
+          ...results.map((result) =>
+            "message" in result
+              ? `✗ ${plain(result.path)}\n  ${plain(result.message)}`
+              : `✓ ${verb(result.action)} ${plain(result.suite.slug)} (“${plain(result.suite.name)}”) from ${plain(result.path)}`
+          ),
+          ...(notPushed > 0
+            ? [
+                "",
+                `${notPushed} of ${results.length} file${results.length === 1 ? " was" : "s were"} not pushed; the others were.`,
+              ]
+            : []),
+        ].join("\n")
       );
     }
     if (command === "list") {
@@ -211,7 +269,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
     }
     if (command === "get" || command === "export") {
       const suite = suites[0]!;
-      const { path: fileName, content: yaml } = await api.file(suite.id);
+      const yaml = suiteFileText(readableSuite(suite));
       if (command === "get")
         return output.result(
           { suite: publicSuite(suite), dashboardUrl },
@@ -228,7 +286,7 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
           () => false
         ));
       const out = toDirectory
-        ? join(values.out, basename(fileName))
+        ? join(values.out, `${suite.slug}.yaml`)
         : values.out;
       try {
         if (toDirectory) await mkdir(values.out, { recursive: true });
@@ -245,41 +303,39 @@ export async function runEvals(argv: readonly string[]): Promise<number> {
       );
     }
     if (command === "create" || command === "update") {
-      // The file's `id` names the suite; a dry run says which one first.
-      const pushed = await api.push([file!], true);
-      if ("invalid" in pushed)
-        throw new UsageError(
-          `${plain(file!.path)}: ${plain(pushed.invalid[0]?.message ?? "invalid suite file")}`
-        );
-      const [planned] = pushed.results;
-      if (command === "create" && planned!.action === "updated")
+      const path = String(values.file);
+      const { plans, errors } = planWrites(
+        [{ path, file: file! }],
+        await api.suites()
+      );
+      if (errors.length > 0)
+        throw new UsageError(`${plain(path)}: ${plain(errors[0]!.message)}`);
+      const { target } = plans[0]!;
+      if (command === "create" && target)
         throw new CommandError(
           "eval_suite_exists",
-          `An eval suite with the ID “${planned!.suite.slug}” already exists (“${planned!.suite.name}”).`,
+          `An eval suite with the ID “${file!.id}” already exists (“${target.name}”).`,
           undefined,
           [
             {
               description: "Replace it",
-              command: `mcp-use evals update ${planned!.suite.slug} --file ${String(values.file)}`,
+              command: `mcp-use evals update ${target.slug} --file ${path}`,
             },
           ]
         );
-      if (command === "update" && planned!.suite.id !== suites[0]!.id)
+      if (command === "update" && target?.id !== suites[0]!.id)
         throw new UsageError(
-          `${plain(file!.path)} has the ID “${plain(planned!.suite.slug)}”, not suite ${plain(ids[0]!)}. A file updates the suite its id names; use mcp-use evals push.`
+          `${plain(path)} has the ID “${plain(file!.id)}”, not suite ${plain(ids[0]!)}. A file updates the suite its id names; use mcp-use evals push.`
         );
-      const written = await api.push([file!], false);
-      if ("invalid" in written)
-        throw new UsageError(
-          `${plain(file!.path)}: ${plain(written.invalid[0]?.message ?? "invalid suite file")}`
-        );
-      const saved = written.results[0]!.suite;
+      const saved = target
+        ? await api.update(target.id, updateBody(file!, target))
+        : await api.create(createBody(file!));
       return output.result(
         { id: saved.id, slug: saved.slug, name: saved.name, dashboardUrl },
         `✓ ${command === "create" ? "Created" : "Updated"} eval suite “${plain(saved.name)}”\n${fields(
           [
             ["ID", saved.slug],
-            ["UUID", saved.id ?? ""],
+            ["UUID", saved.id],
           ]
         )}`
       );
@@ -621,65 +677,19 @@ function evalApi(cloud: Cloud, serverId: string) {
           params: { path },
         })
       ),
-    /**
-     * Create or update the suite each file's `id` names. Cloud validates every
-     * file before writing any; an invalid one returns every file's error and
-     * writes nothing.
-     */
-    async push(
-      files: readonly SuiteFileText[],
-      dryRun: boolean
-    ): Promise<
-      | {
-          results: Array<{
-            path: string;
-            action: "created" | "updated";
-            suite: { id: string | null; slug: string; name: string };
-          }>;
-        }
-      | { invalid: Array<{ path: string; message: string }> }
-    > {
-      const pending = cloud.client.POST(
-        "/api/v1/server-evals/{serverId}/suites/files",
-        {
-          params: { path },
-          body: {
-            files: files.map(({ path, content }) => ({ path, content })),
-            dryRun,
-          },
-        }
-      );
-      const result = await pending;
-      const error = result.error as
-        | { code?: unknown; details?: unknown }
-        | undefined;
-      if (
-        result.response?.status === 400 &&
-        error?.code === "EVAL_SUITE_FILE_INVALID" &&
-        Array.isArray(error.details)
-      )
-        return {
-          invalid: (error.details as Array<Record<string, unknown>>).map(
-            (detail) => ({
-              path: String(detail.path ?? ""),
-              message: String(detail.message ?? "Invalid suite file."),
-            })
-          ),
-        };
-      if (result.response?.status === 404)
-        throw new CommandError(
-          "eval_suite_files_unsupported",
-          "This Manufact Cloud doesn't accept suite files yet. Update the CLI's Cloud, or use an earlier CLI version."
-        );
-      return { results: (await cloud.call(Promise.resolve(result))).results };
-    },
-    /** A suite as a suite file, rendered by Cloud. */
-    file: (suiteId: string) =>
+    create: (body: CreateBody) =>
       cloud.call(
-        cloud.client.GET(
-          "/api/v1/server-evals/{serverId}/suites/{suiteId}/file",
-          { params: { path: { ...path, suiteId } } }
-        ),
+        cloud.client.POST("/api/v1/server-evals/{serverId}/suites", {
+          params: { path },
+          body,
+        })
+      ),
+    update: (suiteId: string, body: UpdateBody) =>
+      cloud.call(
+        cloud.client.PATCH("/api/v1/server-evals/{serverId}/suites/{suiteId}", {
+          params: { path: { ...path, suiteId } },
+          body,
+        }),
         suiteNotFound
       ),
     remove: (suiteId: string) =>
@@ -805,6 +815,99 @@ async function resolveSuites(
       [{ description: "List eval suites", command: "mcp-use evals list" }]
     );
   });
+}
+
+/** A suite file read and validated, or why it can't be used. */
+type LoadedSuiteFile =
+  | { path: string; file: SuiteFile }
+  | { path: string; message: string };
+
+/** Read and validate one suite file; an invalid one is returned with its error. */
+async function loadSuiteFile(path: string): Promise<LoadedSuiteFile> {
+  try {
+    return { path, file: parseSuiteFile(await readSuiteFileText(path)) };
+  } catch (error) {
+    if (!(error instanceof SuiteFileError)) throw error;
+    return { path, message: error.message };
+  }
+}
+
+/** Read and validate the suite file `create` and `update` take. */
+async function requireSuiteFile(path: string): Promise<SuiteFile> {
+  const loaded = await loadSuiteFile(path);
+  if ("message" in loaded)
+    throw new UsageError(`${plain(path)}: ${plain(loaded.message)}`);
+  return loaded.file;
+}
+
+/** One file's result from `push`. */
+type PushResult =
+  | {
+      path: string;
+      action: "created" | "updated";
+      suite: { id: string | null; slug: string; name: string };
+    }
+  | { path: string; code: string; message: string };
+
+/**
+ * The suite each valid file writes: the existing suite its `id` names (a
+ * UUID match wins over a slug), or a new one with that slug. A UUID no suite
+ * has, or a suite two files name, is an error. Errors follow file order.
+ */
+function planWrites(
+  files: readonly LoadedSuiteFile[],
+  suites: readonly Suite[]
+): {
+  plans: Array<{ path: string; file: SuiteFile; target: Suite | undefined }>;
+  errors: Array<{ path: string; message: string }>;
+} {
+  const byRef = new Map<string, Suite>();
+  for (const suite of suites) byRef.set(suite.slug, suite);
+  for (const suite of suites) byRef.set(suite.id, suite);
+  const claimed = new Map<string, string>();
+  const plans: Array<{
+    path: string;
+    file: SuiteFile;
+    target: Suite | undefined;
+  }> = [];
+  const errors: Array<{ path: string; message: string }> = [];
+  for (const loaded of files) {
+    if ("message" in loaded) {
+      errors.push(loaded);
+      continue;
+    }
+    const { path, file } = loaded;
+    const target = byRef.get(file.id);
+    if (!target && file.idIsUuid) {
+      errors.push({
+        path,
+        message: `id: no suite on this server has the UUID ${file.id}`,
+      });
+      continue;
+    }
+    const key = target?.id ?? `slug:${file.id}`;
+    const other = claimed.get(key);
+    if (other !== undefined) {
+      errors.push({ path, message: `id: ${other} already names this suite` });
+      continue;
+    }
+    claimed.set(key, path);
+    plans.push({ path, file, target });
+  }
+  return { plans, errors };
+}
+
+/**
+ * A suite with the fields a file holds. A server-bound CI token lists suites
+ * without them, so `get` and `export` need a signed-in account.
+ */
+function readableSuite(suite: Suite) {
+  if (!Array.isArray((suite as Partial<Suite>).clients))
+    throw new CommandError(
+      "eval_suite_unreadable",
+      "This credential can list suites but not read their definitions. Sign in with an account, or use an API key, to get or export a suite."
+    );
+  return suite;
 }
 
 /** Expand files and directories (one level deep) into suite files, in a stable order. */

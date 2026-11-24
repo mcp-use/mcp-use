@@ -82,8 +82,8 @@ const OPERATIONS = [
   "GET /api/v1/github/installations/{installationId}/repos",
   "GET /api/v1/models",
   "GET /api/v1/server-evals/{serverId}/suites",
-  "POST /api/v1/server-evals/{serverId}/suites/files",
-  "GET /api/v1/server-evals/{serverId}/suites/{suiteId}/file",
+  "POST /api/v1/server-evals/{serverId}/suites",
+  "PATCH /api/v1/server-evals/{serverId}/suites/{suiteId}",
   "DELETE /api/v1/server-evals/{serverId}/suites/{suiteId}",
   "POST /api/v1/server-evals/{serverId}/suites/{suiteId}/runs",
   "GET /api/v1/server-evals/{serverId}/runs",
@@ -282,17 +282,11 @@ const RESPONSE_FIELDS = {
     "[].runs[].score",
     "[].runs[].createdAt",
   ],
-  "POST /api/v1/server-evals/{serverId}/suites/files": [
-    "dryRun",
-    "results[].path",
-    "results[].action",
-    "results[].suite.id",
-    "results[].suite.slug",
-    "results[].suite.name",
-  ],
-  "GET /api/v1/server-evals/{serverId}/suites/{suiteId}/file": [
-    "path",
-    "content",
+  "POST /api/v1/server-evals/{serverId}/suites": ["id", "slug", "name"],
+  "PATCH /api/v1/server-evals/{serverId}/suites/{suiteId}": [
+    "id",
+    "slug",
+    "name",
   ],
   "DELETE /api/v1/server-evals/{serverId}/suites/{suiteId}": ["success"],
   "POST /api/v1/server-evals/{serverId}/suites/{suiteId}/runs": [
@@ -392,7 +386,27 @@ const REQUEST_FIELDS = {
     "reason",
     "expectedRevision",
   ],
-  "POST /api/v1/server-evals/{serverId}/suites/files": ["files", "dryRun"],
+  // The suite definition only: the deprecated fields (prompt, flow, rubric,
+  // models, clientTargets) stay out of the CLI's types.
+  "POST /api/v1/server-evals/{serverId}/suites": [
+    "name",
+    "slug",
+    "task",
+    "judge",
+    "threshold",
+    "requiredTools",
+    "clients",
+    "enabled",
+  ],
+  "PATCH /api/v1/server-evals/{serverId}/suites/{suiteId}": [
+    "name",
+    "task",
+    "judge",
+    "threshold",
+    "requiredTools",
+    "clients",
+    "enabled",
+  ],
 };
 
 const spec = JSON.parse(await readFile(resolve(process.cwd(), input), "utf8"));

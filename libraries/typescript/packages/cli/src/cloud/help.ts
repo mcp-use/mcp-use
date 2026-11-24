@@ -487,7 +487,7 @@ const pages: Record<string, Page> = {
   },
   evals: {
     summary:
-      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: id (the suite's UUID or slug, such as rome-weather), name and task are required; judge, threshold (default 0.7), required-tools, clients (default: Inspector with the default model) and enabled are optional, and omitted fields reset to their defaults. Cloud validates the files. Commands select suites by suite ID (UUID or slug; see mcp-use evals list), never by name, because names aren't unique.",
+      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: id (the suite's UUID or slug, such as rome-weather), name and task are required; judge, threshold (default 0.7), required-tools, clients (default for a new suite: Inspector with the default model) and enabled are optional. Omitted fields reset to their defaults, except clients: a file without clients keeps an existing suite's clients. The CLI validates the files and writes each suite through Cloud's API. Commands select suites by suite ID (UUID or slug; see mcp-use evals list), never by name, because names aren't unique.",
     examples: [
       "mcp-use evals push evals/",
       "mcp-use evals run --all --wait",
@@ -496,7 +496,7 @@ const pages: Record<string, Page> = {
     commands: {
       push: {
         summary:
-          "Update the suite each file's id names (a UUID, which must exist, or a slug), or create one with that slug; prints Created or Updated per file. Cloud validates every file first: if any is invalid (or two share an id), it lists each file's error, writes nothing and exits 1. Directories contribute their .yaml, .yml and .json files (not subdirectories).",
+          "Update the suite each file's id names (a UUID, which must exist, or a slug), or create one with that slug; prints Created or Updated per file. Every file is checked first: if any is invalid (or two name the same suite), push lists each file's error, writes nothing and exits 1. A suite Cloud then rejects is reported and the others are still written; push exits 1. Directories contribute their .yaml, .yml and .json files (not subdirectories).",
         args: "<path...>",
         options: [
           ...project,
@@ -542,7 +542,7 @@ const pages: Record<string, Page> = {
       },
       update: {
         summary:
-          "Replace a suite with a file's definition, including its name and id.",
+          "Replace a suite with a file's definition, including its name. The file's id must name that suite.",
         args: "<suite-id>",
         options: [
           ...project,
