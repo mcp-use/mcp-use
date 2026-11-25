@@ -649,7 +649,21 @@ export function McpClientProvider({
   onSamplingRequest,
   onElicitationRequest,
 }: McpClientProviderProps) {
-  const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
+  const [serverConfigs, setServerConfigsState] = useState<ServerConfig[]>([]);
+  // Event handlers may retain a callback across multiple awaited updates.
+  // Publish config changes synchronously so those callbacks read the latest config.
+  const serverConfigsRef = useRef<ServerConfig[]>([]);
+  const setServerConfigs = useCallback(
+    (update: React.SetStateAction<ServerConfig[]>) => {
+      const next =
+        typeof update === "function"
+          ? update(serverConfigsRef.current)
+          : update;
+      serverConfigsRef.current = next;
+      setServerConfigsState(next);
+    },
+    []
+  );
   const [servers, setServers] = useState<McpServer[]>([]);
   const [serverRevisions, setServerRevisions] = useState<
     Record<string, number>
@@ -1009,7 +1023,7 @@ export function McpClientProvider({
 
   const updateServer = useCallback(
     async (id: string, options: Partial<McpServerConfig>) => {
-      const currentConfig = serverConfigs.find((s) => s.id === id);
+      const currentConfig = serverConfigsRef.current.find((s) => s.id === id);
       if (!currentConfig) {
         providerLogger.warn(
           `[McpClientProvider] Cannot update server "${id}" - not found`
@@ -1040,7 +1054,9 @@ export function McpClientProvider({
       setServers((prev) => prev.filter((s) => s.id !== id));
       setServerConfigs((prev) =>
         prev.map((server) =>
-          server.id === id ? { id, options: updatedOptions } : server
+          server.id === id
+            ? { id, options: { ...server.options, ...options } }
+            : server
         )
       );
       setServerRevisions((prev) => ({
@@ -1048,35 +1064,32 @@ export function McpClientProvider({
         [id]: (prev[id] ?? 0) + 1,
       }));
     },
-    [serverConfigs]
+    [setServerConfigs]
   );
 
-  const reconnectServer = useCallback(
-    async (id: string) => {
-      const currentConfig = serverConfigs.find((s) => s.id === id);
-      if (!currentConfig) {
-        providerLogger.warn(
-          `[McpClientProvider] Cannot reconnect server "${id}" - not found`
-        );
-        return;
-      }
+  const reconnectServer = useCallback(async (id: string) => {
+    const currentConfig = serverConfigsRef.current.find((s) => s.id === id);
+    if (!currentConfig) {
+      providerLogger.warn(
+        `[McpClientProvider] Cannot reconnect server "${id}" - not found`
+      );
+      return;
+    }
 
-      const captured = serversRef.current.find((s) => s.id === id);
-      await captured?.disconnect();
+    const captured = serversRef.current.find((s) => s.id === id);
+    await captured?.disconnect();
 
-      setServers((prev) => prev.filter((s) => s.id !== id));
-      setServerRevisions((prev) => ({
-        ...prev,
-        [id]: (prev[id] ?? 0) + 1,
-      }));
-    },
-    [serverConfigs]
-  );
+    setServers((prev) => prev.filter((s) => s.id !== id));
+    setServerRevisions((prev) => ({
+      ...prev,
+      [id]: (prev[id] ?? 0) + 1,
+    }));
+  }, []);
 
   const updateServerMetadata = useCallback(
     async (id: string, metadata: { name: string }) => {
       return new Promise<void>((resolve) => {
-        const currentConfig = serverConfigs.find((s) => s.id === id);
+        const currentConfig = serverConfigsRef.current.find((s) => s.id === id);
         if (!currentConfig) {
           providerLogger.warn(
             `[McpClientProvider] Cannot update server metadata for "${id}" - not found`
@@ -1107,7 +1120,7 @@ export function McpClientProvider({
         });
       });
     },
-    [serverConfigs]
+    [setServerConfigs]
   );
 
   const getServer = useCallback(
