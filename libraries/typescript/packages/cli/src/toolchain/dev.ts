@@ -18,7 +18,7 @@
  */
 
 import { readViewConfig } from "./view-config.js";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { createServer as createNodeServer } from "node:http";
 import { createRequire } from "node:module";
@@ -60,7 +60,7 @@ import {
   nextStandaloneCompatPlugin,
   nextStandaloneSsrOptions,
 } from "./next-compat.js";
-import { resolvePort } from "./port.js";
+import { listenOnAvailablePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import {
   DEV_LANDING_ENTRY,
@@ -426,6 +426,70 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  * re-exported from the package's "." entry.
  */
 export async function runDev(options: DevOptions): Promise<void> {
+  const startingResponse = (
+    _req: IncomingMessage,
+    res: ServerResponse
+  ): void => {
+    res.writeHead(503, {
+      "content-type": "text/plain",
+      "retry-after": "1",
+      connection: "close",
+    });
+    res.end("Dev server is starting.\n");
+  };
+  const httpServer = createNodeServer(startingResponse);
+  const cleanups: (() => void | Promise<unknown>)[] = [];
+  let closing: Promise<void> | undefined;
+  const teardown = (): Promise<void> => {
+    closing ??= (async () => {
+      const errors: unknown[] = [];
+      // Begin closing before disposing Vite, but await the callback afterward:
+      // Vite owns upgraded HMR sockets that closeAllConnections does not end.
+      const httpClosed = new Promise<void>((resolve) => {
+        httpServer.close((error) => {
+          if (
+            error &&
+            (error as NodeJS.ErrnoException).code !== "ERR_SERVER_NOT_RUNNING"
+          ) {
+            errors.push(error);
+          }
+          resolve();
+        });
+      });
+      httpServer.closeAllConnections();
+      for (const cleanup of cleanups.reverse()) {
+        try {
+          await cleanup();
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      await httpClosed;
+      if (errors.length > 0)
+        throw new AggregateError(errors, "Dev server cleanup failed");
+    })();
+    return closing;
+  };
+  try {
+    await runDevWithListener(
+      options,
+      httpServer,
+      cleanups,
+      teardown,
+      startingResponse
+    );
+  } finally {
+    await teardown();
+  }
+}
+
+async function runDevWithListener(
+  options: DevOptions,
+  httpServer: Server,
+  cleanups: (() => void | Promise<unknown>)[],
+  teardown: () => Promise<void>,
+  startingResponse: (req: IncomingMessage, res: ServerResponse) => void
+): Promise<void> {
   process.env.MCP_USE_DEV_CLI = "1";
   const paths = resolveWorkspacePaths(options.cwd);
   const eventBus = new InMemoryServerEventBus((error) => {
@@ -437,24 +501,14 @@ export async function runDev(options: DevOptions): Promise<void> {
   const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
   const wildcardBind = host === "0.0.0.0" || host === "::";
 
-  // Resolve the listener before importing the entry so module-scope OAuth
-  // configuration observes the canonical port that this CLI will own.
-  // The HTTP listener is a raw node:http server with the vendored
-  // toNodeHandler bridge — same role as the old @hono/node-server
-  // getRequestListener, without a hono dependency.
-  // Connect-style ((req, res, next)) with no fetch-shaped equivalent, so
-  // splicing it in front of the swappable fetch handler needs the raw Node
-  // request boundary. Creating the (not-yet-listening) server up front also
-  // lets Vite attach its HMR websocket to this same socket (`hmr.server`
-  // below) — one port total, so several `mcp-use dev` processes coexist
-  // without websocket port collisions.
-  const httpServer = createNodeServer();
-
-  const { port, requested } = await resolvePort(
+  // Retain the actual listener before Vite setup and entry evaluation so
+  // module-scope OAuth configuration and HMR share the port we already own.
+  const { port, requested } = await listenOnAvailablePort(
+    httpServer,
     resolvePreferredPort(options.port),
     host
   );
-  if (port !== requested) {
+  if (requested !== 0 && port !== requested) {
     console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
   }
   process.env["PORT"] = String(port);
@@ -649,11 +703,14 @@ export async function runDev(options: DevOptions): Promise<void> {
     },
   });
 
+  cleanups.push(() => vite.close());
+
   const ssrEnvironment = vite.environments.ssr;
   const runner = createServerModuleRunner(ssrEnvironment, {
     hmr: false,
     sourcemapInterceptor: "node",
   });
+  cleanups.push(() => runner.close());
   const projectRequire = createRequire(join(options.cwd, "package.json"));
   // Keys of the landing page's current SSR module graph. Modules the render
   // has not loaded (lazy imports) or that changed since are transformed first.
@@ -819,7 +876,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       return load();
     }
 
-    // This is safe only because this CLI selected and will bind this local
+    // This is safe only because this CLI owns this local
     // listener. Never derive OAuth identity from an untrusted request Host.
     // Scope it to entry evaluation: MCPServer freezes the trusted canonical
     // resource during construction, while later runtime code must not inherit
@@ -866,7 +923,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   let currentHandler: WebHandler;
   let basePath: string;
   let currentSkillsDirectory: string | undefined;
-  try {
+  {
     const {
       server,
       skillsDirectory,
@@ -897,10 +954,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     );
     currentSkillsDirectory = skillsDirectory;
     frontendConfigs = candidateFrontendConfigs;
-  } catch (error) {
-    await runner.close();
-    await vite.close();
-    throw error;
   }
 
   let desiredRevision = 0;
@@ -1129,6 +1182,7 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
   const tunnelManager = createTunnelManager(paths.tunnel);
+  cleanups.push(() => tunnelManager.stop());
 
   // Vite owns the upgrade listener and validates Host before our HTTP request
   // guard runs. The public tunnel has already been validated by the proxy and
@@ -1193,33 +1247,14 @@ export async function runDev(options: DevOptions): Promise<void> {
     return true;
   };
 
-  /**
-   * Tear down everything the running dev process owns, in dependency order:
-   * watcher subscriptions, tunnel, HTTP listener, module runner, Vite.
-   */
-  const teardown = async (): Promise<void> => {
+  cleanups.push(() => {
     if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
     if (viewsDiscoveryTimer !== undefined) clearTimeout(viewsDiscoveryTimer);
+    if (reloadTimer !== undefined) clearTimeout(reloadTimer);
     vite.watcher.off("change", onSsrFileEvent);
     vite.watcher.off("add", onFileAddOrUnlink);
     vite.watcher.off("unlink", onFileAddOrUnlink);
-    if (reloadTimer !== undefined) clearTimeout(reloadTimer);
-    await tunnelManager.stop();
-    // Stop accepting new connections first, then terminate the long-lived
-    // transports that would otherwise keep the close callback pending:
-    // closeAllConnections() ends active MCP subscription streams, while
-    // vite.close() below owns upgraded HMR WebSockets.
-    const httpClosed = new Promise<void>((resolve, reject) => {
-      httpServer.close((error) => {
-        if (error !== undefined) reject(error);
-        else resolve();
-      });
-    });
-    httpServer.closeAllConnections();
-    await runner.close();
-    await vite.close();
-    await httpClosed;
-  };
+  });
 
   const devFetch = createDevApiHandler(
     {
@@ -1358,12 +1393,8 @@ export async function runDev(options: DevOptions): Promise<void> {
       void nodeListener(req, res);
     }
   };
+  httpServer.off("request", startingResponse);
   httpServer.on("request", onRequest);
-
-  await new Promise<void>((resolve, reject) => {
-    httpServer.once("error", reject);
-    httpServer.listen(port, host, () => resolve());
-  });
 
   console.log(`[mcp-use] dev server ready`);
   if (currentViews.length > 0) {
@@ -1437,6 +1468,7 @@ export async function runDev(options: DevOptions): Promise<void> {
           // tunnel release) finishes, then restore the default signal action.
           process.off("SIGINT", shutdown);
           process.off("SIGTERM", shutdown);
+          options.signal?.removeEventListener("abort", shutdown);
         }
       })();
     };
