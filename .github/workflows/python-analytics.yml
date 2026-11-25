@@ -1,0 +1,125 @@
+name: Python Analytics
+
+# mcp-use-analytics (libraries/python-analytics): lint and type check, and a PyPI
+# release through trusted publishing whenever `version` in its pyproject.toml
+# changes on main.
+#
+# The package lives outside libraries/python on purpose: that path drives the
+# mcp-use CI, the mcp-use release workflow and the auto-close policy for
+# Python-only PRs, none of which apply to this package.
+
+on:
+  push:
+    branches: [main, canary]
+    paths:
+      - "libraries/python-analytics/**"
+      - ".github/workflows/python-analytics.yml"
+  pull_request:
+    branches: [main, canary]
+    paths:
+      - "libraries/python-analytics/**"
+      - ".github/workflows/python-analytics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-analytics-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: libraries/python-analytics
+
+jobs:
+  lint:
+    name: "python-analytics/lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Lint with ruff
+        run: uv run --locked ruff check .
+      - name: Format check with ruff
+        run: uv run --locked ruff format --check .
+      - name: Type check with ty
+        run: uv run --locked ty check
+      - name: Build and check the wheel has no runtime dependencies
+        run: |
+          uv build
+          unzip -p dist/*.whl '*.dist-info/METADATA' > METADATA
+          if grep -q '^Requires-Dist:' METADATA; then
+            echo "mcp-use-analytics must not have runtime dependencies"; grep '^Requires-Dist:' METADATA; exit 1
+          fi
+          unzip -l dist/*.whl | grep -q 'mcp_use_analytics/py.typed'
+
+  release:
+    name: "python-analytics/release"
+    needs: lint
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: python-analytics-release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Get current version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Current version: $VERSION"
+
+      - name: Decide whether to publish
+        id: decide
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="python-analytics-v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG exists; nothing to release"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif curl -sf "https://pypi.org/pypi/mcp-use-analytics/${VERSION}/json" >/dev/null; then
+            echo "mcp-use-analytics ${VERSION} is already on PyPI; tagging only"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version ${VERSION} is new; will publish"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "tag=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install uv
+        if: steps.decide.outputs.publish == 'true'
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        if: steps.decide.outputs.publish == 'true'
+        run: uv build
+
+      - name: Publish to PyPI
+        if: steps.decide.outputs.publish == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: libraries/python-analytics/dist/
+
+      - name: Create GitHub release
+        if: steps.decide.outputs.tag == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: python-analytics-v${{ steps.version.outputs.version }}
+          name: mcp-use-analytics v${{ steps.version.outputs.version }}
+          body: |
+            `pip install --upgrade mcp-use-analytics==${{ steps.version.outputs.version }}`
+
+            See [libraries/python-analytics](https://github.com/mcp-use/mcp-use/tree/main/libraries/python-analytics) for usage.
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
