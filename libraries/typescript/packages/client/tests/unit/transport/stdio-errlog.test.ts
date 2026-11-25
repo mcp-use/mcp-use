@@ -6,12 +6,13 @@
  * These tests spawn real child processes, no mocks.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Writable } from "node:stream";
 import {
   StdioConnectionManager,
   type StdioStderrMode,
 } from "../../../src/transport/stdio.js";
+import { logger } from "../../../src/utils/logging.js";
 
 function collector(): {
   stream: Writable;
@@ -103,13 +104,13 @@ describe("StdioConnectionManager errlog", () => {
       await manager.stop();
     }
 
-    // The pipe uses { end: false }, so one Writable survives across
-    // reconnects and multiple connectors.
+    // The caller-owned Writable survives across reconnects and connectors.
     expect(ended()).toBe(false);
     expect(stream.writableEnded).toBe(false);
   });
 
   it("handles errlog write failures and removes its listener on close", async () => {
+    const warning = vi.spyOn(logger, "warn");
     const stream = new Writable({
       write(_chunk, _enc, cb) {
         cb(new Error("ERRLOG_WRITE_FAILED"));
@@ -128,11 +129,16 @@ describe("StdioConnectionManager errlog", () => {
       );
       await transport.start();
       await waitFor(
-        () => stream.destroyed,
-        () => "errlog never reported its write failure"
+        () =>
+          stream.destroyed &&
+          warning.mock.calls.some(([message]) =>
+            message.includes("ERRLOG_WRITE_FAILED")
+          ),
+        () => "errlog write failure was not logged"
       );
     } finally {
       await manager.stop();
+      warning.mockRestore();
     }
 
     expect(stream.listenerCount("error")).toBe(initialErrorListeners);
