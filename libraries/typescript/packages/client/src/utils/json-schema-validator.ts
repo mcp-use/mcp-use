@@ -7,7 +7,10 @@ import {
   type CfWorkerSchemaDraft,
 } from "@modelcontextprotocol/client/validators/cf-worker";
 
-const DRAFT_04_URI = "http://json-schema.org/draft-04/schema";
+const DRAFT_04_URIS = new Set([
+  "http://json-schema.org/draft-04/schema",
+  "https://json-schema.org/draft-04/schema",
+]);
 const DRAFT_07_URIS = new Set([
   "http://json-schema.org/draft-07/schema",
   "https://json-schema.org/draft-07/schema",
@@ -28,7 +31,7 @@ function resolveDraft(schema: JsonSchemaType): CfWorkerSchemaDraft | undefined {
 
   const normalized = schema.$schema.replace(/#$/, "");
 
-  if (normalized === DRAFT_04_URI) return "4";
+  if (DRAFT_04_URIS.has(normalized)) return "4";
   if (DRAFT_07_URIS.has(normalized)) return "7";
   if (DRAFT_2019_09_URIS.has(normalized)) return "2019-09";
   if (DRAFT_2020_12_URIS.has(normalized)) return "2020-12";

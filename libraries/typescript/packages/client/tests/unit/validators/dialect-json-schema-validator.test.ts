@@ -68,6 +68,19 @@ describe("DialectJsonSchemaValidator", () => {
     expect(validate({ id: "1" }).valid).toBe(false);
   });
 
+  it("accepts draft-04 schemas declared with the https URI", () => {
+    const schema: JsonSchemaType = {
+      type: "object",
+      properties: { id: { type: "integer" } },
+      required: ["id"],
+      $schema: "https://json-schema.org/draft-04/schema#",
+    };
+
+    const validate = validator.getValidator<{ id: number }>(schema);
+    expect(validate({ id: 1 }).valid).toBe(true);
+    expect(validate({ id: "1" }).valid).toBe(false);
+  });
+
   it("accepts 2019-09 schemas", () => {
     const schema: JsonSchemaType = {
       type: "object",
