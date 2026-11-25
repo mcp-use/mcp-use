@@ -193,6 +193,48 @@ describe("runMcpOperation", () => {
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
   });
+
+  it("logs an async event listener rejection without an unhandled rejection", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    try {
+      const events: McpEventListenerEntry[] = [
+        {
+          pattern: "*",
+          phase: "before",
+          handler: () =>
+            Promise.reject(
+              new Error("async observer failed")
+            ) as unknown as void,
+        },
+      ];
+
+      const result = await runMcpOperation(
+        [],
+        events,
+        "tools/call",
+        ctx("tools/call"),
+        async () => toolResult
+      );
+      expect(result).toBe(toolResult);
+
+      // Let the listener's rejected promise settle.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      // The async rejection is caught and logged, not left unhandled.
+      expect(errorSpy).toHaveBeenCalled();
+      expect(unhandled).toHaveLength(0);
+    } finally {
+      errorSpy.mockRestore();
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
 });
 
 describe("pattern helpers", () => {
