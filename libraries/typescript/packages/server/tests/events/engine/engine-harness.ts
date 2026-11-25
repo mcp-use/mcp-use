@@ -301,7 +301,7 @@ export function harness(
     log: (r) => logs.push(r),
     owner: "inst-1",
     config: defaultJobRuntimeConfig({ retryJitter: 0, ...config }),
-    cursor: (epoch, seq) => `c1.${epoch}.${seq}`,
+    cursor: (_name, epoch, seq) => `c1.${epoch}.${seq}`,
   };
   return { ctx, clock, sender, logs };
 }

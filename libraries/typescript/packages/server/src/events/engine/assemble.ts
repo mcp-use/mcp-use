@@ -38,7 +38,28 @@ import { handleUnsubscribe } from "./unsubscribe.js";
 import { validateArguments } from "./validate.js";
 import { createVerifier } from "./verify/index.js";
 import { revoke as revokeSubscriptions } from "./revoke.js";
-import { resolveKnobs } from "../env.js";
+import { readEventsEnv, resolveKnobs } from "../env.js";
+import { EVENTS_DEFAULTS } from "../config.js";
+import { parseDurationMs } from "../registry.js";
+import { LogTail } from "../responder/logtail.js";
+import { StreamRegistry, handleStream } from "../responder/stream.js";
+import { createEventsRouter } from "../routes/index.js";
+import type { RouteAuthConfig } from "../routes/auth.js";
+import { runDecommission } from "../routes/decommission.js";
+import { openEventsAdminWith } from "../admin/open.js";
+import { plainCodec } from "../admin/views.js";
+import { adminKeys } from "../admin/status.js";
+import { createLazyPump, type LazyPump } from "../drivers/lazy-pump.js";
+import { hasServerlessMarker, isWorkersRuntime } from "../drivers/markers.js";
+import { runScheduled } from "../drivers/scheduled.js";
+import { runTick, type TickCounters } from "../drivers/tick.js";
+import {
+  executionCtxWaitUntil,
+  resolveWaitUntil,
+  runInBackground,
+  type WaitUntil,
+} from "../drivers/wait-until.js";
+import { controlEntry } from "./control.js";
 
 /** Reserved epoch for cursors handed out before a log has any entry. */
 const EMPTY_EPOCH = "000000000000";
@@ -50,6 +71,15 @@ export interface AssembleInput {
   mode: EventsStartMode;
   /** Effective modes of an event (shared with `events/list`). */
   modesFor(event: RegisteredEvent): DeliveryMode[];
+  /** `events.waitUntil` or the runtime one threaded through `server.fetch`. */
+  waitUntil?: () => WaitUntil | undefined;
+}
+
+/** Split a secret option (string list or comma list) into bearers. */
+function secretList(v: string | readonly string[] | undefined): string[] {
+  if (v === undefined) return [];
+  const all = typeof v === "string" ? v.split(",") : [...v];
+  return all.map((x) => x.trim()).filter((x) => x !== "");
 }
 
 /**
@@ -142,7 +172,32 @@ export async function assembleEventsEngine(
   };
   const ectx = await backend.engineContext(deps);
   const verifier = createVerifier(ectx);
-  const pollIntervalMs = resolveKnobs(env, {}).pollIntervalMs.value;
+  const knobs = resolveKnobs(env, {});
+  const pollIntervalMs = knobs.pollIntervalMs.value;
+  const heartbeatMaxMs = knobs.heartbeatMaxMs.value;
+  const snapshot = readEventsEnv(env);
+  const serverless = hasServerlessMarker(snapshot);
+  // push.maxDuration: code, then env, then the runtime default (§8.19); 0 = unlimited.
+  const maxDurationMs = ((): number => {
+    const code = config?.push?.maxDuration;
+    if (code === null) return 0;
+    const parsed = parseDurationMs(code ?? undefined);
+    if (parsed !== undefined) return parsed;
+    const k = knobs.pushMaxDurationMs.value;
+    if (k === null) return 0;
+    if (k !== undefined) return k;
+    if (isWorkersRuntime()) return EVENTS_DEFAULTS.pushMaxDurationWorkersMs;
+    if (serverless) return EVENTS_DEFAULTS.pushMaxDurationServerlessMs;
+    return EVENTS_DEFAULTS.pushMaxDurationLongLivedMs;
+  })();
+  // One shared tail per process fans new log entries out to open streams.
+  const tailMs = parseDurationMs(config?.push?.tailInterval);
+  const tail = new LogTail({
+    backend,
+    clock,
+    ...(tailMs !== undefined && { intervalMs: tailMs }),
+  });
+  const streams = new StreamRegistry();
   const rate = createRateLimiter(120);
 
   const codec: CursorCodec = {
@@ -179,8 +234,7 @@ export async function assembleEventsEngine(
     },
   };
 
-  // eslint-disable-next-line prefer-const -- assigned after the handlers that kick it are defined
-  let pump: Pump | undefined;
+  let kick: (w?: WaitUntil) => void = () => {};
 
   const common = (req: ResponderRequest, mode: "webhook" | "poll" | "push") => {
     const profile = resolveRequestProfile(
@@ -333,7 +387,7 @@ export async function assembleEventsEngine(
                 );
             },
           });
-          pump?.kick();
+          kick();
           return {
             result: result as unknown as Record<string, unknown>,
             dialect: c.profile.preset,
@@ -369,11 +423,36 @@ export async function assembleEventsEngine(
             dialect: c.profile.preset,
           };
         }
+        case "events/stream": {
+          const c = common(req, "push");
+          const response = await handleStream(
+            (req.id ?? 0) as string | number,
+            params,
+            {
+              ...c.shared,
+              backend,
+              codec,
+              era: req.era === "legacy" ? "legacy" : "modern",
+              listedModes: c.profile.axes.listedModes,
+              tail,
+              clock,
+              streams,
+              heartbeatMaxMs,
+              maxDurationMs,
+              pollIntervalMs,
+              ...(config?.push?.maxBacklogBytes !== undefined && {
+                maxBacklogBytes: config.push.maxBacklogBytes,
+              }),
+              toJsonRpc: (e) => e.toJsonRpc({ errorCodes: "sep" }),
+            },
+            req.request.signal
+          );
+          return { response };
+        }
         default:
-          // TODO(events): events/stream needs the shared LogTail and StreamRegistry wiring.
           throw new EventsError(
-            "methodNotFound" as never,
-            "events/stream is not assembled yet"
+            "notFound" as never,
+            `Unknown method ${String(req.method)}`
           );
       }
     },
@@ -385,15 +464,18 @@ export async function assembleEventsEngine(
   const emit = async (
     name: string,
     data: unknown,
-    o?: EmitOptions
+    o?: EmitOptions & { test?: boolean }
   ): Promise<EmitResult> => {
     const ev = registry.get(name);
+    const { ctx: emitCtx, onError: _onError, _meta, ...rest } = o ?? {};
+    void _onError;
     const entry = buildEventEntry(
       {
         name,
         data,
         partition: null,
-        ...(o as Record<string, unknown> | undefined),
+        ...rest,
+        ...(_meta !== undefined && { meta: _meta }),
       } as never,
       clock
     );
@@ -407,20 +489,139 @@ export async function assembleEventsEngine(
         notify: true,
       }
     );
-    pump?.kick();
+    tail.signal();
+    kick(executionCtxWaitUntil(emitCtx));
     return { eventId: r.eventId, duplicate: r.duplicate, accepted: true };
   };
 
   const work = () => backend.process("due", deps, { budgetMs: 25_000 });
-  // TODO(events): handler hosts on serverless runtimes should use the WP-24
-  // lazy pump with waitUntil and tick routes; an unref'd pump serves
-  // long-lived handler hosts such as `mcp-use dev`.
-  pump = startPump({
+  const ticks: TickCounters = { count: 0, last: null };
+  const tick = () => runTick({ process: () => work() as never }, ticks);
+
+  // Drivers (D19): `listen()` runs a pump; long-lived handler hosts a lazy,
+  // unref'd pump; serverless hosts run work under `waitUntil` after each
+  // emit or subscribe and rely on the tick route or `scheduled` otherwise.
+  const workerOff = config?.worker === "off";
+  let pump: Pump | undefined;
+  let lazy: LazyPump | undefined;
+  const pumpOptions = {
     work,
     scanMs: 1_000,
     idleMs: 5_000,
-    unref: input.mode !== "listen",
-    onError: (e) => console.warn("events: pump error", e),
+    onError: (e: unknown) => console.warn("events: pump error", e),
+  };
+  if (!workerOff && input.mode === "listen") {
+    pump = startPump({ ...pumpOptions, unref: false });
+  } else if (!workerOff) {
+    lazy = createLazyPump(pumpOptions, !serverless);
+    lazy.touch();
+  }
+  kick = (w) => {
+    if (pump !== undefined) return pump.kick();
+    const waitUntil = resolveWaitUntil(w, input.waitUntil?.());
+    if (lazy?.pump === undefined && waitUntil !== undefined && !workerOff) {
+      runInBackground(waitUntil, work(), (e) =>
+        console.warn("events: background work failed", e)
+      );
+      return;
+    }
+    lazy?.touch();
+  };
+
+  // Internal routes (D41): admin secrets, tick secret, dev token.
+  const routeAuth: RouteAuthConfig = {
+    tick:
+      config?.tick?.secret !== undefined
+        ? secretList(config.tick.secret)
+        : (snapshot.tickSecrets ?? []),
+    admin: [
+      ...(config?.admin?.secret !== undefined
+        ? secretList(config.admin.secret)
+        : (snapshot.adminSecrets.user ?? [])),
+      ...(snapshot.adminSecrets.platform ?? []),
+    ],
+    ...(dev !== undefined && { devToken: dev.token }),
+  };
+  const admin = openEventsAdminWith(
+    { storage: binding.storage, namespace: binding.namespace },
+    {
+      codec: plainCodec,
+      revoke: async (f) => ({
+        removed: (await backend.revoke(f, { now: clock.now() })).removed.length,
+      }),
+      now: () => clock.now(),
+    }
+  );
+  const route = createEventsRouter({
+    basePath: () => options.basePath(),
+    auth: () => routeAuth,
+    tick,
+    health: () => backend.health(),
+    emit: async () => ({
+      namespace: binding.namespace,
+      nsHash: binding.nsHash,
+      dev: dev !== undefined,
+      emit: async (r) => {
+        const ev = registry.get(r.name);
+        if (ev === undefined)
+          throw new EventsError("notFound", `Unknown event "${r.name}"`, {
+            kind: "event",
+          });
+        const valid = await ev.validatePayload(r.data);
+        return emit(r.name, valid, {
+          eventId: r.eventId,
+          test: true,
+          ...(r.principal !== undefined && { principal: r.principal }),
+          ...(r.subscriptionId !== undefined && {
+            subscriptionId: r.subscriptionId,
+          }),
+        });
+      },
+    }),
+    admin: async () => admin,
+    streams: async () => [],
+    decommission: async (body) => {
+      const out = await runDecommission(
+        binding.storage,
+        adminKeys(binding.nsHash),
+        {
+          revokeAll: async (reason) => ({
+            terminated: (await backend.revoke({ reason }, { now: clock.now() }))
+              .removed.length,
+            hooks: 0,
+          }),
+          closeLogs: async () => {
+            for (const ev of registry.all()) {
+              await st.log.append(
+                ev.name,
+                controlEntry(
+                  { all: true },
+                  {
+                    kind: "forbidden",
+                    message: "",
+                    data: { reason: "closed" },
+                  },
+                  clock.now()
+                ),
+                { maxEvents: 10_000, notify: true, now: clock.now() }
+              );
+            }
+            tail.signal();
+          },
+          drain: async (deadlineAt) => {
+            const left = Math.max(0, deadlineAt - clock.now());
+            const r = await backend.process("due", deps, { budgetMs: left });
+            return {
+              undelivered: (r as { remaining?: number }).remaining ?? 0,
+            };
+          },
+        },
+        body,
+        () => clock.now()
+      );
+      streams.closeAll();
+      return out;
+    },
   });
 
   return {
@@ -438,8 +639,13 @@ export async function assembleEventsEngine(
       process: () => work() as never,
       health: () => backend.health(),
     },
+    route,
+    scheduled: (_env, ctx) => runScheduled(tick, ctx),
     async close() {
+      streams.closeAll();
+      tail.close();
       await pump?.stop();
+      await lazy?.stop();
       await backend.close(5_000);
     },
   };

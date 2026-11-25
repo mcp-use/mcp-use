@@ -13,6 +13,7 @@ import { releaseJob } from "./claim.js";
 import { createDeliver, entryMatches } from "./dispatcher.js";
 import { markGapPending } from "./gap.js";
 import {
+  decodeLogValue,
   enqueueJob,
   settleJob,
   type EngineContext,
@@ -85,8 +86,12 @@ export async function runReplayJob(
   }
   for (const e of read.entries) {
     if (e.seq > job.toSeq) break;
-    const value = await ctx.codec.decode<LogValue>(e.value);
-    if (value.k === "e") {
+    const value = await decodeLogValue<LogValue>(
+      ctx,
+      ctx.keys.log(sub.name),
+      e.value
+    );
+    if (value?.k === "e") {
       const entry = { epoch: job.epoch, seq: e.seq, value };
       if (await entryMatches(ctx, sub, entry))
         await createDeliver(ctx, sub, entry);

@@ -87,10 +87,12 @@ function unavailable(what: string): never {
  * @param options - Server configuration facts.
  */
 export function createEventsHost(
-  options: EventsHostOptions
+  options: EventsHostOptions,
+  existingRegistry?: MutableEventsRegistry
 ): EventsHost & EventsHostInternals {
   const config = options.config;
-  const registry = createEventsRegistry({ config });
+  const registry = existingRegistry ?? createEventsRegistry({ config });
+  let runtimeWaitUntil: ((p: Promise<unknown>) => void) | undefined;
   const sdk = createSdkEventsAdapter();
   let parts: EventsRuntimeParts = {};
   let middleware: ResponderMiddleware | undefined;
@@ -119,7 +121,13 @@ export function createEventsHost(
         (async (m: EventsStartMode) => {
           // The engine chunk loads only when a server with events starts.
           const { assembleEventsEngine } = await import("./engine/assemble.js");
-          return assembleEventsEngine({ options, registry, mode: m, modesFor });
+          return assembleEventsEngine({
+            options,
+            registry,
+            mode: m,
+            modesFor,
+            waitUntil: () => config?.waitUntil ?? runtimeWaitUntil,
+          });
         });
       parts = { ...parts, ...(await start(mode)) };
     })().catch((error: unknown) => {
@@ -264,17 +272,18 @@ export function createEventsHost(
     events,
     preflight,
     async route(request) {
+      await ensureStarted("handler");
       return parts.route?.(request);
     },
     async start(mode) {
       await ensureStarted(mode);
     },
     async scheduled(env, ctx) {
+      await ensureStarted("handler");
       await parts.scheduled?.(env, ctx);
     },
     setWaitUntil(waitUntil) {
-      // TODO(events): WP-24 drivers/wait-until.ts consumes this.
-      void waitUntil;
+      runtimeWaitUntil = waitUntil;
     },
     async close() {
       for (const stream of streams) {

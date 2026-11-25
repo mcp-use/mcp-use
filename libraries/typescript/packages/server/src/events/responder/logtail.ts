@@ -47,7 +47,8 @@ export interface LogTailOptions {
 
 /** The shared tail. */
 export class LogTail {
-  readonly #o: Required<Omit<LogTailOptions, "backend" | "clock">> & LogTailOptions;
+  readonly #o: Required<Omit<LogTailOptions, "backend" | "clock">> &
+    LogTailOptions;
   readonly #logs = new Map<string, Followed>();
   #cancel: (() => void) | null = null;
   #running: Promise<void> | null = null;
@@ -158,7 +159,16 @@ export class LogTail {
           const page = await this.#o.backend.readLog(name, f.pos, {
             limit: this.#o.pageSize,
           });
-          if (page.epoch !== f.epoch || page.first > f.pos + 1) {
+          // A log that was empty at registration gets its first epoch on the
+          // first append: that is not a gap.
+          if (
+            f.epoch === null &&
+            f.pos === 0 &&
+            page.epoch !== null &&
+            page.first <= 1
+          ) {
+            f.epoch = page.epoch;
+          } else if (page.epoch !== f.epoch || page.first > f.pos + 1) {
             f.epoch = page.epoch;
             for (const r of f.readers) r.onGap(page.epoch, page.first);
             f.pos = page.first - 1;

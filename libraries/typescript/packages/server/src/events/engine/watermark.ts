@@ -57,5 +57,5 @@ export async function watermarkCursor(
 ): Promise<string | null> {
   if (!ctx.cursor) return null;
   const pos = await watermarkPosition(ctx, sub);
-  return pos ? ctx.cursor(pos.epoch, pos.seq) : null;
+  return pos ? ctx.cursor(sub.name, pos.epoch, pos.seq) : null;
 }

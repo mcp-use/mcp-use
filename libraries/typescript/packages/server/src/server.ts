@@ -70,7 +70,7 @@ import {
 } from "./middleware/mcp-middleware.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
-import { createEventsHost } from "./events/server-events.js";
+import { createLazyEventsHost } from "./events/lazy-host.js";
 import { installEventsDev, type EventsDevOptions } from "./events/dev/index.js";
 import type { EventsHost } from "./events/internal/host.js";
 import type {
@@ -585,6 +585,20 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       await host.scheduled(env, ctx);
     };
     this.fetch = async (request, env, executionCtx) => {
+      // Thread the runtime waitUntil (Workers, Next, TanStack Start) to the
+      // Events drivers so background delivery outlives the response (D19).
+      if (this.#eventsHost !== undefined) {
+        let waitUntil: ((p: Promise<unknown>) => void) | undefined;
+        try {
+          const w = (
+            executionCtx as { waitUntil?: (p: Promise<unknown>) => void }
+          )?.waitUntil;
+          if (typeof w === "function") waitUntil = w.bind(executionCtx);
+        } catch {
+          waitUntil = undefined;
+        }
+        if (waitUntil !== undefined) this.#eventsHost.setWaitUntil(waitUntil);
+      }
       await this.#ensureSkillsPrimed();
       this.#ensureMounted("handler");
       return this.#httpApp!.fetch(request, env, executionCtx);
@@ -1157,7 +1171,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   /** Create the Events host on first use; zero-event servers never do. */
   #events(): EventsHost {
-    this.#eventsHost ??= createEventsHost({
+    this.#eventsHost ??= createLazyEventsHost({
       config: this.#config.events,
       storage: this.#config.storage,
       oauth: this.#config.oauth !== undefined,

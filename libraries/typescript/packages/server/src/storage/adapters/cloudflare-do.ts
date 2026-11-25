@@ -705,7 +705,7 @@ export class McpUseStorageDurableObject {
     let head = await this.#storage.get<HeadRecord>(headKey);
     if (!head) {
       await this.#deleteRange({ prefix: entries });
-      head = { epoch: randomHex(12), seq: 0 };
+      head = { epoch: randomHex(6), seq: 0 };
     }
     const seq = head.seq + 1;
     await this.#storage.put({

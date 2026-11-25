@@ -166,9 +166,9 @@ export function storageBackend(
           ? plaintextSealer()
           : createSealer(await createEventsKeyring(options.keyring));
       const meta = await ensureMeta(storage, sealer, keys.meta(), clock);
-      // TODO(events): the job engine decodes log entries with a key-less codec,
-      // so the event log is written in plaintext even on sealed bindings.
-      const log = createEventLog({ storage, keys, sealer: plaintextSealer() });
+      // Log entries are sealed with the binding's sealer (plaintext only when
+      // unsealed); the job engine opens them through `openLog`.
+      const log = createEventLog({ storage, keys, sealer });
       return {
         keys,
         engineKeys: engineKeysOf(keys),
@@ -191,10 +191,13 @@ export function storageBackend(
       log: deps.log,
       owner: deps.owner,
       config,
-      cursor: async (epoch, seq) => {
+      cursor: async (name, epoch, seq) => {
         const { encodeCursor } = await import("./engine/cursor.js");
-        return encodeCursor(s.cursorKey, "", epoch, seq);
+        return encodeCursor(s.cursorKey, name, epoch, seq);
       },
+      ...(s.sealer.sealed && {
+        openLog: (key: string, raw: string) => s.sealer.open(key, raw),
+      }),
     };
   };
 

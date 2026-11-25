@@ -24,7 +24,7 @@ import type {
   UnsubscribeEventsRequestParams,
   UnsubscribeEventsResult,
 } from "@mcp-use/events-core";
-import { EventsConfigError } from "../events/errors.js";
+import { EventsConfigError } from "../events/config-error.js";
 import { redactEventsParams } from "../events/confine.js";
 
 const EVENTS_MIDDLEWARE_METHODS = [

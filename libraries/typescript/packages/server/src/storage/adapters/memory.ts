@@ -430,9 +430,9 @@ function decodeCursor(cursor: string): IndexEntry {
   throw new TypeError(`Invalid indexRange cursor ${JSON.stringify(cursor)}`);
 }
 
-/** @internal A random epoch id. */
+/** @internal A random 12-character `[a-z0-9]` epoch id (D49 cursor format). */
 export function randomEpoch(): string {
-  const bytes = new Uint8Array(12);
+  const bytes = new Uint8Array(6);
   globalThis.crypto.getRandomValues(bytes);
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }

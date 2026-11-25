@@ -9,10 +9,10 @@
  * @internal
  */
 
-import { canonicalJson } from "@mcp-use/events-core";
+import { canonicalJson } from "./canonical-json.js";
 import type { EventsConfig } from "./config.js";
 import { EVENTS_DEFAULTS } from "./config.js";
-import { EventsConfigError } from "./errors.js";
+import { EventsConfigError } from "./config-error.js";
 import type { EventsRegistry, RegisteredEvent } from "./internal/registry.js";
 import type {
   AnyEventDefinition,

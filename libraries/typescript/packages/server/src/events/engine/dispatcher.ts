@@ -17,7 +17,12 @@ import type {
 } from "../internal/records.js";
 import { pageSubscriptions, groupsFor } from "./fanout-index.js";
 import { markGapPending } from "./gap.js";
-import { deliverJobId, writeJob, type EngineContext } from "./jobs.js";
+import {
+  decodeLogValue,
+  deliverJobId,
+  writeJob,
+  type EngineContext,
+} from "./jobs.js";
 import { newSchedule } from "./schedule.js";
 import {
   byteLength,
@@ -108,7 +113,7 @@ export async function createDeliver(
   if (replayable && ctx.cursor) {
     const m = await lowestInflight(ctx, sub.id);
     const pos = m === null || m >= entry.seq ? entry.seq : m - 1;
-    cursor = await ctx.cursor(entry.epoch, Math.max(0, pos));
+    cursor = await ctx.cursor(sub.name, entry.epoch, Math.max(0, pos));
   }
 
   // 3. Serialize once.
@@ -249,8 +254,12 @@ export async function dispatchName(
     });
     const entries: DispatchEntry[] = [];
     for (const e of read.entries) {
-      const value = await ctx.codec.decode<LogValue>(e.value);
-      if (value.k === "e" && read.epoch !== null)
+      const value = await decodeLogValue<LogValue>(
+        ctx,
+        ctx.keys.log(name),
+        e.value
+      );
+      if (value?.k === "e" && read.epoch !== null)
         entries.push({ epoch: read.epoch, seq: e.seq, value });
     }
     for (const groupOf of uniqueGroups(entries)) {

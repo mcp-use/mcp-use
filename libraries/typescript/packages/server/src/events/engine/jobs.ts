@@ -56,6 +56,26 @@ export const jsonCodec: EngineCodec = {
   decode: <T>(raw: string) => JSON.parse(raw) as T,
 };
 
+/**
+ * Decode one raw event-log value, unsealing it when the log is sealed.
+ *
+ * @returns The value, or undefined when it does not open or parse.
+ */
+export async function decodeLogValue<T>(
+  ctx: Pick<EngineContext, "codec" | "openLog">,
+  key: string,
+  raw: string
+): Promise<T | undefined> {
+  if (ctx.openLog === undefined) return ctx.codec.decode<T>(raw);
+  const text = await ctx.openLog(key, raw);
+  if (text === undefined) return undefined;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Resolved runtime knobs of the job runtime (Appendix C defaults). */
 export interface JobRuntimeConfig {
   retryDelaysMs: readonly number[];
@@ -132,8 +152,14 @@ export interface EngineContext {
   /** This instance's lease owner id. */
   owner: string;
   config: JobRuntimeConfig;
-  /** Encodes a body cursor `c(epoch, seq)`; WP-13's codec. */
-  cursor?: (epoch: string, seq: number) => Promise<string> | string;
+  /** Encodes a body cursor `c(name, epoch, seq)`; WP-13's codec. The name binds the MAC, so it must be the event name. */
+  cursor?: (
+    name: string,
+    epoch: string,
+    seq: number
+  ) => Promise<string> | string;
+  /** Opens a sealed event-log value bound to its log key; absent for plaintext logs. */
+  openLog?: (key: string, raw: string) => Promise<string | undefined>;
   /** Per-instance concurrency counters (host and subscription). */
   inflight?: InstanceInflight;
 }
