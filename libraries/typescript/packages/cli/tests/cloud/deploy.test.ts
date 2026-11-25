@@ -240,6 +240,91 @@ describe("deploy", () => {
     );
   });
 
+  test("a managed redeploy follows the webhook deployment that supersedes the stopped one", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    await writeFile(join(cli.cwd, "weather.py"), "print('weather')\n");
+    await link(cli.cwd);
+    cloud.on("GET", "/api/v1/servers/srv_1", {
+      body: server({
+        id: "srv_1",
+        connectedRepository: { ...CONNECTED_REPOSITORY, isManaged: true },
+      }),
+    });
+    cloud.on("POST", "/api/v1/servers/srv_1/source", {
+      body: { commitSha: "abc123" },
+    });
+    cloud.on("POST", "/api/v1/deployments", { body: { id: "dep_redeploy" } });
+    const redeploy = deployment({
+      id: "dep_redeploy",
+      serverId: "srv_1",
+      status: "stopped",
+      gitCommitSha: "abc123",
+      deploymentTrigger: "redeploy",
+      createdAt: "2026-01-01T00:00:00Z",
+    });
+    const webhook = deployment({
+      id: "dep_webhook",
+      serverId: "srv_1",
+      status: "running",
+      gitCommitSha: "abc123",
+      deploymentTrigger: "webhook",
+      createdAt: "2026-01-01T00:00:02Z",
+      mcpUrl: "https://weather.example/mcp",
+    });
+    cloud.on("GET", "/api/v1/deployments/dep_redeploy", { body: redeploy });
+    cloud.on("GET", "/api/v1/deployments", {
+      body: { items: [webhook, redeploy], total: 2, limit: 10, skip: 0 },
+    });
+    cloud.on("GET", "/api/v1/deployments/dep_webhook", { body: webhook });
+    const result = await cli.run(["deploy", "--no-github", "--json"], {
+      env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" },
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.json).toMatchObject({
+      serverId: "srv_1",
+      deploymentId: "dep_webhook",
+      status: "running",
+      mcpUrl: "https://weather.example/mcp",
+    });
+    expect(cloud.requestsTo("GET", "/api/v1/deployments")[0]?.query).toEqual({
+      serverId: "srv_1",
+      limit: "10",
+    });
+  });
+
+  test("a stopped deployment with no newer deployment of its commit still fails", async ({
+    cli,
+    cloud,
+  }) => {
+    signIn(cloud);
+    cloud.on("POST", "/api/v1/servers", {
+      body: { server: { id: "srv_1", slug: null }, deploymentId: "dep_1" },
+    });
+    const stopped = deployment({
+      id: "dep_1",
+      serverId: "srv_1",
+      status: "stopped",
+      gitCommitSha: "abc123",
+    });
+    cloud.on("GET", "/api/v1/deployments/dep_1", { body: stopped });
+    cloud.on("GET", "/api/v1/deployments", {
+      body: { items: [stopped], total: 1, limit: 10, skip: 0 },
+    });
+    const result = await cli.run(["deploy", "--no-github", "--json"], {
+      env: { ...SIGNED_IN, MCP_USE_POLL_INTERVAL_MS: "0" },
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.json).toMatchObject({
+      error: {
+        code: "deployment_failed",
+        message: "Deployment dep_1 stopped.",
+      },
+    });
+  });
+
   test("a failed deployment exits 1 with a logs next step", async ({
     cli,
     cloud,

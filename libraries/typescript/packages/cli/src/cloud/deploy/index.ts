@@ -230,9 +230,15 @@ export async function runDeploy(argv: readonly string[]): Promise<number> {
     const deploymentStartedAt = new Date().toISOString();
     try {
       started = managed ? await deployUpload(input) : await deployGitHub(input);
-      terminal = values["no-wait"]
-        ? { status: "pending" }
-        : await waitForDeployment(cloud, started.deploymentId);
+      if (values["no-wait"]) terminal = { status: "pending" };
+      else {
+        const { id, ...result } = await waitForDeployment(
+          cloud,
+          started.deploymentId
+        );
+        started = { ...started, deploymentId: id };
+        terminal = result;
+      }
     } finally {
       progress.stop();
     }
