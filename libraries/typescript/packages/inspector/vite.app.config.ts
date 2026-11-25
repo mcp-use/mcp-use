@@ -79,6 +79,7 @@ export default defineConfig({
       external: [
         "langfuse-langchain",
         "langfuse",
+        "@boxd-sh/sdk",
         "@e2b/code-interpreter",
         "os",
       ],

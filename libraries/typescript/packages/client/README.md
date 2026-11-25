@@ -98,7 +98,7 @@ See [React integration](https://mcp-use.com/docs/typescript/client/usemcp).
 | **Protocol negotiation** | Automatic legacy / modern MCP handling          |
 | **OAuth**                | Browser and Node providers, callback helpers    |
 | **React**                | `useMcp`, `McpClientProvider`, storage adapters |
-| **Code mode**            | Optional sandboxed tool execution (VM / E2B)    |
+| **Code mode**            | Sandboxed tool execution (VM / E2B / boxd)      |
 | **Callbacks**            | Sampling, elicitation, notifications            |
 
 ---

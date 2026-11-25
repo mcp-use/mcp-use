@@ -50,6 +50,7 @@ uses its absolute path for both the server's allowed directory and the tool call
 | ------------------------------------ | ------------------------------------------------------------------ |
 | `"vm"` (default)                     | Local Node.js VM — fast, trusted environments                      |
 | `"e2b"`                              | Cloud sandbox — untrusted code (`@e2b/code-interpreter` + API key) |
+| `"boxd"`                             | Cloud microVM for untrusted code (`@boxd-sh/sdk` + API key)        |
 | Custom function / `BaseCodeExecutor` | Your own runtime                                                   |
 
 ```typescript
@@ -59,6 +60,18 @@ uses its absolute path for both the server's allowed directory and the tool call
     executorOptions: { apiKey: process.env.E2B_API_KEY!, timeoutMs: 300_000 },
 }}
 ```
+
+The `"boxd"` executor runs the code in an isolated [boxd](https://boxd.sh?ref=mcp-use) machine. Install `@boxd-sh/sdk` and set `BOXD_API_KEY` (or pass `apiKey`). The machine is created on the first `executeCode` call, reused for later calls, and deleted by `client.close()`:
+
+```typescript
+{ codeMode: {
+    enabled: true,
+    executor: "boxd",
+    executorOptions: { apiKey: process.env.BOXD_API_KEY!, region: "fra" },
+}}
+```
+
+`executorOptions` also takes `org`, `name`, `labels`, and `timeoutMs`, which deletes the machine that long after it starts even if `close()` never runs.
 
 A custom function receives `(code, timeout?)` and returns an `ExecutionResult`.
 It owns cleanup for whatever runtime it wraps — `client.close()` does not
