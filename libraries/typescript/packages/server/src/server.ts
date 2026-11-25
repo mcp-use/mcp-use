@@ -2219,11 +2219,33 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   /** Build a fully registered SDK server from the immutable registry. */
+  /**
+   * Which Events capability keys this request's handshake advertises (§6.4):
+   * the top-level `events` key for the ChatGPT dialect and the
+   * `io.modelcontextprotocol/events` extension on 2026-07-28 era requests.
+   * Nothing when no event is registered. Mirrors `advertiseFor` in
+   * `events/capabilities.ts` with no known-client row, inlined to keep the
+   * root entry inside its budget.
+   */
+  #eventsAdvertisement(request: Request | undefined): {
+    legacyKey: boolean;
+    extension: boolean;
+  } {
+    const on = (this.#eventsHost?.size ?? 0) > 0;
+    return {
+      legacyKey: on && this.#config.events?.compatibility?.openai !== false,
+      extension:
+        on &&
+        (request?.headers.get("mcp-protocol-version") ?? "") >= "2026-07-28",
+    };
+  }
+
   #buildSdkServer(ctx: McpRequestContext): SdkMcpServer {
     const { name, version, title, description } = this.#config;
     const instructions =
       this.#instructionsOverride ?? this.#config.instructions;
     const authInfo = ctx.authInfo;
+    const events = this.#eventsAdvertisement(ctx.requestInfo);
     const server = new SdkMcpServer(
       {
         name,
@@ -2247,8 +2269,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           tools: { listChanged: true },
           prompts: { listChanged: true },
           resources: { listChanged: true, subscribe: true },
-          ...((this.#skills !== undefined || this.#settings !== undefined) && {
+          ...(events.legacyKey && { events: {} }),
+          ...((this.#skills !== undefined ||
+            this.#settings !== undefined ||
+            events.extension) && {
             extensions: {
+              ...(events.extension && {
+                "io.modelcontextprotocol/events": { listChanged: true },
+              }),
               ...(this.#skills !== undefined && {
                 [SKILLS_EXTENSION_ID]: { directoryRead: true },
               }),
