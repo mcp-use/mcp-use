@@ -268,6 +268,7 @@ const RESPONSE_FIELDS = {
   ],
   "GET /api/v1/server-evals/{serverId}/suites": [
     "[].id",
+    "[].slug",
     "[].name",
     "[].enabled",
     "[].threshold",
@@ -285,8 +286,12 @@ const RESPONSE_FIELDS = {
     "[].runs[].score",
     "[].runs[].createdAt",
   ],
-  "POST /api/v1/server-evals/{serverId}/suites": ["id", "name"],
-  "PATCH /api/v1/server-evals/{serverId}/suites/{suiteId}": ["id", "name"],
+  "POST /api/v1/server-evals/{serverId}/suites": ["id", "slug", "name"],
+  "PATCH /api/v1/server-evals/{serverId}/suites/{suiteId}": [
+    "id",
+    "slug",
+    "name",
+  ],
   "DELETE /api/v1/server-evals/{serverId}/suites/{suiteId}": ["success"],
   "POST /api/v1/server-evals/{serverId}/suites/{suiteId}/runs": [
     "id",
@@ -387,6 +392,7 @@ const REQUEST_FIELDS = {
   ],
   "POST /api/v1/server-evals/{serverId}/suites": [
     "name",
+    "slug",
     "flow",
     "rubric",
     "threshold",
@@ -397,6 +403,7 @@ const REQUEST_FIELDS = {
   ],
   "PATCH /api/v1/server-evals/{serverId}/suites/{suiteId}": [
     "name",
+    "slug",
     "flow",
     "rubric",
     "threshold",
@@ -585,14 +592,21 @@ function keepFields(schema, paths, where) {
   const resolved = resolveRef(schema);
   for (const union of ["anyOf", "oneOf"]) {
     if (resolved[union] !== undefined) {
-      return {
-        ...resolved,
-        [union]: resolved[union].map((variant) =>
-          resolveRef(variant).type === "null"
-            ? variant
-            : keepFields(variant, paths, where)
-        ),
-      };
+      // A variant without every selected field (such as the suite list's
+      // projection for CI tokens) is left out; one variant must have them all.
+      const variants = resolved[union].flatMap((variant) => {
+        if (resolveRef(variant).type === "null") return [variant];
+        try {
+          return [keepFields(variant, paths, where)];
+        } catch {
+          return [];
+        }
+      });
+      if (variants.every((variant) => resolveRef(variant).type === "null"))
+        keepFields(resolved[union].at(-1), paths, where);
+      return variants.length === 1
+        ? variants[0]
+        : { ...resolved, [union]: variants };
     }
   }
   if (resolved.type === "array" || resolved.items !== undefined) {

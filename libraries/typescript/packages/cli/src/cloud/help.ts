@@ -487,16 +487,16 @@ const pages: Record<string, Page> = {
   },
   evals: {
     summary:
-      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: name and flow are required; rubric, threshold (default 0.7), clients (default: Inspector with the default model), disallowedTools and enabled are optional, and omitted fields reset to their defaults. Commands select suites by ID (see mcp-use evals list), because names aren't unique; a suite file only supplies a suite's content.",
+      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: id (the suite's slug, such as rome-weather), name and flow are required; rubric, threshold (default 0.7), clients (default: Inspector with the default model), disallowedTools and enabled are optional, and omitted fields reset to their defaults. Commands select suites by suite ID (UUID or slug; see mcp-use evals list), never by name, because names aren't unique.",
     examples: [
       "mcp-use evals push evals/",
       "mcp-use evals run --all --wait",
-      "mcp-use evals run <suite-id> --wait",
+      "mcp-use evals run rome-weather --wait",
     ],
     commands: {
       push: {
         summary:
-          "Create or replace one suite per file, matched by name. Directories contribute their .yaml, .yml and .json files (not subdirectories). Every file is attempted; exits 1 if any fails.",
+          "Update the suite whose slug is each file's id, or create one with it; prints Created or Updated per file. Fails before writing anything if two files share an id. Directories contribute their .yaml, .yml and .json files (not subdirectories). Every file is attempted; exits 1 if any fails.",
         args: "<path...>",
         options: project,
         examples: [
@@ -518,12 +518,18 @@ const pages: Record<string, Page> = {
       export: {
         summary: "Print a suite as a suite file that push accepts.",
         args: "<suite-id>",
-        options: [...project, ["--out <path>", "Write the file instead"]],
-        examples: ["mcp-use evals export <suite-id> --out evals/rome.yaml"],
+        options: [
+          ...project,
+          [
+            "--out <path>",
+            "Write the file instead; a directory gets <slug>.yaml",
+          ],
+        ],
+        examples: ["mcp-use evals export rome-weather --out evals/"],
       },
       create: {
         summary:
-          "Create a suite from a file. Fails if a suite has the same name; use push or update to replace it.",
+          "Create a suite from a file. Fails if a suite has the file's id; use push or update to replace it.",
         options: [
           ...project,
           ["--file <suite.yaml>", "Required suite file (YAML or JSON)"],
@@ -532,7 +538,7 @@ const pages: Record<string, Page> = {
       },
       update: {
         summary:
-          "Replace a suite with a file's definition, including its name.",
+          "Replace a suite with a file's definition, including its name and id.",
         args: "<suite-id>",
         options: [
           ...project,
@@ -551,7 +557,7 @@ const pages: Record<string, Page> = {
       },
       run: {
         summary:
-          "Start one run per suite against the production endpoint, or a branch environment with --branch. Runs continue on Cloud.",
+          "Start one run per suite, selected by suite ID (UUID or slug), against the production endpoint, or a branch environment with --branch. Runs continue on Cloud.",
         args: "[<suite-id...>]",
         options: [
           ...project,

@@ -759,8 +759,9 @@ Keep eval suites in your repository as YAML files, push them to Manufact Cloud,
 and run them against a deployed server. The CLI validates each file locally,
 like `alerts`, and sends the suite to Cloud as JSON.
 
-```yaml evals/weather.yaml
-name: Rome weather           # required; push matches suites by name
+```yaml evals/rome-weather.yaml
+id: rome-weather             # required; the suite's ID, which push matches suites by
+name: Rome weather           # required; the display name
 flow:                        # required; at least one user step
   - kind: user
     content: What's the weather in Rome?
@@ -783,16 +784,25 @@ enabled: true                # false excludes the suite from run --all
 ```
 
 A file is the suite's whole definition. Writing it over an existing suite
-resets every omitted field to its default. `evals models` lists model IDs for
+resets every omitted field to its default.
+
+Every suite has a UUID and a slug, its ID within the server. A **suite ID** is
+either one. In a file, `id` is the slug: lowercase letters and digits in groups
+joined by single hyphens, at most 64 characters, unique per server. It is
+never taken from `name`, because names aren't unique, so renaming a suite in
+its file keeps the same suite. A file without `id` fails, and the error
+suggests one made from the name. Cloud gives suites created elsewhere (the
+dashboard, the API) a slug made from their name; `evals list` shows it, and
+`evals export` writes it. `evals models` lists model IDs for
 `clients.inspector.models`, and `evals options` lists the web apps and harnesses
 your organization can run, with their models.
 
 Commands that select an existing suite (`get`, `export`, `update`, `rm`,
-`run` and `runs --suite`) take its ID only, because suite names aren't unique.
-`evals list` prints each suite's ID. An argument that isn't a suite ID, such as
-a suite name or a file path, fails with `eval_suite_not_found`. Suite files
-only supply a suite's content, through `push`, `create --file` and
-`update --file`.
+`run` and `runs --suite`) take its suite ID, the UUID or the slug, because
+suite names aren't unique. A UUID match wins over a slug. An argument that
+isn't a suite ID, such as a suite name or a file path, fails with
+`eval_suite_not_found`. Suite files only supply a suite's content, through
+`push`, `create --file` and `update --file`.
 
 In CI, push the suites and wait for the results. `--wait` exits 1 unless every
 run passes:
@@ -803,15 +813,22 @@ mcp-use evals push evals/ && mcp-use evals run --all --wait
 
 ### `evals push`
 
-Create or replace one suite per file, matched by name.
+Update the suite whose slug is the file's `id`, or create one with that slug.
+Prints `Created` or `Updated` for each file.
 
 ```bash
 mcp-use evals push <path...> [options]
 ```
 
 Directories contribute their `.yaml`, `.yml`, and `.json` files, not
-subdirectories. Every file is attempted, and the command exits 1 if any fails.
-Deleting a file does not delete its suite; use `evals rm`.
+subdirectories. If two files have the same `id`, push fails with
+`eval_suite_duplicate_id` before contacting Cloud. Otherwise every file is
+attempted, and the command exits 1 if any fails, for example a file whose
+`id` another suite took in the meantime. Deleting a file does not
+delete its suite; use `evals rm`.
+
+Push needs a Manufact Cloud that supports suite IDs. Against an older one it
+fails with `eval_suite_ids_unsupported` instead of creating duplicates.
 
 ### `evals list`
 
@@ -832,15 +849,19 @@ mcp-use evals get <suite-id> [options]
 ### `evals export`
 
 Print a suite as a file that `evals push` accepts, for example to move a suite
-built in the dashboard into your repository.
+built in the dashboard into your repository. The file starts with `id: <slug>`.
 
 ```bash
 mcp-use evals export <suite-id> [--out <path>] [options]
 ```
 
+When `--out` is a directory (one that exists, or a path ending in `/`), the
+file is `<slug>.yaml` inside it.
+
 ### `evals create`
 
-Create a suite from a file. Fails if a suite already has the file's name.
+Create a suite from a file. Fails with `eval_suite_exists` if a suite already
+has the file's `id`; use `push` or `update` to replace it.
 
 ```bash
 mcp-use evals create --file <suite.yaml> [options]
@@ -848,7 +869,9 @@ mcp-use evals create --file <suite.yaml> [options]
 
 ### `evals update`
 
-Replace a suite with a file's definition, including its name.
+Replace a suite with a file's definition, including its name and slug: the
+file's `id` becomes the suite's slug. Fails with `eval_suite_id_taken` if
+another suite has that slug.
 
 ```bash
 mcp-use evals update <suite-id> --file <suite.yaml> [options]
@@ -870,7 +893,7 @@ Start one run per suite against the server's production endpoint.
 mcp-use evals run [<suite-id...>] [--all] [--branch <name>] [--profile <id>] [--wait] [--timeout <seconds>] [--json-file <path>] [--markdown-file <path>] [options]
 ```
 
-Pass suite IDs or `--all`. `--all` runs every enabled suite, and `--branch` targets a branch environment.
+Pass suite IDs (UUIDs or slugs) or `--all`. `--all` runs every enabled suite, and `--branch` targets a branch environment.
 `--profile` signs in with that profile of the server's organization instead of
 the server's own, so the same suites can run as different accounts. It doesn't
 apply to native apps or to clients running the plugin lifecycle, which sign in
