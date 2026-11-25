@@ -157,8 +157,9 @@ test("checklist terminal and Markdown reports count policy concerns the same way
   expect(terminal).toContain(
     "\n1 passed\n1 policy concern may require additional review"
   );
-  expect(markdown).toContain("| ✅ 1 passed |");
-  expect(markdown).toContain("· 1 policy concern<br>");
+  expect(markdown).toContain("### Policy concerns");
+  expect(markdown.match(/<tr><td /g)).toHaveLength(1);
+  expect(markdown).toContain("<strong>Unsolicited feedback</strong>");
 });
 
 test("domain guidance keeps certificate validation records and never uses a hostname ID as a domain ID", () => {

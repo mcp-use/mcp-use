@@ -395,7 +395,7 @@ const pages: Record<string, Page> = {
           ],
           [
             "--markdown-file <path>",
-            "Also write a Markdown report, laid out like the dashboard",
+            "Also write a Markdown report in the Manufact GitHub app's publishing-check format",
           ],
           ["--verbose", "Show every check and full finding details"],
         ],
@@ -419,7 +419,7 @@ const pages: Record<string, Page> = {
           ["--verbose", "Show every check and full finding details"],
           [
             "--markdown-file <path>",
-            "Also write a Markdown report, laid out like the dashboard",
+            "Also write a Markdown report in the Manufact GitHub app's publishing-check format",
           ],
         ],
         examples: ["mcp-use checklist get run_123"],
@@ -487,11 +487,11 @@ const pages: Record<string, Page> = {
   },
   evals: {
     summary:
-      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: name and flow are required; rubric, threshold (default 0.7), clients (default: Inspector with the default model), disallowedTools and enabled are optional, and omitted fields reset to their defaults. A <suite> is a suite ID, its name, or a suite file.",
+      "Define eval suites as YAML files, run them against a server, and read results. A file is a suite's whole definition: name and flow are required; rubric, threshold (default 0.7), clients (default: Inspector with the default model), disallowedTools and enabled are optional, and omitted fields reset to their defaults. Commands select suites by ID (see mcp-use evals list), because names aren't unique; a suite file only supplies a suite's content.",
     examples: [
       "mcp-use evals push evals/",
       "mcp-use evals run --all --wait",
-      "mcp-use evals run evals/checkout.yaml --wait",
+      "mcp-use evals run <suite-id> --wait",
     ],
     commands: {
       push: {
@@ -511,15 +511,15 @@ const pages: Record<string, Page> = {
       },
       get: {
         summary: "Show a suite as YAML with its latest run.",
-        args: "<suite>",
+        args: "<suite-id>",
         options: project,
-        examples: ['mcp-use evals get "Rome weather"'],
+        examples: ["mcp-use evals get <suite-id>"],
       },
       export: {
         summary: "Print a suite as a suite file that push accepts.",
-        args: "<suite>",
+        args: "<suite-id>",
         options: [...project, ["--out <path>", "Write the file instead"]],
-        examples: ['mcp-use evals export "Rome weather" --out evals/rome.yaml'],
+        examples: ["mcp-use evals export <suite-id> --out evals/rome.yaml"],
       },
       create: {
         summary:
@@ -533,26 +533,26 @@ const pages: Record<string, Page> = {
       update: {
         summary:
           "Replace a suite with a file's definition, including its name.",
-        args: "<suite>",
+        args: "<suite-id>",
         options: [
           ...project,
           ["--file <suite.yaml>", "Required suite file (YAML or JSON)"],
         ],
         examples: [
-          'mcp-use evals update "Old name" --file evals/checkout.yaml',
+          "mcp-use evals update <suite-id> --file evals/checkout.yaml",
         ],
       },
       rm: {
         summary:
           "Delete a suite and all of its runs; cancels runs in progress (alias: remove).",
-        args: "<suite>",
+        args: "<suite-id>",
         options: [...project, yes],
-        examples: ['mcp-use evals rm "Rome weather" --yes'],
+        examples: ["mcp-use evals rm <suite-id> --yes"],
       },
       run: {
         summary:
           "Start one run per suite against the production endpoint, or a branch environment with --branch. Runs continue on Cloud.",
-        args: "[<suite...>]",
+        args: "[<suite-id...>]",
         options: [
           ...project,
           ["--all", "Run every enabled suite"],
@@ -577,8 +577,8 @@ const pages: Record<string, Page> = {
         ],
         examples: [
           "mcp-use evals run --all --wait",
-          "mcp-use evals run evals/ --wait",
-          'mcp-use evals run "Rome weather" --branch preview',
+          "mcp-use evals run <suite-id> <suite-id> --wait",
+          "mcp-use evals run <suite-id> --branch preview",
           "mcp-use evals run --all --wait --json-file evals.json --markdown-file evals.md",
           "mcp-use evals run --all --wait --profile <profile-id>",
         ],
@@ -587,11 +587,11 @@ const pages: Record<string, Page> = {
         summary: "List eval runs, newest first.",
         options: [
           ...project,
-          ["--suite <suite>", "Only runs of this suite"],
+          ["--suite <suite-id>", "Only runs of this suite"],
           limit(100, 30),
           skip,
         ],
-        examples: ['mcp-use evals runs --suite "Rome weather"'],
+        examples: ["mcp-use evals runs --suite <suite-id>"],
       },
       report: {
         summary:

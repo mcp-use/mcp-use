@@ -19,6 +19,8 @@ export interface ChecklistRun {
   isReadyForClaudeai?: boolean | null;
   score?: number | null;
   targetUrl?: string | null;
+  /** Cloud's copyable prompt for fixing the run's findings, when it has one. */
+  fixPrompt?: string;
   checks?: Array<{
     checkId: string;
     checkName: string;
@@ -121,6 +123,9 @@ export function checklistRun(
   ] as const) {
     if (item[key] !== undefined) Object.assign(result, { [key]: item[key] });
   }
+  // run/get/cancel add it to their result as `fixPrompt: string | null`.
+  if (presentation && typeof item.fixPrompt === "string" && item.fixPrompt)
+    result.fixPrompt = item.fixPrompt;
   if (Array.isArray(item.checks)) {
     result.checks = item.checks
       .filter(
