@@ -174,7 +174,12 @@ export interface FromOpenAPIOptions {
   version?: string;
   /** Static bearer or custom-header authentication for upstream requests. */
   auth?: OpenAPIAuth;
-  /** Static headers merged into every upstream request. */
+  /**
+   * Static headers merged into every upstream request. Header names are
+   * matched case-insensitively. When the same header is set more than once,
+   * precedence is static `headers`, then operation header parameters, then
+   * `auth` (highest).
+   */
   headers?: Record<string, string>;
   /** Include only operations having at least one of these tags. */
   tags?: string[];
