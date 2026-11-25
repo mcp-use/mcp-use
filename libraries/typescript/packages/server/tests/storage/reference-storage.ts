@@ -188,7 +188,7 @@ export class ReferenceDatabase {
         const log = db.logs.get(stream) ?? { head: undefined, entries: [] };
         db.logs.set(stream, log);
         if (!log.head) {
-          log.head = { epoch: `epoch-${++db.#epoch}`, seq: 0 };
+          log.head = { epoch: String(++db.#epoch).padStart(12, "0"), seq: 0 };
           log.entries = [];
         }
         const seq = ++log.head.seq;

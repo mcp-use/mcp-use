@@ -132,7 +132,7 @@ export type LogAppendResult =
       duplicate: false;
       /** Position of the new entry, `head + 1`. */
       seq: number;
-      /** Epoch of the log the entry was appended to. */
+      /** Epoch of the log the entry was appended to: a 12-character `[a-z0-9]` id. */
       epoch: string;
     }
   | {

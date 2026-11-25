@@ -5,12 +5,14 @@
 //        [--omit note.deleted,...] [--no-lock]
 //
 // <bundle> is the --out of build-variant.mjs (vendor/*.tgz, combo.json,
-// sdk-variant.json). Writes <out>/{package.json,src/,vendor/,combo.json,omit.json},
+// sdk-variant.json) or of resolve-published.mjs (combo.json with mcpUse.specs,
+// no vendor/). Writes <out>/{package.json,src/,vendor/?,combo.json,omit.json},
 // runs `npm install --package-lock-only`, then the R3a lockfile check. Exit 1
 // with class `product` when R3a fails.
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   rmSync,
@@ -40,9 +42,13 @@ const omit =
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 cpSync(join(HARNESS_ROOT, "fixture"), out, { recursive: true });
-cpSync(join(bundle, "vendor"), join(out, "vendor"), { recursive: true });
+// Published sources (canary, pr) carry `mcpUse.specs` and no vendor/ directory.
+const specs = combo.mcpUse.specs;
+if (!specs)
+  cpSync(join(bundle, "vendor"), join(out, "vendor"), { recursive: true });
 cpSync(join(bundle, "combo.json"), join(out, "combo.json"));
-cpSync(join(bundle, "sdk-variant.json"), join(out, "sdk-variant.json"));
+if (existsSync(join(bundle, "sdk-variant.json")))
+  cpSync(join(bundle, "sdk-variant.json"), join(out, "sdk-variant.json"));
 // omit.json is baked into the source, never an environment variable (MF9).
 writeFileSync(join(out, "omit.json"), `${JSON.stringify(omit)}\n`);
 
@@ -60,6 +66,7 @@ const manifest = fixtureManifest({
   extAppsPeer: combo.extAppsPeerOverride
     ? "$@modelcontextprotocol/ext-apps"
     : undefined,
+  mcpUse: specs,
 });
 // Packages absent from this build (for example before events-core exists) are dropped.
 for (const field of ["dependencies", "overrides"]) {
@@ -91,7 +98,7 @@ if (!args["no-lock"]) {
     }
   );
   const lock = JSON.parse(readFileSync(join(out, "package-lock.json"), "utf8"));
-  const problems = checkLockfile(lock, { sdk }).filter(
+  const problems = checkLockfile(lock, { sdk, mcpUse: specs }).filter(
     (p) => p.code !== "MCP_USE_MISSING" || combo.mcpUse.versions[p.name]
   );
   if (problems.length > 0) {
@@ -100,7 +107,7 @@ if (!args["no-lock"]) {
     process.exit(1);
   }
   console.log(
-    "R3a: lockfile resolves every mcp-use package to vendor/ and the SDK to the variant"
+    "R3a: lockfile resolves every mcp-use package to the bundle and the SDK to the variant"
   );
 }
 console.log(`staged fixture at ${out}`);

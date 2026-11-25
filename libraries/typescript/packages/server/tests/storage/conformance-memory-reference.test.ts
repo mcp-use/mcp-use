@@ -246,23 +246,28 @@ describe("runStorageConformance", () => {
 });
 
 describe("runStorageIsolationCheck", () => {
-  it("passes for two prefixes on one database", async () => {
+  it("fails DENIED-WRITE when denied uses another prefix, which tests no credential", async () => {
     const db = new ReferenceDatabase();
     const report = await runStorageIsolationCheck({
       allowed: db.store("tenant-a/"),
       denied: db.store("tenant-b/"),
     });
     expect(report).toEqual({
-      passed: true,
+      passed: false,
       checks: [
         { id: "ALLOWED-READ-WRITE", status: "pass" },
         { id: "DENIED-READ", status: "pass" },
-        { id: "DENIED-WRITE", status: "pass" },
+        {
+          id: "DENIED-WRITE",
+          status: "fail",
+          detail:
+            "denied wrote and read back its own value at allowed's key while allowed kept its value, so the two stores address different keys: build denied with allowed's prefix",
+        },
       ],
     });
   });
 
-  it("passes when the denied credential is refused every operation", async () => {
+  it("passes when denied has allowed's prefix and a credential refused every operation", async () => {
     const db = new ReferenceDatabase();
     const refused = async () => {
       throw new Error("NOPERM");
@@ -275,10 +280,17 @@ describe("runStorageIsolationCheck", () => {
       ])
     ) as unknown as McpUseStorage;
     const report = await runStorageIsolationCheck({ allowed: store, denied });
-    expect(report.passed).toBe(true);
+    expect(report).toEqual({
+      passed: true,
+      checks: [
+        { id: "ALLOWED-READ-WRITE", status: "pass" },
+        { id: "DENIED-READ", status: "pass" },
+        { id: "DENIED-WRITE", status: "pass" },
+      ],
+    });
   });
 
-  it("fails when both stores share a prefix", async () => {
+  it("fails when denied has allowed's prefix and the same credential", async () => {
     const db = new ReferenceDatabase();
     const report = await runStorageIsolationCheck({
       allowed: db.store("shared/"),

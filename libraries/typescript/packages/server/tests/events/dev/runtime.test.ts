@@ -94,6 +94,31 @@ describe("dev runtime", () => {
     expect(closed).toEqual(["a:hot_reload"]);
   });
 
+  it("updates the tunnel origin without a new generation or closing streams", () => {
+    const rt = installEventsDev(base);
+    const closed: string[] = [];
+    rt.trackStream(1, (r) => closed.push(r));
+    installEventsDev({
+      ...base,
+      publicOrigin: "https://abc.tunnel.dev",
+      reason: "tunnel",
+    });
+    expect(eventsDevInfo()).toEqual({
+      stateDir: "/tmp/proj/.mcp-use/state",
+      generation: 1,
+      tokenAvailable: true,
+      publicOrigin: "https://abc.tunnel.dev",
+    });
+    const tunnel = new Request("http://localhost:3000/mcp", {
+      headers: { host: "abc.tunnel.dev" },
+    });
+    expect(rt.principalFor(tunnel, { oauth: false })).toBe(undefined);
+    installEventsDev({ ...base, reason: "tunnel" });
+    expect(rt.principalFor(tunnel, { oauth: false })).toBe("dev|local");
+    expect(rt.generation).toBe(1);
+    expect(closed).toEqual([]);
+  });
+
   it("signals list_changed only when the catalog hash changes", () => {
     const rt = installEventsDev(base);
     const seen: string[] = [];

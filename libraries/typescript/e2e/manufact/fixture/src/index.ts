@@ -95,6 +95,12 @@ server.tool(
 // sdk.bundled, sdk.bundledHash, sdk.external, sdk.patchedPredicate) come from
 // the health route (WP-26).
 
-log("startup", { combo: combo.sha ?? null });
+// A canary bundle has no sha, so the mcp-use version identifies the build too.
+log("startup", {
+  combo: combo.sha ?? null,
+  mcpUse:
+    (combo.mcpUse as { versions?: Record<string, string> } | undefined)
+      ?.versions?.["mcp-use"] ?? null,
+});
 
 export default server;

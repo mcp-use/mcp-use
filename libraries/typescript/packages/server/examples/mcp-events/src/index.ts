@@ -20,17 +20,25 @@ function eventsConfigFromEnv(env: NodeJS.ProcessEnv): EventsConfig {
     >;
   }
   if (env.EXAMPLE_EVENTS_ADVERTISE) {
-    // One row for the client under test: match every client, change only where
-    // the capability is advertised ("top", "extensions" or "both").
-    compatibility.knownClients = [
-      {
-        id: "example-override",
-        match: {},
-        advertise: env.EXAMPLE_EVENTS_ADVERTISE,
-      } as unknown as NonNullable<typeof compatibility.knownClients>[number],
-    ];
+    // One row for the client under test, tried before the built-in table: it
+    // matches every client and keeps the forced (or ChatGPT) preset, so only
+    // where the capability is advertised changes ("top", "extension", "both").
+    type KnownClientRow = NonNullable<
+      NonNullable<EventsConfig["compatibility"]>["knownClients"]
+    >[number];
+    const row: KnownClientRow = {
+      id: "example-override",
+      match: {},
+      preset: env.EXAMPLE_EVENTS_DIALECT ?? "openai@1",
+      advertise: env.EXAMPLE_EVENTS_ADVERTISE as NonNullable<
+        KnownClientRow["advertise"]
+      >,
+      source: "examples/mcp-events EXAMPLE_EVENTS_ADVERTISE (local override)",
+    };
+    compatibility.knownClients = [row];
   }
-  if (Object.keys(compatibility).length > 0) config.compatibility = compatibility;
+  if (Object.keys(compatibility).length > 0)
+    config.compatibility = compatibility;
 
   if (env.EXAMPLE_EVENTS_TTL_MS) {
     config.ttl = { default: Number(env.EXAMPLE_EVENTS_TTL_MS) };
@@ -58,6 +66,9 @@ interface Note {
 
 const notes: Note[] = [];
 let nextId = 1;
+// The dev event store outlives the process and dedupes eventIds for 24 h, so
+// ids carry a per-process prefix: a restart must not reuse note_1.
+const runId = Date.now().toString(36);
 
 /**
  * Replayable (the default: 1 h, 1,000 events), so it is offered over webhook,
@@ -99,7 +110,7 @@ export const createNote = server.tool(
     inputSchema: z.object({ folder: z.string(), title: z.string() }),
   },
   async ({ folder, title }, ctx) => {
-    const noteId = `note_${nextId++}`;
+    const noteId = `note_${runId}_${nextId++}`;
     notes.push({ noteId, folder, title });
     // Upstream-stable id: retries of the same note dedupe for 24 h. onError
     // "log" keeps the tool working if event storage is down.

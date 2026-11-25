@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import IORedis from "ioredis";
+import pg from "pg";
+import { afterAll, describe, expect, it } from "vitest";
 import { isMemoryStorage } from "../../src/oauth/proxy/storage.js";
 import {
   openStorageUrl,
@@ -19,6 +21,37 @@ const REDIS_URL = service("MCP_USE_TEST_REDIS_URL");
 const POSTGRES_URL = service("MCP_USE_TEST_POSTGRES_URL");
 const UPSTASH_URL = service("MCP_USE_TEST_UPSTASH_URL");
 const UPSTASH_TOKEN = service("MCP_USE_TEST_UPSTASH_TOKEN");
+
+/** Connections the tests open through `openStorageUrl`, closed afterwards. */
+const opened: (IORedis | pg.Pool)[] = [];
+afterAll(async () => {
+  await Promise.all(
+    opened.map((client) =>
+      client instanceof IORedis ? client.quit() : client.end()
+    )
+  );
+});
+
+class RecordedRedis extends IORedis {
+  constructor(url: string) {
+    super(url);
+    opened.push(this);
+  }
+}
+
+class RecordedPool extends pg.Pool {
+  constructor(config: pg.PoolConfig) {
+    super(config);
+    opened.push(this);
+  }
+}
+
+/** Loads the real drivers, recording each client the store creates. */
+const recordingImport = async (specifier: string): Promise<unknown> => {
+  if (specifier === "ioredis") return { Redis: RecordedRedis };
+  if (specifier === "pg") return { Pool: RecordedPool };
+  return import(/* @vite-ignore */ specifier);
+};
 
 function codeOf(work: () => unknown): unknown {
   try {
@@ -266,8 +299,13 @@ describe("openStorageUrl", () => {
         MCP_USE_STORAGE_URL: REDIS_URL,
         MCP_USE_STORAGE_PREFIX: "wp02-url/",
       })!;
-      const storage = await openStorageUrl(target);
-      const raw = await openStorageUrl({ ...target, prefix: "" });
+      const storage = await openStorageUrl(target, {
+        importModule: recordingImport,
+      });
+      const raw = await openStorageUrl(
+        { ...target, prefix: "" },
+        { importModule: recordingImport }
+      );
       const key = uniqueKey();
       await storage.set(key, "via-url", 60);
       expect([
@@ -276,12 +314,16 @@ describe("openStorageUrl", () => {
       ]).toEqual(["via-url", "via-url"]);
       await storage.delete(key);
       expect(await raw.get(`wp02-url/${key}`)).toBeUndefined();
+      expect(
+        opened.filter((client) => client instanceof RecordedRedis)
+      ).toHaveLength(2);
     }
   );
 
   it.skipIf(!POSTGRES_URL)("opens postgres:// through pg", async () => {
     const storage = await openStorageUrl(
-      parseStorageUrl({ MCP_USE_STORAGE_URL: POSTGRES_URL })!
+      parseStorageUrl({ MCP_USE_STORAGE_URL: POSTGRES_URL })!,
+      { importModule: recordingImport }
     );
     const key = uniqueKey();
     expect(await storage.add(key, "once", 60)).toBe(true);

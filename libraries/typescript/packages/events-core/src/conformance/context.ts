@@ -432,7 +432,9 @@ function sampleValue(p: Record<string, unknown>): unknown {
   if ("default" in p) return p.default;
   if ("const" in p) return p.const;
   if (Array.isArray(p.enum) && p.enum.length > 0) return p.enum[0];
-  const type = Array.isArray(p.type) ? p.type[0] : p.type;
+  const type: unknown = Array.isArray(p.type)
+    ? (p.type as unknown[])[0]
+    : p.type;
   switch (type) {
     case "integer":
     case "number":

@@ -1,10 +1,20 @@
 # Manufact dev-space E2E (PLAN.md §18.8). Its own workflow: never called from
 # ci.yml, so fork PRs never reach the manufact-e2e environment.
+#
+# Package sources (e2e/manufact/matrix.json):
+#   pr     - same-repo PRs into feat/mcp-events: this job publishes the pkg.pr.new
+#            preview of the PR head, the fixture installs it by per-commit URL and
+#            is deployed to the PR's dev space, branch pr<number>-pr. Every push
+#            redeploys that branch; closing the PR tears it down.
+#   canary - nightly: the published npm `canary` set, as-published, branch r<run>a<att>-canary.
+#   pack   - workflow_dispatch only for now: one workspace build per SDK variant,
+#            packed tarballs (build-variant.mjs), branch r<run>a<att>-<variant>.
 name: Manufact E2E
 
 on:
   pull_request:
     branches: [feat/mcp-events]
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "libraries/typescript/packages/server/**"
       - "libraries/typescript/packages/client/**"
@@ -17,8 +27,17 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
+      source:
+        description: "Package source: canary, pr or pack"
+        default: "canary"
+      ref:
+        description: "source=pr: mcp-use commit sha whose pkg.pr.new preview to test"
+        default: ""
+      tag:
+        description: "source=canary: npm dist-tag"
+        default: "canary"
       variants:
-        description: "Comma-separated variants (pinned,latest,prerelease,pr-3209)"
+        description: "source=pack: comma-separated SDK variants (pinned,latest,prerelease,pr-3209)"
         default: "pinned"
       suite:
         description: "S, N or W"
@@ -36,21 +55,24 @@ concurrency:
 
 jobs:
   plan:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     outputs:
-      variants: ${{ steps.v.outputs.variants }}
+      cells: ${{ steps.v.outputs.cells }}
     steps:
       - id: v
         env:
           EVENT: ${{ github.event_name }}
-          INPUT: ${{ inputs.variants }}
+          SOURCE: ${{ inputs.source }}
+          VARIANTS: ${{ inputs.variants }}
         run: |
           case "$EVENT" in
-            schedule) v="pinned,latest,prerelease,pr-3209" ;;
-            workflow_dispatch) v="$INPUT" ;;
-            *) v="pinned,latest" ;;
+            pull_request) src=pr; v=pr ;;
+            schedule) src=canary; v=canary ;;
+            *) src="$SOURCE"; if [ "$src" = pack ]; then v="$VARIANTS"; else v="$src"; fi ;;
           esac
-          echo "variants=$(node -e 'console.log(JSON.stringify(process.argv[1].split(",").map(s=>s.trim()).filter(Boolean)))' "$v")" >> "$GITHUB_OUTPUT"
+          case "$src" in canary|pr|pack) ;; *) echo "unknown source: $src" >&2; exit 1 ;; esac
+          echo "cells=$(node -e 'const [src,v]=process.argv.slice(1);console.log(JSON.stringify(v.split(",").map(s=>s.trim()).filter(Boolean).map(variant=>({source:src,variant}))))' "$src" "$v")" >> "$GITHUB_OUTPUT"
 
   variant:
     needs: plan
@@ -66,10 +88,15 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        variant: ${{ fromJSON(needs.plan.outputs.variants) }}
+        cell: ${{ fromJSON(needs.plan.outputs.cells) }}
     env:
       E2E_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'manufact' }}
       E2E_SUITE: ${{ github.event_name == 'schedule' && 'N' || github.event_name == 'workflow_dispatch' && inputs.suite || 'S' }}
+      SOURCE: ${{ matrix.cell.source }}
+      VARIANT: ${{ matrix.cell.variant }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.ref }}
+      CANARY_TAG: ${{ inputs.tag || 'canary' }}
     defaults:
       run:
         working-directory: libraries/typescript
@@ -81,13 +108,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build and pack the variant (failure = product-compile)
-        run: node e2e/manufact/scripts/build-variant.mjs "${{ matrix.variant }}" --out "$RUNNER_TEMP/bundle" --attempt "${{ github.run_attempt }}" --scratch "$RUNNER_TEMP/scratch"
+      - name: Build and publish the PR preview (failure = product-compile)
+        if: github.event_name == 'pull_request'
+        env:
+          PNPM_CONFIG_NODE_LINKER: hoisted
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm build
+          # Per-commit URLs pkg.pr.new/mcp-use/mcp-use/<pkg>@<sha7>; no PR comment.
+          pnpm dlx pkg-pr-new publish './packages/*' --pnpm --comment=off
+      - name: Resolve the packages under test
+        run: |
+          case "$SOURCE" in
+            pr) node e2e/manufact/scripts/resolve-published.mjs pr --ref "$PR_HEAD_SHA" --wait-ms 600000 --out "$RUNNER_TEMP/bundle" --attempt "${{ github.run_attempt }}" ;;
+            canary) node e2e/manufact/scripts/resolve-published.mjs canary --tag "$CANARY_TAG" --out "$RUNNER_TEMP/bundle" --attempt "${{ github.run_attempt }}" ;;
+            pack) node e2e/manufact/scripts/build-variant.mjs "$VARIANT" --out "$RUNNER_TEMP/bundle" --attempt "${{ github.run_attempt }}" --scratch "$RUNNER_TEMP/scratch" ;;
+          esac
       - name: Stage the fixture and check lockfile resolution (R3a)
         run: node e2e/manufact/scripts/stage-fixture.mjs --bundle "$RUNNER_TEMP/bundle" --out "$RUNNER_TEMP/fixture"
       - name: Install harness
         run: pnpm install --filter @mcp-use/e2e-manufact
-      - name: Deploy to the per-run branch
+      - name: Deploy (PR dev space or per-run branch)
         if: env.E2E_TARGET == 'manufact'
         env:
           MANUFACT_TOKEN: ${{ secrets.MANUFACT_TOKEN }}
@@ -98,7 +139,9 @@ jobs:
           [ -n "${{ secrets.E2E_CLOUD_WEB_URL }}" ] && export E2E_CLOUD_WEB_URL="${{ secrets.E2E_CLOUD_WEB_URL }}"
           # TODO(events): derive and `env set --sensitive --branch` the per-run admin secret
           # from E2E_SECRET_SEED (deriveSecrets in scripts/lib.mjs) before deploying.
-          node e2e/manufact/scripts/deploy.mjs --fixture "$RUNNER_TEMP/fixture" --variant "${{ matrix.variant }}" --execute
+          PR_ARGS=()
+          [ "$SOURCE" = pr ] && [ -n "$PR_NUMBER" ] && PR_ARGS=(--pr "$PR_NUMBER")
+          node e2e/manufact/scripts/deploy.mjs --fixture "$RUNNER_TEMP/fixture" --variant "$VARIANT" "${PR_ARGS[@]}" --execute
       - name: Scenarios
         env:
           E2E_FIXTURE_DIR: ${{ runner.temp }}/fixture
@@ -106,15 +149,16 @@ jobs:
           E2E_RECEIVER_TOKEN: ${{ secrets.E2E_RECEIVER_TOKEN }}
         working-directory: libraries/typescript/e2e/manufact
         run: pnpm e2e
-      - name: Cleanup
-        if: always() && env.E2E_TARGET == 'manufact'
+      - name: Cleanup per-run branch
+        # A PR dev space stays up for the PR; the `teardown` job removes it on close.
+        if: always() && env.E2E_TARGET == 'manufact' && env.SOURCE != 'pr'
         env:
           MANUFACT_TOKEN: ${{ secrets.MANUFACT_TOKEN }}
           MANUFACT_ORG: ${{ secrets.MANUFACT_ORG }}
         working-directory: ${{ runner.temp }}/fixture
         run: |
           # TODO(events): `mcp-use events purge --branch <b> --yes` once WP-35 ships it.
-          B="r${{ github.run_id }}a${{ github.run_attempt }}-${{ matrix.variant }}"
+          B="r${{ github.run_id }}a${{ github.run_attempt }}-$VARIANT"
           for id in $(npx mcp-use deployments list --server ev-e2e-app --branch "$B" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);for(const d of (Array.isArray(j)?j:j.items??j.deployments??[]))console.log(d.id)})'); do
             npx mcp-use deployments stop "$id" --yes || true
             npx mcp-use deployments rm "$id" --yes || true
@@ -123,10 +167,34 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: manufact-e2e-${{ matrix.variant }}-a${{ github.run_attempt }}
+          name: manufact-e2e-${{ matrix.cell.source }}-${{ matrix.cell.variant }}-a${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/bundle/combo.json
             ${{ runner.temp }}/bundle/sdk-variant.json
             ${{ runner.temp }}/fixture/deployment.json
             libraries/typescript/e2e/manufact/e2e-results.xml
           if-no-files-found: ignore
+
+  teardown:
+    # Closing a PR removes its dev space (branch pr<number>-pr).
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: manufact-e2e
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Remove the PR dev-space deployments
+        env:
+          MANUFACT_TOKEN: ${{ secrets.MANUFACT_TOKEN }}
+          MANUFACT_ORG: ${{ secrets.MANUFACT_ORG }}
+          B: pr${{ github.event.pull_request.number }}-pr
+        run: |
+          # TODO(events): `mcp-use events purge --branch "$B" --yes` once WP-35 ships it.
+          CLI="npx -y @mcp-use/cli@canary"
+          for id in $($CLI deployments list --server ev-e2e-app --branch "$B" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);for(const d of (Array.isArray(j)?j:j.items??j.deployments??[]))console.log(d.id)})'); do
+            $CLI deployments stop "$id" --yes || true
+            $CLI deployments rm "$id" --yes || true
+          done

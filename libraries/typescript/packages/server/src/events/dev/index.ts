@@ -49,6 +49,12 @@ export interface EventsDevOptions {
   publicOrigin?: string;
   /** Random per-process dev token (D41). */
   token: string;
+  /**
+   * `"generation"` (default) begins a new generation and closes older
+   * streams; `"tunnel"` only updates `publicOrigin` on the current one, so
+   * starting or stopping a tunnel never drops open streams.
+   */
+  reason?: "generation" | "tunnel";
 }
 
 /** `GET …/inspector/api/dev/events` body: dev-runtime info only (D66). */
@@ -187,6 +193,11 @@ class RuntimeImpl implements EventsDevRuntime {
     this.storeDir = joinPath(stateDir, "events");
   }
 
+  /** Update the tunnel origin without starting a new generation. */
+  retunnel(publicOrigin: string | undefined): void {
+    this.publicOrigin = publicOrigin;
+  }
+
   /** Begin a new generation and close every stream of an older one. */
   swap(options: EventsDevOptions): void {
     this.generation += 1;
@@ -308,13 +319,18 @@ export function isEventsDevOptions(value: unknown): value is EventsDevOptions {
     typeof v["devPort"] === "number" &&
     typeof v["basePath"] === "string" &&
     typeof v["token"] === "string" &&
-    (v["publicOrigin"] === undefined || typeof v["publicOrigin"] === "string")
+    (v["publicOrigin"] === undefined || typeof v["publicOrigin"] === "string") &&
+    (v["reason"] === undefined ||
+      v["reason"] === "generation" ||
+      v["reason"] === "tunnel")
   );
 }
 
 /**
  * Install or advance the dev runtime for `options.stateDir`: called once per
- * generation. Returns the runtime, whose `generation` was incremented.
+ * generation, and again with `reason: "tunnel"` when a tunnel starts or
+ * stops. A generation handoff increments `generation`; a tunnel handoff on an
+ * existing runtime only updates `publicOrigin`.
  *
  * @throws TypeError when `options` is not plain {@link EventsDevOptions}.
  */
@@ -330,7 +346,11 @@ export function installEventsDev(options: EventsDevOptions): EventsDevRuntime {
     runtime = new RuntimeImpl(options.stateDir);
     reg.runtimes.set(options.stateDir, runtime);
   }
-  runtime.swap(options);
+  if (options.reason === "tunnel" && runtime.generation > 0) {
+    runtime.retunnel(options.publicOrigin);
+  } else {
+    runtime.swap(options);
+  }
   reg.active = options.stateDir;
   return runtime;
 }

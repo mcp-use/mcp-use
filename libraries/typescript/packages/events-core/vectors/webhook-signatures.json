@@ -1,9 +1,9 @@
 {
-  "$comment": "Standard Webhooks v1 signatures: v1, + base64(HMAC-SHA256(secret bytes, webhook-id + '.' + webhook-timestamp + '.' + body)), one entry per secret, space-separated, in secret order. `body` is signed as its UTF-8 bytes. The first case is the published Standard Webhooks test vector (standard-webhooks/standard-webhooks go/webhook_test.go:233-238); the others were computed with node:crypto createHmac, independently of this package. The placeholders {{STANDARD_WEBHOOKS_TEST_SECRET}} (whsec_ plus the key) and {{STANDARD_WEBHOOKS_TEST_KEY}} (the base64 key MfKQ9r8GKY followed by qrTwjUPD8ILPZIo2LaLaSw) stand for the published Standard Webhooks test secret, kept out of the file as one literal because secret scanning flags it; readers substitute them before use.",
+  "$comment": "Standard Webhooks v1 signatures: v1, + base64(HMAC-SHA256(secret bytes, webhook-id + '.' + webhook-timestamp + '.' + body)), one entry per secret, space-separated, in secret order. `body` is signed as its UTF-8 bytes. The first case is the published Standard Webhooks test vector (standard-webhooks/standard-webhooks go/webhook_test.go:233-238); the others were computed with node:crypto createHmac, independently of this package. A case gives its secrets either as `secrets` (the whsec_ strings) or as `secretsHex` (the raw key bytes in hex); a `secretsHex` entry stands for the secret whsec_ + standard padded base64 of those bytes. The published Standard Webhooks test secret is given that way because GitHub secret scanning flags its whsec_ form.",
   "cases": [
     {
       "case": "standard-webhooks-published",
-      "secrets": ["{{STANDARD_WEBHOOKS_TEST_SECRET}}"],
+      "secretsHex": ["31f290f6bf06298aab4f08d43c3f082cf648a362da2da4b0"],
       "webhookId": "msg_p5jXN8AQM9LWM0D4loKWxJek",
       "timestamp": 1614265330,
       "body": "{\"test\": 2432232314}",
@@ -30,7 +30,7 @@
     },
     {
       "case": "non-ascii-body",
-      "secrets": ["{{STANDARD_WEBHOOKS_TEST_SECRET}}"],
+      "secretsHex": ["31f290f6bf06298aab4f08d43c3f082cf648a362da2da4b0"],
       "webhookId": "note_812233",
       "timestamp": 1764000001,
       "body": "{\"eventId\":\"note_812233\",\"name\":\"café.updated\",\"timestamp\":\"2026-11-24T10:01:07.000Z\",\"data\":{\"city\":\"Zürich\",\"emoji\":\"🎉\"},\"cursor\":null}",

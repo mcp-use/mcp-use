@@ -46,7 +46,9 @@ export interface EventSchema<Input = unknown, Output = Input> {
     /** Validates a value. */
     readonly validate: (value: unknown) => unknown;
     /** Phantom input and output types. */
-    readonly types?: { readonly input: Input; readonly output: Output };
+    readonly types?:
+      | { readonly input: Input; readonly output: Output }
+      | undefined;
   };
 }
 

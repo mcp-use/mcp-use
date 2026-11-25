@@ -4,7 +4,8 @@
 //   node e2e/manufact/scripts/janitor.mjs [--execute]
 //
 // Lists deployments of ev-e2e-app, selects `r<run>a<att>-` branches older than
-// janitorMaxAgeMs (w* branches are exempt) and stops and removes them. Without
+// janitorMaxAgeMs and PR dev-space `pr<n>-` branches older than janitorPrMaxAgeMs
+// (w* branches are exempt) and stops and removes them. Without
 // --execute it only prints the selection.
 import { execFileSync } from "node:child_process";
 import { env, janitorSelect, parseArgs, readMatrix } from "./lib.mjs";
@@ -35,6 +36,7 @@ const stale = janitorSelect(items, {
   serverId: server.id,
   now: Date.now(),
   maxAgeMs: matrix.janitorMaxAgeMs,
+  prMaxAgeMs: matrix.janitorPrMaxAgeMs,
 });
 console.log(
   JSON.stringify(

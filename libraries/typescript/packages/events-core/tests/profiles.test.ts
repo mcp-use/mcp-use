@@ -460,6 +460,43 @@ describe("KNOWN_CLIENTS (Appendix E)", () => {
     );
   });
 
+  it("every signal matrix row records the same §20.2 keys", () => {
+    const matrix = JSON.parse(
+      readFileSync(
+        new URL("../src/data/signal-matrix.json", import.meta.url),
+        "utf8"
+      )
+    ) as { rows: Array<Record<string, unknown>> };
+    const expected = [
+      "id",
+      "client",
+      "clientInfoName",
+      "eras",
+      "declaresEventsExtension",
+      "sendsMcpName",
+      "sendsMcpMethod",
+      "callbackHost",
+      "readsCapabilityKey",
+      "webhookIdEqualsEventId",
+      "persistsCursor",
+      "sendsTtlMs",
+      "sendsMcpParam",
+      "userAgent",
+      "callbackPathShape",
+      "refreshCadenceMs",
+      "acceptsRandomWebhookId",
+      "acceptedErrorNumbering",
+      "challengeEcho",
+      "modesUsed",
+      "status",
+      "source",
+      "checkedAt",
+    ];
+    for (const row of matrix.rows) {
+      expect(Object.keys(row)).toEqual(expected);
+    }
+  });
+
   it("every present match field must hold (AND)", () => {
     const row: KnownClientRule = {
       id: "and",
@@ -604,6 +641,10 @@ describe("satisfiesRange (match.clientVersion)", () => {
     ["2.4.0", "1.2 - 2.3", false],
     ["1.0.0-beta.2", ">=1.0.0", false],
     ["1.0.0-beta.2", ">=1.0.0-beta.1", true],
+    ["2.0.0-beta.1", "^1.0.0", false],
+    ["1.5.0-rc.1", ">=1.4.0 <2", false],
+    ["1.1.0-beta.1", ">=1.0.0-beta.1", false],
+    ["5.0.0-beta", "*", false],
     ["5.0.0", "*", true],
     ["1.2.3", "1.2.3", true],
     ["1.2.4", "1.2.3", false],

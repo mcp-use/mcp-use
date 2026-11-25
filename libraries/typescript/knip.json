@@ -18,7 +18,8 @@
     "packages/server": {
       "entry": ["src/oauth/**/*.ts", "tests/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreUnresolved": ["#mcp-use-node-http", "#mcp-use-skills-loader", "#mcp-use-vite-handler"]
+      "ignoreUnresolved": ["#mcp-use-node-http", "#mcp-use-skills-loader", "#mcp-use-vite-handler"],
+      "ignoreDependencies": ["miniflare"]
     },
     "packages/agent": {
       "entry": ["tests/**/*.ts", "examples/**/*.ts"],

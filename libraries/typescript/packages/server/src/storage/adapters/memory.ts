@@ -69,8 +69,11 @@ export class StorageEngine {
 
   readonly now: () => number;
 
-  /** Engine `constructor`: see the matching `McpUseStorage` method. */
-  constructor(now: () => number = Date.now) {
+  /**
+   * Engine `constructor`. The default clock reads `Date.now()` on every call,
+   * so a patched or faked `Date` is honoured.
+   */
+  constructor(now: () => number = () => Date.now()) {
     this.now = now;
   }
 
@@ -430,7 +433,7 @@ function decodeCursor(cursor: string): IndexEntry {
   throw new TypeError(`Invalid indexRange cursor ${JSON.stringify(cursor)}`);
 }
 
-/** @internal A random 12-character `[a-z0-9]` epoch id (D49 cursor format). */
+/** @internal A random 12-character `[a-z0-9]` epoch id (PLAN.md D49). */
 export function randomEpoch(): string {
   const bytes = new Uint8Array(6);
   globalThis.crypto.getRandomValues(bytes);

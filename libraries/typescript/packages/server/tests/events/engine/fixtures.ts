@@ -52,7 +52,9 @@ export const codec: CursorCodec = {
 
 export function event(
   name: string,
-  o: Partial<RegisteredEvent> & { definition?: Partial<RegisteredEvent["definition"]> } = {}
+  o: Omit<Partial<RegisteredEvent>, "definition"> & {
+    definition?: Partial<RegisteredEvent["definition"]>;
+  } = {}
 ): RegisteredEvent {
   return {
     name,

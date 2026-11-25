@@ -30,6 +30,7 @@ export const skip = (detail: string): CheckResult => ({
 
 /** Thrown inside a check to end it with a result. */
 export class Outcome extends Error {
+  /** @param result - The result the check ends with. */
   constructor(readonly result: CheckResult) {
     super(result.detail ?? result.outcome);
   }

@@ -29,8 +29,10 @@ export interface PostgresLikeClient {
    * operations run in a transaction on their own connection and `LISTEN`
    * uses one connection for the signal. Without it (one `Client`),
    * operations are serialized on the one connection and `signal` is off.
+   * A pool resolves to a {@link PostgresPoolClientLike}; `pg.Client`
+   * resolves to nothing.
    */
-  connect?(): Promise<PostgresPoolClientLike>;
+  connect?(): Promise<unknown>;
 }
 
 /** A connection checked out of a pool (`pg.PoolClient`). */
@@ -46,9 +48,11 @@ export interface PostgresPoolClientLike {
   /** Returns the connection to the pool; pass an error or `true` to discard it. */
   release(error?: Error | boolean): void;
   /** Adds a `notification` (from `LISTEN`) or `error` listener. */
-  on?(event: string, listener: (...args: never[]) => void): unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches EventEmitter
+  on?(event: string, listener: (...args: any[]) => void): unknown;
   /** Removes a listener added with `on`. */
-  off?(event: string, listener: (...args: never[]) => void): unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches EventEmitter
+  off?(event: string, listener: (...args: any[]) => void): unknown;
 }
 
 /** Options for {@link postgresStorage}. */
@@ -175,7 +179,7 @@ function poolExecutor(pool: PostgresLikeClient): SqlExecutor {
     dialect: "postgres",
     query: (statement) => run(pool, statement),
     atomic: async (statements) => {
-      const conn = await pool.connect!();
+      const conn = (await pool.connect!()) as PostgresPoolClientLike;
       let failed = false;
       try {
         return await transaction(conn, statements);
@@ -244,8 +248,8 @@ function listenSignal(pool: PostgresLikeClient): StorageSignal {
     }
   };
   const detach = (conn: PostgresPoolClientLike) => {
-    conn.off?.("notification", onNotification as never);
-    conn.off?.("error", onError as never);
+    conn.off?.("notification", onNotification);
+    conn.off?.("error", onError);
   };
   // A broken LISTEN connection is discarded; the next subscribe reopens one.
   function onError(): void {
@@ -260,15 +264,15 @@ function listenSignal(pool: PostgresLikeClient): StorageSignal {
   }
   const open = () => {
     connection ??= (async () => {
-      const conn = await pool.connect!();
+      const conn = (await pool.connect!()) as PostgresPoolClientLike;
       if (typeof conn.on !== "function") {
         conn.release();
         throw new TypeError(
           "postgresStorage signal needs a connection with on('notification'); pass signal: false"
         );
       }
-      conn.on("notification", onNotification as never);
-      conn.on("error", onError as never);
+      conn.on("notification", onNotification);
+      conn.on("error", onError);
       try {
         await conn.query(`LISTEN ${NOTIFY_CHANNEL}`);
       } catch (error) {

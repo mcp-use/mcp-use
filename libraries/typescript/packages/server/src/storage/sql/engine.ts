@@ -70,6 +70,7 @@ function newVersion(): number {
   return 1 + Math.floor(Math.random() * SAFE_INT_LIMIT);
 }
 
+/** A random 12-character `[a-z0-9]` epoch id (PLAN.md D49). */
 function newEpoch(): string {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);

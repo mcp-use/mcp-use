@@ -132,7 +132,11 @@ export const STREAM_CHECKS: readonly ConformanceCheck[] = [
     profiles: ["sep-3415"],
     level: "MUST",
     cite: "events.mdx:715",
-    run: (c) => withStream(c, async (s) => (await active(c, s), pass())),
+    run: (c) =>
+      withStream(c, async (s) => {
+        await active(c, s);
+        return pass();
+      }),
   }),
   check({
     id: "STREAM-META-ID",

@@ -83,7 +83,12 @@ import {
   type ProjectInspectorModule,
 } from "./inspector.js";
 import { isInspectorPath, isInspectorRequest } from "./inspector-route.js";
-import { type EventsDevHandoff, tunnelPathDecision } from "./dev-events.js";
+import {
+  type EventsDevHandoff,
+  type EventsDevHandoffReason,
+  tunnelPathDecision,
+  tunnelPublicOrigin,
+} from "./dev-events.js";
 // Bundled into the CLI artifact without becoming a runtime dependency.
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { createTunnelManager } from "@mcp-use/tunnel";
@@ -877,7 +882,10 @@ export async function runDev(options: DevOptions): Promise<void> {
   let basePath: string;
   let activeServer: ServerLike | undefined;
   let eventsPublicOrigin: string | undefined;
-  const eventsDevHandoff = (nextBasePath: string): EventsDevHandoff => ({
+  const eventsDevHandoff = (
+    nextBasePath: string,
+    reason: EventsDevHandoffReason = "generation"
+  ): EventsDevHandoff => ({
     stateDir: paths.state,
     devPort: port,
     basePath: nextBasePath,
@@ -885,6 +893,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       ? {}
       : { publicOrigin: eventsPublicOrigin }),
     token: eventsDevToken,
+    reason,
   });
   let currentSkillsDirectory: string | undefined;
   try {
@@ -1154,6 +1163,25 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
   const tunnelManager = createTunnelManager(paths.tunnel);
+  // Tell the dev runtime the tunnel host whenever a tunnel starts or stops,
+  // from `--tunnel` or the Inspector, so tunnel requests never get the dev
+  // principal or loopback callbacks (D13 a, D33).
+  const syncEventsTunnel = (url: string | null): void => {
+    eventsPublicOrigin = tunnelPublicOrigin(url);
+    activeServer?.__setEventsDev?.(eventsDevHandoff(basePath, "tunnel"));
+  };
+  const eventsAwareTunnel: typeof tunnelManager = {
+    start: async (tunnelPort) => {
+      const started = await tunnelManager.start(tunnelPort);
+      syncEventsTunnel(started.url);
+      return started;
+    },
+    stop: async () => {
+      await tunnelManager.stop();
+      syncEventsTunnel(null);
+    },
+    status: () => tunnelManager.status(),
+  };
 
   // Vite owns the upgrade listener and validates Host before our HTTP request
   // guard runs. The public tunnel has already been validated by the proxy and
@@ -1250,7 +1278,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     {
       getBasePath: () => basePath,
       port,
-      tunnel: tunnelManager,
+      tunnel: eventsAwareTunnel,
     },
     (request) => {
       if (
@@ -1426,8 +1454,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       const { url } = await tunnelManager.start(port);
       // Tell the dev runtime the tunnel host so tunnel requests never get the
       // dev principal or loopback callbacks (D13 a, D33).
-      eventsPublicOrigin = new URL(url).origin;
-      activeServer?.__setEventsDev?.(eventsDevHandoff(basePath));
+      syncEventsTunnel(url);
       console.log(`  ➜ Tunnel:        ${url}${basePath}`);
     } catch (error) {
       await teardown();

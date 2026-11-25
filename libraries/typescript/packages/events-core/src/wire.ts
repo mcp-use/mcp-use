@@ -212,15 +212,21 @@ export interface UnsubscribeEventsRequestParams {
   arguments?: Record<string, unknown>;
   /** The callback the subscription delivers to. */
   delivery: {
-    /** Always `"webhook"`. */
-    mode: "webhook";
+    /**
+     * Optional and ignored. The spec's request carries only `delivery.url`
+     * (`events.mdx:653-666`); servers must not require `mode`.
+     */
+    mode?: "webhook";
     /** The callback URL the subscription was created with. */
     url: string;
   };
 }
 
-/** Result of `events/unsubscribe`: an empty object. */
-export type UnsubscribeEventsResult = Record<string, never>;
+/** Result of `events/unsubscribe`: an empty `Result`, which may carry `_meta`. */
+export interface UnsubscribeEventsResult {
+  /** Result metadata. */
+  _meta?: Record<string, unknown>;
+}
 
 /** Parameters of `events/poll`. */
 export interface PollEventsRequestParams {

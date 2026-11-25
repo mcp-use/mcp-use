@@ -520,7 +520,8 @@ function holds(c: Comparator, v: Version): boolean {
 /**
  * Tests a version against a semver range. Missing minor or patch parts of the
  * version count as `0` (`"1.4"` is `1.4.0`); an unparseable version or range
- * never satisfies.
+ * never satisfies. As in node-semver, a prerelease version (`2.0.0-beta.1`)
+ * satisfies only a range that names a prerelease of the same `major.minor.patch`.
  *
  * @param version - The version, typically `clientInfo.version`.
  * @param range - A semver range such as `>=1.2.0 <2`, `^1.0.0`, `~2.1` or `1.x || 3.x`.
@@ -530,5 +531,18 @@ export function satisfiesRange(version: string, range: string): boolean {
   const v = parseVersion(version);
   const sets = parseRange(range);
   if (!v || !sets) return false;
-  return sets.some((set) => set.every((c) => holds(c, v)));
+  return sets.some(
+    (set) =>
+      set.every((c) => holds(c, v)) &&
+      // node-semver: a prerelease version satisfies a comparator set only when
+      // some comparator in it is a prerelease of the same major.minor.patch.
+      (v[3].length === 0 ||
+        set.some(
+          (c) =>
+            c.v[3].length > 0 &&
+            c.v[0] === v[0] &&
+            c.v[1] === v[1] &&
+            c.v[2] === v[2]
+        ))
+  );
 }

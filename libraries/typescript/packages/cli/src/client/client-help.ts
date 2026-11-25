@@ -82,9 +82,146 @@ page("<name>", {
     ["tools", "List, describe, or call tools"],
     ["resources", "List or read resources"],
     ["prompts", "List or get prompts"],
+    ["events", "List, subscribe to, receive or check MCP Events"],
     ["auth", "Authenticate or inspect saved OAuth state"],
   ],
   options: [HELP],
+});
+
+const DIALECT: [string, string] = [
+  "--dialect <auto|sep-3415|chatgpt>",
+  "Wire dialect to speak (default: auto)",
+];
+const EVENT_ARGS: [string, string] = [
+  "--args <json>",
+  "Subscription arguments as one JSON object",
+];
+const CURSOR: [string, string] = [
+  "--cursor <cursor>",
+  "Resume after this cursor (`null` for from now)",
+];
+const MAX_AGE: [string, string] = [
+  "--max-age <duration>",
+  "Replay floor, such as 10m",
+];
+
+page("<name> events", {
+  usage: "mcp-use client <name> events <command>",
+  summary: "Use MCP Events on a saved MCP server.",
+  commands: [
+    ["list", "List the events the server offers"],
+    ["subscribe <event>", "Create a webhook subscription for a callback URL"],
+    ["unsubscribe <event>", "Remove a webhook subscription"],
+    ["listen <event>", "Receive and print verified deliveries"],
+    ["poll <event>", "Poll for events"],
+    ["stream <event>", "Open a push stream and print every frame"],
+    ["check", "Run the Events conformance checks"],
+  ],
+  options: [HELP],
+  notes: [
+    "Exit codes: 0 success, 1 failure, 2 usage, 3 the server terminated the stream or subscription.",
+  ],
+});
+
+page("<name> events list", {
+  usage: "mcp-use client <name> events list [options]",
+  summary: "List the events a saved MCP server offers.",
+  options: [DIALECT, JSON, HELP],
+});
+
+page("<name> events subscribe", {
+  usage:
+    "mcp-use client <name> events subscribe <event> --url <callback> [options]",
+  summary: "Create a webhook subscription and print its id and secret.",
+  options: [
+    EVENT_ARGS,
+    ["--url <callback>", "Webhook receiver the server delivers to"],
+    ["--secret <whsec_…>", "Signing secret (default: generated)"],
+    ["--ttl <duration>", "Requested lifetime, such as 1h"],
+    CURSOR,
+    MAX_AGE,
+    DIALECT,
+    JSON,
+    HELP,
+  ],
+});
+
+page("<name> events unsubscribe", {
+  usage:
+    "mcp-use client <name> events unsubscribe <event> --url <callback> [options]",
+  summary: "Remove a webhook subscription.",
+  options: [
+    EVENT_ARGS,
+    ["--url <callback>", "The subscribed callback"],
+    DIALECT,
+    JSON,
+    HELP,
+  ],
+});
+
+page("<name> events listen", {
+  usage: "mcp-use client <name> events listen <event> [options]",
+  summary:
+    "Subscribe and print one line per verified delivery: time, eventId, webhook-id, checks, cursor, data.",
+  options: [
+    EVENT_ARGS,
+    ["--mode <webhook|push|poll>", "Delivery mode (default: push, then poll)"],
+    ["--tunnel", "Expose the local webhook receiver through a tunnel"],
+    ["--port <port>", "Local webhook receiver port (default: any free port)"],
+    CURSOR,
+    MAX_AGE,
+    ["--count <n>", "Exit after n deliveries"],
+    DIALECT,
+    JSON,
+    HELP,
+  ],
+  notes: ["Runs until Ctrl+C. With --json, prints one JSON object per line."],
+});
+
+page("<name> events poll", {
+  usage: "mcp-use client <name> events poll <event> [options]",
+  summary: "Poll for events and print them with the next cursor.",
+  options: [
+    EVENT_ARGS,
+    CURSOR,
+    MAX_AGE,
+    ["--max-events <n>", "Page size"],
+    ["--follow", "Keep polling, honouring hasMore and nextPollMs"],
+    DIALECT,
+    JSON,
+    HELP,
+  ],
+});
+
+page("<name> events stream", {
+  usage: "mcp-use client <name> events stream <event> [options]",
+  summary:
+    "Open events/stream and print every frame with its arrival time; exits 0 on a graceful close and 3 when the server terminates the stream.",
+  options: [
+    EVENT_ARGS,
+    CURSOR,
+    MAX_AGE,
+    ["--heartbeat <duration>", "Requested heartbeat interval, such as 30s"],
+    DIALECT,
+    JSON,
+    HELP,
+  ],
+});
+
+page("<name> events check", {
+  usage: "mcp-use client <name> events check [options]",
+  summary:
+    "Run the MCP Events conformance catalog against the server; exits 1 when a MUST check fails.",
+  options: [
+    ["--dialect <openai,sep-3415>", "Profiles to check (default: both)"],
+    ["--only <ids>", "Check ids or family prefixes, such as POLL-,STREAM-"],
+    ["--mcp-name <lenient|strict>", "Require Mcp-Name (default: lenient)"],
+    ["--tunnel", "Receive webhook checks through a tunnel (remote servers)"],
+    ["--format <text|json|junit>", "Report format (default: text)"],
+    ["--out <file>", "Write the report to a file"],
+    JSON,
+    HELP,
+  ],
 });
 
 page("<name> tools", {
@@ -219,7 +356,7 @@ export function resolveClientHelp(argv: readonly string[]): ClientHelpResult {
 
   const family = path[1];
   if (family === undefined) return { text: render(pages.get("<name>")!) };
-  if (!["tools", "resources", "prompts", "auth"].includes(family)) {
+  if (!["tools", "resources", "prompts", "events", "auth"].includes(family)) {
     return { error: `Unknown client command family: ${family}` };
   }
 

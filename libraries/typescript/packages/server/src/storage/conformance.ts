@@ -669,8 +669,8 @@ const CHECKS: Record<Exclude<StorageCheckId, "LOG-ATOMIC">, Check> = {
     const first = await storage.logAppend(s, "a", { maxEvents: 10 });
     check(!first.duplicate, "first append is not a duplicate");
     check(
-      typeof first.epoch === "string" && first.epoch.length > 0,
-      "the epoch is a non-empty string"
+      typeof first.epoch === "string" && /^[a-z0-9]{12}$/.test(first.epoch),
+      "the epoch is a 12-character [a-z0-9] id (cursors embed it)"
     );
     same(first.seq, 1, "first seq");
     const second = await storage.logAppend(s, "b", { maxEvents: 10 });

@@ -30,7 +30,10 @@ describe.skipIf(!hasFixture)("E0 deploy and identity", () => {
   it("the startup record with the instance id is in the runtime logs", async () => {
     const lines = await target().logs();
     const startup = lines.map(tryJson).find((l) => l?.msg === "startup");
-    expect(startup?.combo).toBe(target().combo.sha);
+    const combo = target().combo;
+    // A canary bundle has no sha: the fixture logs null and its mcp-use version.
+    expect(startup?.combo).toBe(combo.sha ?? null);
+    expect(startup?.mcpUse).toBe(combo.mcpUse.versions["mcp-use"]);
   });
 
   // TODO(events): health route assertions (binding, layout 1, nsHash and R3b

@@ -194,7 +194,7 @@ function retryAfterSec(response: Response, body: unknown): number | undefined {
 }
 
 /** An authenticated client scoped to one organization. */
-interface CloudConnection {
+export interface CloudConnection {
   /** Calls infer parameters and responses from the route. */
   client: Client<paths>;
   /** The organization requests act on. */

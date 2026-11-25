@@ -7,6 +7,8 @@ import { parseArgs } from "node:util";
 import type { MCPConnection } from "@mcp-use/client";
 
 import { resolveClientHelp } from "./client-help.js";
+import { runClientEvents } from "./events/index.js";
+import type { EventsLaneLike } from "./events/types.js";
 import { loadClientPackage } from "./load-client.js";
 import { CommandError, UsageError } from "../core/errors.js";
 import {
@@ -242,6 +244,32 @@ async function savedServerCommand(
     }
   }
 
+  if (family === "events") {
+    const credentials = await readJson<SavedCredentials>(
+      credentialsPath(name),
+      {}
+    );
+    return await runClientEvents({
+      server: name,
+      url: definition.url,
+      headers: credentials.headers ?? {},
+      argv: argv.slice(1),
+      json,
+      loadClient: () => loadClientPackage({ allowInstall: !json }),
+      connect: (lane) =>
+        openConnection(
+          name,
+          definition,
+          credentials,
+          300_000,
+          resolveBrowserMode({ noOpen: false, json }),
+          json,
+          undefined,
+          lane
+        ),
+    });
+  }
+
   validateSavedCommandArgs(name, family, operation, argv.slice(2));
   const credentials = await readJson<SavedCredentials>(
     credentialsPath(name),
@@ -340,7 +368,7 @@ async function savedServerCommand(
       }
     }
     throw new UsageError(
-      `Usage: mcp-use client ${name} <tools|resources|prompts|auth> ...`
+      `Usage: mcp-use client ${name} <tools|resources|prompts|events|auth> ...`
     );
   } finally {
     await connection.disconnect();
@@ -387,7 +415,7 @@ function validateSavedCommandArgs(
     return;
   }
   throw new UsageError(
-    `Usage: mcp-use client ${name} <tools|resources|prompts|auth> ...`
+    `Usage: mcp-use client ${name} <tools|resources|prompts|events|auth> ...`
   );
 }
 
@@ -474,11 +502,17 @@ async function openConnection(
   authTimeoutMs: number,
   browserMode: BrowserMode = process.stdin.isTTY ? "ask" : "never",
   quiet = false,
-  interactiveCommand = `mcp-use client ${name} tools list`
+  interactiveCommand = `mcp-use client ${name} tools list`,
+  eventsLane?: EventsLaneLike
 ): Promise<MCPConnection> {
-  const { createOAuthProvider, MCPClient, logger } = await loadClientPackage({
+  const clientPackage = await loadClientPackage({
     allowInstall: !quiet,
   });
+  const { createOAuthProvider, logger } = clientPackage;
+  const MCPClient =
+    eventsLane === undefined
+      ? clientPackage.MCPClient
+      : withEventsLane(clientPackage, eventsLane);
   if (quiet) {
     logger.level = "silent";
   } else if (
@@ -561,6 +595,13 @@ async function openConnection(
         ...(credentials.headers !== undefined
           ? { headers: credentials.headers }
           : {}),
+        ...(eventsLane !== undefined
+          ? {
+              fetch: eventsLane.wrapFetch((input, init) =>
+                globalThis.fetch(input, init)
+              ),
+            }
+          : {}),
         ...(authProvider !== undefined ? { authProvider } : { oauth: false }),
         ...protocolConfig,
       },
@@ -590,6 +631,41 @@ async function openConnection(
       credentials
     );
   }
+}
+
+/**
+ * An `MCPClient` whose HTTP connectors carry the MCP Events lane on their
+ * transport (PLAN.md §9.2), as `useMcp` installs it. The connector is built by
+ * the SDK's own `createConnectorFromConfig` with `wrapTransport`, the one
+ * connector option the Node client's config does not forward.
+ */
+function withEventsLane(
+  clientPackage: Awaited<ReturnType<typeof loadClientPackage>>,
+  lane: EventsLaneLike
+): typeof clientPackage.MCPClient {
+  const { createConnectorFromConfig } = clientPackage;
+  // The package's default declarations are the browser build, whose
+  // `createConnectorFromConfig` is synchronous; the Node client loaded at run
+  // time awaits whatever it returns.
+  const Base = clientPackage.MCPClient as unknown as new (
+    config?: Record<string, unknown>
+  ) => {
+    createConnectorFromConfig(serverConfig: Record<string, unknown>): unknown;
+  };
+  class EventsLaneMCPClient extends Base {
+    override createConnectorFromConfig(serverConfig: Record<string, unknown>) {
+      if (!("url" in serverConfig)) {
+        return super.createConnectorFromConfig(serverConfig);
+      }
+      return createConnectorFromConfig(
+        serverConfig as unknown as Parameters<
+          typeof createConnectorFromConfig
+        >[0],
+        { wrapTransport: (transport: unknown) => lane.wrapTransport(transport) }
+      );
+    }
+  }
+  return EventsLaneMCPClient as unknown as typeof clientPackage.MCPClient;
 }
 
 /**

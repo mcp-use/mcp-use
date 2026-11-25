@@ -18,7 +18,9 @@ const processApiLimiter = new RateLimiterMemory({
  * caller keys. Requests that didn't pass through a platform proxy (a local
  * Inspector or `mcp-use dev`) can't be told apart, so only the ceiling applies.
  */
-export function inspectorApiRateLimit(limiter: RateLimiterMemory) {
+export function inspectorApiRateLimit(
+  limiter: RateLimiterMemory
+): (c: Context, next: Next) => Promise<Response | void> {
   return async (c: Context, next: Next) => {
     try {
       const key = clientKey(c);
@@ -44,7 +46,10 @@ function clientKey(c: Context): string | undefined {
 }
 
 /** Return the standard Inspector response for an exhausted route budget. */
-export function inspectorRateLimitResponse(c: Context, error: unknown) {
+export function inspectorRateLimitResponse(
+  c: Context,
+  error: unknown
+): Response {
   c.header("Retry-After", String(retryAfterSeconds(error)));
   return c.json({ error: "Too Many Requests" }, 429);
 }

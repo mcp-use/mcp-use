@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { isPrivateAddress } from "../../src/net/address.js";
 import { fetchWebhookSender } from "../../src/events/senders/fetch.js";
@@ -11,12 +10,9 @@ import {
   createTestReceiver,
   type TestReceiver,
 } from "../../src/events/testing/receiver.js";
+import { createReceiverTlsFixture } from "./tls-fixture.js";
 
-const fixtures = new URL("./fixtures/", import.meta.url);
-const tlsFixture = {
-  cert: readFileSync(new URL("receiver-cert.pem", fixtures), "utf8"),
-  key: readFileSync(new URL("receiver-key.pem", fixtures), "utf8"),
-};
+const tlsFixture = createReceiverTlsFixture();
 
 const receivers: TestReceiver[] = [];
 async function receiver(

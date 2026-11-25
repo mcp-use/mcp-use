@@ -2,7 +2,7 @@
 // Deploy a staged fixture with the in-development CLI to a per-run branch (PLAN.md §18.8.1 step 7, §18.8.8).
 //
 //   node e2e/manufact/scripts/deploy.mjs --fixture <dir> --variant <v>
-//        [--run <id>] [--attempt <n>] [--branch <b>] [--fallback] [--execute]
+//        [--run <id>] [--attempt <n>] [--pr <n>] [--branch <b>] [--fallback] [--execute]
 //
 // Without --execute it prints the plan (argv and environment it would use) and
 // calls nothing, so it is safe locally. With --execute it requires
@@ -21,6 +21,7 @@ import {
   deployArgv,
   env,
   isJanitorBranch,
+  isPrBranch,
   parseArgs,
   readMatrix,
 } from "./lib.mjs";
@@ -28,7 +29,7 @@ import {
 const args = parseArgs(process.argv.slice(2));
 if (typeof args.fixture !== "string" || typeof args.variant !== "string") {
   console.error(
-    "usage: deploy.mjs --fixture <dir> --variant <v> [--run <id>] [--attempt <n>] [--branch <b>] [--fallback] [--execute]"
+    "usage: deploy.mjs --fixture <dir> --variant <v> [--run <id>] [--attempt <n>] [--pr <n>] [--branch <b>] [--fallback] [--execute]"
   );
   process.exit(2);
 }
@@ -37,15 +38,19 @@ const fixtureDir = resolve(args.fixture);
 const combo = JSON.parse(readFileSync(join(fixtureDir, "combo.json"), "utf8"));
 const runId = String(args.run ?? env("GITHUB_RUN_ID") ?? "0");
 const attempt = String(args.attempt ?? env("GITHUB_RUN_ATTEMPT") ?? "1");
+// --pr <n> deploys to the PR's dev-space branch `pr<n>-<variant>`, which every
+// push to that PR redeploys; without it each run gets its own `r<run>a<att>-` branch.
+const pr = typeof args.pr === "string" ? args.pr : undefined;
 const branch =
   typeof args.branch === "string"
     ? args.branch
-    : branchName({ runId, attempt, variant: args.variant });
+    : branchName({ runId, attempt, variant: args.variant, pr });
 const message = commitMessage({
   runId,
   attempt,
   variant: args.variant,
   sha: combo.sha,
+  version: combo.mcpUse?.versions?.["mcp-use"],
 });
 const cli = join(fixtureDir, "node_modules", ".bin", "mcp-use");
 
@@ -125,7 +130,9 @@ try {
       : (listed.items ?? listed.deployments ?? []);
     const live = items.filter(
       (d) =>
+        // Per-run branches only: PR dev spaces are long-lived and the janitor ages them out.
         isJanitorBranch(d.branch ?? "") &&
+        !isPrBranch(d.branch ?? "") &&
         ["running", "building", "pending"].includes(d.status)
     );
     if (live.length < matrix.caps.liveDeployments) break;

@@ -9,22 +9,28 @@ import {
   verifyWebhook,
   WebhookVerificationError,
 } from "../src/index.js";
-import { readVector } from "./vectors.js";
+import { readVector, secretFromHex } from "./vectors.js";
 
 const encoder = new TextEncoder();
 
-interface SignatureCase {
+interface SignatureVector {
   case: string;
-  secrets: string[];
+  secrets?: string[];
+  secretsHex?: string[];
   webhookId: string;
   timestamp: number;
   body: string;
   signature: string;
 }
 
-const signatures = readVector<{ cases: SignatureCase[] }>(
+type SignatureCase = SignatureVector & { secrets: string[] };
+
+const signatures: SignatureCase[] = readVector<{ cases: SignatureVector[] }>(
   "webhook-signatures.json"
-).cases;
+).cases.map((c) => ({
+  ...c,
+  secrets: c.secrets ?? (c.secretsHex ?? []).map((hex) => secretFromHex(hex)),
+}));
 
 function secretBytes(secret: string): Uint8Array {
   const bytes = parseWebhookSecret(secret);
@@ -301,15 +307,25 @@ describe("webhook ids and secrets", () => {
     expect(() => generateWebhookSecret(65)).toThrow(RangeError);
   });
 
-  const secrets = readVector<{
-    strict: Array<{
-      secret: string;
-      ok: boolean;
-      bytes?: number;
-      reason?: string;
-    }>;
-    lenient: Array<{ secret: string; bytes: number | null }>;
+  interface SecretInput {
+    secret?: string;
+    secretHex?: string;
+    secretPrefix?: string;
+  }
+  const raw = readVector<{
+    strict: Array<
+      SecretInput & { ok: boolean; bytes?: number; reason?: string }
+    >;
+    lenient: Array<SecretInput & { bytes: number | null }>;
   }>("webhook-secrets.json");
+  const withSecret = <T extends SecretInput>(c: T): T & { secret: string } => ({
+    ...c,
+    secret: c.secret ?? secretFromHex(c.secretHex ?? "", c.secretPrefix ?? ""),
+  });
+  const secrets = {
+    strict: raw.strict.map(withSecret),
+    lenient: raw.lenient.map(withSecret),
+  };
 
   for (const c of secrets.strict) {
     it(`strict ${c.secret.slice(0, 30)} → ${c.ok ? c.bytes : c.reason}`, () => {

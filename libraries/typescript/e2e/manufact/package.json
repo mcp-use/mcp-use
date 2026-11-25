@@ -12,6 +12,7 @@
     "e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit",
     "build-variant": "node scripts/build-variant.mjs",
+    "resolve-published": "node scripts/resolve-published.mjs",
     "stage-fixture": "node scripts/stage-fixture.mjs",
     "deploy": "node scripts/deploy.mjs"
   },

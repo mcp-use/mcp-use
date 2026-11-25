@@ -1,4 +1,5 @@
 import IORedis from "ioredis";
+import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { memoryStorage } from "../../src/oauth/proxy/storage.js";
 import { cloudflareStorage } from "../../src/storage/adapters/cloudflare-d1.js";
@@ -20,12 +21,17 @@ function service(name: string): string | undefined {
 }
 
 const REDIS_URL = service("MCP_USE_TEST_REDIS_URL");
+const POSTGRES_URL = service("MCP_USE_TEST_POSTGRES_URL");
 const UPSTASH_URL = service("MCP_USE_TEST_UPSTASH_URL");
 const UPSTASH_TOKEN = service("MCP_USE_TEST_UPSTASH_TOKEN");
 
 const clients: IORedis[] = [];
+const pools: pg.Pool[] = [];
 afterAll(async () => {
-  await Promise.all(clients.map((client) => client.quit()));
+  await Promise.all([
+    ...clients.map((client) => client.quit()),
+    ...pools.map((pool) => pool.end()),
+  ]);
 });
 
 const run = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -50,6 +56,14 @@ describe("validateStoragePrefix", () => {
         cloudflareStorage({
           d1: { prepare: () => ({}) as never },
           prefix: "{",
+        }),
+      () =>
+        cloudflareStorage({
+          durableObject: {
+            idFromName: () => "id",
+            get: () => ({ fetch: async () => Response.json({}) }),
+          },
+          prefix: "do}",
         }),
     ];
     for (const factory of factories) {
@@ -160,20 +174,26 @@ describe("factory prefix option", () => {
     ]);
   });
 
-  it("postgresStorage stores prefixed keys", async () => {
-    const queries: unknown[][] = [];
-    const storage = postgresStorage({
-      client: {
-        query: async (_text: string, values?: unknown[]) => {
-          if (values) queries.push(values);
-          return { rows: [] };
-        },
-      },
-      prefix: "app/",
-    });
-    await storage.get("k");
-    expect(queries).toEqual([["app/k"]]);
-  });
+  it.skipIf(!POSTGRES_URL)(
+    "postgresStorage stores prefixed keys in the mcp_use_oauth table",
+    async () => {
+      const pool = new pg.Pool({ connectionString: POSTGRES_URL });
+      pools.push(pool);
+      const prefix = `wp02-${run}/`;
+      const storage = postgresStorage({ client: pool, prefix });
+      await storage.set("k", "v", 60);
+      const rows = async () =>
+        (
+          await pool.query(
+            "SELECT key, value FROM mcp_use_oauth WHERE key = ANY($1) ORDER BY key",
+            [[`${prefix}k`, "k"]]
+          )
+        ).rows;
+      expect(await rows()).toEqual([{ key: `${prefix}k`, value: "v" }]);
+      expect(await storage.take("k")).toBe("v");
+      expect(await rows()).toEqual([]);
+    }
+  );
 
   it.skipIf(!REDIS_URL)(
     "redisStorage over ioredis writes under the prefix",

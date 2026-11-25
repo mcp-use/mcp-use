@@ -20,6 +20,29 @@ export interface EventsDevHandoff {
   publicOrigin?: string;
   /** Random per-process dev token (D41). */
   token: string;
+  /**
+   * Why the handoff happens. `"generation"` (the default) starts a new server
+   * generation and closes the previous generation's streams; `"tunnel"` only
+   * updates `publicOrigin` on the current generation. Older `mcp-use`
+   * versions ignore it.
+   */
+  reason?: EventsDevHandoffReason;
+}
+
+/** Why the CLI hands the dev runtime new data. */
+export type EventsDevHandoffReason = "generation" | "tunnel";
+
+/**
+ * The public origin to hand the dev runtime for a tunnel status URL: the
+ * origin while a tunnel is active, otherwise undefined.
+ */
+export function tunnelPublicOrigin(url: string | null): string | undefined {
+  if (url === null) return undefined;
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
 }
 
 /** What the dev listener does with a request that arrived through the tunnel host. */

@@ -57,7 +57,10 @@ const TTL_MS = 10 * 60 * 1000;
  * does not throw on failure.
  *
  * Build `denied` with `allowed`'s prefix: with a different prefix it writes
- * other keys, and the check passes without testing the credential.
+ * other keys and proves nothing about the credential. `DENIED-WRITE` fails
+ * when `denied` can write and read back its own value at a key under test
+ * while `allowed` still reads its own, which is what a prefix mismatch
+ * looks like.
  *
  * @param options - The allowed and denied stores.
  * @returns One result per check.
@@ -162,10 +165,22 @@ export async function runStorageIsolationCheck(
     await quietly(() => denied.indexRemove(ix, "m"));
     await quietly(() => denied.logAppend(s, "denied", { maxEvents: 10 }));
     const changed = await allowedView();
+    // A denied store that reads back its own writes while allowed keeps its
+    // values is not addressing allowed's keys (usually another prefix), so
+    // nothing about its credential was tested.
+    const ownCopy =
+      changed === undefined &&
+      ((await quietly(async () => (await denied.read(k))?.value)) ===
+        "denied" ||
+        (await quietly(() => denied.get(o))) === "denied");
     await quietly(() => denied.remove(k));
     await quietly(() => denied.delete(o));
     await quietly(() => denied.logDelete(s));
-    const removed = changed ?? (await allowedView());
+    const removed =
+      changed ??
+      (ownCopy
+        ? "denied wrote and read back its own value at allowed's key while allowed kept its value, so the two stores address different keys: build denied with allowed's prefix"
+        : await allowedView());
     checks.push(
       removed === undefined
         ? { id: "DENIED-WRITE", status: "pass" }

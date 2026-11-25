@@ -83,6 +83,16 @@ describe("events middleware (D43)", () => {
   });
 });
 
+/** `server.on` with a pattern the overloads reject at compile time. */
+function onAny(
+  server: MCPServer
+): (pattern: string, handler: () => undefined) => unknown {
+  return server.on.bind(server) as unknown as (
+    pattern: string,
+    handler: () => undefined
+  ) => unknown;
+}
+
 describe("server.on naming (D3)", () => {
   it("still accepts operation patterns", () => {
     const server = new MCPServer({
@@ -92,7 +102,7 @@ describe("server.on naming (D3)", () => {
     });
     expect(() => server.on("mcp:tools/call", () => undefined)).not.toThrow();
     expect(() =>
-      server.on("tools/call" as never, () => undefined)
+      onAny(server)("tools/call", () => undefined)
     ).not.toThrow();
   });
 
@@ -102,7 +112,7 @@ describe("server.on naming (D3)", () => {
       version: "1.0.0",
       skills: false,
     });
-    expect(() => server.on("note.created" as never, () => undefined)).toThrow(
+    expect(() => onAny(server)("note.created", () => undefined)).toThrow(
       expect.objectContaining({ code: "ON_NOT_EVENT" })
     );
   });
