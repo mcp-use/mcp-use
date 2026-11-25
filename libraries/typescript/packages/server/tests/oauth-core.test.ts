@@ -232,6 +232,44 @@ describe("OAuth core", () => {
     }
   });
 
+  it("matches aud URLs to the resource with the same canonicalization as the resource claim", async () => {
+    const key = new TextEncoder().encode(
+      "a sufficiently long test signing key"
+    );
+    const issuer = "https://issuer.example.test";
+    const verifierFor = (resource: URL) =>
+      createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
+        key,
+        algorithms: ["HS256"],
+        resource,
+      });
+    const sign = (claims: Record<string, unknown>) =>
+      new SignJWT({ sub: "user-1", client_id: "client-1", ...claims })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(issuer)
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
+        .sign(key);
+
+    const origin = new URL("https://api.example.test");
+    await expect(
+      verifierFor(origin).verifyAccessToken(
+        await sign({ aud: "https://api.example.test" })
+      )
+    ).resolves.toMatchObject({ resource: origin });
+    await expect(
+      verifierFor(canonicalResource).verifyAccessToken(
+        await sign({ aud: ["provider-api", `${canonicalResource.href}/`] })
+      )
+    ).resolves.toMatchObject({ resource: canonicalResource });
+    await expect(
+      verifierFor(canonicalResource).verifyAccessToken(
+        await sign({ aud: "https://api.example.test/mcp-other" })
+      )
+    ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+  });
+
   it("keeps provider audiences separate from the protected resource", async () => {
     const key = new TextEncoder().encode(
       "a sufficiently long test signing key"

@@ -267,7 +267,11 @@ function verifiedResource(
     throw invalidToken("Token audience claim must be a string or string array");
   }
   const audiences = typeof audience === "string" ? [audience] : audience;
-  if (!audiences.includes(configuredResource.href)) {
+  if (
+    !audiences.some(
+      (value) => canonicalAudience(value) === configuredResource.href
+    )
+  ) {
     throw invalidToken(
       "Token audience does not include the protected resource"
     );
@@ -344,6 +348,19 @@ function canonicalUrl(value: string): URL {
     throw invalidToken(
       "Token resource claim must be an absolute HTTPS URL, or HTTP URL for localhost"
     );
+  }
+}
+
+/**
+ * Canonicalizes an `aud` entry the way {@link canonicalUrl} does the
+ * `resource` claim. An entry that is not an allowed URL (a provider API
+ * identifier such as "provider-api") is returned unchanged.
+ */
+function canonicalAudience(value: string): string {
+  try {
+    return canonicalUrl(value).href;
+  } catch {
+    return value;
   }
 }
 
