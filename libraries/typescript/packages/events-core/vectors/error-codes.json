@@ -1,0 +1,260 @@
+{
+  "$comment": "Events error codes in the three numberings of the errorCodes axis (PLAN §6.13, D53). `sep` equals EVENTS_ERROR_CODES of modelcontextprotocol/typescript-sdk PR #3209 (packages/core-internal/src/ext/events/codes.ts). `encode`: an error raised with `kind` and `data` serialized under `numbering`. `decode`: a JSON-RPC error a client receives and the kind it decodes to (null = not an Events error).",
+  "numberings": {
+    "sketch": {
+      "invalidParams": -32602,
+      "notFound": -32011,
+      "forbidden": -32012,
+      "resourceExhausted": -32013,
+      "unsupported": -32014,
+      "callbackEndpointError": -32015
+    },
+    "sep": {
+      "invalidParams": -32602,
+      "notFound": -32023,
+      "forbidden": -32024,
+      "resourceExhausted": -32025,
+      "unsupported": -32026,
+      "callbackEndpointError": -32027
+    },
+    "documented": {
+      "invalidParams": -32602,
+      "notFound": -32602,
+      "forbidden": -32602,
+      "resourceExhausted": -32602,
+      "unsupported": -32602,
+      "callbackEndpointError": -32015
+    }
+  },
+  "fixed": {
+    "headerMismatch": -32020,
+    "notOffered": -32601,
+    "invalidRequest": -32600,
+    "internal": -32603
+  },
+  "encode": [
+    {
+      "numbering": "sep",
+      "kind": "notFound",
+      "data": { "kind": "event" },
+      "code": -32023,
+      "wireData": { "kind": "event" }
+    },
+    {
+      "numbering": "sketch",
+      "kind": "forbidden",
+      "data": { "reason": "principal_required" },
+      "code": -32012,
+      "wireData": { "reason": "principal_required" }
+    },
+    {
+      "numbering": "documented",
+      "kind": "notFound",
+      "data": { "kind": "subscription" },
+      "code": -32602,
+      "wireData": { "kind": "subscription" }
+    },
+    {
+      "numbering": "documented",
+      "kind": "forbidden",
+      "data": { "reason": "revoked" },
+      "code": -32602,
+      "wireData": { "reason": "revoked", "kind": "forbidden" }
+    },
+    {
+      "numbering": "documented",
+      "kind": "resourceExhausted",
+      "data": { "limit": "pollRate", "retryAfterMs": 500 },
+      "code": -32602,
+      "wireData": {
+        "limit": "pollRate",
+        "retryAfterMs": 500,
+        "kind": "resourceExhausted"
+      }
+    },
+    {
+      "numbering": "documented",
+      "kind": "unsupported",
+      "data": { "feature": "deliveryMode", "value": "poll" },
+      "code": -32602,
+      "wireData": {
+        "feature": "deliveryMode",
+        "value": "poll",
+        "kind": "unsupported"
+      }
+    },
+    {
+      "numbering": "documented",
+      "kind": "callbackEndpointError",
+      "data": { "reason": "timeout" },
+      "code": -32015,
+      "wireData": { "reason": "timeout" }
+    },
+    {
+      "numbering": "sep",
+      "kind": "invalidParams",
+      "data": { "field": "delivery.secret" },
+      "code": -32602,
+      "wireData": { "field": "delivery.secret" }
+    }
+  ],
+  "decode": [
+    { "error": { "code": -32023, "message": "x" }, "kind": "notFound" },
+    { "error": { "code": -32024, "message": "x" }, "kind": "forbidden" },
+    {
+      "error": { "code": -32025, "message": "x" },
+      "kind": "resourceExhausted"
+    },
+    { "error": { "code": -32026, "message": "x" }, "kind": "unsupported" },
+    {
+      "error": { "code": -32027, "message": "x" },
+      "kind": "callbackEndpointError"
+    },
+    {
+      "error": {
+        "code": -32011,
+        "message": "Subscription missing",
+        "data": { "kind": "subscription" }
+      },
+      "kind": "notFound"
+    },
+    {
+      "error": { "code": -32011, "message": "Not Found" },
+      "kind": "notFound"
+    },
+    { "error": { "code": -32011, "message": "Server busy" }, "kind": null },
+    {
+      "error": {
+        "code": -32012,
+        "message": "Denied",
+        "data": { "reason": "revoked" }
+      },
+      "kind": "forbidden"
+    },
+    { "error": { "code": -32012, "message": "Forbidden" }, "kind": "forbidden" },
+    { "error": { "code": -32012, "message": "Denied" }, "kind": null },
+    {
+      "error": {
+        "code": -32013,
+        "message": "Slow down",
+        "data": { "limit": "pollRate" }
+      },
+      "kind": "resourceExhausted"
+    },
+    { "error": { "code": -32013, "message": "Slow down" }, "kind": null },
+    {
+      "error": {
+        "code": -32014,
+        "message": "No",
+        "data": { "feature": "deliveryMode", "value": "poll" }
+      },
+      "kind": "unsupported"
+    },
+    { "error": { "code": -32014, "message": "No" }, "kind": null },
+    {
+      "error": {
+        "code": -32015,
+        "message": "Callback failed",
+        "data": { "reason": "challenge_failed" }
+      },
+      "kind": "callbackEndpointError"
+    },
+    {
+      "error": {
+        "code": -32015,
+        "message": "Callback endpoint unreachable"
+      },
+      "kind": "callbackEndpointError"
+    },
+    {
+      "error": {
+        "code": -32015,
+        "message": "Failed",
+        "data": { "reason": "disk_full" }
+      },
+      "kind": null
+    },
+    {
+      "error": {
+        "code": -32602,
+        "message": "Invalid params",
+        "data": { "kind": "event" }
+      },
+      "kind": "notFound"
+    },
+    {
+      "error": {
+        "code": -32602,
+        "message": "Invalid params",
+        "data": { "kind": "subscription" }
+      },
+      "kind": "notFound"
+    },
+    {
+      "error": {
+        "code": -32602,
+        "message": "Invalid params",
+        "data": { "kind": "forbidden", "reason": "revoked" }
+      },
+      "kind": "forbidden"
+    },
+    {
+      "error": {
+        "code": -32602,
+        "message": "Invalid params",
+        "data": { "kind": "resourceExhausted", "limit": "streams" }
+      },
+      "kind": "resourceExhausted"
+    },
+    {
+      "error": {
+        "code": -32602,
+        "message": "Invalid params",
+        "data": { "kind": "unsupported", "feature": "deliveryMode" }
+      },
+      "kind": "unsupported"
+    },
+    {
+      "error": {
+        "code": -32602,
+        "message": "Invalid params",
+        "data": { "field": "arguments" }
+      },
+      "kind": "invalidParams"
+    },
+    {
+      "error": { "code": -32602, "message": "Invalid params" },
+      "kind": "invalidParams"
+    },
+    {
+      "error": {
+        "code": -32020,
+        "message": "Header mismatch",
+        "data": { "header": "Mcp-Name" }
+      },
+      "kind": "headerMismatch"
+    },
+    {
+      "error": { "code": -32601, "message": "Method not found" },
+      "kind": "notOffered"
+    },
+    {
+      "error": {
+        "code": -32600,
+        "message": "Invalid Request",
+        "data": { "reason": "events_in_batch" }
+      },
+      "kind": "invalidRequest"
+    },
+    { "error": { "code": -32600, "message": "Invalid Request" }, "kind": null },
+    {
+      "error": {
+        "code": -32603,
+        "message": "Internal error",
+        "data": { "reason": "storage_unavailable" }
+      },
+      "kind": null
+    },
+    { "error": { "code": -32000, "message": "Not found" }, "kind": null }
+  ]
+}

@@ -34,6 +34,10 @@
       "ignore": ["src/cloud/api/generated/**"],
       "ignoreDependencies": ["@types/react-dom", "mcp-use", "react-dom"]
     },
+    "packages/events-core": {
+      "entry": ["tests/**/*.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
     "packages/client": {
       "entry": ["tests/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]

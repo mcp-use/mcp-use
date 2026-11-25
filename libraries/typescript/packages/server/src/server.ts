@@ -70,6 +70,18 @@ import {
 } from "./middleware/mcp-middleware.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
+import { createEventsHost } from "./events/server-events.js";
+import { installEventsDev, type EventsDevOptions } from "./events/dev/index.js";
+import type { EventsHost } from "./events/internal/host.js";
+import type {
+  AnyEventDefinition,
+  EventArgs,
+  EventDefinition,
+  EventPayloadIn,
+  EventRef,
+  EventSchema,
+  ServerEvents,
+} from "./events/types.js";
 import {
   prepareSettings,
   type SettingsFields,
@@ -427,6 +439,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #httpApp: Hono<TEnv> | undefined;
   #handler: McpHttpHandler | undefined;
   #eventBus: ServerEventBus | undefined;
+  /** MCP Events host, created on the first Events API call. */
+  #eventsHost: EventsHost | undefined;
   #httpServer: NodeHttpListener | undefined;
   #oauthResource: URL | undefined;
   #oauthResourceResolved = false;
@@ -502,6 +516,17 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   ) => Promise<Response>;
 
   /**
+   * Workers cron entrypoint (`export default server`): runs one MCP Events
+   * tick (due deliveries, retries and the sweep). A no-op on a server with no
+   * registered events.
+   */
+  readonly scheduled: (
+    controller: unknown,
+    env: TEnv["Bindings"],
+    ctx: { waitUntil(p: Promise<unknown>): void }
+  ) => Promise<void>;
+
+  /**
    * Create an MCP server from a parsed, bundled OpenAPI document.
    *
    * Each included OpenAPI operation becomes a tool that validates its input,
@@ -554,6 +579,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.patch = this.app.patch.bind(this.app) as Hono<TEnv>["patch"];
     this.delete = this.app.delete.bind(this.app) as Hono<TEnv>["delete"];
     this.all = this.app.all.bind(this.app) as Hono<TEnv>["all"];
+    this.scheduled = async (_controller, env, ctx) => {
+      const host = this.#eventsHost;
+      if (host === undefined || host.size === 0) return;
+      await host.scheduled(env, ctx);
+    };
     this.fetch = async (request, env, executionCtx) => {
       await this.#ensureSkillsPrimed();
       this.#ensureMounted("handler");
@@ -1086,6 +1116,57 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   /**
+   * Register an MCP Event before start (PLAN.md §7.1). Throws
+   * `EventsConfigError` synchronously for an invalid definition. Returns a
+   * typed {@link EventRef} whose `emit` appends to the event log.
+   *
+   * @param definition - Name, description, schemas and delivery options.
+   */
+  event<
+    const Name extends string,
+    I extends EventSchema | undefined = undefined,
+    P extends EventSchema = EventSchema,
+  >(
+    definition: EventDefinition<Name, I, P, TUser, TEnv>
+  ): EventRef<Name, EventArgs<I>, EventPayloadIn<P>> {
+    this.#assertNotStarted("event", definition.name);
+    return this.#events().register(
+      definition as AnyEventDefinition
+    ) as EventRef<Name, EventArgs<I>, EventPayloadIn<P>>;
+  }
+
+  /**
+   * Install the MCP Events dev runtime for this process. Called by
+   * `mcp-use dev` on every generation with plain data (D44); not for
+   * application code.
+   *
+   * @param options - State directory, dev port, base path, tunnel origin and dev token.
+   * @internal
+   */
+  __setEventsDev(options: EventsDevOptions): void {
+    installEventsDev(options);
+  }
+
+  /**
+   * Runtime handle for MCP Events: emit by name, revoke, list, process due
+   * work, and read `info()` and `health()` (PLAN.md §7.2).
+   */
+  get events(): ServerEvents {
+    return this.#events().events;
+  }
+
+  /** Create the Events host on first use; zero-event servers never do. */
+  #events(): EventsHost {
+    this.#eventsHost ??= createEventsHost({
+      config: this.#config.events,
+      storage: this.#config.storage,
+      oauth: this.#config.oauth !== undefined,
+      basePath: () => this.#basePath(),
+    });
+    return this.#eventsHost;
+  }
+
+  /**
    * Register a read-only MCP observer. Unlike {@link MCPServer.use}, listeners
    * cannot block, override, or mutate params. Throwing is logged and does not
    * fail the request.
@@ -1230,6 +1311,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const host = resolveListenHost(options.host, this.#config.host);
     const requestedPort = resolveListenPort(port, this.#config.port);
     this.#assertListenOAuthConfiguration(host);
+    if (this.#eventsHost !== undefined && this.#eventsHost.size > 0) {
+      await this.#eventsHost.start("listen");
+    }
 
     return new Promise((resolve, reject) => {
       let resolveFetch: ((fetch: FetchHandler) => void) | undefined;
@@ -1301,6 +1385,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   async close(): Promise<void> {
     this.#closed = true;
+    const eventsClose = this.#eventsHost?.close();
     await Promise.allSettled([...this.#proxyOperations]);
 
     const errors: unknown[] = [];
@@ -1316,6 +1401,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       await this.#handler?.close();
     } catch (error) {
       errors.push(error);
+    }
+    if (eventsClose !== undefined) {
+      try {
+        await eventsClose;
+      } catch (error) {
+        errors.push(error);
+      }
     }
     const httpServer = this.#httpServer;
     if (httpServer !== undefined) {
@@ -1836,10 +1928,27 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
       this.#validateViewBindingsAtMount();
 
+      const eventsHost =
+        this.#eventsHost !== undefined && this.#eventsHost.size > 0
+          ? this.#eventsHost
+          : undefined;
+      if (eventsHost !== undefined) {
+        // Internal Events routes sit outside the OAuth gate (D41) and carry
+        // their own bearer auth.
+        httpApp.all(`${basePath}/_mcp-use/events/*`, async (context) => {
+          const response = await eventsHost.route(context.req.raw);
+          return response ?? context.notFound();
+        });
+      }
+
       const { handler, fetch: mcpFetch } = createMcpMount(
         (ctx) => this.#buildSdkServer(ctx),
         {
           path: basePath,
+          ...(eventsHost !== undefined && {
+            preflight: (request: Request, parsedBody: unknown) =>
+              eventsHost.preflight(request, parsedBody),
+          }),
           ...((this.#config.legacy !== undefined ||
             this.#eventBus !== undefined) && {
             handler: {
@@ -2354,8 +2463,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         _requestHandlers?: Map<string, RequestHandler>;
       }
     )._requestHandlers;
-    if (handlers === undefined) {
-      return;
+    if (!(handlers instanceof Map)) {
+      throw Object.assign(
+        new Error(
+          "MCP_USE_SDK_INTERNALS_CHANGED: the installed @modelcontextprotocol/server " +
+            "no longer exposes _requestHandlers as a Map; list middleware cannot be installed."
+        ),
+        { code: "MCP_USE_SDK_INTERNALS_CHANGED" }
+      );
     }
 
     type ListMethod = "tools/list" | "resources/list" | "prompts/list";

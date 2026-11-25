@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "d.Zk3x9QmP2LwT7rVb1nYc4A",
+      "kind": "deliver",
+      "subscriptionId": "sub_01J9Z3K4M5N6P7Q8R9S0T1V2W3",
+      "name": "issue.opened",
+      "eventId": "evt_01J9Z4",
+      "webhookId": "msg_01J9Z4",
+      "reason": "exhausted",
+      "abandonedAt": "2026-11-25T12:30:00.000Z",
+      "attempts": 5,
+      "lastError": "http_5xx",
+      "callbackOrigin": "https://hooks.example.com",
+      "bodyBytes": 512
+    }
+  ]
+}

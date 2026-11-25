@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "hash": "h1",
+    "events": {
+      "issue.opened": {
+        "schemaHash": "s1"
+      }
+    }
+  },
+  "active": {
+    "v": 1,
+    "hash": "h1",
+    "writtenAt": 1764072000000,
+    "deployment": "dep_1",
+    "events": {
+      "issue.opened": {
+        "schemaHash": "s1",
+        "replay": true,
+        "hooks": {
+          "onSubscribe": false,
+          "onUnsubscribe": true
+        }
+      }
+    }
+  },
+  "missing": {},
+  "diff": [
+    {
+      "name": "issue.opened",
+      "change": "unchanged"
+    }
+  ]
+}

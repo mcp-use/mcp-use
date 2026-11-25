@@ -297,6 +297,7 @@ export default [
       "packages/server/src/**/*.ts",
       "packages/cli/src/**/*.ts",
       "packages/tunnel/src/**/*.ts",
+      "packages/events-core/src/**/*.ts",
     ],
     languageOptions: {
       parser: tsparser,
@@ -308,6 +309,7 @@ export default [
           "./packages/server/tsconfig.test.json",
           "./packages/cli/tsconfig.test.json",
           "./packages/tunnel/tsconfig.test.json",
+          "./packages/events-core/tsconfig.test.json",
         ],
         tsconfigRootDir: import.meta.dirname,
       },

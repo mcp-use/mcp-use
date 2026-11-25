@@ -92,6 +92,24 @@ export type {
 } from "@modelcontextprotocol/server";
 
 export type { ServerConfig, CorsOptions } from "./config.js";
+/** MCP Events types (implementations live in `mcp-use/events` and lazy chunks, D28). */
+export type {
+  EventDefinition,
+  EventRef,
+  EventSchema,
+  EmitOptions,
+  EmitResult,
+  MatchContext,
+  SubscriptionInfo,
+  ServerEvents,
+  InferEventArgs,
+  InferEventPayload,
+  UnsubscribeReason,
+  DialectId,
+  Duration,
+} from "./events/types.js";
+export type { EventsConfig } from "./events/config.js";
+export type { McpUseStorage } from "./storage/types.js";
 export { registerSkills, SKILLS_EXTENSION_ID } from "./skills/types.js";
 export type {
   SkillsOptions,

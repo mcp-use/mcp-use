@@ -77,6 +77,14 @@ export default defineConfig([
       "tanstack-start/index": "src/tanstack-start/index.ts",
       "tanstack-start/vite": "src/tanstack-start/vite.ts",
       "vite/index": "src/vite/index.ts",
+      // MCP Events and storage subpaths (PLAN.md §8.6). The engine is loaded
+      // lazily behind src/events/internal/host.ts (D28).
+      "events/index": "src/events/index.ts",
+      "events/admin/index": "src/events/admin/index.ts",
+      "events/testing/index": "src/events/testing/index.ts",
+      "storage/index": "src/storage/index.ts",
+      "storage/node": "src/storage/node.ts",
+      "storage/testing": "src/storage/testing.ts",
       "internal/vite-handler": "src/vite/handler-unavailable.ts",
     },
     // ESM-only: the v2 @modelcontextprotocol/* packages ship no CJS entry, so a
@@ -94,6 +102,8 @@ export default defineConfig([
       "#mcp-use-skills-loader",
       "#mcp-use-vite-handler",
     ],
+    // events-core is inlined so the wire contract ships inside mcp-use.
+    noExternal: ["@mcp-use/events-core"],
     define: packageVersionDefine,
     esbuildPlugins: sharedBufferedResponse,
     esbuildOptions: minifyFrameworkOutput,
@@ -115,6 +125,8 @@ export default defineConfig([
       "#mcp-use-skills-loader",
       "#mcp-use-vite-handler",
     ],
+    // events-core is inlined so the wire contract ships inside mcp-use.
+    noExternal: ["@mcp-use/events-core"],
     define: packageVersionDefine,
     esbuildPlugins: sharedBufferedResponse,
     esbuildOptions(options) {
@@ -142,6 +154,7 @@ export default defineConfig([
       "@modelcontextprotocol/core",
       "@modelcontextprotocol/server",
       "zod",
+      "@mcp-use/events-core",
     ],
     define: packageVersionDefine,
     esbuildPlugins: sharedBufferedResponse,

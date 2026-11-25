@@ -145,6 +145,8 @@ export abstract class BaseConnector {
   protected serverInfoCache: MCPServerInfo | null = null;
   protected authorizationCache: MCPAuthorizationInfo | undefined;
   protected connected = false;
+  /** One WARN per process for the C9 fallback. */
+  private static c9Warned = false;
   private connectPromise: Promise<void> | null = null;
   private disconnectPromise: Promise<void> | null = null;
   private disconnectGeneration = 0;
@@ -262,7 +264,21 @@ export abstract class BaseConnector {
     // that bypass fallbackNotificationHandler entirely. Override them to also
     // forward to user-registered handlers so they appear in notification UIs.
     const client = this.client as any;
-    const handlersMap = client._notificationHandlers as Map<
+    const rawHandlers: unknown = client._notificationHandlers;
+    // C9 guard (PLAN.md §9.2.4): the reach-in only works while the SDK keeps
+    // `_notificationHandlers` as a Map. Otherwise fall back to
+    // fallbackNotificationHandler-only forwarding with one WARN; the
+    // connection still succeeds.
+    if (!(rawHandlers instanceof Map)) {
+      if (!BaseConnector.c9Warned) {
+        BaseConnector.c9Warned = true;
+        logger.warn(
+          "[events] SDK client internals changed: progress/cancelled notifications are forwarded through fallbackNotificationHandler only"
+        );
+      }
+      return;
+    }
+    const handlersMap = rawHandlers as Map<
       string,
       (notification: Notification, ...args: unknown[]) => Promise<void>
     >;

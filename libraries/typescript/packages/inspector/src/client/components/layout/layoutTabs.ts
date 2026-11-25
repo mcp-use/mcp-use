@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Settings,
   Wrench,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import type { TabType } from "@/client/context/InspectorContext";
@@ -31,6 +32,7 @@ export const LAYOUT_TABS: LayoutTabDef[] = [
   { id: "prompts", label: "Prompts", icon: MessageSquare },
   { id: "resources", label: "Resources", icon: FolderOpen },
   { id: "skills", label: "Skills", icon: LibraryBig },
+  { id: "events", label: "Events", icon: Zap },
   { id: "sampling", label: "Sampling", icon: Hash },
   { id: "elicitation", label: "Elicitation", icon: CheckSquare },
   { id: "notifications", label: "Notifications", icon: Bell },

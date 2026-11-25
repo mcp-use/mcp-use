@@ -1,0 +1,96 @@
+---
+title: "Troubleshoot Events"
+description: "Fix MCP Events errors by code, and diagnose ChatGPT, verification, header and streaming symptoms."
+icon: "life-buoy"
+---
+
+Every Events error carries a stable `code`. Find it below.
+
+## Fix registration errors
+
+`server.event()` throws `EventsConfigError` synchronously.
+
+| Code | Fix |
+|---|---|
+| `EVENT_NAME_INVALID` | Use `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`. The `mcp.` prefix is reserved |
+| `EVENT_DUPLICATE` | Register each name once |
+| `EVENT_ARGUMENT_UNMATCHED` | An `inputSchema` field has no same-named scalar in `payloadSchema`. Add `match(args, data)` or rename the field |
+| `EVENT_PARTITION_INVALID` | `partitionBy` must be a scalar key in both schemas |
+| `EVENT_SCHEMA_UNSUPPORTED` | Use a schema library with JSON Schema export (Zod 4, Valibot, ArkType) |
+| `EVENT_REPLAY_INVALID` | Keep `maxAge` in 1 min–30 d and `maxEvents` in 1–100,000 |
+| `EVENT_POLL_REQUIRES_REPLAY` | Remove `delivery.poll: true` or drop `replay: false` |
+| `EVENT_NO_DELIVERY_MODE` | Turn at least one possible mode back on |
+
+## Fix startup and configuration errors
+
+| Code | Cause | Fix |
+|---|---|---|
+| `EVENTS_CONFIG_INVALID` | An `events` option is out of range; `data.field` names it | Correct that field |
+| `EVENTS_STORAGE_REQUIRED` | Production start with events and no durable storage | Set `MCP_USE_STORAGE_URL` ([Storage](/typescript/server/storage)) |
+| `EVENTS_SECRET_REQUIRED` | No keyring | Set `MCP_USE_SECRET` to the value the message prints |
+| `STORAGE_DRIVER_MISSING` | `redis://` or `postgres://` without the driver | `npm i ioredis` or `npm i pg` |
+| `STORAGE_UNSUPPORTED` | A Workers KV binding was passed | Use D1, a Durable Object or Upstash |
+| `EVENTS_PLATFORM_BINDING_INCOMPLETE` | Some `MCP_USE_PLATFORM_*` variables are set, others missing (`data.missing`) | Set them all, or none |
+| `EVENTS_SDK_CAPABILITY_CONFLICT` | The installed MCP SDK advertises Events capabilities itself | Align `@modelcontextprotocol/*` with the version mcp-use supports |
+| `EVENTS_SDK_EXTENSION_CONFLICT` | Another extension already registered the Events extension key | Remove the duplicate registration |
+| `MCP_USE_SDK_INTERNALS_CHANGED` | An SDK upgrade changed internals mcp-use relies on | Pin the SDK to the supported range and report it |
+
+## Fix emit errors
+
+| Code | Fix |
+|---|---|
+| `EVENT_PAYLOAD_INVALID` | Make `data` match `payloadSchema`; nothing was written |
+| `EVENT_PAYLOAD_TOO_LARGE` | Keep bodies under 256 KiB; send ids and a read tool instead |
+| `EVENTS_BACKEND_UNAVAILABLE` | Storage is down. Use `onError: "log"` in tools; retry from upstream webhooks |
+| `ON_NOT_EVENT` | `server.on("note.created")` observes MCP operations, not events. Use `emit()` where the event happens |
+
+## Diagnose ChatGPT symptoms
+
+| Symptom | Fix |
+|---|---|
+| "No available webhook events" | Press **Refresh tools** on the connector; check the event is listed for the `openai` profile in the Inspector |
+| `insufficient_scope` on subscribe | Set `events.scopes.attachToTools: true` so sign-in requests event scopes |
+| Task never fires | Check the subscription in the Inspector's server subscriptions panel and its last delivery status |
+| Event shows without data | Add a read tool and name it in the description ([ChatGPT](/typescript/server/events-chatgpt)) |
+
+## Diagnose webhook verification
+
+mcp-use verifies each callback before the first delivery. Failures surface
+as `CallbackEndpointError` on subscribe:
+
+- The callback returned a non-2xx or did not echo `{"challenge": …}` exactly.
+- The callback took longer than 5 s (`events.webhook.verification.timeout`).
+- The URL is not HTTPS or resolves to a private address. Add dev receivers to
+  `events.webhook.trustedOrigins`.
+
+## Diagnose `Mcp-Name` 400s
+
+SEP clients send `Mcp-Name` and `Mcp-Param-*` headers. With
+`compatibility.mcpName: "strict"`, a missing or mismatched header answers HTTP
+400. The default `"lenient"` accepts requests without them; keep it unless
+your gateway routes on these headers.
+
+## Diagnose push falling back to poll
+
+Buffering proxies (some CDNs, Lambda without response streaming) hold stream
+frames, so clients see no heartbeat and fall back to poll. Disable response
+buffering for `/mcp`, or turn push off with `MCP_USE_EVENTS_PUSH=off`. Poll
+delivers the same events from the same cursors.
+
+## Diagnose tunnel churn
+
+Each `mcp-use dev --tunnel` session can get a new URL. Subscriptions created
+through the old URL keep delivering to their callbacks, but ChatGPT's
+connector points at the old server URL. Re-add the connector after a URL
+change. Tunnels are dev-only and last 24 hours.
+
+## Inspect delivery state
+
+```sh
+mcp-use events status
+mcp-use events deliveries --failed
+mcp-use events redeliver <dead-letter-id>
+```
+
+The Inspector's **Events** tab shows the same data in the server subscriptions
+panel.

@@ -47,6 +47,7 @@ npx mcp-use screenshot --server dev --tool show-product id=item-1
 
 - For Skills over MCP, verify the catalog, retrieve the Skill, read supporting files, and run a strict production build.
 - For notifications, keep a listener active and confirm non-durable invalidation behavior.
+- For MCP Events, check capabilities in both eras (the `openai` top-level key and the SEP-3415 extension), list events in the Inspector Events tab, run one verification round trip (subscribe, emit, delivery to the local inbox under `mcp-use dev`), and confirm a repeated subscribe (refresh) is idempotent and returns the same subscription.
 - For elicitation, test required, accept, decline, cancel, invalid input, callback replay, and side-effect ordering.
 - For proxying or OpenAPI, verify representative generated capabilities and documented unsupported boundaries.
 - For export, dependency, or packaging changes, pack the package and install it in an empty temporary consumer; a workspace build cannot prove the published boundary.

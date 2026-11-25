@@ -522,7 +522,23 @@ async function assertScenario(connection, example, origin) {
       }
       return;
     }
-    case "events": {
+    case "mcp-events": {
+      const created = await connection.callTool("create_note", {
+        folder: "inbox",
+        title: "Verifier note",
+      });
+      if (!text(created).includes("Created note_")) {
+        throw new Error("create_note did not report the created note id.");
+      }
+      const listed = await connection.callTool("list_notes", {
+        folder: "inbox",
+      });
+      if (!text(listed).includes("Verifier note")) {
+        throw new Error("list_notes did not return the note create_note added.");
+      }
+      return;
+    }
+    case "observers": {
       await connection.listTools();
       await connection.callTool("ping", {});
       const result = await connection.callTool("recent-events", {});

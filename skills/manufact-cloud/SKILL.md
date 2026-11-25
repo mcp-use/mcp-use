@@ -77,6 +77,8 @@ Network failures and timeouts leave acceptance unknown; do not retry automatical
   [other Cloud commands](references/cloud-commands.md).
 - **Create or update alerts:** read [alert rules](references/alerts.md) for the
   dashboard YAML format, metric selection, and useful recovery conditions.
+- **Inspect or operate MCP Events** (subscriptions, deliveries, redeliver,
+  revoke, purge): read [Events](references/events.md).
 - **Write, push, or run eval suites:** read [eval suites](references/evals.md)
   for the YAML format, client selection, and CI usage.
 - **Analyze server usage, errors, latency, or clients:** use the bundled

@@ -10,6 +10,8 @@ packages:
   - packages/create-mcp-use-app/src/templates/**/*
   # tests
   - test_app
+  # private e2e harnesses (never published)
+  - e2e/*
 
 catalog:
   "@modelcontextprotocol/sdk": "^1.32.1"
@@ -72,6 +74,8 @@ overrides:
   "mcp-use-example-a2ui>zod": 3.25.76
   "@a2ui/react>zod": 3.25.76
   "@a2ui/web_core>zod": 3.25.76
+  # Miniflare (storage adapter tests in miniflare) uses the Zod 3 API.
+  "miniflare>zod": 3.25.76
   # Better Auth 1.7 uses Zod's validate API, added after the workspace pin.
   "@better-auth/core>zod": ^4.6.6
   "@better-auth/oauth-provider>zod": ^4.6.6
@@ -151,6 +155,7 @@ allowBuilds:
   # sharp dependency must not run a native build in CI.
   sharp: false
   unrs-resolver: true
+  workerd: false
 
 patchedDependencies:
   "@modelcontextprotocol/server@2.3.1": patches/sdk/2.3.1.patch

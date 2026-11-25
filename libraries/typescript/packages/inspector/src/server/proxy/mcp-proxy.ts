@@ -140,6 +140,26 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
     });
   const rateLimit = inspectorApiRateLimit(rateLimiter);
 
+  // MCP Events (SEP-3415) routing headers: `Mcp-Name`, `Mcp-Method` and any
+  // `Mcp-Param-*`. The param names are open-ended, so a preflight asking for
+  // them gets them appended to the static allow list below.
+  app.use(`${basePath}/*`, async (c, next) => {
+    await next();
+    if (c.req.method !== "OPTIONS") return;
+    const requested = c.req.header("access-control-request-headers");
+    if (!requested) return;
+    const extra = requested
+      .split(",")
+      .map((h) => h.trim())
+      .filter((h) => MCP_ROUTING_HEADER.test(h));
+    if (extra.length === 0) return;
+    const current = c.res.headers.get("access-control-allow-headers");
+    c.res.headers.set(
+      "access-control-allow-headers",
+      [current, ...extra].filter(Boolean).join(",")
+    );
+  });
+
   // CRITICAL: Enable CORS and expose all headers for FastMCP session management
   // The Mcp-Session-Id header MUST be exposed for the browser to read it
   // NOTE: Authorization must be listed explicitly — the wildcard * does NOT cover it per the Fetch spec.
@@ -267,7 +287,9 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           lowerKey !== "cdn-loop" &&
           !lowerKey.startsWith("sec-fetch-")
         ) {
-          headers[key] = value;
+          headers[key] = MCP_ROUTING_HEADER.test(lowerKey)
+            ? singleHeaderValue(value)
+            : value;
         }
       }
 
@@ -392,6 +414,24 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       );
     }
   });
+}
+
+/** `Mcp-Name`, `Mcp-Method` and `Mcp-Param-*` (SEP-3415 routing headers). */
+const MCP_ROUTING_HEADER = /^mcp-(name|method|param-[a-z0-9_-]+)$/i;
+
+/**
+ * Exactly one value goes upstream for an MCP routing header (contract C2).
+ * Node joins a repeated request header with ", ", so a browser lane that set
+ * `Mcp-Name` plus a fetch wrapper that set it again would otherwise send
+ * `a, a`; that collapses to `a`. A value whose comma-separated parts differ
+ * is passed through unchanged, since a parameter value may contain commas.
+ *
+ * TODO(events): stream fault presets (drop after N frames, stall reading,
+ * delay `active`) are not applied by the proxy yet.
+ */
+export function singleHeaderValue(value: string): string {
+  const parts = value.split(",").map((p) => p.trim());
+  return parts.every((p) => p === parts[0]) ? (parts[0] ?? value) : value;
 }
 
 function deleteHeader(headers: Record<string, string>, name: string): void {

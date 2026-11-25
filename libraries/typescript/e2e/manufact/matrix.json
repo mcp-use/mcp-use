@@ -1,0 +1,64 @@
+{
+  "$comment": "Manufact dev-space E2E matrix (PLAN.md §18.8). Variant legs match scripts/sdk-matrix/apply.mjs. Deadlines are measured p95 in ms; waitUntil never waits past them.",
+  "variants": {
+    "pinned": { "leg": "pinned", "role": "baseline" },
+    "latest": { "leg": "latest", "role": "next routine bump" },
+    "prerelease": {
+      "leg": "prerelease",
+      "role": "early warning",
+      "skipWhenUnavailable": true
+    },
+    "pr-3209": { "leg": "pr-3209", "role": "native-Events preview" }
+  },
+  "smokeHop": ["pinned", "latest"],
+  "nightlyHops": [
+    ["pinned", "latest"],
+    ["pinned", "prerelease"],
+    ["pinned", "pr-3209"],
+    ["latest", "pinned"]
+  ],
+  "suites": {
+    "S": ["E0", "E1", "E2", "E3", "E4", "E5", "E8", "E14"],
+    "N": [
+      "E0",
+      "E1",
+      "E2",
+      "E3",
+      "E4",
+      "E5",
+      "E6",
+      "E7",
+      "E8",
+      "E9",
+      "E10",
+      "E11",
+      "E12",
+      "E13",
+      "E14",
+      "E15",
+      "E16",
+      "E17",
+      "E18",
+      "E19",
+      "E21"
+    ],
+    "W": ["E9", "E20"]
+  },
+  "deadlinesMs": {
+    "deployRunning": 900000,
+    "serverReady": 60000,
+    "delivery": 15000,
+    "streamActive": 2000,
+    "streamEvent": 2000,
+    "coldStartExtra": 10000,
+    "wakeRetryExtra": 90000
+  },
+  "caps": { "liveDeployments": 6, "capWaitMs": 1200000 },
+  "servers": {
+    "app": "ev-e2e-app",
+    "receiver": "ev-e2e-recv",
+    "external": "ev-e2e-ext",
+    "tmpPrefix": "ev-e2e-tmp-"
+  },
+  "janitorMaxAgeMs": 21600000
+}

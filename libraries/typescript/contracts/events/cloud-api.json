@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "base": "/servers/{id}/events",
+  "target": {
+    "query": [
+      "branch",
+      "production"
+    ],
+    "postBody": [
+      "branch",
+      "production"
+    ],
+    "omitted": {
+      "read": "production",
+      "write": "rejected"
+    }
+  },
+  "pageLimit": {
+    "max": 200,
+    "default": 50
+  },
+  "operations": [
+    {
+      "id": "status",
+      "method": "GET",
+      "path": "/status",
+      "fixture": "status.json"
+    },
+    {
+      "id": "catalog",
+      "method": "GET",
+      "path": "/catalog",
+      "fixture": "catalog.json"
+    },
+    {
+      "id": "subscriptions",
+      "method": "GET",
+      "path": "/subscriptions",
+      "query": [
+        "event",
+        "principal",
+        "status",
+        "mode",
+        "after",
+        "limit"
+      ],
+      "fixture": "subscriptions.json"
+    },
+    {
+      "id": "subscription",
+      "method": "GET",
+      "path": "/subscriptions/{subId}",
+      "fixture": "subscription.json"
+    },
+    {
+      "id": "deliveries",
+      "method": "GET",
+      "path": "/deliveries",
+      "query": [
+        "status",
+        "subscription",
+        "after",
+        "limit"
+      ],
+      "fixture": "deliveries.json"
+    },
+    {
+      "id": "deadLetters",
+      "method": "GET",
+      "path": "/dead-letters",
+      "query": [
+        "subscription",
+        "after",
+        "limit"
+      ],
+      "fixture": "dead-letters.json"
+    },
+    {
+      "id": "redeliver",
+      "method": "POST",
+      "path": "/dead-letters/{deadLetterId}:redeliver",
+      "fixture": "redeliver.json"
+    },
+    {
+      "id": "revoke",
+      "method": "POST",
+      "path": "/revoke",
+      "body": [
+        "principal",
+        "name",
+        "subscriptionId",
+        "reason"
+      ],
+      "fixture": "revoke.json"
+    },
+    {
+      "id": "emit",
+      "method": "POST",
+      "path": "/emit",
+      "body": [
+        "name",
+        "data",
+        "eventId",
+        "principal",
+        "subscriptionId"
+      ],
+      "fixture": "emit.json"
+    },
+    {
+      "id": "purge",
+      "method": "POST",
+      "path": "/purge",
+      "fixture": "purge.json"
+    },
+    {
+      "id": "egress",
+      "method": "GET",
+      "path": "/egress",
+      "fixture": "egress.json"
+    }
+  ],
+  "errors": {
+    "not_found": 404,
+    "production_confirmation_required": 409
+  }
+}

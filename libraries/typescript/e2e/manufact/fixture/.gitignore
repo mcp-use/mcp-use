@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.mcp-use/
+# vendor/*.tgz is committed into the staged fixture on purpose (PLAN.md §18.8.1).

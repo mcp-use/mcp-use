@@ -20,6 +20,43 @@ function alternateLoopbackOrigin(requestUrl: URL): string | undefined {
   return origin.origin;
 }
 
+/** Structural view of the `mcp-use` Events dev runtime (D44); no package dependency. */
+interface EventsDevRuntimeView {
+  token: string;
+  publicOrigin: string | undefined;
+  info(): {
+    stateDir: string;
+    generation: number;
+    tokenAvailable: boolean;
+    publicOrigin: string | null;
+  };
+}
+
+/**
+ * Read the active Events dev runtime from its process-global registry
+ * (`Symbol.for("mcp-use.events.dev")`), or undefined outside `mcp-use dev`.
+ */
+export function readEventsDevRuntime(): EventsDevRuntimeView | undefined {
+  const registry = (globalThis as Record<symbol, unknown>)[
+    Symbol.for("mcp-use.events.dev")
+  ] as
+    | { runtimes?: Map<string, EventsDevRuntimeView>; active?: string }
+    | undefined;
+  if (registry?.active === undefined || !(registry.runtimes instanceof Map)) {
+    return undefined;
+  }
+  const runtime = registry.runtimes.get(registry.active);
+  return runtime !== undefined &&
+    typeof runtime.token === "string" &&
+    typeof runtime.info === "function"
+    ? runtime
+    : undefined;
+}
+
+function safeJson(value: string): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
 type InspectorShellConfig = {
   basePath?: string;
   devMode?: boolean;
@@ -80,6 +117,18 @@ function generateInspectorShellHtml(
   }
   if (process.env.MCP_USE_DEV_CLI === "1") {
     scripts.push(`<script>window.__MCP_DEV_CLI__ = true;</script>`);
+  }
+  // Only while the `mcp-use dev` Events runtime is active in this process (D41).
+  const eventsDev = readEventsDevRuntime();
+  if (eventsDev !== undefined && eventsDev.token.length > 0) {
+    scripts.push(
+      `<script>window.__MCP_USE_DEV_TOKEN__ = ${safeJson(eventsDev.token)};</script>`
+    );
+    if (eventsDev.publicOrigin !== undefined) {
+      scripts.push(
+        `<script>window.__MCP_EVENTS_PUBLIC_ORIGIN__ = ${safeJson(eventsDev.publicOrigin)};</script>`
+      );
+    }
   }
   const runtimeScripts = scripts.join("\n    ");
 

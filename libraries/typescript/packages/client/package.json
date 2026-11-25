@@ -43,6 +43,10 @@
     "./sandbox": {
       "types": "./dist/sandbox.d.ts",
       "import": "./dist/sandbox.js"
+    },
+    "./webhooks": {
+      "types": "./dist/events/webhooks.d.ts",
+      "import": "./dist/events/webhooks.js"
     }
   },
   "module": "./dist/index.js",
@@ -60,6 +64,7 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@mcp-use/events-core": "workspace:*",
     "@modelcontextprotocol/client": "catalog:mcp-sdk",
     "@modelcontextprotocol/core": "catalog:mcp-sdk",
     "@modelcontextprotocol/ext-apps": "2.0.3"

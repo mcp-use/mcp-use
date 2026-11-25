@@ -90,6 +90,18 @@ const OPERATIONS = [
   "GET /api/v1/server-evals/{serverId}/runs/{runId}",
   "POST /api/v1/server-evals/{serverId}/runs/{runId}/cancel",
   "GET /api/v1/server-evals/{serverId}/runtime-options",
+  // Events (PLAN.md §11.4; contract in src/cloud/events/contract.ts).
+  "GET /api/v1/servers/{id}/events/status",
+  "GET /api/v1/servers/{id}/events/catalog",
+  "GET /api/v1/servers/{id}/events/subscriptions",
+  "GET /api/v1/servers/{id}/events/subscriptions/{subId}",
+  "GET /api/v1/servers/{id}/events/deliveries",
+  "GET /api/v1/servers/{id}/events/dead-letters",
+  "POST /api/v1/servers/{id}/events/dead-letters/{deadLetterId}:redeliver",
+  "POST /api/v1/servers/{id}/events/revoke",
+  "POST /api/v1/servers/{id}/events/emit",
+  "POST /api/v1/servers/{id}/events/purge",
+  "GET /api/v1/servers/{id}/events/egress",
 ];
 
 /**

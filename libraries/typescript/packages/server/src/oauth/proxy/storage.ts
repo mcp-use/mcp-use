@@ -64,55 +64,8 @@ export interface OAuthProxyStorage {
 
 const MEMORY_STORAGE = Symbol.for("mcp-use.oauth.memoryStorage");
 
-/**
- * Creates an in-process store for local development.
- *
- * Its state is lost on restart and is not shared between instances, so
- * `oauthProxy` accepts it only when the MCP resource is on localhost and a
- * `listen()` binds a loopback address. A local `listen()` uses it by default
- * when no `storage` is set.
- *
- * @returns A store that keeps values in memory.
- */
-export function memoryStorage(): OAuthProxyStorage {
-  const values = new Map<string, { value: string; expiresAt: number }>();
-  const read = (key: string): string | undefined => {
-    const entry = values.get(key);
-    if (entry === undefined) return undefined;
-    if (entry.expiresAt <= Date.now()) {
-      values.delete(key);
-      return undefined;
-    }
-    return entry.value;
-  };
-  const write = (key: string, value: string, ttlSeconds: number): void => {
-    if (values.size > 10_000) {
-      for (const [candidate, entry] of values) {
-        if (entry.expiresAt <= Date.now()) values.delete(candidate);
-      }
-    }
-    values.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
-  };
-  const storage: OAuthProxyStorage = {
-    get: async (key) => read(key),
-    set: async (key, value, ttlSeconds) => write(key, value, ttlSeconds),
-    delete: async (key) => {
-      values.delete(key);
-    },
-    take: async (key) => {
-      const value = read(key);
-      values.delete(key);
-      return value;
-    },
-    add: async (key, value, ttlSeconds) => {
-      if (read(key) !== undefined) return false;
-      write(key, value, ttlSeconds);
-      return true;
-    },
-  };
-  Object.defineProperty(storage, MEMORY_STORAGE, { value: true });
-  return storage;
-}
+// The full McpUseStorage memory store; one new store per call (D15).
+export { memoryStorage } from "../../storage/adapters/memory.js";
 
 /** @internal Whether a store came from {@link memoryStorage}. */
 export function isMemoryStorage(storage: OAuthProxyStorage): boolean {

@@ -14,6 +14,8 @@ import { NotificationsTab } from "@/client/components/NotificationsTab";
 import { PromptsTab } from "@/client/components/PromptsTab";
 import { ResourcesTab } from "@/client/components/ResourcesTab";
 import { SkillsTab } from "@/client/components/SkillsTab";
+import { EventsTab } from "@/client/components/EventsTab";
+import { supportsEvents } from "@/client/hooks/useEventSubscriptions";
 import { SamplingTab } from "@/client/components/SamplingTab";
 import { ServerMetadataTab } from "@/client/components/ServerMetadataTab";
 import { ToolsTab } from "@/client/components/ToolsTab";
@@ -38,6 +40,7 @@ const ALL_KNOWN_TABS: TabType[] = [
   "prompts",
   "resources",
   "skills",
+  "events",
   "chat",
   "sampling",
   "elicitation",
@@ -205,6 +208,9 @@ export function LayoutContent({
     if (tab === "skills" && getSkillsState(selectedServer) !== "available") {
       return false;
     }
+    if (tab === "events" && !supportsEvents(selectedServer)) {
+      return false;
+    }
     if (!embeddedConfig.visibleTabs) return true;
     return embeddedConfig.visibleTabs.includes(tab);
   };
@@ -289,6 +295,17 @@ export function LayoutContent({
             getSkill={selectedServer.getSkill}
             readResource={selectedServer.readResource}
             refreshSkills={selectedServer.listSkills}
+          />
+        </div>
+      )}
+      {isTabVisible("events") && mountedTabs.has("events") && (
+        <div
+          style={{ display: activeTab === "events" ? "block" : "none" }}
+          className="h-full"
+        >
+          <EventsTab
+            key={`events-${selectedServer.id}`}
+            server={selectedServer}
           />
         </div>
       )}

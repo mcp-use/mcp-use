@@ -1,0 +1,32 @@
+{
+  "$comment": "Header-safe eventId normalization (D11, the headerSafe value of the eventIdNormalization axis): ids matching ^[A-Za-z0-9_-]{1,128}$ are unchanged; any other id becomes evt_ + the first 27 characters of base64url(SHA-256(UTF-8 id)). Outputs computed with node:crypto createHash('sha256').digest('base64url'), independently of this package.",
+  "pattern": "^[A-Za-z0-9_-]{1,128}$",
+  "cases": [
+    { "input": "note_812233", "headerSafe": "note_812233" },
+    {
+      "input": "evt_01JDZ8Q4N6V3T0C9K2M5R7W1XY",
+      "headerSafe": "evt_01JDZ8Q4N6V3T0C9K2M5R7W1XY"
+    },
+    { "input": "a", "headerSafe": "a" },
+    { "input": "A-Z_0-9", "headerSafe": "A-Z_0-9" },
+    {
+      "input": "01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567",
+      "headerSafe": "01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567"
+    },
+    {
+      "input": "012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678",
+      "headerSafe": "evt_X9XZLCGgxpXeFD3MqOQ7KXx6_pY"
+    },
+    { "input": "", "headerSafe": "evt_47DEQpj8HBSa-_TImW-5JCeuQeR" },
+    { "input": "order:42", "headerSafe": "evt_2mg4DeAiuscneC7-48SV1K4IujI" },
+    { "input": "note 812", "headerSafe": "evt_AUCxzU1gDO4WN7y4eC2FwazNdfq" },
+    {
+      "input": "gid://shopify/Order/1234",
+      "headerSafe": "evt_BTefCu4ZwCZmHDDhI73LFGU51j8"
+    },
+    { "input": "café-1", "headerSafe": "evt_px7vVJD_U5R-aBf9cYjvkwgl4c8" },
+    { "input": "😀", "headerSafe": "evt_8EQ6NCxe9UeDoRG1G6Vsk45HTDI" },
+    { "input": "a.b", "headerSafe": "evt_LnM23I66h-9HLfVow1SCq_JXXcP" },
+    { "input": "id\nnext", "headerSafe": "evt_2aopL7hrGz-9NlCw93GNPJZmom-" }
+  ]
+}

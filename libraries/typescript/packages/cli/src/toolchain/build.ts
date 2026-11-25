@@ -16,7 +16,7 @@
 import { readViewConfig } from "./view-config.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -56,6 +56,12 @@ import {
 } from "../views/document.js";
 import type { ViewsManifest } from "../views/types.js";
 import type { SkillsSnapshot } from "../skills/types.js";
+import {
+  diffEventsCatalog,
+  formatEventsCatalogDiff,
+  isEventsCatalogSnapshot,
+  type EventsCatalogSnapshot,
+} from "./events-catalog.js";
 
 /** Fixed filename of the emitted server entry inside `.mcp-use/build/`. */
 const BUILD_ENTRY_NAME = "index.js";
@@ -530,6 +536,11 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const conventionalSkillsDirectory =
     options.mcpDir === undefined ? "skills" : join(options.mcpDir, "skills");
 
+  let eventsSnapshot: EventsCatalogSnapshot | undefined;
+  const captureEvents = (value: unknown): void => {
+    if (isEventsCatalogSnapshot(value)) eventsSnapshot = value;
+  };
+
   if (views.length === 0) {
     let skillsSnapshot: SkillsSnapshot | undefined;
     bindingServer ??= await createBindingValidationServer(
@@ -543,7 +554,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         entry,
         {},
         options.cwd,
-        conventionalSkillsDirectory
+        conventionalSkillsDirectory,
+        captureEvents
       );
       let landing: BuiltLanding | undefined;
       if (hasLanding) {
@@ -635,7 +647,9 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       createdAt: new Date().toISOString(),
       views: {},
       ...(skillsSnapshot !== undefined && { skills: skillsSnapshot }),
+      ...(eventsSnapshot !== undefined && { events: eventsSnapshot }),
     };
+    await reportEventsCatalogDiff(paths.buildManifest, eventsSnapshot);
     await mkdir(paths.build, { recursive: true });
     await writeFile(
       paths.buildManifest,
@@ -739,7 +753,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       entry,
       viewsManifest,
       options.cwd,
-      conventionalSkillsDirectory
+      conventionalSkillsDirectory,
+      captureEvents
     );
   } finally {
     await bindingServer.close();
@@ -796,7 +811,9 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     createdAt: new Date().toISOString(),
     views: viewsManifest,
     ...(skillsSnapshot !== undefined && { skills: skillsSnapshot }),
+    ...(eventsSnapshot !== undefined && { events: eventsSnapshot }),
   };
+  await reportEventsCatalogDiff(paths.buildManifest, eventsSnapshot);
   await mkdir(paths.build, { recursive: true });
   await writeFile(
     paths.buildManifest,
@@ -809,4 +826,26 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     `[mcp-use] built ${relative(options.cwd, entry)} + views (${viewNames}) → ` +
       `${relative(options.cwd, join(paths.build, BUILD_ENTRY_NAME))} (${duration}ms)`
   );
+}
+
+/**
+ * Print the catalog diff against the previous build's manifest (PLAN.md
+ * §11.5). Non-additive changes are flagged; the diff never fails the build.
+ */
+async function reportEventsCatalogDiff(
+  manifestPath: string,
+  next: EventsCatalogSnapshot | undefined
+): Promise<void> {
+  let previous: EventsCatalogSnapshot | undefined;
+  try {
+    const old = JSON.parse(await readFile(manifestPath, "utf8")) as {
+      events?: unknown;
+    };
+    if (isEventsCatalogSnapshot(old.events)) previous = old.events;
+  } catch {
+    // No previous build.
+  }
+  if (previous === undefined || previous.hash === next?.hash) return;
+  for (const line of formatEventsCatalogDiff(diffEventsCatalog(previous, next)))
+    console.log(line);
 }

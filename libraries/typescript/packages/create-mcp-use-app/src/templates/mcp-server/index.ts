@@ -56,4 +56,20 @@ server.prompt(
   })
 );
 
+// MCP Events: tell subscribers when something happens. Uncomment to try it:
+// under `mcp-use dev`, open the Inspector's Events tab, subscribe, then call
+// a tool that emits. No storage or OAuth is needed in dev.
+// See https://mcp-use.com/docs/typescript/server/events
+//
+// export const weatherAlert = server.event({
+//   name: "weather.alert",
+//   description:
+//     "A severe weather alert was issued for a city you follow. Tell the user in one sentence.",
+//   inputSchema: z.object({ city: z.string().optional() }),
+//   payloadSchema: z.object({ city: z.string(), summary: z.string() }),
+// });
+//
+// Inside a tool handler:
+//   await weatherAlert.emit({ city, summary }, { eventId: `alert_${city}_${Date.now()}`, ctx });
+
 export default server;

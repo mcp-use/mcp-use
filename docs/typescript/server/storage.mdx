@@ -1,0 +1,93 @@
+---
+title: "Storage"
+description: "Configure the shared state store that MCP Events and the OAuth proxy use, from memory to Redis, Postgres and Cloudflare."
+icon: "database"
+---
+
+mcp-use keeps framework state (event logs, subscriptions, delivery jobs,
+OAuth proxy records) in one `McpUseStorage`. Every adapter takes a client
+you bring, so mcp-use adds no hard database dependency.
+
+## Configure with one variable
+
+```sh
+MCP_USE_STORAGE_URL=rediss://default:…@redis.example.com:6379
+```
+
+| Value | Adapter |
+|---|---|
+| `upstash` | Upstash from `UPSTASH_REDIS_REST_URL`/`_TOKEN` or Vercel `KV_REST_API_URL`/`_TOKEN` |
+| `https://…` + `MCP_USE_STORAGE_TOKEN` | Any Upstash-REST-compatible endpoint |
+| `redis://…`, `rediss://…` | Redis through `ioredis` (or `redis`); install it with `npm i ioredis` |
+| `postgres://…`, `postgresql://…` | Postgres through `pg`; install it with `npm i pg` |
+| `file:./path` | File storage (single instance) |
+| `memory` | Memory; refused outside dev and test |
+
+`MCP_USE_STORAGE_PREFIX` sets the key prefix. On edge runtimes only
+`upstash`, `https://…` and `memory` are accepted.
+
+## Configure in code
+
+```ts
+import { MCPServer } from "mcp-use";
+import { redisStorage } from "mcp-use/storage";
+import Redis from "ioredis";
+
+const server = new MCPServer({
+  name: "notes",
+  version: "1.0.0",
+  storage: redisStorage(new Redis(process.env.REDIS_URL!), { prefix: "notes:" }),
+});
+```
+
+`events.storage` overrides `storage` for Events only.
+
+## Choose an adapter
+
+| Factory | Import | Durable | Shared | Wake signal | Use for |
+|---|---|---|---|---|---|
+| `memoryStorage()` | `mcp-use/storage` | ✘ | ✘ | in-process | Tests |
+| `fileStorage(dir)` | `mcp-use/storage/node` | ✔ | ✘ | in-process | Dev, one instance with a volume |
+| `redisStorage(client, { subscriber?, prefix? })` | `mcp-use/storage` | ✔ | ✔ | pub/sub | Node fleets |
+| `upstashStorage({ url, token, prefix? })` | `mcp-use/storage` | ✔ | ✔ | tail polling | Serverless and edge |
+| `postgresStorage({ pool, schema?, signal?, prefix? })` | `mcp-use/storage` | ✔ | ✔ | `LISTEN` | Node with Postgres |
+| `cloudflareStorage({ d1, prefix? })` | `mcp-use/storage` | ✔ | ✔ | tail polling | Workers |
+| `cloudflareStorage({ durableObject, prefix? })` | `mcp-use/storage` | ✔ | ✔ | tail polling | Workers |
+
+Workers KV is not supported: it is eventually consistent and has no
+compare-and-set, so passing it throws `STORAGE_UNSUPPORTED`.
+
+Postgres `LISTEN` does not work through PgBouncer transaction mode or some
+serverless drivers. Pass `signal: false` there; it is off automatically for
+the Neon serverless driver. Streams then poll the log.
+
+## Budget storage commands
+
+On the Redis family every operation is one script call:
+
+| Operation | Commands |
+|---|---|
+| `emit()` | 1 |
+| Webhook subscribe or refresh | 1–2 |
+| Poll | 1–2 |
+| One webhook delivery | 2–3 |
+| Open stream, idle | 1 per tail interval (shared per instance) |
+
+{/* TODO(events): replace with the measured per-operation budget from the storage conformance suite. */}
+
+## Test a third-party adapter
+
+```ts
+import { runStorageConformance, runStorageIsolationCheck } from "mcp-use/storage/testing";
+import { describe } from "vitest";
+
+describe("my adapter", () => {
+  runStorageConformance(() => myStorage({ prefix: `t-${crypto.randomUUID()}:` }));
+  runStorageIsolationCheck((prefix) => myStorage({ prefix }));
+});
+```
+
+An adapter that passes conformance supports Events and the OAuth proxy.
+
+See the maintained example in
+[`examples/upstash`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/upstash).

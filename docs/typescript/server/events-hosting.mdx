@@ -1,0 +1,113 @@
+---
+title: "Hosting mcp-use Events"
+description: "The open contract a hosting platform implements to run mcp-use Events with zero user configuration."
+icon: "server"
+---
+
+Any platform can host mcp-use Events with no configuration from its users,
+as Manufact Cloud does. The contract is open: inject a store binding, keep
+due work moving while instances sleep, and optionally provide an egress
+proxy. This page is for platform builders. App developers start at
+[Deploy Events](/typescript/server/events-deployment).
+
+## Inject the platform binding
+
+Set these variables on every instance of a deployment, as one unit:
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `MCP_USE_PLATFORM_STORAGE_URL` | ✔ | An Upstash-REST-compatible endpoint (`https://…`) |
+| `MCP_USE_PLATFORM_STORAGE_TOKEN` | when the URL needs one | REST token |
+| `MCP_USE_PLATFORM_STORAGE_PREFIX` | | Key prefix, default `""` |
+| `MCP_USE_PLATFORM_NAMESPACE` | ✔ | Stable environment identity, for example `srv_8f:production` |
+| `MCP_USE_PLATFORM_SECRET` | ✔ | Keyring; comma-separated for rotation |
+| `MCP_USE_PLATFORM_ADMIN_SECRET` | | Bearer for the internal routes |
+| `MCP_USE_PLATFORM_NAME` | | Printed in the startup line |
+
+Setting any required variable selects the platform binding. A missing piece
+fails closed with `EVENTS_PLATFORM_BINDING_INCOMPLETE` and lists what is
+missing. Precedence:
+
+1. `mcp-use dev` always uses its local store.
+2. A user binding (`events.storage`, `storage`, `MCP_USE_STORAGE_URL`) beats the platform binding.
+3. The platform binding.
+
+Under the platform binding, user `events.namespace` and `events.secret` are
+ignored with one warning, so the platform's dashboard can always read the
+store.
+
+## Set runtime defaults
+
+Each runtime knob `X` (`PUSH`, `PUSH_MAX_DURATION_MS`, `HEARTBEAT_MAX_MS`,
+`POLL_INTERVAL_MS`, `EGRESS_PROXY`, `LOG_FORMAT`) reads code config, then
+`MCP_USE_EVENTS_<X>`, then `MCP_USE_PLATFORM_EVENTS_<X>`. A platform sets the
+last form; users can still override it.
+
+## Keep layout 1 compatible
+
+The store layout is versioned (`layout: 1`). Platforms may read it only
+through the admin library. An instance that finds a newer layout answers
+`events/*` with an error instead of writing, so rollbacks across layout
+changes fail safe. Never write keys under the namespace yourself.
+
+## Honor the wake guarantee
+
+Hosts that stop, freeze or throttle idle instances must ensure that whenever
+`now − nextWakeAt > 60 s`, a `GET {basePath}/_mcp-use/events/tick` with an
+accepted bearer reaches an instance. Repeat at once while
+`TickReport.remaining > 0`, otherwise at the returned `nextWakeAt`.
+
+```ts
+import { openEventsAdminFromEnv, runWakeLoop } from "mcp-use/events/admin";
+
+const admin = await openEventsAdminFromEnv(process.env);
+await runWakeLoop({
+  admin,
+  tick: { url: "https://notes.example.com/mcp/_mcp-use/events/tick", secret: process.env.MCP_USE_PLATFORM_ADMIN_SECRET! },
+  signal: AbortSignal.timeout(24 * 60 * 60 * 1000),
+});
+```
+
+Equivalent strategies are fine: schedule a ping from `nextWakeAt` when the
+last instance stops, or keep one instance running while work is due within 15
+minutes. Hosts that never idle instances need nothing.
+
+## Provide an egress proxy
+
+Set `MCP_USE_PLATFORM_EVENTS_EGRESS_PROXY=http://proxy:3128` to send
+verification and delivery traffic through a CONNECT proxy with static IPs
+(Node and Bun). mcp-use still resolves and pins callback addresses and
+refuses private ranges.
+
+## Use the admin library
+
+`mcp-use/events/admin` is edge-safe and needs no app code:
+
+| Method | Does |
+|---|---|
+| `status()`, `nextWakeAt()` | Key-less health and scheduling |
+| `catalog()`, `subscriptions()`, `leases()` | Read state |
+| `deadLetters()`, `redeliver(id)` | Inspect and retry failed deliveries |
+| `revoke(filter)` | End subscriptions, polls and streams |
+| `rekey()` | Re-seal with the first key after rotation |
+| `purge()` | Delete the namespace |
+
+## Call the internal routes
+
+Routes live under `{basePath}/_mcp-use/events/`, outside the OAuth gate,
+and are disabled when no secret is configured (except in dev). The tunnel
+blocks all of them.
+
+| Route | Purpose |
+|---|---|
+| `GET\|POST tick` | Run due work for up to 25 s |
+| `GET health` | `EventsHealth` |
+| `POST emit` | Test emit; requires `x-mcp-use-confirm: <namespace>` outside dev |
+| `admin/subscriptions`, `admin/leases`, `admin/dead-letters`, `admin/streams` | Admin views |
+| `POST admin/decommission` | Revoke everything and close the namespace |
+
+## Decommission an environment
+
+When an environment is deleted, call `POST admin/decommission`. It revokes
+every subscription (running `onUnsubscribe(…, "closed")`), notifies SEP
+subscribers, and marks the namespace closed. Then `purge()` deletes it.

@@ -1,0 +1,141 @@
+---
+title: "Deploy Events"
+description: "Run MCP Events on Node, serverless, edge and Cloudflare Workers, with the storage and scheduling each runtime needs."
+icon: "rocket"
+---
+
+Events need two things in production: shared, durable
+[storage](/typescript/server/storage) and something that runs background
+work (retries, fan-out, sweeps). Long-lived processes run that work
+themselves; serverless hosts need a scheduled tick. Under `mcp-use dev` and on
+[Manufact Cloud](/typescript/server/deployment/mcp-use) you configure
+nothing.
+
+## Pick your runtime
+
+| Runtime | Setup | Push (max stream duration) | Background work |
+|---|---|---|---|
+| Node `mcp-use start` (Docker, Railway, Fly, VPS) | `MCP_USE_STORAGE_URL` + `MCP_USE_SECRET` | ✔ 1 h | In-process pump and sweeper |
+| Express, TanStack Start, `Bun.serve`, `Deno.serve` | Same | ✔ 1 h | Lazy in-process pump |
+| Next.js on Vercel | Upstash + Vercel Cron | ✔ 240 s | Cron calls the tick route; first attempt in `waitUntil` |
+| Vercel Edge, Deno Deploy | Upstash + a scheduler | ✔ 240 s | Scheduler calls the tick route |
+| Cloudflare Workers | Upstash, D1 or a Durable Object + a cron trigger | ✔ 120 s | `server.scheduled` |
+| AWS Lambda, Netlify Functions | Upstash + a scheduler | Off by default | Scheduler calls the tick route |
+| `mcp-use dev` | Nothing | ✔ unlimited | Dev pump; file storage in `.mcp-use/state/events/` |
+| Manufact Cloud | Nothing | ✔ | Platform binding and wake guarantee |
+
+Clients reconnect transparently when a stream reaches its maximum duration;
+replayable events resume from the cursor without loss.
+
+## Deploy on Node
+
+```sh
+MCP_USE_STORAGE_URL=rediss://default:…@redis.example.com:6379
+MCP_USE_SECRET=$(openssl rand -base64 32)
+mcp-use start
+```
+
+`listen()` fails fast with `EVENTS_STORAGE_REQUIRED` or
+`EVENTS_SECRET_REQUIRED` when either is missing, and the message carries the
+fix. `MCP_USE_SECRET` seals webhook secrets at rest; keep it stable across
+deploys. To rotate, pass a list: `events: { secret: [newKey, oldKey] }`.
+
+## Deploy Next.js on Vercel
+
+```ts title="app/api/mcp/[[...route]]/route.ts"
+import server from "@/mcp/server";
+export const { GET, POST, DELETE } = server.nextHandlers({ basePath: "/api/mcp" });
+export const maxDuration = 300;
+```
+
+```json title="vercel.json"
+{ "crons": [{ "path": "/api/mcp/_mcp-use/events/tick", "schedule": "* * * * *" }] }
+```
+
+Set `MCP_USE_STORAGE_URL=upstash` (it reads `KV_REST_API_URL` and
+`KV_REST_API_TOKEN` from the Vercel integration), `MCP_USE_SECRET` and
+`CRON_SECRET`. Vercel Cron sends `Authorization: Bearer $CRON_SECRET`, which
+the tick route accepts. Pass `ctx` to `emit()` so the first delivery attempt
+runs in `waitUntil`.
+
+## Deploy on Cloudflare Workers
+
+```ts title="src/index.ts"
+import { MCPServer } from "mcp-use";
+import { cloudflareStorage } from "mcp-use/storage";
+
+const server = new MCPServer({
+  name: "notes",
+  version: "1.0.0",
+  events: { storage: (env) => cloudflareStorage({ d1: env.DB }) },
+});
+// … server.event(), server.tool() …
+export default server; // exports fetch and scheduled
+```
+
+```toml title="wrangler.toml"
+[[d1_databases]]
+binding = "DB"
+database_name = "mcp-events"
+database_id = "…"
+
+[triggers]
+crons = ["* * * * *"]
+```
+
+D1, a Durable Object and Upstash all work. A Workers KV binding is rejected
+with `STORAGE_UNSUPPORTED` because KV is eventually consistent.
+
+{/* TODO(events): confirm the per-env storage factory signature against the merged WP for Workers bindings. */}
+
+## Run your own scheduler
+
+Set `events.worker: "off"` and call `server.events.process()` from your own
+loop or cron. Or call the tick route with a bearer from `events.tick.secret`
+(default `MCP_USE_EVENTS_TICK_SECRET`, then `CRON_SECRET`):
+
+```sh
+curl -X POST -H "Authorization: Bearer $MCP_USE_EVENTS_TICK_SECRET" \
+  https://notes.example.com/mcp/_mcp-use/events/tick
+```
+
+## Scale to zero
+
+Hosts that idle instances must call the tick route while idle, or deliveries
+wait until the next request. Manufact Cloud does this for you. Other hosts use
+`runWakeLoop` from the admin library; see
+[Hosting mcp-use Events](/typescript/server/events-hosting).
+
+## Understand failure isolation
+
+A storage outage never breaks tools, resources or prompts. `events/*`
+requests answer `-32603`, `emit()` rejects with `EVENTS_BACKEND_UNAVAILABLE`
+(or resolves `accepted: false` with `onError: "log"`), and the engine resumes
+when storage returns. A failing callback host trips a per-host breaker without
+slowing other hosts.
+
+## Control egress
+
+Webhook callbacks are verified and must use HTTPS public addresses; private
+and link-local addresses are refused (SSRF protection). To deliver from a
+static IP, set `MCP_USE_EVENTS_EGRESS_PROXY=http://proxy:3128` (Node and Bun).
+Fetch-only runtimes cannot use a CONNECT proxy.
+
+## Tune runtime knobs
+
+Each knob reads code config first, then `MCP_USE_EVENTS_<X>`, then
+`MCP_USE_PLATFORM_EVENTS_<X>`, then the built-in default.
+
+| Variable | Default |
+|---|---|
+| `MCP_USE_EVENTS_PUSH` | `auto` (`on`, `off`) |
+| `MCP_USE_EVENTS_PUSH_MAX_DURATION_MS` | by runtime; `0` = unlimited |
+| `MCP_USE_EVENTS_HEARTBEAT_MAX_MS` | `55000` |
+| `MCP_USE_EVENTS_POLL_INTERVAL_MS` | `10000` |
+| `MCP_USE_EVENTS_EGRESS_PROXY` | none |
+| `MCP_USE_EVENTS_LOG_FORMAT` | `text` (`json`) |
+
+See the maintained deployment recipes in
+[`examples/vercel`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/vercel),
+[`examples/upstash`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/upstash) and
+[`examples/railway`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/railway).

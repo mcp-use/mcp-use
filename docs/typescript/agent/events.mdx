@@ -1,0 +1,56 @@
+---
+title: "Events"
+description: "Run an agent automatically when an MCP server emits an event."
+icon: "radio-tower"
+---
+
+`agent.onEvent()` subscribes to an MCP Event and starts an agent run for
+each occurrence. It works in every delivery mode through the client
+[events manager](/typescript/client/events).
+
+## Trigger a run
+
+```ts
+import { MCPAgent, MCPClient } from "mcp-use";
+
+const client = new MCPClient({ mcpServers: { github: { url: "https://issues.example.com/mcp" } } });
+const agent = new MCPAgent({ llm, client });
+
+const trigger = agent.onEvent("github", "issue.opened", { repo: "acme/web" }, {
+  prompt: (e) => `A new issue was opened. Triage it: add labels and a first reply.\n${e.untrusted}`,
+  coalesce: "30s",
+  maxRunsPerHour: 30,
+});
+
+// later
+await trigger.stop();
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `prompt` | required | Builds the run prompt from the event |
+| `mode` | manager's choice | Force `webhook`, `push` or `poll` |
+| `coalesce` | none | Batch bursts into one run |
+| `maxRunsPerHour` | none | Drop excess events with a log line |
+
+## Keep event data untrusted
+
+`e.untrusted` wraps the data:
+
+```xml
+<untrusted-mcp-event server="github" name="issue.opened">{"repo":"acme/web",…}</untrusted-mcp-event>
+```
+
+Interpolate only `e.untrusted` into prompts, never raw `e.data` fields.
+Event payloads come from outside your system and can contain prompt
+injection.
+
+## Prevent feedback loops
+
+A run that calls a tool that emits the same event can loop. Set
+`maxRunsPerHour`, and the server limits deliveries per subscription per
+minute. Runs from one trigger never overlap. `agent.close()` stops every
+trigger the agent created.
+
+See the maintained example in
+[`examples/mcp-events`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/mcp-events).

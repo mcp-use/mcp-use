@@ -12,6 +12,19 @@ import { randomToken } from "./crypto.js";
 import { keys, type ClientRecord } from "./records.js";
 import type { SecureStore } from "./storage.js";
 import { printable } from "./upstream.js";
+import { isPrivateAddress } from "../../net/address.js";
+import {
+  defaultPinnedTransport,
+  pinnedLookup,
+  type PinnedLookup,
+  type PinnedTransport,
+} from "../../net/pinned.js";
+import {
+  checkHost,
+  defaultHostResolver,
+  hostResolverFrom,
+  type HostResolver,
+} from "../../net/resolver.js";
 
 /**
  * A client defined on the server, for clients that can use neither a client
@@ -570,46 +583,6 @@ async function readLimited(response: Response, limit: number): Promise<string> {
   return new TextDecoder().decode(bytes);
 }
 
-/** @internal A `lookup` for `node:https` that answers from a fixed list. */
-export type PinnedLookup = (
-  hostname: string,
-  options: { all?: boolean },
-  callback: (
-    error: Error | null,
-    address: string | { address: string; family: number }[],
-    family?: number
-  ) => void
-) => void;
-
-/** The parts of a `node:http` response that {@link requestPinned} uses. */
-interface PinnedResponse {
-  statusCode?: number | undefined;
-  headers: Record<string, string | string[] | undefined>;
-  destroy(): unknown;
-}
-
-/**
- * @internal The parts of `node:https` and `node:stream` that
- * {@link createCimdFetcher} uses to connect to checked addresses only.
- */
-export interface PinnedTransport {
-  /** `https.request`. */
-  request(
-    url: URL,
-    options: {
-      headers: Record<string, string>;
-      signal: AbortSignal;
-      lookup: PinnedLookup;
-    },
-    onResponse: (response: PinnedResponse) => void
-  ): {
-    on(event: "error", listener: (error: Error) => void): unknown;
-    end(): unknown;
-  };
-  /** `Readable.toWeb`. */
-  toWeb(response: PinnedResponse): ReadableStream<Uint8Array>;
-}
-
 /**
  * GETs `url` over `node:https`, connecting only to `addresses` (already
  * checked) instead of resolving the host again, which would let a host
@@ -623,16 +596,7 @@ function requestPinned(
   addresses: readonly string[],
   signal: AbortSignal
 ): Promise<Response> {
-  const entries = addresses.map((address) => ({
-    address,
-    family: address.includes(":") ? 6 : 4,
-  }));
-  const lookup: PinnedLookup = (_hostname, options, callback) => {
-    const first = entries[0];
-    if (options.all === true) callback(null, entries);
-    else if (first !== undefined) callback(null, first.address, first.family);
-    else callback(new Error("no checked address"), "");
-  };
+  const lookup = pinnedLookup(addresses);
   return new Promise((resolve, reject) => {
     const request = transport.request(
       url,
@@ -658,57 +622,6 @@ function requestPinned(
   });
 }
 
-let defaultTransport: Promise<PinnedTransport | undefined> | undefined;
-
-/**
- * @internal Loads `node:https` once on Node.js and Bun, where its `lookup`
- * option is honored, else `undefined`. Deno and Cloudflare Workers also
- * have `node:https`, but are not known to honor `lookup`.
- */
-export function defaultPinnedTransport(): Promise<PinnedTransport | undefined> {
-  defaultTransport ??= (async () => {
-    const versions = (
-      globalThis as { process?: { versions?: Record<string, unknown> } }
-    ).process?.versions;
-    const userAgent = (globalThis as { navigator?: { userAgent?: unknown } })
-      .navigator?.userAgent;
-    const nodeOrBun =
-      typeof versions?.["bun"] === "string" ||
-      (typeof versions?.["node"] === "string" &&
-        !("Deno" in globalThis) &&
-        userAgent !== "Cloudflare-Workers");
-    if (!nodeOrBun) return undefined;
-    try {
-      // Computed specifiers keep edge bundlers from resolving the builtins.
-      type Https = { request?: PinnedTransport["request"] };
-      type Stream = {
-        Readable?: { toWeb?: PinnedTransport["toWeb"] };
-      };
-      const [https, stream] = (await Promise.all([
-        import(/* @vite-ignore */ ["node", "https"].join(":")),
-        import(/* @vite-ignore */ ["node", "stream"].join(":")),
-      ])) as [Https & { default?: Https }, Stream & { default?: Stream }];
-      const request = https.request ?? https.default?.request;
-      const readable = stream.Readable ?? stream.default?.Readable;
-      const toWeb = readable?.toWeb?.bind(readable);
-      if (typeof request !== "function" || typeof toWeb !== "function") {
-        return undefined;
-      }
-      return {
-        request: (url, options, onResponse) =>
-          request(url, options, onResponse),
-        toWeb,
-      };
-    } catch {
-      return undefined;
-    }
-  })();
-  return defaultTransport;
-}
-
-/** @internal Resolves a hostname to the IP addresses it points to. */
-export type HostResolver = (hostname: string) => Promise<string[]>;
-
 /**
  * @internal Refuses hosts that resolve to private, loopback, link-local, or
  * otherwise non-public addresses (SSRF). Without a `resolve`, only an IP
@@ -730,154 +643,20 @@ export async function resolvePublicAddresses(
   hostname: string,
   resolve: HostResolver | undefined
 ): Promise<string[]> {
-  const host = hostname.replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost")) {
-    throw new Error("metadata document host is not public");
-  }
-  if (isIpLiteral(host)) {
-    if (isPrivateAddress(host)) {
-      throw new Error("metadata document host is not public");
-    }
-    return [host];
-  }
-  if (resolve === undefined) {
-    throw new Error(
-      "metadata document host cannot be checked: this runtime has no node:dns to resolve it. Enable node:dns (nodejs_compat on Cloudflare Workers), or pass oauthProxy a fetch that enforces your own network policy"
-    );
-  }
-  let addresses: string[];
-  try {
-    addresses = await resolve(host);
-  } catch {
-    throw new Error("metadata document host does not resolve");
-  }
-  if (
-    addresses.length === 0 ||
-    addresses.some((address) => isPrivateAddress(address))
-  ) {
-    throw new Error("metadata document host is not public");
-  }
-  return addresses;
-}
-
-/** The parts of `node:dns` promises that the resolvers use. */
-interface DnsPromises {
-  lookup?: (
-    hostname: string,
-    options: { all: true; verbatim: boolean }
-  ) => Promise<{ address: string }[]>;
-  resolve4?: (hostname: string) => Promise<string[]>;
-  resolve6?: (hostname: string) => Promise<string[]>;
-}
-
-/**
- * @internal Picks a resolver from a loaded `node:dns` module, or returns
- * `undefined` when it has none.
- *
- * Node.js, Bun, and Deno use `lookup`, which resolves as `fetch` does
- * (getaddrinfo, including the hosts file). Cloudflare Workers is the
- * exception: its `node:dns` (with `nodejs_compat`) implements `resolve4`
- * and `resolve6` over DNS over HTTPS but throws "Not implemented" from
- * `lookup`, and a Worker has no hosts file for `lookup` to honor, so its A
- * and AAAA records are the addresses to check.
- *
- * @param dns - The `node:dns` module namespace.
- * @param userAgent - The runtime's `navigator.userAgent`.
- */
-export function hostResolverFrom(
-  dns: unknown,
-  userAgent: string | undefined
-): HostResolver | undefined {
-  const namespace = dns as
-    | { promises?: DnsPromises; default?: { promises?: DnsPromises } }
-    | undefined;
-  const promises = namespace?.promises ?? namespace?.default?.promises;
-  if (promises === undefined) return undefined;
-  if (userAgent === "Cloudflare-Workers") {
-    const { resolve4, resolve6 } = promises;
-    if (typeof resolve4 !== "function" || typeof resolve6 !== "function") {
-      return undefined;
-    }
-    return async (hostname) => {
-      const results = await Promise.allSettled([
-        resolve4(hostname),
-        resolve6(hostname),
-      ]);
-      if (results.every((result) => result.status === "rejected")) {
-        throw new Error("host does not resolve");
-      }
-      return results.flatMap((result) =>
-        result.status === "fulfilled" ? result.value : []
+  const result = await checkHost(hostname, resolve);
+  if ("addresses" in result) return result.addresses;
+  switch (result.refused) {
+    case "no_resolver":
+      throw new Error(
+        "metadata document host cannot be checked: this runtime has no node:dns to resolve it. Enable node:dns (nodejs_compat on Cloudflare Workers), or pass oauthProxy a fetch that enforces your own network policy"
       );
-    };
+    case "dns_failure":
+      throw new Error("metadata document host does not resolve");
+    default:
+      throw new Error("metadata document host is not public");
   }
-  const lookup = promises.lookup;
-  if (typeof lookup !== "function") return undefined;
-  return async (hostname) =>
-    (await lookup(hostname, { all: true, verbatim: true })).map(
-      (entry) => entry.address
-    );
 }
 
-let defaultResolver: Promise<HostResolver | undefined> | undefined;
-
-/**
- * @internal Loads the runtime's resolver once: from `node:dns` where the
- * runtime has it, else `undefined`, which refuses metadata documents.
- */
-export function defaultHostResolver(): Promise<HostResolver | undefined> {
-  defaultResolver ??= (async () => {
-    // A computed specifier keeps edge bundlers from resolving the builtin.
-    const specifier = ["node", "dns"].join(":");
-    let dns: unknown;
-    try {
-      dns = await import(/* @vite-ignore */ specifier);
-    } catch {
-      return undefined;
-    }
-    const userAgent = (globalThis as { navigator?: { userAgent?: unknown } })
-      .navigator?.userAgent;
-    return hostResolverFrom(
-      dns,
-      typeof userAgent === "string" ? userAgent : undefined
-    );
-  })();
-  return defaultResolver;
-}
-
-function isIpLiteral(host: string): boolean {
-  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(":");
-}
-
-/** @internal Whether an IP address is not publicly routable. */
-export function isPrivateAddress(address: string): boolean {
-  const ipv4 = address.match(
-    /^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/i
-  );
-  if (ipv4 !== null) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    return (
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 0 && Number(ipv4[3]) === 0) ||
-      (a === 192 && b === 168) ||
-      (a === 198 && (b === 18 || b === 19)) ||
-      a >= 224
-    );
-  }
-  const ipv6 = address.toLowerCase();
-  return (
-    ipv6 === "::" ||
-    ipv6 === "::1" ||
-    /^f[cd]/.test(ipv6) ||
-    // fe80::/10 link-local and fec0::/10 (deprecated) site-local.
-    /^fe[89a-f]/.test(ipv6) ||
-    ipv6.startsWith("ff") ||
-    ipv6.startsWith("64:ff9b:") ||
-    ipv6.startsWith("::ffff:")
-  );
-}
+export { defaultHostResolver, hostResolverFrom, isPrivateAddress };
+export type { HostResolver, PinnedLookup, PinnedTransport };
+export { defaultPinnedTransport };

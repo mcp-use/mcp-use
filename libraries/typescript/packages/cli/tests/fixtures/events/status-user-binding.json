@@ -1,0 +1,15 @@
+{
+  "layout": null,
+  "closed": null,
+  "due": null,
+  "fanoutDue": null,
+  "oldestDueAgeMs": null,
+  "nextWakeAt": null,
+  "deadLetters": null,
+  "subscriptions": null,
+  "leases": null,
+  "binding": "user",
+  "namespaceHash": "q2V8k1Xh0bLmP3sA",
+  "updatedAt": "2026-11-25T12:30:05.000Z",
+  "message": "Events state is in your own storage"
+}

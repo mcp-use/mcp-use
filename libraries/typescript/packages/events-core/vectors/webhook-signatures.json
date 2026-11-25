@@ -1,0 +1,40 @@
+{
+  "$comment": "Standard Webhooks v1 signatures: v1, + base64(HMAC-SHA256(secret bytes, webhook-id + '.' + webhook-timestamp + '.' + body)), one entry per secret, space-separated, in secret order. `body` is signed as its UTF-8 bytes. The first case is the published Standard Webhooks test vector (standard-webhooks/standard-webhooks go/webhook_test.go:233-238); the others were computed with node:crypto createHmac, independently of this package. The placeholders {{STANDARD_WEBHOOKS_TEST_SECRET}} (whsec_ plus the key) and {{STANDARD_WEBHOOKS_TEST_KEY}} (the base64 key MfKQ9r8GKY followed by qrTwjUPD8ILPZIo2LaLaSw) stand for the published Standard Webhooks test secret, kept out of the file as one literal because secret scanning flags it; readers substitute them before use.",
+  "cases": [
+    {
+      "case": "standard-webhooks-published",
+      "secrets": ["{{STANDARD_WEBHOOKS_TEST_SECRET}}"],
+      "webhookId": "msg_p5jXN8AQM9LWM0D4loKWxJek",
+      "timestamp": 1614265330,
+      "body": "{\"test\": 2432232314}",
+      "signature": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+    },
+    {
+      "case": "event-delivery",
+      "secrets": ["whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="],
+      "webhookId": "msg_x9QeV0aL3pTz7cB2mN5kRw",
+      "timestamp": 1764000000,
+      "body": "{\"eventId\":\"note_812233\",\"name\":\"note.created\",\"timestamp\":\"2026-11-24T10:01:07.000Z\",\"data\":{\"folder\":\"inbox\"},\"cursor\":null}",
+      "signature": "v1,1X4J7RMMy7644A8n31eE30McSw/YenpF+FAoaz3vJCM="
+    },
+    {
+      "case": "rotation-two-signers",
+      "secrets": [
+        "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+        "whsec_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8="
+      ],
+      "webhookId": "msg_gap_Qm9vX2RlbW8tbWFjMDEyMz",
+      "timestamp": 1764000300,
+      "body": "{\"type\":\"gap\",\"cursor\":\"c1.k3v9q2m7x1a0.2f.Qm9vX2RlbW8tbWFj\"}",
+      "signature": "v1,jva3clDPIiUvSUmnWlgNejB4JvUIeZcoGLXk6OBfVgQ= v1,prby1WlbwwJp1y96rvN1rRI9JUHFPBZ4sm1Ei8qQM6g="
+    },
+    {
+      "case": "non-ascii-body",
+      "secrets": ["{{STANDARD_WEBHOOKS_TEST_SECRET}}"],
+      "webhookId": "note_812233",
+      "timestamp": 1764000001,
+      "body": "{\"eventId\":\"note_812233\",\"name\":\"café.updated\",\"timestamp\":\"2026-11-24T10:01:07.000Z\",\"data\":{\"city\":\"Zürich\",\"emoji\":\"🎉\"},\"cursor\":null}",
+      "signature": "v1,9JYhSjvunIL/5ELdQvL2cMhPAVFExNipIYQC8xvnadY="
+    }
+  ]
+}

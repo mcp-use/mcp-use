@@ -1,0 +1,9 @@
+{
+  "$comment": "Official MCP Events conformance suites (PLAN.md D1, D73, §17.3.3). Pinned by commit SHA: the PR head while the PR is open, the merge SHA afterwards. Repinning is a one-line change to `sha`. TODO(events): fill both SHAs (40 hex chars) before the feat/mcp-events -> canary merge; events-conformance.yml fails PRs into canary/main while a sha is null.",
+  "repository": "modelcontextprotocol/conformance",
+  "suites": {
+    "server": { "pr": 521, "sha": null },
+    "client": { "pr": 541, "sha": null }
+  },
+  "compatibility": { "mcpName": "strict", "dialect": "sep-3415" }
+}

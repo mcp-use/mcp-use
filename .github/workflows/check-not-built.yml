@@ -1,0 +1,56 @@
+name: check-not-built
+permissions:
+  contents: read
+
+# Permanent gate (PLAN.md §17.3.3, WP-38). WP-03 creates every Events module
+# with a `notBuilt("WP-nn")` body. On PRs into feat/mcp-events this is a
+# report; on every PR into canary and main it blocks while any `notBuilt(`
+# call remains in source, so the feat/mcp-events -> canary merge cannot land a
+# skeleton body.
+
+on:
+  pull_request:
+    branches: [main, canary, feat/mcp-events]
+  push:
+    branches: [main, canary]
+
+jobs:
+  check-not-built:
+    name: check-not-built
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Find notBuilt( calls in source
+        env:
+          BASE_REF: ${{ github.base_ref || github.ref_name }}
+        run: |
+          # Source only: the helper's own definition, tests and docs are excluded.
+          hits=$(git grep -n -E '(^|[^[:alnum:]_])notBuilt\(' -- \
+            'libraries/typescript/packages/*/src/*' \
+            ':(exclude)*.test.ts' ':(exclude)*.test.tsx' \
+            ':(exclude)*/__tests__/*' ':(exclude)libraries/typescript/packages/*/tests/*' \
+            ':(exclude)*/not-built.ts' || true)
+          count=$(printf '%s' "$hits" | grep -c . || true)
+          {
+            echo "### check-not-built"
+            echo
+            echo "\`notBuilt(\` calls remaining in source: **$count**"
+            if [ "$count" -gt 0 ]; then
+              echo
+              echo '```'
+              printf '%s\n' "$hits" | sed -E 's/notBuilt\("(WP-[0-9]+)".*/notBuilt("\1")/'
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$count" -eq 0 ]; then
+            echo "No notBuilt( calls remain."
+            exit 0
+          fi
+          printf '%s\n' "$hits"
+          case "$BASE_REF" in
+            main|canary)
+              echo "::error::$count notBuilt( call(s) remain in source; PRs into $BASE_REF must have none"
+              exit 1 ;;
+            *)
+              echo "::notice::$count notBuilt( call(s) remain (report only on $BASE_REF)" ;;
+          esac

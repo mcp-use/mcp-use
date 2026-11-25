@@ -1,0 +1,116 @@
+{
+  "prefix": "/_mcp-use/events",
+  "routes": [
+    {
+      "id": "tick",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "tick",
+      "auth": "tick"
+    },
+    {
+      "id": "health",
+      "methods": [
+        "GET"
+      ],
+      "path": "health",
+      "auth": "admin"
+    },
+    {
+      "id": "emit",
+      "methods": [
+        "POST"
+      ],
+      "path": "emit",
+      "auth": "admin",
+      "requiredHeaders": [
+        "x-mcp-use-confirm"
+      ]
+    },
+    {
+      "id": "admin.subscriptions",
+      "methods": [
+        "GET"
+      ],
+      "path": "admin/subscriptions",
+      "auth": "admin",
+      "query": [
+        "name",
+        "principal",
+        "status",
+        "mode",
+        "after",
+        "limit"
+      ]
+    },
+    {
+      "id": "admin.subscription",
+      "methods": [
+        "GET"
+      ],
+      "path": "admin/subscriptions/:id",
+      "auth": "admin"
+    },
+    {
+      "id": "admin.leases",
+      "methods": [
+        "GET"
+      ],
+      "path": "admin/leases",
+      "auth": "admin",
+      "query": [
+        "name",
+        "principal",
+        "after",
+        "limit"
+      ]
+    },
+    {
+      "id": "admin.dead-letters",
+      "methods": [
+        "GET"
+      ],
+      "path": "admin/dead-letters",
+      "auth": "admin",
+      "query": [
+        "subscriptionId",
+        "after",
+        "limit"
+      ]
+    },
+    {
+      "id": "admin.redeliver",
+      "methods": [
+        "POST"
+      ],
+      "path": "admin/dead-letters/:id/redeliver",
+      "auth": "admin"
+    },
+    {
+      "id": "admin.revoke",
+      "methods": [
+        "POST"
+      ],
+      "path": "admin/revoke",
+      "auth": "admin"
+    },
+    {
+      "id": "admin.streams",
+      "methods": [
+        "GET"
+      ],
+      "path": "admin/streams",
+      "auth": "admin"
+    },
+    {
+      "id": "admin.decommission",
+      "methods": [
+        "POST"
+      ],
+      "path": "admin/decommission",
+      "auth": "admin-no-dev"
+    }
+  ]
+}

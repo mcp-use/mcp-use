@@ -31,6 +31,17 @@ export interface MountMcpOptions {
    * runs. When omitted, requests are served without authenticated identity.
    */
   authInfo?: (request: Request) => AuthInfo | undefined;
+  /**
+   * Answer a request before the SDK handler sees it. Runs after the body is
+   * parsed; return a `Response` to answer, or `undefined` to continue.
+   * MCP Events uses it to answer every `events/*` method itself (D75).
+   * Without a preflight, `events/*` requests reach the SDK, which answers
+   * `-32601` exactly as it does for any unknown method.
+   */
+  preflight?: (
+    request: Request,
+    parsedBody: unknown
+  ) => Promise<Response | undefined> | Response | undefined;
 }
 
 /** Result of {@link createMcpMount}. */
@@ -66,6 +77,7 @@ export function createMcpMount(
     path = "/mcp",
     handler: handlerOptions,
     authInfo: getAuthInfo,
+    preflight,
   } = options;
   const legacyMode = handlerOptions?.legacy ?? "stateless";
   const handler = createMcpHandler(factory, {
@@ -95,6 +107,11 @@ export function createMcpMount(
       } catch {
         // Non-JSON or empty body — the SDK handler will surface the error.
       }
+    }
+
+    if (preflight !== undefined) {
+      const answered = await preflight(request, parsedBody);
+      if (answered !== undefined) return answered;
     }
 
     const capabilities = extractClientCapabilitiesFromBody(parsedBody);

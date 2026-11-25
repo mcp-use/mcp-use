@@ -75,3 +75,6 @@ deno-test-temp
 
 # Scratch fixture copies made by the CLI tests
 .tmp
+
+# Test-only self-signed receiver certificate (MCP Events sender tests)
+!packages/server/tests/events/fixtures/*.pem

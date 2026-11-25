@@ -1,0 +1,31 @@
+# Removes stale Manufact E2E deployments (PLAN.md §18.8.8 layer 2).
+name: Manufact E2E janitor
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manufact-e2e-janitor
+
+jobs:
+  janitor:
+    runs-on: ubuntu-latest
+    environment: manufact-e2e
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Remove r<run>a<attempt>- deployments older than 6 h
+        env:
+          MANUFACT_TOKEN: ${{ secrets.MANUFACT_TOKEN }}
+          MANUFACT_ORG: ${{ secrets.MANUFACT_ORG }}
+        run: |
+          npm install -g @mcp-use/cli
+          E2E_MCP_USE_CLI=mcp-use node libraries/typescript/e2e/manufact/scripts/janitor.mjs --execute

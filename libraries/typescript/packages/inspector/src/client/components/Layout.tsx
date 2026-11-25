@@ -196,6 +196,7 @@ export function Layout({ children }: LayoutProps) {
         "prompts",
         "resources",
         "skills",
+        "events",
         "chat",
         "sampling",
         "elicitation",

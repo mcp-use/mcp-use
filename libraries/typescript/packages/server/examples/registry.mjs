@@ -57,11 +57,15 @@ export const examples = [
     prompts: ["plan-trip"],
     landing: true,
   }),
-  local("events", {
+  local("observers", {
     tools: ["ping", "recent-events"],
     resources: ["events://observations"],
-    scenario: "events",
+    scenario: "observers",
     headers: { "x-example-request-id": "example-verifier" },
+  }),
+  local("mcp-events", {
+    tools: ["create_note", "list_notes"],
+    scenario: "mcp-events",
   }),
   local("skills-over-mcp", {
     tools: ["refund-order", "create-purchase-order", "get-order-status"],

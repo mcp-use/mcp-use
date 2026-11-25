@@ -1,0 +1,23 @@
+{
+  "name": "@mcp-use/e2e-manufact",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Manufact dev-space E2E harness for MCP Events (PLAN.md §18.8). Never published.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit",
+    "build-variant": "node scripts/build-variant.mjs",
+    "stage-fixture": "node scripts/stage-fixture.mjs",
+    "deploy": "node scripts/deploy.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12"
+  }
+}

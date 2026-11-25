@@ -48,3 +48,6 @@ export {
 } from "./telemetry/tel-fetch.js";
 export { getPackageVersion, VERSION } from "./utils/version.js";
 export { detectFavicon } from "./utils/favicon.js";
+
+/** MCP Events client contract (types and `EventsClientError`). */
+export * from "./events/index.js";

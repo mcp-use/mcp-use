@@ -1,0 +1,69 @@
+---
+title: "Migrate to mcp-use Events"
+description: "Move event definitions from Skybridge registerEvent and mcp-handler experimental_registerMcpEvents to server.event()."
+icon: "arrow-right-left"
+---
+
+mcp-use Events speak the same `openai` wire dialect as Skybridge and
+mcp-handler, so existing ChatGPT subscriptions keep working after a
+redeploy once the client refreshes tools. You also gain SEP-3415, push, poll
+and replay without code changes.
+
+## Migrate from Skybridge
+
+```ts title="Before"
+server.registerEvent("note.created", {
+  description: "A note was created.",
+  inputSchema: { folder: z.string().optional() },
+  payloadSchema: { folder: z.string(), noteId: z.string() },
+});
+await server.emitEvent("note.created", { folder, noteId });
+```
+
+```ts title="After"
+export const noteCreated = server.event({
+  name: "note.created",
+  description: "A note was created. Summarize it in one sentence.",
+  inputSchema: z.object({ folder: z.string().optional() }),
+  payloadSchema: z.object({ folder: z.string(), noteId: z.string() }),
+});
+await noteCreated.emit({ folder, noteId }, { eventId: noteId });
+```
+
+- Wrap raw shapes in `z.object()`.
+- Filters on same-named fields need no code. Replace a custom filter with `match`.
+- Pass an upstream-stable `eventId` so retries dedupe.
+
+## Migrate from mcp-handler
+
+```ts title="Before"
+experimental_registerMcpEvents(server, {
+  events: { "issue.opened": { description, inputSchema, payloadSchema } },
+  storage: redisStore,
+});
+```
+
+```ts title="After"
+const server = new MCPServer({ name: "issues", version: "1.0.0", storage: redisStorage(redis) });
+export const issueOpened = server.event({ name: "issue.opened", description, inputSchema, payloadSchema });
+```
+
+- Move the store to `storage` or `MCP_USE_STORAGE_URL`. mcp-use uses its own
+  layout, so existing subscriptions are not carried over; ChatGPT recreates
+  them after **Refresh tools**.
+- Replace custom webhook senders with `events.sender` only if you need one;
+  the default sender verifies callbacks, signs and retries.
+
+## Map the concepts
+
+| Skybridge / mcp-handler | mcp-use |
+|---|---|
+| `registerEvent`, `registerMcpEvents` | `server.event()` |
+| `emitEvent(name, data)` | `ref.emit(data, options)` |
+| Filter callback | `match` (or automatic matching) |
+| Auth check | `authorize` and `scopes` |
+| Store option | `storage` / `MCP_USE_STORAGE_URL` |
+| — | `replay`, push, poll, cursors |
+
+See the maintained example in
+[`examples/mcp-events`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/mcp-events).

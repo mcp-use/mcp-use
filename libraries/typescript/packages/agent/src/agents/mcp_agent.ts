@@ -1,6 +1,12 @@
 import type { MCPClient } from "@mcp-use/client";
 import type { BaseConnector } from "@mcp-use/client";
 import { logger } from "@mcp-use/client";
+import {
+  startEventTrigger,
+  type EventTrigger,
+  type EventsSubscriber,
+  type OnEventOptions,
+} from "../events/on-event.js";
 import type { ZodSchema } from "zod";
 import { NativeAdapter } from "../adapters/native_adapter.js";
 import { createLlmDriver, type LlmDriver } from "../llm/driver.js";
@@ -86,6 +92,7 @@ export class MCPAgent {
   private client?: MCPClient;
   private connectors: BaseConnector[] = [];
   private clientOwnedByAgent = false;
+  private readonly eventTriggers = new Set<EventTrigger>();
   private nativeAdapter: NativeAdapter;
   private providerTools: import("../llm/types.js").ProviderTool[] = [];
   private callTool?: (
@@ -630,11 +637,56 @@ export class MCPAgent {
   }
 
   /**
+   * Run the agent whenever an MCP event arrives (PLAN.md §9.7). Event data is
+   * wrapped as `<untrusted-mcp-event>` in `e.untrusted`; one run at a time
+   * per trigger; `maxRunsPerHour` (default 30) drops excess events.
+   *
+   * @param server - MCPClient server key.
+   * @param name - Event name.
+   * @param args - Subscription arguments.
+   * @param options - Prompt builder, mode, coalescing and the hourly cap.
+   * @returns The trigger; `agent.close()` stops it too.
+   * @throws Error when the client has no Events manager (`client.events`).
+   */
+  async onEvent<T = unknown>(
+    server: string,
+    name: string,
+    args: Record<string, unknown>,
+    options: OnEventOptions<T>
+  ): Promise<EventTrigger> {
+    const events = (this.client as { events?: EventsSubscriber } | undefined)
+      ?.events;
+    if (!events || typeof events.subscribe !== "function") {
+      throw new Error(
+        "agent.onEvent needs an MCPClient with an Events manager (client.events)"
+      );
+    }
+    const trigger = await startEventTrigger<T>({
+      events,
+      server,
+      name,
+      args,
+      options,
+      run: (prompt) => this.run({ prompt }),
+    });
+    const tracked: EventTrigger = {
+      stop: async () => {
+        this.eventTriggers.delete(tracked);
+        await trigger.stop();
+      },
+    };
+    this.eventTriggers.add(tracked);
+    return tracked;
+  }
+
+  /**
    * Closes MCP sessions created by this agent and resets initialization state.
    *
    * Existing clients supplied by the caller remain open.
    */
   async close(): Promise<void> {
+    await Promise.all([...this.eventTriggers].map((t) => t.stop()));
+    this.eventTriggers.clear();
     if (this.clientOwnedByAgent && this.client) {
       await this.client.closeAllSessions?.();
     }

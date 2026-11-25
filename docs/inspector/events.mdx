@@ -1,0 +1,64 @@
+---
+title: "Events"
+description: "Browse, subscribe to and debug MCP Events in the Inspector, with a local inbox and server-side delivery views."
+icon: "radio-tower"
+---
+
+The **Events** tab lists a server's MCP Events, subscribes to them in any
+delivery mode, and shows what arrives. Open it directly with
+`?tab=events` (see [URL parameters](/inspector/url-parameters)).
+
+## Browse the catalog
+
+The catalog lists each event with its description, arguments and payload
+schemas, and the delivery modes the server offers. The lint panel flags
+descriptions ChatGPT cannot act on, oversized payload schemas and arguments
+that cannot be matched.
+
+## Subscribe in any mode
+
+Pick an event, fill in arguments, and choose:
+
+| Panel | What it does |
+|---|---|
+| Push | Opens `events/stream` and shows frames, heartbeats and cursors |
+| Poll | Calls `events/poll`, with manual or automatic paging from a cursor |
+| Webhook | Subscribes with an Inspector-hosted callback and shows signed deliveries |
+
+The dialect selector switches between SEP-3415 and the ChatGPT dialect, and
+can emulate older ChatGPT behavior, so you can see what each client gets.
+
+## Read the inbox
+
+Webhook deliveries land in the inbox. Under `mcp-use dev` the inbox is local
+and trusted; with `--tunnel` it is reachable from the internet so ChatGPT can
+deliver to the same server. Each entry shows headers, signature status, body
+and cursor.
+
+## Inspect server subscriptions
+
+When the Inspector is connected to a server under `mcp-use dev`, or with an
+admin secret, the server subscriptions panel shows every subscription and
+lease, recent attempts, and dead letters. Select a dead letter and press
+**Redeliver** to retry it.
+
+## Inject faults
+
+Fault presets make the inbox answer `500`, `410`, slow responses or bad
+challenges, so you can watch retries, suspension and termination.
+
+## Run conformance
+
+The conformance panel runs the Events conformance checks against the server
+in both dialects and reports each failure with the request and response.
+
+## Verify the integration
+
+1. Run `mcp-use dev` in your server project.
+2. Open the **Events** tab and confirm your events are listed.
+3. Subscribe through push, trigger an emit, and see the frame arrive.
+4. Subscribe through webhook and see the delivery in the inbox.
+5. Turn on the `500` fault preset and watch the delivery retry in the server subscriptions panel.
+
+See the maintained example in
+[`examples/mcp-events`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/mcp-events).

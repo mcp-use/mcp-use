@@ -52,3 +52,6 @@ export {
   POSTHOG_API_KEY,
 } from "./telemetry/index.js";
 export { logger } from "./utils/logging.js";
+
+/** MCP Events client contract (types and `EventsClientError`). */
+export * from "./events/index.js";

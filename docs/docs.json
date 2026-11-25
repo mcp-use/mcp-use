@@ -195,6 +195,7 @@
                           "inspector/cli",
                           "inspector/connection-settings",
                           "inspector/url-parameters",
+                          "inspector/events",
                           "inspector/keyboard-shortcuts",
                           "inspector/command-palette",
                           "inspector/integration",
@@ -360,7 +361,8 @@
                         "icon": "rocket",
                         "pages": [
                           "typescript/server/deployment/mcp-use",
-                          "typescript/server/deployment/self-hosted"
+                          "typescript/server/deployment/self-hosted",
+                          "typescript/server/events-hosting"
                         ]
                       },
                       "typescript/server/proxy",
@@ -374,7 +376,14 @@
                           "typescript/server/elicitation",
                           "typescript/server/sampling",
                           "typescript/server/subscriptions",
-                          "typescript/server/notifications"
+                          "typescript/server/notifications",
+                          "typescript/server/events",
+                          "typescript/server/events-chatgpt",
+                          "typescript/server/events-deployment",
+                          "typescript/server/events-hosting",
+                          "typescript/server/events-troubleshooting",
+                          "typescript/server/events-migration",
+                          "typescript/server/storage"
                         ]
                       }
                     ]
@@ -415,7 +424,8 @@
                           "typescript/client/sampling",
                           "typescript/client/elicitation",
                           "typescript/client/completion",
-                          "typescript/client/notifications"
+                          "typescript/client/notifications",
+                          "typescript/client/events"
                         ]
                       },
                       "typescript/client/authentication",
@@ -431,6 +441,7 @@
                       "typescript/agent/llm-providers",
                       "typescript/agent/memory-management",
                       "typescript/agent/streaming",
+                      "typescript/agent/events",
                       {
                         "group": "LangChain integration",
                         "pages": [

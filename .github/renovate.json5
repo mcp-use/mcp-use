@@ -1,0 +1,28 @@
+// SDK bumps only (PLAN.md D82/D83, WP-38). Renovate opens one PR for the three
+// official SDK packages when npm `latest` moves. The branch name
+// (renovate/mcp-sdk*) makes events-sdk-matrix.yml run the blocking `candidate`
+// leg. Never auto-merged: follow "Bumping the MCP SDK" in CONTRIBUTING.md.
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  enabledManagers: ["npm"],
+  packageRules: [
+    {
+      matchPackageNames: ["*"],
+      enabled: false,
+    },
+    {
+      matchPackageNames: [
+        "@modelcontextprotocol/server",
+        "@modelcontextprotocol/client",
+        "@modelcontextprotocol/core",
+      ],
+      enabled: true,
+      groupName: "mcp-sdk",
+      groupSlug: "mcp-sdk",
+      followTag: "latest",
+      rangeStrategy: "pin",
+      labels: ["sdk-bump"],
+      automerge: false,
+    },
+  ],
+}

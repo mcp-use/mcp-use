@@ -1,0 +1,264 @@
+---
+title: "Events"
+description: "Push durable, typed events from your MCP server to ChatGPT, agents and apps over webhook, push or poll."
+icon: "radio-tower"
+---
+
+MCP Events let a server tell clients that something happened: a note was
+created, an issue was opened, a build failed. A client subscribes once with
+filter arguments; the server delivers each matching occurrence by webhook,
+over a long-lived stream (push), or on request (poll).
+
+mcp-use implements both wire dialects in use today: the ChatGPT dialect
+(`openai`) and the MCP Events extension, SEP-3415 (`sep-3415`). SEP-3415 is a
+Beta extension of MCP. The mcp-use API is stable: dialect changes are absorbed
+by the framework, not by your code.
+
+## Start with one event
+
+```ts
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "notes", version: "1.0.0" });
+const notes = new Map<string, { folder: string; title: string }>();
+
+export const noteCreated = server.event({
+  name: "note.created",
+  description:
+    "A note was created in a folder you follow. Summarize it in one sentence and ask whether to act on it.",
+  inputSchema: z.object({
+    folder: z.string().optional().describe("Only notes in this folder"),
+  }),
+  payloadSchema: z.object({
+    folder: z.string(),
+    noteId: z.string(),
+    title: z.string(),
+  }),
+});
+
+server.tool(
+  {
+    name: "create_note",
+    inputSchema: z.object({ folder: z.string(), title: z.string() }),
+  },
+  async ({ folder, title }, ctx) => {
+    const noteId = `note_${notes.size + 1}`;
+    notes.set(noteId, { folder, title });
+    await noteCreated.emit({ folder, noteId, title }, { eventId: noteId, ctx });
+    return { content: [{ type: "text", text: `Created ${noteId}` }] };
+  }
+);
+
+export default server;
+```
+
+Run it with `mcp-use dev`, open the Inspector's **Events** tab, subscribe to
+`note.created` and call `create_note`. The event arrives in the local inbox.
+
+- `folder` is in both schemas, so a subscription to `{ folder: "inbox" }`
+  receives only inbox notes. An omitted `folder` receives everything.
+- `emit()` resolves after one durable append to the event log. Fan-out,
+  signing and retries run in the background.
+- No OAuth, storage or environment variables are needed in dev: the Inspector
+  subscribes as the dev principal `dev|local`.
+
+## Understand the model
+
+| Concept | Meaning |
+|---|---|
+| Event | A named, typed occurrence type registered with `server.event()` |
+| Arguments | The subscription filter, validated by `inputSchema` |
+| Payload | The `data` of each occurrence, validated by `payloadSchema` |
+| Principal | Who owns a subscription: OAuth `iss\|sub`, `dev\|local`, or `anonymous` |
+| Event log | Every emit is appended once; webhook deliveries, polls and streams all read it |
+| Cursor | A position in the log. Clients resume from it after a restart |
+
+## Choose delivery modes
+
+| Mode | How it works | Offered when |
+|---|---|---|
+| `webhook` | The server POSTs a signed body to the client's callback URL | A principal exists: OAuth, `mcp-use dev`, or anonymous `openai` subscriptions |
+| `push` | The client holds an `events/stream` open | The runtime streams responses (on by default except on Lambda and Netlify) |
+| `poll` | The client calls `events/poll` with a cursor | The event is replayable |
+
+Every mode is on by default. Turn one off per event with
+`delivery: { push: false }`.
+
+## Control replay
+
+Events are replayable by default: the log keeps them for 1 hour or 1,000
+events, whichever is reached first. SEP clients get cursors in every mode and
+resume without loss after a disconnect. A cursor older than the window
+resumes at the oldest retained event with `truncated: true`.
+
+```ts
+server.event({ name: "audit.entry", description: "…", payloadSchema, replay: { maxAge: "24h", maxEvents: 10_000 } });
+
+// High-volume, no history: no cursor, no poll, at-most-once across push reconnects.
+server.event({ name: "presence.changed", description: "…", payloadSchema, replay: false });
+```
+
+Set the server-wide default with `events.replay`.
+
+## Write the description
+
+ChatGPT decides how to react from the `description` alone, and its default
+reaction is to notify the user only. Say what happened and what the model
+should do: "Summarize it and suggest labels."
+
+- Keep payloads small: ids, URLs and short summaries. Add a read tool for the
+  full content.
+- Never put model instructions in payloads. Payload data is untrusted.
+- Use upstream-stable `eventId` values (a GitHub delivery id, a Stripe
+  `evt_…`). A repeated id for the same target within 24 hours is dropped.
+
+## Filter with match
+
+The default `match: "auto"` compares top-level arguments with same-named
+scalar payload fields. Write a function when the payload has no such field.
+`match` has no request context; it receives
+`{ principal, subscriptionId, dialect, mode }`.
+
+```ts
+export const incident = server.event({
+  name: "incident.created",
+  description: "A production incident was opened at or above your chosen severity.",
+  inputSchema: z.object({ minSeverity: z.enum(["P1", "P2", "P3"]).default("P2") }),
+  payloadSchema: z.object({ id: z.string(), severity: z.enum(["P1", "P2", "P3"]), title: z.string() }),
+  match: ({ minSeverity }, data) => data.severity <= minSeverity,
+});
+```
+
+## Authorize subscribers
+
+`authorize` gets the full request context and runs on every subscribe,
+refresh, poll, stream open, and every 15 minutes on open streams. `scopes`
+are requested at sign-in and enforced on subscribe, poll and stream.
+
+```ts
+export const issueOpened = server.event({
+  name: "issue.opened",
+  description: "A new issue was opened in a GitHub repository you can access. Summarize it and suggest labels.",
+  inputSchema: z.object({ repo: z.string().describe("owner/name") }),
+  payloadSchema: z.object({ repo: z.string(), number: z.number(), title: z.string(), url: z.string().url() }),
+  authorize: async ({ repo }, ctx) => github.canRead(ctx.auth.principal!, repo),
+  scopes: ["issues:read"],
+});
+```
+
+Throw `EventsError` from `authorize`, `match` or `onSubscribe` to choose the
+wire error: `NotFound`, `Forbidden`, `ResourceExhausted`, `Unsupported`,
+`InvalidParams` or `CallbackEndpointError`.
+
+## Emit per-user events
+
+Target principals instead of filtering by arguments:
+
+```ts
+await dmReceived.emit(data, { eventId: body.event_id, principal: await users.principalForSlack(userId) });
+```
+
+Per-user emits never reach the shared `anonymous` principal.
+
+## Emit from webhooks and other processes
+
+```ts
+server.post("/webhooks/github", async (c) => {
+  const raw = await c.req.text();
+  if (!(await gh.verify(raw, c.req.header("x-hub-signature-256") ?? ""))) return c.body(null, 401);
+  const body = JSON.parse(raw);
+  if (c.req.header("x-github-event") === "issues" && body.action === "opened") {
+    await issueOpened.emit(
+      { repo: body.repository.full_name, number: body.issue.number, title: body.issue.title, url: body.issue.html_url },
+      { eventId: c.req.header("x-github-delivery"), ctx: c }
+    );
+  }
+  return c.body(null, 204);
+});
+```
+
+`emit()` is durable before your handler returns 2xx, so upstream retries
+dedupe on `eventId`. Inside tools, pass `onError: "log"` to keep the tool
+working during a storage outage. From a queue consumer that serves no MCP,
+share definitions with `defineEvent()` and emit with
+`createEventsEmitter({ events: [def] })`; it resolves the same storage,
+namespace and keyring as the server.
+
+## Run hooks on subscribe and unsubscribe
+
+```ts
+server.event({
+  // …
+  async onSubscribe(sub) { await github.ensureRepoWebhook(sub.args.repo); },
+  async onUnsubscribe(sub) {
+    if ((await server.events.count({ name: sub.name, args: sub.args })) === 0) {
+      await github.removeRepoWebhook(sub.args.repo);
+    }
+  },
+});
+```
+
+`onSubscribe` runs inline when a webhook subscription is created, or when the
+first poll or stream for a principal and arguments opens. `onUnsubscribe`
+runs at least once from a durable job, possibly after the server wakes, and
+must be idempotent.
+
+## Manage subscriptions at runtime
+
+| Call | Does |
+|---|---|
+| `server.events.revoke({ principal })` | Ends that principal's webhook subscriptions, polls and streams on every instance |
+| `server.events.list({ name })` | Lists subscriptions without secrets |
+| `server.events.count({ name, args })` | Counts live subscriptions and leases |
+| `server.events.process()` | Runs due work when `events.worker: "off"` |
+| `eventRef.terminate({ all: true })` | Ends every subscription of one event |
+
+Revoke on identity-provider webhooks (`user.deleted`) so removed users stop
+receiving events.
+
+## Guard against feedback loops
+
+An event that triggers an agent run, which calls a tool, which emits the same
+event, loops. mcp-use limits each subscription to 60 deliveries per minute
+(`events.limits.deliveriesPerSubscriptionPerMinute`). Design tools so that a
+reaction does not emit the event it reacts to.
+
+## Understand anonymous mode
+
+A server with no OAuth accepts anonymous `openai`-dialect webhook
+subscriptions (`events.anonymous: "auto"`). Every anonymous subscriber shares
+the principal `anonymous`, so do not emit private data to anonymous
+subscribers. Set `anonymous: "reject"` to turn it off.
+
+## Refresh after catalog changes
+
+The catalog is fixed per process. After a deploy changes it, ChatGPT users
+press **Refresh tools**. SEP clients that opted in on `subscriptions/listen`
+receive `notifications/events/list_changed`.
+
+## Check host support
+
+| Host | Support |
+|---|---|
+| ChatGPT | ✔ webhook (`openai` dialect) |
+| AI SDK, TanStack AI, MCPJam, Mastra | ✔ |
+| Inspector v2, opencode and other poll/push clients | ✔ for replayable events |
+| Claude | ✘ |
+
+## Verify the integration
+
+1. Run `mcp-use dev` and open the Inspector's **Events** tab.
+2. Check that your event is listed and the lint panel shows no warnings.
+3. Subscribe with sample arguments and trigger the emitting code.
+4. Confirm the event reaches the inbox, and that a non-matching argument does not.
+5. Run `mcp-use dev --tunnel` and repeat from ChatGPT ([Trigger ChatGPT automations](/typescript/server/events-chatgpt)).
+
+## Next steps
+
+- [Deploy Events](/typescript/server/events-deployment) and [configure storage](/typescript/server/storage)
+- [Troubleshoot Events](/typescript/server/events-troubleshooting)
+- [Consume Events from a client](/typescript/client/events)
+
+See the maintained example in
+[`examples/mcp-events`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/mcp-events).
