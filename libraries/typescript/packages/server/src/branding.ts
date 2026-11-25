@@ -89,7 +89,7 @@ function parseDataImage(source: string, field: string): ParsedDataImage {
     throw new TypeError(`${field} data URL must use an image MIME type`);
   }
   try {
-    if (parts.includes("base64")) {
+    if (parts.some((part) => part.toLowerCase() === "base64")) {
       const binary = atob(payload);
       return {
         mimeType,
