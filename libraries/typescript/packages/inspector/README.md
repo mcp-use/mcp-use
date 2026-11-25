@@ -164,6 +164,24 @@ For servers requiring OAuth (like Linear):
 3. The inspector handles the redirect automatically
 4. Server appears in Connected Servers list with a green indicator
 
+Inspector automatically uses [OAuth Client ID Metadata Documents (CIMD)](https://datatracker.ietf.org/doc/draft-ietf-oauth-client-id-metadata-document/)
+when the authorization server advertises support. Servers without CIMD continue
+to use dynamic client registration. An explicitly configured OAuth client ID
+takes precedence.
+
+HTTPS deployments serve their metadata at
+`<inspector-path>/oauth/client-metadata.json`. Local Inspectors use the public
+`https://inspector.manufact.com/inspector/oauth/local-client-metadata/<callback>.json`
+endpoint, where `<callback>` is the base64url-encoded callback URL. The document
+lists that exact callback, including its port and mount path. Only `localhost`,
+`127.0.0.1`, and `[::1]` Inspector callbacks are accepted; remote redirects,
+credentials, query strings, and fragments are rejected. This supports the CLI's
+automatic port selection and embedded paths such as `/mcp/inspector`.
+
+The hosted metadata endpoint must be deployed before local CIMD connections can
+use it. Authorization servers must be able to fetch the document over HTTPS.
+Remote HTTP deployments need dynamic registration or a pre-registered client.
+
 > **Privacy Note**: All authentication tokens and credentials are stored securely in your browser's local storage. Nothing is sent to our servers - everything stays on your device.
 
 ### Connected Servers
