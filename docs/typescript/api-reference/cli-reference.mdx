@@ -263,7 +263,8 @@ input. Use each command's `--help` for its complete flag list.
 Cloud credentials live in `~/.manufact/auth.json` (mode 0600). Project links live
 in `.manufact/project.json`. Server selection is `--server`, `MANUFACT_SERVER`,
 then the project link. Organization selection is `--org`, `MANUFACT_ORG`, the
-project link, the active organization, then the account default.
+project link, the active organization, the organization that owns the server,
+then the account default.
 
 ## Authentication commands
 
@@ -879,6 +880,19 @@ line as each client and model finishes, so a CI log shows results as they come.
 Stopping the command while it waits (Ctrl+C, or a cancelled CI job) cancels the
 runs it started that haven't finished. Runs still going when `--timeout` runs out
 keep running on Cloud.
+
+One suite that can't start doesn't stop the others. A dropped connection, a
+timeout, a 5xx or a 429 gets up to 3 attempts in all. Before sending a start
+again, the command looks for a run the lost request created (with the
+`--profile` asked for) and uses it instead. That check is best effort: a run
+someone else starts for the same suite at that moment can be taken for this
+one, and a start is sent again if Cloud can't be read in time, so a suite can
+occasionally run twice. A suite Cloud rejects (for example, an invalid
+configuration) is skipped, and a 401 or 403 (signed out, no access, or out of
+credits) stops further starts. The suites without a run are listed under
+`notStarted` in the JSON, in `--json-file` and in the Markdown report, also
+when no suite started, and the command exits 1 after reporting the runs that
+started.
 
 For CI, `--json-file` also writes the `--json` result to a file while the
 readable report still prints. With `--wait`, `--markdown-file` writes a

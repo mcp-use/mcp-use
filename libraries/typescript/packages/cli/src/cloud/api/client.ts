@@ -64,6 +64,31 @@ export type Call = <T>(
   context?: CallContext
 ) => Promise<Exclude<T, undefined>>;
 
+/**
+ * A Cloud request that got an HTTP error response. Callers that retry read
+ * `status` and `retryAfterSec`; everything else treats it as a CommandError.
+ */
+export class CloudResponseError extends CommandError {
+  /**
+   * @param code - Stable machine-readable code.
+   * @param message - Human-readable failure description.
+   * @param nextSteps - Commands that may resolve the failure.
+   * @param status - The HTTP status Cloud answered with.
+   * @param retryAfterSec - Seconds Cloud asked to wait before retrying.
+   */
+  constructor(
+    code: string,
+    message: string,
+    nextSteps: readonly NextStep[] | undefined,
+    /** The HTTP status Cloud answered with. */
+    readonly status: number,
+    /** Seconds Cloud asked the client to wait before retrying, if it said. */
+    readonly retryAfterSec: number | undefined
+  ) {
+    super(code, message, undefined, nextSteps);
+  }
+}
+
 /** A `call` that keeps `secret` (an API key or token) out of error messages. */
 export function callerFor(secret: string): Call {
   return async (pending, context = {}) => {
@@ -78,12 +103,16 @@ export function callerFor(secret: string): Call {
       return settle(result, context);
     } catch (error) {
       if (!(error instanceof CommandError)) throw error;
-      throw new CommandError(
-        error.code,
-        error.message.replaceAll(secret, "[REDACTED]"),
-        undefined,
-        error.nextSteps
-      );
+      const message = error.message.replaceAll(secret, "[REDACTED]");
+      if (error instanceof CloudResponseError)
+        throw new CloudResponseError(
+          error.code,
+          message,
+          error.nextSteps,
+          error.status,
+          error.retryAfterSec
+        );
+      throw new CommandError(error.code, message, undefined, error.nextSteps);
     }
   };
 }
@@ -117,30 +146,51 @@ function settle<T>(
   }
   const message =
     messageOf(result.error) ?? `Manufact Cloud request failed (${status}).`;
-  if (status === 401) {
-    throw new CommandError("not_authenticated", message, undefined, [LOG_IN]);
-  }
-  if (status === 403) {
-    throw new CommandError(
-      context.forbidden?.code ?? "forbidden",
+  const fail = (code: string, nextSteps?: readonly NextStep[]) =>
+    new CloudResponseError(
+      code,
       message,
-      undefined,
+      nextSteps,
+      status,
+      retryAfterSec(response, result.error)
+    );
+  if (status === 401) throw fail("not_authenticated", [LOG_IN]);
+  if (status === 403)
+    throw fail(
+      context.forbidden?.code ?? "forbidden",
       context.forbidden?.nextSteps
     );
-  }
-  if (status === 404) {
-    throw new CommandError(
+  if (status === 404)
+    throw fail(
       context.notFound?.code ?? "not_found",
-      message,
-      undefined,
       context.notFound?.nextSteps
     );
+  if (status === 400 || status === 422) throw fail("validation_error");
+  if (status === 429) throw fail("rate_limited");
+  throw fail("cloud_api_error");
+}
+
+/**
+ * `Retry-After` in seconds (as seconds or an HTTP date), or the
+ * `retryAfterSec` Cloud mirrors in the body.
+ */
+function retryAfterSec(response: Response, body: unknown): number | undefined {
+  const value = response.headers.get("retry-after")?.trim();
+  if (value) {
+    if (/^\d+$/.test(value)) return Number(value);
+    const at = Date.parse(value);
+    if (Number.isFinite(at))
+      return Math.max(0, Math.ceil((at - Date.now()) / 1000));
   }
-  if (status === 400 || status === 422) {
-    throw new CommandError("validation_error", message);
-  }
-  if (status === 429) throw new CommandError("rate_limited", message);
-  throw new CommandError("cloud_api_error", message);
+  const mirrored =
+    body !== null && typeof body === "object"
+      ? (body as Record<string, unknown>).retryAfterSec
+      : undefined;
+  return typeof mirrored === "number" &&
+    Number.isFinite(mirrored) &&
+    mirrored >= 0
+    ? mirrored
+    : undefined;
 }
 
 /** An authenticated client scoped to one organization. */
@@ -164,10 +214,14 @@ interface CloudConnection {
 /**
  * Connect with the current credential (see `auth/store.ts`), scoped to
  * `options.organization` (an id or slug) when given, else the active
- * organization.
+ * organization. Without either, a user in several organizations acts in the
+ * one that owns `options.server`, when given and visible to them.
  */
 export async function connectCloud(
-  options: { organization?: string | undefined } = {}
+  options: {
+    organization?: string | undefined;
+    server?: string | undefined;
+  } = {}
 ): Promise<CloudConnection> {
   const credential = await requireCredential();
   const { apiKey } = credential;
@@ -179,6 +233,7 @@ export async function connectCloud(
   const organization = await chooseOrganization(api, organizations, {
     selector: options.organization,
     storedId: await savedOrganizationId(credential),
+    server: options.server,
   });
   if (organization === undefined) throw organizationRequired();
   return {

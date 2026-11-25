@@ -209,9 +209,7 @@ function text(value: string) {
  * One tool per `securitySchemes` shape, a noauth tool with a view, and one
  * resource, resource template, and prompt, which always require sign-in.
  */
-function shopServer(
-  options: { requiredScopes?: readonly string[]; buildId?: string } = {}
-) {
+function shopServer(options: { requiredScopes?: readonly string[] } = {}) {
   const server = oauthServer(options);
 
   server.tool(
@@ -288,7 +286,7 @@ function shopServer(
     {
       "catalog-card": { kind: "external", entry: "assets/card.js", css: [] },
     },
-    { ...(options.buildId !== undefined && { buildId: options.buildId }) }
+    { buildId: "a1b2c3" }
   );
   server.__primeSkills(undefined);
   return server;
@@ -686,18 +684,30 @@ describe("mixed auth: resources, prompts, and views", () => {
     expect(values.result.completion.values).toEqual(["coffee", "tea"]);
   });
 
-  it.each([undefined, "a1b2c3"])(
-    "serves every tool's view signed out with build %s",
-    async (buildId) => {
-      // ChatGPT reads every view while an app is created, before sign-in.
-      const shop = shopServer({ ...(buildId !== undefined && { buildId }) });
-      const catalogUri = buildId
-        ? "ui://views/catalog-card-a1b2c3.html"
-        : "ui://views/catalog-card.html";
-      const catalog = await shop.fetch(read(catalogUri));
-      expect(catalog.status).toBe(200);
-      expect(await resourceText(catalog)).toContain("<!doctype html>");
+  it("serves every tool's view signed out under its advertised URI", async () => {
+    // ChatGPT reads every view while an app is created, before sign-in.
+    const shop = shopServer();
+    const listed = await shop.fetch(post(rpc("resources/list", {})));
+    const { result } = (await listed.json()) as {
+      result: { resources: Array<{ name: string; uri: string }> };
+    };
+    const catalogUri = result.resources.find(
+      (item) => item.name === "catalog-card"
+    )?.uri;
+    expect(catalogUri).toBe("ui://views/catalog-card.html?v=a1b2c3");
+    const catalog = await shop.fetch(read(catalogUri!));
+    expect(catalog.status).toBe(200);
+    expect(await resourceText(catalog)).toContain("<!doctype html>");
+  });
 
+  it.each([
+    "ui://views/%s.html",
+    "ui://views/%s.html?v=0123abcd",
+    "ui://views/%s-0123456789abcdef.html",
+  ])(
+    "gates views by tool binding for URIs like %s from earlier deployments",
+    async (pattern) => {
+      const uri = (name: string) => pattern.replace("%s", name);
       // A view of a tool that requires sign-in loads signed out too.
       const server = oauthServer();
       server.tool(
@@ -708,39 +718,18 @@ describe("mixed auth: resources, prompts, and views", () => {
         },
         async () => ({ structuredContent: { ok: true }, content: [] })
       );
-      server.__primeViews(
-        {
-          "private-card": { kind: "external", entry: "assets/p.js", css: [] },
-          // No tool binds this view, so it stays behind sign-in.
-          orphan: { kind: "external", entry: "assets/o.js", css: [] },
-        },
-        { ...(buildId !== undefined && { buildId }) }
-      );
+      server.__primeViews({
+        "private-card": { kind: "external", entry: "assets/p.js", css: [] },
+        // No tool binds this view, so it stays behind sign-in.
+        orphan: { kind: "external", entry: "assets/o.js", css: [] },
+      });
       server.__primeSkills(undefined);
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
-        expect(
-          (
-            await server.fetch(
-              read(
-                buildId
-                  ? "ui://views/private-card-a1b2c3.html"
-                  : "ui://views/private-card.html"
-              )
-            )
-          ).status
-        ).toBe(200);
-        expect(
-          (
-            await server.fetch(
-              read(
-                buildId
-                  ? "ui://views/orphan-a1b2c3.html"
-                  : "ui://views/orphan.html"
-              )
-            )
-          ).status
-        ).toBe(401);
+        const card = await server.fetch(read(uri("private-card")));
+        expect(card.status).toBe(200);
+        expect(await resourceText(card)).toContain("<!doctype html>");
+        expect((await server.fetch(read(uri("orphan")))).status).toBe(401);
       } finally {
         warn.mockRestore();
       }
@@ -749,17 +738,11 @@ describe("mixed auth: resources, prompts, and views", () => {
     }
   );
 
-  it("challenges stale view URIs signed out and reports them missing after sign-in", async () => {
-    const server = shopServer({ buildId: "a1b2c3" });
-    const current = await server.fetch(
-      read("ui://views/catalog-card-a1b2c3.html")
-    );
-    expect(current.status).toBe(200);
-    expect(await resourceText(current)).toContain("<!doctype html>");
-
+  it("challenges view-like URIs that name no current view and reports them missing after sign-in", async () => {
+    const server = shopServer();
     for (const uri of [
-      "ui://views/catalog-card.html",
       "ui://views/catalog-card-old.html",
+      "ui://views/retired-0123456789abcdef.html",
     ]) {
       const signedOut = await server.fetch(read(uri));
       expect(signedOut.status).toBe(401);

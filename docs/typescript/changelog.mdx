@@ -6,6 +6,19 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.10" description="November 2026">
+  ## Stable view URIs and CLI eval resilience
+  Patch release bundling @mcp-use/cli v5.4.1, which keeps `evals run` going when a suite fails to start, and @mcp-use/inspector v20.3.34.
+
+- **Fix**: production view resource URIs stay at `ui://views/<name>.html` across deploys, and the build ID is sent as a `?v=<build ID>` cache key instead of in the path. Reads ignore the `?v=` value, and the `ui://views/<name>-<build ID>.html` URIs from 2.12 still resolve, so a host that reads a URI from an older tool catalog, such as a published ChatGPT app, gets the current view instead of resource-not-found. On `mixedAuth` servers those URIs of tool-bound views are readable signed out like the current one; unbound views stay gated (`#3135`)
+- **Fix** (@mcp-use/cli): `evals run` no longer stops at the first suite that fails to start. Dropped connections, timeouts, 5xx and 429 responses get up to 3 attempts, and a start whose answer was lost is retried only when the CLI finds no run it created in the meantime (best effort, so a suite can occasionally start twice). Suites without a run are listed under `notStarted` in the JSON, `--json-file` and Markdown report, and the command exits 1 (`#3142`)
+- **Fix** (@mcp-use/cli): when `evals run --wait` is stopped, each run is reported as it answers, so one slow cancel no longer hides the others, and a cancel Cloud hasn't answered yet is reported as requested instead of as a failure (`#3142`)
+- **Fix** (@mcp-use/cli): project-scoped Cloud commands such as `evals run` act in the organization that owns `--server` (or `MANUFACT_SERVER`) when no `--org`, `MANUFACT_ORG`, link or active organization applies, instead of failing with "No active organization." (`#3141`)
+- **Enhancement** (@mcp-use/inspector): chat hides MCP Apps `ui/message` content whose `annotations.audience` omits `"user"`; see the [Inspector changelog](/inspector/changelog) (`#3137`)
+- **Update**: Updated @mcp-use/cli to v5.4.1
+- **Update**: Updated @mcp-use/inspector to v20.3.34; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
 <Update label="v2.12.9" description="November 2026">
   ## Evals from the CLI and CI
   Patch release bundling @mcp-use/cli v5.4.0, which adds `mcp-use evals` to keep eval suites as YAML files, run them on Manufact Cloud, and gate CI on the results.

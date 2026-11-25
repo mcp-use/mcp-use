@@ -1,5 +1,28 @@
 # mcp-use
 
+## 2.12.10-canary.2
+
+### Patch Changes
+
+- d68aa66: Keep production view resource paths stable across deploys. The path is now always `ui://views/<name>.html`, and production sends the build ID as a `?v=<build ID>` cache key instead of putting it in the path. Reads ignore the `?v=` value, and the `ui://views/<name>-<build ID>.html` URIs from 2.12 still resolve, so a host that reads a URI from an older tool catalog, such as a published ChatGPT app, gets the current view instead of resource-not-found. On `mixedAuth` servers those URIs of tool-bound views are readable signed out like the current one; unbound views stay gated.
+
+## 2.12.10-canary.1
+
+### Patch Changes
+
+- Updated dependencies [3d64137]
+- Updated dependencies [fc3efbe]
+  - @mcp-use/cli@5.4.1-canary.1
+
+## 2.12.10-canary.0
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [e65dff6]
+  - @mcp-use/cli@5.4.1-canary.0
+  - @mcp-use/inspector@20.3.34-canary.0
+
 ## 2.12.9
 
 ### Patch Changes

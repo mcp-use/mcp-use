@@ -1,5 +1,21 @@
 # @mcp-use/cli
 
+## 5.4.1-canary.1
+
+### Patch Changes
+
+- 3d64137: `evals run` no longer stops at the first suite that fails to start. Dropped connections, timeouts, 5xx and 429 responses get up to 3 attempts. Before a start whose answer was lost is sent again, the CLI looks for a run it created (with the requested `--profile`) and uses it; this is best effort, so a suite can occasionally start twice. A suite Cloud rejects is skipped, and 401/403 stops further starts. The runs that started are still waited for and reported, and the suites without a run are listed under `notStarted` in the JSON, `--json-file` and the Markdown report, including when no suite started. The command exits 1 when any suite didn't start.
+
+  When `evals run --wait` is stopped, each run is reported as it answers, so one slow cancel no longer hides the others, and a cancel Cloud hasn't answered yet is reported as requested (with the command to check it) instead of as a failure.
+
+- fc3efbe: Project-scoped Cloud commands such as `evals run` now act in the organization that owns `--server` (or `MANUFACT_SERVER`) when no `--org`, `MANUFACT_ORG`, link or active organization chooses one, instead of failing with "No active organization." for users in several organizations without a dashboard default.
+
+## 5.4.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 5.4.0
 
 ### Minor Changes
