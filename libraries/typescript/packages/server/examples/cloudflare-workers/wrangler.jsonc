@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mcp-use-cloudflare-workers-example",
+  "main": "worker.ts",
+  "compatibility_date": "2026-11-12",
+  "observability": {
+    "enabled": true,
+  },
+}

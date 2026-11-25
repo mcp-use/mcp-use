@@ -6,6 +6,8 @@
  * are started and exercised over HTTP by @mcp-use/client. Integration examples
  * intentionally stop at build/type/config validation until test credentials
  * and tenants are available in CI.
+ * Command examples run a named package script after typecheck, without
+ * launching a server.
  */
 export const examples = [
   // Core V2 patterns.
@@ -67,6 +69,9 @@ export const examples = [
     tools: ["refund-order", "create-purchase-order", "get-order-status"],
     scenario: "skills",
   }),
+
+  // Build-time checks for examples without a local listener.
+  command("cloudflare-workers", "smoke"),
 
   // Existing server examples.
   local("conformance", { tools: ["test_simple_text"] }),
@@ -132,5 +137,14 @@ function configuration(directory, skippedLiveReason) {
     directory,
     verification: "configuration",
     skippedLiveReason,
+  };
+}
+
+function command(directory, script) {
+  return {
+    id: directory.replaceAll("/", "-"),
+    directory,
+    verification: "command",
+    script,
   };
 }
