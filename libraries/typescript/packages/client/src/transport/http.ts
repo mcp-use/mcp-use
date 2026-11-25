@@ -225,6 +225,8 @@ export class HttpConnector extends BaseConnector {
   private streamableTransport: StreamableHTTPClientTransport | null = null;
   private hadAccessTokenAtConnect = false;
   private pendingOAuthCompletion: Promise<void> | null = null;
+  private pendingSessionRecovery: Promise<void> | null = null;
+  private expiredSessionId: string | undefined;
   private authorizationDiscovery: Promise<
     MCPAuthorizationInfo | undefined
   > | null = null;
@@ -312,7 +314,66 @@ export class HttpConnector extends BaseConnector {
     await this.pendingOAuthCompletion;
   }
 
+  /**
+   * Replace a legacy session the server no longer recognises. Concurrent
+   * requests that failed on the same session share one replacement.
+   */
+  private recoverExpiredSession(expiredSessionId: string): Promise<void> {
+    if (!this.pendingSessionRecovery) {
+      this.expiredSessionId = expiredSessionId;
+      this.pendingSessionRecovery = (async () => {
+        logger.info(
+          "Server no longer recognises the MCP session (HTTP 404); starting a new session"
+        );
+        this.connected = false;
+        await this.cleanupResources();
+        await this.connect();
+        await this.initialize();
+      })().finally(() => {
+        this.pendingSessionRecovery = null;
+        this.expiredSessionId = undefined;
+      });
+    }
+    return this.pendingSessionRecovery;
+  }
+
   protected override async executeRequest<T>(
+    operation: () => Promise<T>
+  ): Promise<T> {
+    // Streamable HTTP (2025 era): a 404 on a request carrying a session ID
+    // means the session is gone, and the client MUST start a new one with a
+    // fresh initialize. The server did not process the request, so retry it
+    // once on the new session.
+    const sessionId =
+      this.protocolEra === "legacy"
+        ? this.streamableTransport?.sessionId
+        : undefined;
+    try {
+      return await this.executeAuthorizedRequest(operation);
+    } catch (error) {
+      if (
+        sessionId === undefined ||
+        this.unwrapStreamableError(error)?.status !== 404
+      ) {
+        throw error;
+      }
+      if (this.pendingSessionRecovery) {
+        // A 404 on the replacement session itself must not wait on the
+        // recovery it belongs to.
+        if (sessionId !== this.expiredSessionId) throw error;
+        await this.pendingSessionRecovery;
+      } else if (this.streamableTransport?.sessionId === sessionId) {
+        await this.recoverExpiredSession(sessionId);
+      }
+      // Otherwise another request has already replaced the session.
+      if (!this.connected || !this.client) {
+        throw new Error("MCP client is not connected");
+      }
+      return this.executeAuthorizedRequest(operation);
+    }
+  }
+
+  private async executeAuthorizedRequest<T>(
     operation: () => Promise<T>
   ): Promise<T> {
     try {
