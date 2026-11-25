@@ -583,6 +583,7 @@ export abstract class BaseConnector {
    * @param defaultRequestOptions - Options used while fetching the initial tool list.
    * @returns The capabilities advertised by the server.
    * @throws When {@link BaseConnector.connect} has not completed.
+   * @throws When initial tool discovery fails for a supported method.
    */
   async initialize(
     defaultRequestOptions: RequestOptions = this.opts.defaultRequestOptions ??
@@ -612,8 +613,8 @@ export abstract class BaseConnector {
         }
       : null;
 
-    // Fetch and cache tools
-    // Gracefully handle servers that don't implement tools/list or have no tools
+    // Fetch and cache tools; the SDK returns an empty list for servers without
+    // the tools capability. Preserve compatibility with unsupported methods.
     try {
       const listToolsRes = await this.executeRequest(() =>
         this.client!.listTools(undefined, defaultRequestOptions)
@@ -623,14 +624,12 @@ export abstract class BaseConnector {
     } catch (err: unknown) {
       if (isOAuthInteractionRequired(err)) throw err;
       const error = err as Error & { code?: number };
-      // If tools/list is not implemented or fails, assume no tools
-      // This commonly happens with blank servers that have no tools registered
       if (error.code === -32601) {
         logger.debug("Server does not implement tools/list, assuming no tools");
+        this.toolsCache = [];
       } else {
-        logger.debug("Failed to list tools, assuming empty:", error.message);
+        throw err;
       }
-      this.toolsCache = [];
     }
 
     logger.debug("Server capabilities:", capabilities);
