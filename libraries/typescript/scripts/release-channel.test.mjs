@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   packedArtifactErrors,
@@ -11,7 +12,7 @@ import {
   requiredPackedEntries,
 } from "./release-artifact.mjs";
 
-const script = new URL("./release-channel.mjs", import.meta.url).pathname;
+const script = fileURLToPath(new URL("./release-channel.mjs", import.meta.url));
 
 function fixture({ localVersion, latest, canary, published = [] }) {
   const root = mkdtempSync(join(tmpdir(), "release-channel-test-"));
