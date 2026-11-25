@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { inputRequired } from "@modelcontextprotocol/server";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Client } from "@modelcontextprotocol/client";
+import {
+  inputRequired,
+  InMemoryTransport,
+  McpServer,
+} from "@modelcontextprotocol/server";
 
 import {
   toPromptResult,
@@ -7,10 +12,12 @@ import {
 } from "../src/response-conversion.js";
 import {
   array,
+  audio,
   error,
   image,
   mix,
   object,
+  resource,
   text,
   widget,
 } from "../src/response-helpers.js";
@@ -68,6 +75,77 @@ describe("response helpers", () => {
       structuredContent: { b: 1 },
       _meta: { mimeType: "application/json" },
     });
+  });
+});
+
+describe("embedded resource results", () => {
+  let client: Client;
+  let server: McpServer;
+
+  beforeAll(async () => {
+    server = new McpServer({ name: "resource-helpers", version: "1.0.0" });
+    server.registerTool("image", {}, () =>
+      resource(
+        "file:///image.svg",
+        image(
+          "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjwvc3ZnPg==",
+          "image/svg+xml"
+        )
+      )
+    );
+    server.registerTool("audio", {}, () =>
+      resource(
+        "file:///audio.wav",
+        audio(
+          "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=",
+          "audio/wav"
+        )
+      )
+    );
+    server.registerTool("text", {}, () =>
+      resource("file:///readme.txt", text("hello resource"))
+    );
+    client = new Client({ name: "resource-helper-client", version: "1.0.0" });
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+  });
+
+  afterAll(async () => {
+    await client.close();
+    await server.close();
+  });
+
+  it.each([
+    {
+      name: "image",
+      contents: {
+        uri: "file:///image.svg",
+        mimeType: "image/svg+xml",
+        blob: "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjwvc3ZnPg==",
+      },
+    },
+    {
+      name: "audio",
+      contents: {
+        uri: "file:///audio.wav",
+        mimeType: "audio/wav",
+        blob: "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=",
+      },
+    },
+    {
+      name: "text",
+      contents: {
+        uri: "file:///readme.txt",
+        mimeType: "text/plain",
+        text: "hello resource",
+      },
+    },
+  ])("preserves $name content over tools/call", async ({ name, contents }) => {
+    const result = await client.callTool({ name, arguments: {} });
+
+    expect(result.content).toEqual([{ type: "resource", resource: contents }]);
   });
 });
 
