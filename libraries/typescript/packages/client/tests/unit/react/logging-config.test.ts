@@ -205,6 +205,26 @@ describe("Logger Configuration", () => {
     });
   });
 
+  describe("Logger.setFormat()", () => {
+    it("keeps the configured level when switching formats", () => {
+      Logger.configure({ level: "debug", format: "minimal" });
+      const current = Logger.get("FormatLevelExisting");
+
+      Logger.setFormat("emoji");
+
+      expect(current.level).toBe("debug");
+      expect(current.format).toBe("emoji");
+      const later = Logger.get("FormatLevelNew");
+      expect(later.level).toBe("debug");
+      expect(later.format).toBe("emoji");
+
+      current.debug("still debugging");
+      expect(console.debug).toHaveBeenCalledWith(
+        expect.stringContaining("still debugging")
+      );
+    });
+  });
+
   describe("Format Styles", () => {
     it("should support detailed format (timestamp)", () => {
       const logger = Logger.get("TestLogger5");

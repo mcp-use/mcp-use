@@ -143,7 +143,10 @@ export class Logger {
   }
 
   static setFormat(format: LogFormat): void {
-    this.configure({ format });
+    this.currentFormat = format;
+    for (const log of Object.values(this.instances)) {
+      log.format = format;
+    }
   }
 }
 
