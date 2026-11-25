@@ -69,7 +69,14 @@ try {
     rerank: "none",
     top_k: 3,
   });
-  if (result.isError) throw new Error("Loom document search failed");
+  if (result.isError) {
+    const detail = result.content.find((block) => block.type === "text");
+    throw new Error(
+      detail?.type === "text"
+        ? `Loom document search failed: ${detail.text}`
+        : "Loom document search failed",
+    );
+  }
 
   const data = result.structuredContent;
   if (
