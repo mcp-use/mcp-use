@@ -530,13 +530,42 @@ function buildHeaders(
 }
 
 function resolveBaseUrl(options: FromOpenAPIOptions): string {
-  const baseUrl = options.baseUrl ?? options.spec.servers?.[0]?.url;
+  const server = options.spec.servers?.[0];
+  const baseUrl =
+    options.baseUrl ??
+    (server === undefined ? undefined : expandServerVariables(server));
   if (baseUrl === undefined || baseUrl.trim() === "") {
     throw new Error(
       "MCPServer.fromOpenAPI requires options.baseUrl or spec.servers[0].url"
     );
   }
+  // Every tool call builds its URL from this one, so catch a relative,
+  // malformed or non-HTTP value now instead of failing each call.
+  let protocol: string;
+  try {
+    protocol = new URL(baseUrl).protocol;
+  } catch {
+    throw new Error(
+      `MCPServer.fromOpenAPI: upstream base URL "${baseUrl}" is not an absolute URL; pass options.baseUrl`
+    );
+  }
+  if (protocol !== "http:" && protocol !== "https:") {
+    throw new Error(
+      `MCPServer.fromOpenAPI: upstream base URL "${baseUrl}" must use http or https`
+    );
+  }
   return baseUrl;
+}
+
+/** Replace `{name}` placeholders in a server URL with each variable's default. */
+function expandServerVariables(
+  server: NonNullable<OpenAPIDocument["servers"]>[number]
+): string {
+  return server.url.replace(
+    /{([^}]+)}/g,
+    (placeholder, name: string) =>
+      server.variables?.[name]?.default ?? placeholder
+  );
 }
 
 function appendQueryParam(url: URL, name: string, value: unknown): void {

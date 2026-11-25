@@ -577,6 +577,80 @@ describe("MCPServer.fromOpenAPI", () => {
     }
   });
 
+  it("fills spec.servers[0].url variables with their defaults", async () => {
+    const { port } = new URL(upstreamBaseUrl);
+    const spec: OpenAPIDocument = {
+      openapi: "3.1.0",
+      info: { title: "Server variables API" },
+      servers: [
+        {
+          url: "{scheme}://127.0.0.1:{port}/{version}",
+          variables: {
+            scheme: { default: "http", enum: ["http", "https"] },
+            port: { default: port },
+            version: { default: "v1" },
+          },
+        },
+      ],
+      paths: {
+        "/status": {
+          get: {
+            operationId: "getStatus",
+            responses: { "200": { description: "ok" } },
+          },
+        },
+      },
+    };
+    const connection = await connect(MCPServer.fromOpenAPI({ spec }));
+    try {
+      const result = await connection.client.callTool({
+        name: "getStatus",
+        arguments: {},
+      });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        ok: true,
+        path: "/v1/status",
+      });
+    } finally {
+      await connection.close();
+    }
+  });
+
+  it("rejects a relative upstream base URL when the server is created", () => {
+    expect(() =>
+      MCPServer.fromOpenAPI({
+        spec: {
+          openapi: "3.1.0",
+          info: { title: "Relative URL API" },
+          servers: [{ url: "/api/v3" }],
+          paths: {
+            "/status": {
+              get: { responses: { "200": { description: "ok" } } },
+            },
+          },
+        },
+      })
+    ).toThrow(/"\/api\/v3" is not an absolute URL/);
+  });
+
+  it("rejects a non-http upstream base URL when the server is created", () => {
+    expect(() =>
+      MCPServer.fromOpenAPI({
+        baseUrl: "ftp://files.example.com",
+        spec: {
+          openapi: "3.1.0",
+          info: { title: "FTP API" },
+          paths: {
+            "/status": {
+              get: { responses: { "200": { description: "ok" } } },
+            },
+          },
+        },
+      })
+    ).toThrow(/must use http or https/);
+  });
+
   it("requires an upstream base URL when operations are present", () => {
     expect(() =>
       MCPServer.fromOpenAPI({
