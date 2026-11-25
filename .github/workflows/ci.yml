@@ -50,9 +50,9 @@ permissions:
 
 on:
   push:
-    branches: [main, canary]
+    branches: [main, canary, feat/mcp-events]
   pull_request:
-    branches: [main, canary]
+    branches: [main, canary, feat/mcp-events]
   workflow_call:
     inputs:
       ref:

@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type Options } from "tsup";
+import { sdkIdentityDefine } from "../../scripts/sdk-identity.mjs";
 
 const frameworkPackage = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8")
@@ -7,6 +9,8 @@ const frameworkPackage = JSON.parse(
 
 const packageVersionDefine = {
   __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
+  // The Node entry inlines the official SDK; record which one (PLAN.md D82).
+  ...sdkIdentityDefine(fileURLToPath(new URL(".", import.meta.url))),
 };
 
 // Every build must use the same module-local response/request identity maps.

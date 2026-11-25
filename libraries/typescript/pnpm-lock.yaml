@@ -4,6 +4,18 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  mcp-sdk:
+    '@modelcontextprotocol/client':
+      specifier: 2.3.1
+      version: 2.3.1
+    '@modelcontextprotocol/core':
+      specifier: 2.3.1
+      version: 2.3.1
+    '@modelcontextprotocol/server':
+      specifier: 2.3.1
+      version: 2.3.1
+
 overrides:
   mcp-use: workspace:*
   '@mcp-use/client': workspace:*
@@ -183,7 +195,7 @@ importers:
         specifier: workspace:*
         version: link:../client
       '@modelcontextprotocol/client':
-        specifier: 2.3.1
+        specifier: catalog:mcp-sdk
         version: 2.3.1
       langchain:
         specifier: ^1.2.3
@@ -251,10 +263,10 @@ importers:
         specifier: workspace:*
         version: link:../tunnel
       '@modelcontextprotocol/client':
-        specifier: 2.3.1
+        specifier: catalog:mcp-sdk
         version: 2.3.1
       '@modelcontextprotocol/server':
-        specifier: 2.3.1
+        specifier: catalog:mcp-sdk
         version: 2.3.1(patch_hash=d174dcbb0cda204a05fc1a7fdc58b88afcdc342605224bfd8c802bcc4096fed6)
       '@types/node':
         specifier: ^22.20.0
@@ -296,10 +308,10 @@ importers:
   packages/client:
     dependencies:
       '@modelcontextprotocol/client':
-        specifier: 2.3.1
+        specifier: catalog:mcp-sdk
         version: 2.3.1
       '@modelcontextprotocol/core':
-        specifier: 2.3.1
+        specifier: catalog:mcp-sdk
         version: 2.3.1
       '@modelcontextprotocol/ext-apps':
         specifier: 2.0.3
@@ -316,7 +328,7 @@ importers:
         version: 6.2.5
       jsdom:
         specifier: ^27.0.0
-        version: 27.4.0(@noble/hashes@2.2.0)(supports-color@7.2.0)
+        version: 27.4.0(@noble/hashes@2.2.0)
       react:
         specifier: ^19.2.0
         version: 19.2.4
@@ -368,7 +380,7 @@ importers:
         version: link:../..
       jsdom:
         specifier: ^27.0.0
-        version: 27.4.0(@noble/hashes@2.2.0)(supports-color@7.2.0)
+        version: 27.4.0(@noble/hashes@2.2.0)
       react:
         specifier: ^19.2.0
         version: 19.2.4
@@ -526,13 +538,13 @@ importers:
         version: 9.39.2(jiti@2.7.0)(supports-color@7.2.0)
       express:
         specifier: ^5.2.1
-        version: 5.2.1(supports-color@7.2.0)
+        version: 5.2.1
       hono:
         specifier: '>=4.13.7'
         version: 4.13.11
       jsdom:
         specifier: ^27.0.0
-        version: 27.4.0(@noble/hashes@2.2.0)(supports-color@7.2.0)
+        version: 27.4.0(@noble/hashes@2.2.0)
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.4)
@@ -612,16 +624,16 @@ importers:
         specifier: workspace:*
         version: link:../inspector
       '@modelcontextprotocol/client':
-        specifier: 2.3.1
+        specifier: catalog:mcp-sdk
         version: 2.3.1
       '@modelcontextprotocol/core':
-        specifier: 2.3.1
+        specifier: catalog:mcp-sdk
         version: 2.3.1
       '@modelcontextprotocol/ext-apps':
         specifier: 2.0.3
         version: 2.0.3(@modelcontextprotocol/client@2.3.1)(@modelcontextprotocol/core@2.3.1)(@modelcontextprotocol/server@2.3.1(patch_hash=d174dcbb0cda204a05fc1a7fdc58b88afcdc342605224bfd8c802bcc4096fed6))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.6.6)
       '@modelcontextprotocol/server':
-        specifier: 2.3.1
+        specifier: catalog:mcp-sdk
         version: 2.3.1(patch_hash=d174dcbb0cda204a05fc1a7fdc58b88afcdc342605224bfd8c802bcc4096fed6)
       hono:
         specifier: '>=4.13.7'
@@ -12454,7 +12466,7 @@ snapshots:
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
-      express: 5.2.1(supports-color@7.2.0)
+      express: 5.2.1
       express-rate-limit: 8.6.0(express@5.2.1)(supports-color@7.2.0)
       hono: 4.13.11
       jose: 6.2.12
@@ -15927,7 +15939,7 @@ snapshots:
 
   binary-extensions@2.3.0: {}
 
-  body-parser@2.4.0(supports-color@7.2.0):
+  body-parser@2.4.0:
     dependencies:
       bytes: 3.1.2
       content-type: 2.1.0
@@ -17022,15 +17034,15 @@ snapshots:
   express-rate-limit@8.6.0(express@5.2.1)(supports-color@7.2.0):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
-      express: 5.2.1(supports-color@7.2.0)
+      express: 5.2.1
       ip-address: 10.7.4
     transitivePeerDependencies:
       - supports-color
 
-  express@5.2.1(supports-color@7.2.0):
+  express@5.2.1:
     dependencies:
       accepts: 2.0.0
-      body-parser: 2.4.0(supports-color@7.2.0)
+      body-parser: 2.4.0
       content-disposition: 1.0.1
       content-type: 1.0.5
       cookie: 0.7.2
@@ -17040,7 +17052,7 @@ snapshots:
       encodeurl: 2.0.0
       escape-html: 1.0.3
       etag: 1.8.1
-      finalhandler: 2.1.1(supports-color@7.2.0)
+      finalhandler: 2.1.1
       fresh: 2.0.0
       http-errors: 2.0.1
       merge-descriptors: 2.0.0
@@ -17051,8 +17063,8 @@ snapshots:
       proxy-addr: 2.0.8
       qs: 6.16.0
       range-parser: 1.2.1
-      router: 2.2.0(supports-color@7.2.0)
-      send: 1.2.1(supports-color@7.2.0)
+      router: 2.2.0
+      send: 1.2.1
       serve-static: 2.2.1
       statuses: 2.0.2
       type-is: 2.0.1
@@ -17147,7 +17159,7 @@ snapshots:
     dependencies:
       to-regex-range: 5.0.1
 
-  finalhandler@2.1.1(supports-color@7.2.0):
+  finalhandler@2.1.1:
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       encodeurl: 2.0.0
@@ -17273,7 +17285,7 @@ snapshots:
   gaxios@7.1.3:
     dependencies:
       extend: 3.0.2
-      https-proxy-agent: 7.0.6(supports-color@7.2.0)
+      https-proxy-agent: 7.0.6
       node-fetch: 3.3.2
       rimraf: 5.0.10
     transitivePeerDependencies:
@@ -17283,7 +17295,7 @@ snapshots:
   gaxios@7.3.1:
     dependencies:
       extend: 3.0.2
-      https-proxy-agent: 7.0.6(supports-color@7.2.0)
+      https-proxy-agent: 7.0.6
       node-fetch: 3.3.2
     transitivePeerDependencies:
       - supports-color
@@ -17538,7 +17550,7 @@ snapshots:
 
   http-parser-js@0.5.10: {}
 
-  http-proxy-agent@7.0.2(supports-color@7.2.0):
+  http-proxy-agent@7.0.2:
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@7.2.0)
@@ -17552,17 +17564,17 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  https-proxy-agent@7.0.6:
+    dependencies:
+      agent-base: 7.1.4
+      debug: 4.4.3(supports-color@7.2.0)
+    transitivePeerDependencies:
+      - supports-color
+
   https-proxy-agent@7.0.6(supports-color@10.2.2):
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@10.2.2)
-    transitivePeerDependencies:
-      - supports-color
-
-  https-proxy-agent@7.0.6(supports-color@7.2.0):
-    dependencies:
-      agent-base: 7.1.4
-      debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -17858,7 +17870,7 @@ snapshots:
 
   jsdoc-type-pratt-parser@7.2.0: {}
 
-  jsdom@27.4.0(@noble/hashes@2.2.0)(supports-color@7.2.0):
+  jsdom@27.4.0(@noble/hashes@2.2.0):
     dependencies:
       '@acemir/cssom': 0.9.31
       '@asamuzakjp/dom-selector': 6.8.1
@@ -17867,8 +17879,8 @@ snapshots:
       data-urls: 6.0.1
       decimal.js: 10.6.0
       html-encoding-sniffer: 6.0.0(@noble/hashes@2.2.0)
-      http-proxy-agent: 7.0.2(supports-color@7.2.0)
-      https-proxy-agent: 7.0.6(supports-color@7.2.0)
+      http-proxy-agent: 7.0.2
+      https-proxy-agent: 7.0.6
       is-potential-custom-element-name: 1.0.1
       parse5: 8.0.0
       saxes: 6.0.0
@@ -18530,7 +18542,7 @@ snapshots:
     dependencies:
       basic-auth: 2.0.1
       cors: 2.8.6
-      express: 5.2.1(supports-color@7.2.0)
+      express: 5.2.1
       is-plain-obj: 4.1.0
       jose: 6.1.3
     transitivePeerDependencies:
@@ -19415,7 +19427,7 @@ snapshots:
       points-on-curve: 0.2.0
       points-on-path: 0.2.1
 
-  router@2.2.0(supports-color@7.2.0):
+  router@2.2.0:
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       depd: 2.0.0
@@ -19480,7 +19492,7 @@ snapshots:
 
   semver@7.8.5: {}
 
-  send@1.2.1(supports-color@7.2.0):
+  send@1.2.1:
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       encodeurl: 2.0.0
@@ -19507,7 +19519,7 @@ snapshots:
       encodeurl: 2.0.0
       escape-html: 1.0.3
       parseurl: 1.3.3
-      send: 1.2.1(supports-color@7.2.0)
+      send: 1.2.1
     transitivePeerDependencies:
       - supports-color
 
@@ -19819,8 +19831,8 @@ snapshots:
 
   teeny-request@10.1.4:
     dependencies:
-      http-proxy-agent: 7.0.2(supports-color@7.2.0)
-      https-proxy-agent: 7.0.6(supports-color@7.2.0)
+      http-proxy-agent: 7.0.2
+      https-proxy-agent: 7.0.6
       node-fetch: 3.3.2
       stream-events: 1.0.5
     transitivePeerDependencies:
@@ -19829,8 +19841,8 @@ snapshots:
 
   teeny-request@11.0.1:
     dependencies:
-      http-proxy-agent: 7.0.2(supports-color@7.2.0)
-      https-proxy-agent: 7.0.6(supports-color@7.2.0)
+      http-proxy-agent: 7.0.2
+      https-proxy-agent: 7.0.6
       node-fetch: 3.3.2
       stream-events: 1.0.5
     transitivePeerDependencies:
@@ -20265,7 +20277,7 @@ snapshots:
       '@types/node': 22.20.1
       '@vitest/coverage-v8': 4.1.12(vitest@4.1.12)
       happy-dom: 21.0.4
-      jsdom: 27.4.0(@noble/hashes@2.2.0)(supports-color@7.2.0)
+      jsdom: 27.4.0(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw
 
@@ -20296,7 +20308,7 @@ snapshots:
       '@types/node': 25.6.0
       '@vitest/coverage-v8': 4.1.12(vitest@4.1.12)
       happy-dom: 21.0.4
-      jsdom: 27.4.0(@noble/hashes@2.2.0)(supports-color@7.2.0)
+      jsdom: 27.4.0(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw
 
