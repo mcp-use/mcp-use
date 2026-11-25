@@ -17,7 +17,14 @@ import {
   WORKSPACE_DIR_NAME,
   type BuildManifest,
 } from "../../src/toolchain/index.js";
-import { bindBasicToolToView, copyFixture, removeDir } from "./helpers.js";
+import { runStart } from "../../src/bin/start.js";
+import {
+  bindBasicToolToView,
+  copyFixture,
+  getFreePort,
+  mcpRequest,
+  removeDir,
+} from "./helpers.js";
 
 const UI_META = {
   "io.modelcontextprotocol/protocolVersion": "2026-07-28",
@@ -734,6 +741,66 @@ describe("runBuild (views)", () => {
       process.chdir(previousCwd);
     }
   }, 60_000);
+
+  it.each([false, true])(
+    "serves built view assets when started from another directory, with a landing page: %s",
+    async (withLanding) => {
+      const cwd = copyFixture("build-start-elsewhere", "views");
+      dirs.push(cwd);
+      if (withLanding) {
+        writeFileSync(
+          join(cwd, "landing.tsx"),
+          "export default function Landing() { return <main>Landing</main>; }\n"
+        );
+      }
+      await runBuild({ cwd });
+      // Like `mcp-use start --path <project>` run from a parent directory.
+      expect(process.cwd()).not.toBe(cwd);
+      const started = await runStart({
+        cwd,
+        port: await getFreePort(),
+        host: "127.0.0.1",
+      });
+      try {
+        const listBody = await mcpRequest(
+          started.url,
+          "resources/list",
+          {},
+          { ui: true }
+        );
+        const viewUri = (
+          listBody["result"] as { resources: { uri: string }[] }
+        ).resources
+          .map((resource) => resource.uri)
+          .find((uri) => uri.startsWith("ui://views/product-search-result"));
+        expect(viewUri).toBeDefined();
+        const readBody = await mcpRequest(
+          started.url,
+          "resources/read",
+          { uri: viewUri },
+          { ui: true }
+        );
+        const html = (readBody["result"] as { contents: { text: string }[] })
+          .contents[0]?.text;
+        const script = /<script[^>]+src="([^"]+)"/.exec(html ?? "")?.[1];
+        expect(script).toBeDefined();
+        const scriptResponse = await fetch(new URL(script!, started.url));
+        expect(scriptResponse.status).toBe(200);
+        expect(scriptResponse.headers.get("content-type")).toMatch(
+          /javascript/
+        );
+
+        const publicResponse = await fetch(
+          `${started.url}/_mcp-use/public/test.txt`
+        );
+        expect(publicResponse.status).toBe(200);
+        expect(await publicResponse.text()).toBe("public-fixture\n");
+      } finally {
+        await started.close();
+      }
+    },
+    60_000
+  );
 
   it("embeds view JavaScript and CSS in resources with --inline", async () => {
     const cwd = copyFixture("build-views-inline", "views");

@@ -135,6 +135,7 @@ async function writeWrapperEntry(
     [
       `import server from ${JSON.stringify(userEntry)};`,
       `import { registerSkills, registerViews } from "mcp-use";`,
+      `import { fileURLToPath } from "node:url";`,
       ...(landing === undefined
         ? []
         : [
@@ -142,9 +143,11 @@ async function writeWrapperEntry(
             `import { createElement } from "react";`,
             `import { renderToString } from "react-dom/server";`,
             `import { __withLandingData } from "mcp-use/landing";`,
-            `import { fileURLToPath } from "node:url";`,
           ]),
-      `server[registerViews](${manifestJson}, { buildId: ${JSON.stringify(buildId)} });`,
+      // The bundle runs from <project>/.mcp-use/build/, so built view assets
+      // and public/ resolve from the project even when `start` runs elsewhere.
+      `const projectRoot = fileURLToPath(new URL("../../", import.meta.url));`,
+      `server[registerViews](${manifestJson}, { buildId: ${JSON.stringify(buildId)}, projectRoot });`,
       `server[registerSkills](${skillsJson});`,
       ...(landing === undefined
         ? []
@@ -157,7 +160,7 @@ async function writeWrapperEntry(
             `  entry: ${JSON.stringify(landing.entry)},`,
             `  css: ${JSON.stringify(landing.css)},`,
             `  dataKeys: ${JSON.stringify(landing.dataKeys)},`,
-            `  projectRoot: fileURLToPath(new URL("../../", import.meta.url)),`,
+            `  projectRoot,`,
             `});`,
           ]),
       `export default server;`,
