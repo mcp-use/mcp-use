@@ -187,6 +187,77 @@ return result
         assert result["result"]["int"] == 42
         assert result["result"]["float"] == 3.14
 
+    @pytest.mark.asyncio
+    async def test_asyncio_globals_escape_blocked(self, code_executor):
+        """Test that the asyncio.__globals__ sandbox escape is blocked.
+
+        Regression test for issue #3179: the full asyncio module must not be
+        exposed in the sandbox namespace because its Python-defined functions
+        carry __globals__ referencing real __builtins__ (with __import__),
+        enabling OS command execution without any MCP tool.
+
+        The PoC exploit path was:
+            asyncio.iscoroutine.__globals__["__builtins__"]["__import__"]("os")
+        """
+        # asyncio.iscoroutine must not be accessible (only a safe proxy is exposed)
+        code = "return asyncio.iscoroutine"
+        result = await code_executor.execute(code, timeout=5.0)
+        assert result["error"] is not None, "asyncio.iscoroutine should not be accessible"
+
+    @pytest.mark.asyncio
+    async def test_getattr_dunder_blocked(self, code_executor):
+        """Test that getattr cannot be used to access dunder attributes."""
+        code = "getattr([], '__class__')"
+        result = await code_executor.execute(code, timeout=5.0)
+        assert result["error"] is not None
+        assert "restricted" in result["error"].lower() or "attribute" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_asyncio_proxy_blocks_dunder_access(self, code_executor):
+        """Test that the asyncio proxy blocks dunder attribute traversal."""
+        code = "return asyncio.__class__"
+        result = await code_executor.execute(code, timeout=5.0)
+        assert result["error"] is not None, "asyncio.__class__ should raise AttributeError"
+
+    @pytest.mark.asyncio
+    async def test_asyncio_sleep_still_works(self, code_executor):
+        """Test that asyncio.sleep still works through the proxy."""
+        code = """
+await asyncio.sleep(0)
+return "ok"
+"""
+        result = await code_executor.execute(code, timeout=5.0)
+        assert result["error"] is None
+        assert result["result"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_no_os_commands_via_asyncio_escape(self, code_executor):
+        """Test the full PoC exploit chain is blocked (issue #3179)."""
+        import os
+
+        marker = "/tmp/mcp_use_rce_test_marker"
+        if os.path.exists(marker):
+            os.remove(marker)
+
+        # Exact exploit from the issue report adapted to use getattr
+        code = (
+            '_g = getattr(asyncio.iscoroutine, "__globals__")\n'
+            '_bi = _g["__builtins__"]\n'
+            '_imp = _bi["__import__"]\n'
+            '_os = _imp("os")\n'
+            f'_os.popen("touch {marker}").read()\n'
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        # The exploit must have failed at some point
+        assert result["error"] is not None or not os.path.exists(marker), (
+            "Sandbox escape succeeded: OS command ran without an MCP tool (issue #3179)"
+        )
+        # Clean up if somehow the marker was created
+        if os.path.exists(marker):
+            os.remove(marker)
+
 
 class TestCodeExecutorTimeout:
     """Test timeout functionality."""

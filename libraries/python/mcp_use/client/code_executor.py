@@ -19,6 +19,54 @@ if TYPE_CHECKING:
     from mcp_use.client.client import MCPClient
 
 
+def _safe_getattr(obj: Any, name: str) -> Any:
+    """Restricted getattr that blocks dunder attribute access.
+
+    Prevents traversal of __globals__, __builtins__, and similar
+    dunder attributes that can be used to escape the sandbox.
+    """
+    if name.startswith("__") and name.endswith("__"):
+        raise AttributeError(f"access to attribute '{name}' is restricted")
+    return getattr(obj, name)
+
+
+def _build_asyncio_proxy() -> Any:
+    """Build a minimal asyncio proxy for the sandbox namespace.
+
+    Returns an object exposing only specific safe async primitives. The full
+    asyncio module must not be injected directly because its Python-defined
+    functions carry __globals__ that reference the real __builtins__ dict
+    (which includes __import__), enabling sandbox escape via:
+
+        asyncio.iscoroutine.__globals__["__builtins__"]["__import__"]("os")
+    """
+    _ALLOWED = frozenset({"sleep", "gather", "wait_for", "create_task", "CancelledError", "TimeoutError"})
+
+    class AsyncioProxy:
+        """Minimal asyncio surface exposed to sandboxed code.
+
+        Only the attributes listed in _ALLOWED are accessible. Dunder attribute
+        access is blocked to prevent __globals__ / __builtins__ traversal.
+        """
+
+        def __getattribute__(self, name: str) -> Any:
+            if name.startswith("__") and name.endswith("__"):
+                raise AttributeError(f"access to attribute '{name}' is restricted")
+            if name not in _ALLOWED:
+                raise AttributeError(f"asyncio.{name} is not available in sandbox")
+            return object.__getattribute__(self, name)
+
+    proxy = AsyncioProxy()
+    object.__setattr__(proxy, "sleep", asyncio.sleep)
+    object.__setattr__(proxy, "gather", asyncio.gather)
+    object.__setattr__(proxy, "wait_for", asyncio.wait_for)
+    object.__setattr__(proxy, "create_task", asyncio.create_task)
+    object.__setattr__(proxy, "CancelledError", asyncio.CancelledError)
+    object.__setattr__(proxy, "TimeoutError", asyncio.TimeoutError)
+
+    return proxy
+
+
 class CodeExecutor:
     """Executes Python code with access to MCP tools in a restricted namespace.
 
@@ -158,8 +206,8 @@ class CodeExecutor:
             "all": all,
             "isinstance": isinstance,
             "hasattr": hasattr,
-            "getattr": getattr,
-            "type": type,
+            # Use restricted getattr that blocks dunder attribute traversal
+            "getattr": _safe_getattr,
             "repr": repr,
             "None": None,
             "True": True,
@@ -174,9 +222,16 @@ class CodeExecutor:
             "RuntimeError": RuntimeError,
         }
 
+        # Expose only specific async primitives rather than the full asyncio
+        # module. The asyncio module object carries Python-defined functions
+        # whose __globals__ contain real __builtins__ (with __import__), which
+        # would allow sandbox escape via:
+        #   asyncio.iscoroutine.__globals__["__builtins__"]["__import__"]("os")
+        asyncio_proxy = _build_asyncio_proxy()
+
         namespace = {
             "__builtins__": safe_builtins,
-            "asyncio": asyncio,  # Allow async/await
+            "asyncio": asyncio_proxy,
         }
 
         # Add search_tools function
