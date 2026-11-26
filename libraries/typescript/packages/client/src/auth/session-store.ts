@@ -252,6 +252,58 @@ export class OAuthSessionStore {
     await this.store.remove(this.getKey("last_auth_callback_url"));
   }
 
+  /**
+   * @internal
+   * Reads the stored client registration without the redirect-URI check, so a
+   * provider can adopt the loopback port from the last sign-in before deciding
+   * whether the registration still matches (issue #3178). Returns `undefined`
+   * when nothing is stored; never invalidates credentials.
+   */
+  async storedClientInformation(ctx?: OAuthClientInformationContext): Promise<
+    | (OAuthClientInformation & {
+        redirect_uris?: string[];
+      })
+    | undefined
+  > {
+    const stored = await this.readCredential<
+      OAuthClientInformation & { redirect_uris?: string[] }
+    >("client_info", ctx);
+    return stored?.value;
+  }
+
+  /**
+   * @internal
+   * Redirect URIs of every stored client registration (the unscoped key and
+   * every issuer-scoped key), without validating or invalidating anything.
+   * Used to adopt a loopback port only when all registrations agree on it
+   * (issue #3178).
+   */
+  async storedClientRedirectUris(): Promise<string[][]> {
+    const prefix = `${this.getKey("client_info")}_`;
+    const keys = (await this.store.keys()).filter(
+      (key) => key === this.getKey("client_info") || key.startsWith(prefix)
+    );
+    const redirectUris: string[][] = [];
+    for (const key of keys) {
+      const raw = await this.store.get(key);
+      if (!raw) continue;
+      try {
+        const value = JSON.parse(raw) as { redirect_uris?: unknown };
+        if (Array.isArray(value.redirect_uris)) {
+          redirectUris.push(
+            value.redirect_uris.filter(
+              (uri): uri is string => typeof uri === "string"
+            )
+          );
+        }
+      } catch {
+        // Ignore an unreadable registration; the redirect check will
+        // re-register it when it is actually used.
+      }
+    }
+    return redirectUris;
+  }
+
   async clientInformation(
     ctx?: OAuthClientInformationContext
   ): Promise<OAuthClientInformation | undefined> {

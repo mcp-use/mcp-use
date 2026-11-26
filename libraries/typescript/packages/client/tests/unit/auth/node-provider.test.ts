@@ -146,6 +146,144 @@ describe("NodeOAuthClientProvider", () => {
     expect(provider.callbackPort).toBe(persistedPort);
   });
 
+  it("reuses the registered loopback port so tokens survive a later provider (#3178)", async () => {
+    const kv = new MemoryKVStore();
+    const serverUrl = "https://mcp.example.com/mcp";
+    const preferredPort = 42_000 + (process.pid % 500);
+    const ctx = { issuer: "https://auth.example.com" };
+
+    const signIn = await NodeOAuthClientProvider.create(serverUrl, {
+      kvStore: kv,
+      preferredPort,
+      portRange: 20,
+      openBrowser: vi.fn(),
+    });
+    await signIn.saveClientInformation(
+      {
+        client_id: "client-1",
+        redirect_uris: [signIn.redirectUrl],
+        issuer: ctx.issuer,
+      },
+      ctx
+    );
+    await signIn.saveTokens(
+      {
+        access_token: "access-1",
+        refresh_token: "r1",
+        issuer: ctx.issuer,
+      },
+      ctx
+    );
+
+    // A later session (for example another provider created in parallel)
+    // persisted a different port before this provider was created.
+    kv.set("port", String(signIn.callbackPort + 1));
+
+    const later = await NodeOAuthClientProvider.create(serverUrl, {
+      kvStore: kv,
+      openBrowser: vi.fn(),
+      portRange: 20,
+    });
+
+    // It adopts the registered port instead of probing a new one, so the
+    // stored registration still matches and its tokens are not invalidated.
+    expect(later.redirectUrl).toBe(signIn.redirectUrl);
+    expect(await later.clientInformation(ctx)).toMatchObject({
+      client_id: "client-1",
+    });
+    expect(await later.tokens(ctx)).toMatchObject({ access_token: "access-1" });
+
+    signIn.dispose();
+    later.dispose();
+  });
+
+  it("falls back to the probed port when the registered port is busy (#3178)", async () => {
+    const kv = new MemoryKVStore();
+    const serverUrl = "https://mcp.example.com/mcp";
+    const preferredPort = 43_000 + (process.pid % 500);
+    const ctx = { issuer: "https://auth.example.com" };
+
+    const signIn = await NodeOAuthClientProvider.create(serverUrl, {
+      kvStore: kv,
+      preferredPort,
+      portRange: 20,
+      openBrowser: vi.fn(),
+    });
+    await signIn.saveClientInformation(
+      {
+        client_id: "client-1",
+        redirect_uris: [signIn.redirectUrl],
+        issuer: ctx.issuer,
+      },
+      ctx
+    );
+
+    const blocker = createNetServer();
+    await new Promise<void>((resolve) =>
+      blocker.listen(signIn.callbackPort, "127.0.0.1", resolve)
+    );
+    try {
+      const later = await NodeOAuthClientProvider.create(serverUrl, {
+        kvStore: kv,
+        openBrowser: vi.fn(),
+        portRange: 20,
+      });
+      // The registered port is taken, so the previous probing behaviour wins.
+      expect(later.callbackPort).not.toBe(signIn.callbackPort);
+      later.dispose();
+    } finally {
+      await new Promise<void>((resolve) => blocker.close(() => resolve()));
+      signIn.dispose();
+    }
+  });
+
+  it("does not adopt a port when stored registrations disagree (#3178)", async () => {
+    const kv = new MemoryKVStore();
+    const serverUrl = "https://mcp.example.com/mcp";
+    const preferredPort = 44_000 + (process.pid % 500);
+
+    const signIn = await NodeOAuthClientProvider.create(serverUrl, {
+      kvStore: kv,
+      preferredPort,
+      portRange: 20,
+      openBrowser: vi.fn(),
+    });
+    const issuerA = { issuer: "https://a.example.com" };
+    const issuerB = { issuer: "https://b.example.com" };
+    await signIn.saveClientInformation(
+      {
+        client_id: "client-a",
+        redirect_uris: [signIn.redirectUrl],
+        issuer: issuerA.issuer,
+      },
+      issuerA
+    );
+    await signIn.saveClientInformation(
+      {
+        client_id: "client-b",
+        redirect_uris: [
+          `http://127.0.0.1:${signIn.callbackPort + 10}/callback`,
+        ],
+        issuer: issuerB.issuer,
+      },
+      issuerB
+    );
+    kv.set("port", String(signIn.callbackPort + 1));
+
+    const later = await NodeOAuthClientProvider.create(serverUrl, {
+      kvStore: kv,
+      openBrowser: vi.fn(),
+      portRange: 20,
+    });
+
+    // Two issuers on different ports: adopting either would break the other's
+    // redirect check, so keep the probed port.
+    expect(later.callbackPort).toBe(signIn.callbackPort + 1);
+
+    signIn.dispose();
+    later.dispose();
+  });
+
   it("does not create OAuth state on disk until authorization starts", async () => {
     const root = mkdtempSync(join(tmpdir(), "mcp-use-node-oauth-"));
     const baseDir = join(root, "oauth");
