@@ -7,6 +7,45 @@ import { BaseCodeExecutor, type ExecutionResult } from "./executor.js";
 type Sandbox = any;
 
 /**
+ * Split Node's stderr into the diagnostics the program printed before it threw
+ * and the message of the final thrown error, so the E2B executor reports the
+ * same message as the VM executor and keeps the user's own stderr output in the
+ * logs (#3161).
+ */
+export function parseProgramError(stderr: string): {
+  message: string | null;
+  diagnostics: string;
+} {
+  const pattern =
+    /(?:^|\n)(?:Uncaught\s+)?(?:[A-Z][A-Za-z]*)?Error:\s*([^\n]+)/g;
+  let last: RegExpExecArray | null = null;
+  for (let match = pattern.exec(stderr); match; match = pattern.exec(stderr)) {
+    last = match;
+  }
+  if (!last) return { message: null, diagnostics: stderr.trim() };
+  return {
+    message: last[1].trim(),
+    diagnostics: stderr.slice(0, last.index).trim(),
+  };
+}
+
+/**
+ * Extract the thrown error's message from Node's stderr: an "Error: boom"
+ * line followed by a stack trace becomes "boom". The last error record wins so
+ * earlier `console.error("Error: ...")` output cannot mask the thrown error.
+ */
+export function extractProgramErrorMessage(stderr: string): string | null {
+  return parseProgramError(stderr).message;
+}
+
+/** Result of a sandbox command, however e2b chose to deliver it. */
+type CommandExecution = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+};
+
+/**
  * E2B-based code executor using remote sandboxes.
  * Executes code in an E2B sandbox with tool calls proxied back to the host.
  */
@@ -226,8 +265,9 @@ ${shim}
       const filename = `exec_${Date.now()}.js`;
       await sandbox.files.write(filename, wrappedCode);
 
-      // Execute the file
-      const execution = await sandbox.commands.run(`node ${filename}`, {
+      // Execute the file. e2b rejects with CommandExitError on a non-zero
+      // exit instead of returning { exitCode, stdout, stderr } (#3161).
+      const runPromise = sandbox.commands.run(`node ${filename}`, {
         timeoutMs: timeout,
         onStdout: async (data: string) => {
           // Check for tool calls
@@ -299,10 +339,32 @@ ${shim}
         },
       });
 
+      let execution: CommandExecution;
+      try {
+        execution = await runPromise;
+      } catch (runError: any) {
+        // Only a run that exited with a code is recoverable; transport
+        // failures and timeouts keep the outer catch's behaviour.
+        if (typeof runError?.exitCode !== "number") throw runError;
+        execution = {
+          stdout: runError.stdout ?? "",
+          stderr: runError.stderr ?? "",
+          exitCode: runError.exitCode,
+        };
+      }
+
       logs = [execution.stdout, execution.stderr].filter(Boolean);
 
       if (execution.exitCode !== 0) {
-        error = execution.stderr || "Execution failed";
+        // Report what the program threw, like the VM executor does, and keep
+        // the diagnostics it printed beforehand in the logs; only the thrown
+        // error's stack is noise once the message is surfaced (#3161).
+        const programError = parseProgramError(execution.stderr);
+        error =
+          programError.message || execution.stderr.trim() || "Execution failed";
+        logs = [execution.stdout, programError.diagnostics].filter(
+          (log): log is string => Boolean(log)
+        );
       } else {
         const stdout = execution.stdout;
         const startMarker = "__MCP_RESULT_START__";
