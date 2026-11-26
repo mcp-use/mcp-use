@@ -106,6 +106,30 @@ async function reservePort(
   return null;
 }
 
+/**
+ * Loopback callback port recorded in a stored registration's redirect URIs, or
+ * null when the registration has none. Used to keep the redirect stable across
+ * providers created at different times (issue #3178).
+ */
+function callbackPortFromRedirectUris(
+  redirectUris: string[] | undefined
+): number | null {
+  if (!Array.isArray(redirectUris)) return null;
+  for (const uri of redirectUris) {
+    if (typeof uri !== "string") continue;
+    try {
+      const url = new URL(uri);
+      if (url.hostname === "127.0.0.1" && url.pathname === "/callback") {
+        const port = Number.parseInt(url.port, 10);
+        if (Number.isFinite(port) && port > 0) return port;
+      }
+    } catch {
+      // Ignore a malformed stored redirect URI and try the next one.
+    }
+  }
+  return null;
+}
+
 const SUCCESS_HTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Authentication complete</title>
 <style>body{font-family:system-ui,sans-serif;max-width:480px;margin:80px auto;padding:0 24px;color:#222}
@@ -220,11 +244,36 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     }
 
     const callbackUrl = `http://127.0.0.1:${port}/callback`;
-    const session = new OAuthSessionStore(
+    let session = new OAuthSessionStore(
       serverUrl,
       { ...options, callbackUrl },
       kv
     );
+
+    // A provider that is created only to connect should keep the registration
+    // and tokens from the last sign-in even when it probed another free port.
+    // Adopt the stored loopback port only when every stored registration
+    // agrees on it (a base-key-only read could pick one issuer's port and break
+    // another's redirect check); otherwise the redirect-URI check below
+    // re-registers as before (issue #3178).
+    const storedPorts = new Set(
+      (await session.storedClientRedirectUris())
+        .map((uris) => callbackPortFromRedirectUris(uris))
+        .filter((candidate): candidate is number => candidate !== null)
+    );
+    const storedPort = storedPorts.size === 1 ? [...storedPorts][0] : null;
+    if (
+      storedPort !== null &&
+      storedPort !== port &&
+      (await isPortFree(storedPort))
+    ) {
+      port = storedPort;
+      session = new OAuthSessionStore(
+        serverUrl,
+        { ...options, callbackUrl: `http://127.0.0.1:${port}/callback` },
+        kv
+      );
+    }
 
     return new NodeOAuthClientProvider(
       serverUrl,
