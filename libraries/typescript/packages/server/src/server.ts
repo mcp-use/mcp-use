@@ -242,7 +242,18 @@ function productId(value: unknown, fallback: string): string {
 function eventsClientName(params: unknown): string | null {
   const meta = record(record(params)?.["_meta"]);
   const name = record(meta?.[CLIENT_INFO_META_KEY])?.["name"];
-  return typeof name === "string" ? productId(name, "") || null : null;
+  if (typeof name !== "string") return null;
+  // Keep long names such as "openai-mcp (Codex)/<version>" (cut, not dropped);
+  // strip control characters so the name is safe to display.
+  const clean = [...name]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    })
+    .join("")
+    .trim()
+    .slice(0, 128);
+  return clean.length > 0 ? clean : null;
 }
 
 function clientUsageFromBody(body: unknown): ClientUsage | undefined {

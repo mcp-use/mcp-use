@@ -96,11 +96,11 @@ request times out after 10 s.
 
 ## Storage
 
-| Where          | Store                                                                                                                |
-| -------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `mcp-use dev`  | Memory (resets on restart). `http:` and loopback callbacks are allowed.                                              |
-| Manufact Cloud | Redis through the platform proxy, from `MCP_USE_PLATFORM_STORAGE_URL`, `_TOKEN` and `_PREFIX`. Nothing to configure. |
-| Self-hosted    | Any Upstash REST endpoint:                                                                                           |
+| Where          | Store                                                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mcp-use dev`  | Memory (resets on restart). `http:` and loopback callbacks are allowed.                                                                                           |
+| Manufact Cloud | Redis through the platform proxy, from `MCP_USE_PLATFORM_STORAGE_URL`, `_TOKEN` and `_PREFIX`. Enable **MCP Events storage** in the server settings and redeploy. |
+| Self-hosted    | Any Upstash REST endpoint:                                                                                                                                        |
 
 ```ts
 import { upstashEventsStore } from "mcp-use/events";
@@ -119,8 +119,8 @@ new MCPServer({
 
 Other platform variables: `MCP_USE_PLATFORM_NAMESPACE` (key namespace) and
 `MCP_USE_PLATFORM_SECRET` (encrypts stored webhook secrets; comma-separated for
-rotation). At startup the server logs which store is active (in-memory, custom,
-or Upstash REST with the host only, never the token).
+rotation). On the first `events/*` request the server logs which store is
+active (in-memory, custom, or Upstash REST with the host only, never the token).
 
 ### Tick and health routes
 
@@ -162,6 +162,29 @@ unset:
   `{ deliveries: [...] }`, newest first (`limit` 1-200, default 50).
 
 Neither route returns webhook secrets or full callback URLs.
+
+### On Manufact Cloud
+
+With **MCP Events storage** enabled and the server redeployed, subscriptions
+and delivery history appear in the dashboard's **Events** tab and survive
+redeploys.
+
+## ChatGPT
+
+Observed in live testing:
+
+- Subscriptions are created only from ChatGPT Work chats with **Cloud**
+  selected. A local Codex chat delegates the subscription to a Work Cloud chat.
+- The workspace needs **Developer mode** and **Allow event-triggered scheduled
+  tasks** turned on.
+- ChatGPT uses the 2026-07-28 `server/discover` handshake and identifies as
+  client `openai-mcp (Codex)/<version>`, which is recorded as the
+  subscription's client name.
+- Servers without OAuth work.
+- Each delivered event triggers one automation run. ChatGPT deduplicates by
+  `eventId`, so retries of the same event do not run twice.
+- A successful callback verification is cached for 1 hour per principal and
+  callback URL, so re-subscribing within the hour skips the challenge.
 
 ## Receive events in a client
 
