@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { findPackageJSON } from "node:module";
 import { chmod, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -41,12 +42,6 @@ async function findProjectRoot(startDir: string): Promise<string | undefined> {
   }
 }
 
-/** Where `@mcp-use/client` was auto-installed. */
-interface InstallLocation {
-  location: "project" | "sandbox";
-  projectRoot?: string;
-}
-
 interface LoadClientPackageOptions {
   /** Allow installing the optional SDK when it is not already available. */
   allowInstall?: boolean;
@@ -56,63 +51,80 @@ interface LoadClientPackageOptions {
  * Load `@mcp-use/client` on demand so the framework library entry does not
  * pull the client SDK (or legacy v1 transitive deps) into every install.
  *
+ * Looks for an installed copy next to the CLI, then in the project around the
+ * working directory, then in the CLI's private `~/.mcp-use/client-sdk`
+ * directory. When none is found, installs it into that private directory with
+ * npm. It never installs into the user's project: under `npx` the CLI cannot
+ * tell which package manager the project uses, and running the wrong one
+ * corrupts `node_modules` or crashes (mcp-use/mcp-use#3081).
+ *
  * @throws {@link UsageError} When the package is not installed and auto-install
  * fails or the retry import still cannot resolve it.
  */
 export async function loadClientPackage(
   options: LoadClientPackageOptions = {}
 ): Promise<ClientPackage> {
-  try {
-    return await importClientModule();
-  } catch (error) {
-    if (!isClientPackageMissing(error)) throw error;
-    if (options.allowInstall === false) {
-      throw new CommandError(
-        "client_install_required",
-        `${CLIENT_PACKAGE} is required for this command.`,
-        {
-          nextSteps: [
-            {
-              description: "Install the optional client SDK",
-              command: `npm install ${CLIENT_PACKAGE}`,
-            },
-          ],
-        }
-      );
-    }
+  const projectRoot = await findProjectRoot(process.cwd());
+  const installed = await importFirstInstalledClient([
+    projectRoot,
+    CLIENT_SDK_DIR,
+  ]);
+  if (installed !== undefined) return installed;
 
-    const installed = await installClientPackage();
-    try {
-      return installed.location === "sandbox"
-        ? await importSandboxClientModule()
-        : await importProjectClientModule(installed.projectRoot!);
-    } catch (retryError) {
-      if (isClientPackageMissing(retryError)) {
-        throw new UsageError(INSTALL_HINT);
-      }
-      throw retryError;
+  if (options.allowInstall === false) {
+    // No `nextSteps`: the right install command depends on the project's
+    // package manager, which the CLI cannot reliably tell (see above).
+    throw new CommandError(
+      "client_install_required",
+      `${CLIENT_PACKAGE} is required for this command. Install it in this project with its package manager.`
+    );
+  }
+
+  await installClientPackage();
+  try {
+    return await importInstalledClientModule(CLIENT_SDK_DIR);
+  } catch (retryError) {
+    if (isClientPackageMissing(retryError)) {
+      throw new UsageError(INSTALL_HINT);
     }
+    throw retryError;
   }
 }
 
-async function installClientPackage(): Promise<InstallLocation> {
+/**
+ * @internal Import `@mcp-use/client` from next to the CLI, else from the first
+ * of `roots` that has a copy installed at or above it. Returns `undefined`
+ * when no copy is found. Tests pass `importBare` to simulate the CLI running
+ * from outside the project (the `npx` cache), where the bare import misses.
+ */
+export async function importFirstInstalledClient(
+  roots: ReadonlyArray<string | undefined>,
+  importBare: () => Promise<ClientPackage> = importClientModule
+): Promise<ClientPackage | undefined> {
+  try {
+    return await importBare();
+  } catch (error) {
+    if (!isClientPackageMissing(error)) throw error;
+  }
+  for (const root of roots) {
+    if (root === undefined) continue;
+    try {
+      return await importInstalledClientModule(root);
+    } catch (error) {
+      if (!isClientPackageMissing(error)) throw error;
+    }
+  }
+  return undefined;
+}
+
+/** Install `@mcp-use/client` into the CLI's private directory with npm. */
+async function installClientPackage(): Promise<void> {
   const versionSpec = readClientPeerRange();
   const dependency = `${CLIENT_PACKAGE}@${versionSpec}`;
-  const projectRoot = await findProjectRoot(process.cwd());
 
-  process.stderr.write(`[mcp-use] installing ${CLIENT_PACKAGE}…\n`);
-
-  if (projectRoot !== undefined) {
-    const [command, args] = packageManagerInstallArgs(dependency);
-    const code = await spawnAndWait(command, args, projectRoot);
-    if (code !== 0) {
-      throw new CommandError(
-        "client_install_failed",
-        `Failed to install ${CLIENT_PACKAGE}.`
-      );
-    }
-    return { location: "project", projectRoot };
-  }
+  process.stderr.write(
+    `[mcp-use] installing ${CLIENT_PACKAGE} into ${CLIENT_SDK_DIR}…\n`
+  );
 
   await mkdir(CLIENT_SDK_DIR, { recursive: true, mode: 0o700 });
   await chmod(CLIENT_SDK_DIR, 0o700);
@@ -136,18 +148,6 @@ async function installClientPackage(): Promise<InstallLocation> {
       `Failed to install ${CLIENT_PACKAGE}.`
     );
   }
-  return { location: "sandbox" };
-}
-
-function packageManagerInstallArgs(dependency: string): [string, string[]] {
-  const userAgent = process.env["npm_config_user_agent"] ?? "";
-  if (userAgent.startsWith("pnpm/")) {
-    return ["pnpm", ["add", dependency]];
-  }
-  if (userAgent.startsWith("bun/")) {
-    return ["bun", ["add", dependency]];
-  }
-  return ["npm", ["install", dependency]];
 }
 
 /**
@@ -174,51 +174,31 @@ export function readClientPeerRange(): string {
 }
 
 async function importClientModule(): Promise<ClientPackage> {
-  disableBrokenNodeLocalStorage();
   return import("@mcp-use/client");
 }
 
-/** @internal Imported from project `node_modules` after auto-install. */
-export async function importProjectClientModule(
-  projectRoot: string
-): Promise<ClientPackage> {
-  disableBrokenNodeLocalStorage();
-  const parent = pathToFileURL(join(projectRoot, "package.json")).href;
-  const resolved = await import.meta.resolve(CLIENT_PACKAGE, parent);
-  return import(resolved) as Promise<ClientPackage>;
-}
-
-async function importSandboxClientModule(): Promise<ClientPackage> {
-  disableBrokenNodeLocalStorage();
-  const entry = join(
-    CLIENT_SDK_DIR,
-    "node_modules",
-    CLIENT_PACKAGE,
-    "dist",
-    "index.js"
-  );
-  const mod = (await import(pathToFileURL(entry).href)) as ClientPackage;
-  return mod;
-}
-
 /**
- * Node 25 exposes a lazy `localStorage` getter that warns unless the process
- * was started with `--localstorage-file`. The CLI client uses its own encrypted
- * filesystem stores, so the browser global is neither needed nor desirable.
- * Shadow the getter without reading it, which also keeps JSON stderr clean.
+ * @internal Import the copy installed at or above `installRoot`, right after
+ * an auto-install.
+ *
+ * Imports the entry file rather than the package name. The failed
+ * `import("@mcp-use/client")` that triggered the install leaves Node 24 with a
+ * cached miss for the package's `package.json`, so importing the name again in
+ * this process falls back to a nonexistent `index.js`. `findPackageJSON` walks
+ * `node_modules` the way the resolver does (workspace hoisting, symlinks)
+ * without hitting that cache, and throws `ERR_MODULE_NOT_FOUND` when no copy is
+ * installed. The entry path mirrors `exports["."].node.import` in the client's
+ * package.json.
  */
-function disableBrokenNodeLocalStorage(): void {
-  const descriptor = Object.getOwnPropertyDescriptor(
-    globalThis,
-    "localStorage"
+export async function importInstalledClientModule(
+  installRoot: string
+): Promise<ClientPackage> {
+  const manifest = findPackageJSON(
+    CLIENT_PACKAGE,
+    pathToFileURL(join(installRoot, "package.json"))
   );
-  if (descriptor?.get === undefined || descriptor.configurable !== true) return;
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    enumerable: descriptor.enumerable ?? false,
-    value: undefined,
-    writable: true,
-  });
+  const entry = join(dirname(manifest!), "dist", "index.js");
+  return import(pathToFileURL(entry).href) as Promise<ClientPackage>;
 }
 
 function isClientPackageMissing(error: unknown): boolean {

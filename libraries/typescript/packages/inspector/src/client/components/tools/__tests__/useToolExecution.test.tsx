@@ -14,12 +14,103 @@ vi.mock("@/client/telemetry", () => ({
   captureInspectorEvent: vi.fn(async () => {}),
 }));
 
-describe("useToolExecution cancellation", () => {
+describe("useToolExecution", () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     localStorage.clear();
   });
+
+  it.each([
+    {
+      name: "legacy flat metadata",
+      toolMeta: { "ui/resourceUri": "ui://weather/forecast.html" },
+    },
+    {
+      name: "nested metadata",
+      toolMeta: { ui: { resourceUri: "ui://weather/forecast.html" } },
+    },
+    {
+      name: "nested metadata taking precedence over the flat key",
+      toolMeta: {
+        ui: { resourceUri: "ui://weather/forecast.html" },
+        "ui/resourceUri": "ui://wrong/legacy.html",
+      },
+    },
+  ])(
+    "prefetches and updates the pending view with $name",
+    async ({ toolMeta }) => {
+      let finishTool!: (result: unknown) => void;
+      const pendingTool = new Promise<unknown>((resolve) => {
+        finishTool = resolve;
+      });
+      const callTool = vi.fn(() => pendingTool);
+      const readResource = vi.fn(async () => ({ contents: [] }));
+      let latest!: ReturnType<typeof useToolExecution>;
+      let execution!: Promise<void>;
+
+      function TestComponent() {
+        latest = useToolExecution({
+          selectedTool: {
+            name: "weather",
+            inputSchema: { type: "object" },
+            _meta: toolMeta,
+          },
+          payloadToSend: { city: "Tokyo" },
+          toolArgs: { city: "Tokyo" },
+          callTool,
+          readResource,
+          serverId: "weather-server",
+          isConnected: true,
+        });
+        return null;
+      }
+
+      const root = createRoot(document.createElement("div"));
+      try {
+        await act(async () => root.render(<TestComponent />));
+        await act(async () => {
+          execution = latest.executeTool();
+        });
+
+        expect(readResource).toHaveBeenCalledWith("ui://weather/forecast.html");
+        expect(callTool).toHaveBeenCalledWith(
+          "weather",
+          { city: "Tokyo" },
+          expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
+        expect(latest.isExecuting).toBe(true);
+        expect(latest.results).toEqual([
+          expect.objectContaining({
+            toolName: "weather",
+            args: { city: "Tokyo" },
+            result: null,
+            toolMeta,
+          }),
+        ]);
+
+        await act(async () => {
+          finishTool({ content: [{ type: "text", text: "Sunny" }] });
+          await execution;
+        });
+
+        expect(latest.isExecuting).toBe(false);
+        expect(latest.results).toEqual([
+          expect.objectContaining({
+            toolName: "weather",
+            result: { content: [{ type: "text", text: "Sunny" }] },
+            toolMeta,
+          }),
+        ]);
+      } finally {
+        finishTool({});
+        await act(async () => {
+          await execution;
+          root.unmount();
+        });
+      }
+    }
+  );
 
   it("uses the saved connection timeouts for tool calls", async () => {
     saveStoredConnectionConfig("server-1", {

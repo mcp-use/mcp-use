@@ -193,9 +193,46 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
 
     expect(flow.completeOAuthFlow).toHaveBeenCalledWith(
       provider,
-      "https://example.com/mcp"
+      "https://example.com/mcp",
+      { fetchFn: undefined }
     );
     expect(attempts).toBe(2);
+  });
+
+  it("on 401 completes OAuth with the provider-scoped configured fetch", async () => {
+    const baseFetch = vi.fn() as unknown as typeof fetch;
+    const scopedFetch = vi.fn() as unknown as typeof fetch;
+    const getProxyFetch = vi.fn(() => scopedFetch);
+    const client = new TestClient({
+      mcpServers: {
+        demo: { url: "https://example.com/mcp", fetch: baseFetch },
+      },
+    });
+    const provider = {
+      getAuthorizationCode: vi.fn(async () => "code"),
+      getProxyFetch,
+    } as unknown as OAuthClientProvider;
+    client.createDefaultOAuthProvider.mockResolvedValue(provider);
+
+    const unauthorized = Object.assign(new Error("Unauthorized"), {
+      code: 401,
+    });
+    let attempts = 0;
+    client.createConnectorFromConfig.mockImplementation(() =>
+      makeConnector(async () => {
+        attempts += 1;
+        if (attempts === 1) throw unauthorized;
+      })
+    );
+
+    await client.createSession("demo");
+
+    expect(getProxyFetch).toHaveBeenCalledWith(baseFetch);
+    expect(flow.completeOAuthFlow).toHaveBeenCalledWith(
+      provider,
+      "https://example.com/mcp",
+      { fetchFn: scopedFetch }
+    );
   });
 
   it("does not retry non-401 errors", async () => {

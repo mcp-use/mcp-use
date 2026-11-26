@@ -6,7 +6,8 @@
  * - **Server:** `--server`, then `MANUFACT_SERVER`, then the project link.
  * - **Organization:** `--org`, then `MANUFACT_ORG`, then the project link's
  *   organization, then the active organization (`mcp-use org use`), then the
- *   account default.
+ *   organization that owns the server, then the account default. A user in a
+ *   single organization always acts in it.
  *
  * Servers and organizations may be given by id or slug.
  */
@@ -44,7 +45,8 @@ function serverSelector(
 /**
  * The organization from `--org`, `MANUFACT_ORG` or the link. `undefined`
  * leaves the choice to `connectCloud`, which takes the active organization
- * (`mcp-use org use`), then the account default.
+ * (`mcp-use org use`), then the server's organization, then the account
+ * default.
  */
 function organizationSelector(
   flags: ProjectFlags,
@@ -98,6 +100,7 @@ export async function connectProject(
   }
   const cloud = await connectCloud({
     organization: organizationSelector(flags, link),
+    server,
   });
   return {
     cloud,

@@ -44,6 +44,7 @@ export function deployment(
     organizationId: "org_1",
     createdAt: TIMESTAMP,
     updatedAt: TIMESTAMP,
+    failedAt: null,
     // The spec documents these as non-null strings, though Cloud can return
     // null for deployments that never built.
     buildStartedAt: TIMESTAMP,

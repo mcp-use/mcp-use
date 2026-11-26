@@ -1,5 +1,211 @@
 # mcp-use
 
+## 2.12.10
+
+### Patch Changes
+
+- 7f2abf9: Keep production view resource paths stable across deploys. The path is now always `ui://views/<name>.html`, and production sends the build ID as a `?v=<build ID>` cache key instead of putting it in the path. Reads ignore the `?v=` value, and the `ui://views/<name>-<build ID>.html` URIs from 2.12 still resolve, so a host that reads a URI from an older tool catalog, such as a published ChatGPT app, gets the current view instead of resource-not-found. On `mixedAuth` servers those URIs of tool-bound views are readable signed out like the current one; unbound views stay gated.
+- Updated dependencies [7f2abf9]
+- Updated dependencies [7f2abf9]
+- Updated dependencies [7f2abf9]
+- Updated dependencies [7f2abf9]
+  - @mcp-use/cli@5.4.1
+  - @mcp-use/inspector@20.3.34
+
+## 2.12.10-canary.2
+
+### Patch Changes
+
+- d68aa66: Keep production view resource paths stable across deploys. The path is now always `ui://views/<name>.html`, and production sends the build ID as a `?v=<build ID>` cache key instead of putting it in the path. Reads ignore the `?v=` value, and the `ui://views/<name>-<build ID>.html` URIs from 2.12 still resolve, so a host that reads a URI from an older tool catalog, such as a published ChatGPT app, gets the current view instead of resource-not-found. On `mixedAuth` servers those URIs of tool-bound views are readable signed out like the current one; unbound views stay gated.
+
+## 2.12.10-canary.1
+
+### Patch Changes
+
+- Updated dependencies [3d64137]
+- Updated dependencies [fc3efbe]
+  - @mcp-use/cli@5.4.1-canary.1
+
+## 2.12.10-canary.0
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [e65dff6]
+  - @mcp-use/cli@5.4.1-canary.0
+  - @mcp-use/inspector@20.3.34-canary.0
+
+## 2.12.9
+
+### Patch Changes
+
+- Updated dependencies [9663941]
+- Updated dependencies [9663941]
+- Updated dependencies [9663941]
+- Updated dependencies [9663941]
+  - @mcp-use/cli@5.4.0
+  - @mcp-use/inspector@20.3.33
+
+## 2.12.9-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d1fc432]
+- Updated dependencies [d315301]
+- Updated dependencies [d1fc432]
+- Updated dependencies
+  - @mcp-use/cli@5.4.0-canary.0
+  - @mcp-use/inspector@20.3.33-canary.0
+
+## 2.12.8
+
+### Patch Changes
+
+- Updated dependencies [343a803]
+- Updated dependencies [343a803]
+  - @mcp-use/cli@5.3.0
+  - @mcp-use/inspector@20.3.32
+
+## 2.12.8-canary.0
+
+### Patch Changes
+
+- Updated dependencies [2104fb8]
+- Updated dependencies
+  - @mcp-use/cli@5.3.0-canary.0
+  - @mcp-use/inspector@20.3.32-canary.0
+
+## 2.12.7
+
+### Patch Changes
+
+- Updated dependencies [33279c8]
+- Updated dependencies [33279c8]
+  - @mcp-use/cli@5.2.0
+  - @mcp-use/inspector@20.3.31
+
+## 2.12.7-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c5d21ce]
+- Updated dependencies
+  - @mcp-use/cli@5.2.0-canary.0
+  - @mcp-use/inspector@20.3.31-canary.0
+
+## 2.12.6
+
+### Patch Changes
+
+- 4b2e49e: Release pending canary improvements on top of the 2.12.5 CSP hotfix.
+- 4b2e49e: Keep binary request bodies intact under Node. `toWebRequest` decoded every request body as UTF-8 text, so bytes that aren't valid UTF-8, such as a file uploaded to a custom route, reached the handler replaced with U+FFFD. This affected `listen()`, `mcp-use start`, `mcp-use dev`, and `toNodeHandler`/`toWebRequest` from `mcp-use/node`. The body is now passed on as the bytes that were received.
+- 4b2e49e: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 4b2e49e: Stop the server's usage telemetry from reading `globalThis.localStorage`. On Node 25 the opt-out check printed `Warning: --localstorage-file was provided without a valid path` on a server's first request. Turn telemetry off with `MCP_USE_ANONYMIZED_TELEMETRY=false`; the server no longer reads that setting from `localStorage`.
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+- Updated dependencies [4b2e49e]
+  - @mcp-use/cli@5.1.1
+  - @mcp-use/inspector@20.3.30
+
+## 2.12.6-canary.0
+
+### Patch Changes
+
+- Release pending canary improvements on top of the 2.12.5 CSP hotfix.
+- Updated dependencies [136c9e3]
+  - @mcp-use/inspector@20.3.30-canary.5
+
+## 2.12.5
+
+### Patch Changes
+
+- 6e08b9d: Omit `frameDomains` and `baseUriDomains` from view CSP metadata when their merged lists are empty, including explicitly configured empty arrays.
+
+## 2.12.5-canary.9
+
+### Patch Changes
+
+- Updated dependencies [620471f]
+  - @mcp-use/inspector@20.3.30-canary.4
+  - @mcp-use/cli@5.1.1-canary.5
+
+## 2.12.5-canary.8
+
+### Patch Changes
+
+- Updated dependencies [0130e50]
+  - @mcp-use/cli@5.1.1-canary.5
+
+## 2.12.5-canary.7
+
+### Patch Changes
+
+- Updated dependencies [c8f90f5]
+  - @mcp-use/cli@5.1.1-canary.4
+
+## 2.12.5-canary.6
+
+### Patch Changes
+
+- Updated dependencies [018ba48]
+  - @mcp-use/cli@5.1.1-canary.3
+
+## 2.12.5-canary.5
+
+### Patch Changes
+
+- Updated dependencies [9eba5b3]
+  - @mcp-use/cli@5.1.1-canary.2
+
+## 2.12.5-canary.4
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.30-canary.3
+  - @mcp-use/cli@5.1.1-canary.1
+
+## 2.12.5-canary.3
+
+### Patch Changes
+
+- c4c27e0: Stop the server's usage telemetry from reading `globalThis.localStorage`. On Node 25 the opt-out check printed `Warning: --localstorage-file was provided without a valid path` on a server's first request. Turn telemetry off with `MCP_USE_ANONYMIZED_TELEMETRY=false`; the server no longer reads that setting from `localStorage`.
+- Updated dependencies [c4c27e0]
+- Updated dependencies
+  - @mcp-use/cli@5.1.1-canary.1
+  - @mcp-use/inspector@20.3.30-canary.2
+
+## 2.12.5-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.30-canary.1
+  - @mcp-use/cli@5.1.1-canary.0
+
+## 2.12.5-canary.1
+
+### Patch Changes
+
+- 353790c: Keep binary request bodies intact under Node. `toWebRequest` decoded every request body as UTF-8 text, so bytes that aren't valid UTF-8, such as a file uploaded to a custom route, reached the handler replaced with U+FFFD. This affected `listen()`, `mcp-use start`, `mcp-use dev`, and `toNodeHandler`/`toWebRequest` from `mcp-use/node`. The body is now passed on as the bytes that were received.
+
+## 2.12.5-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@5.1.1-canary.0
+  - @mcp-use/inspector@20.3.30-canary.0
+
 ## 2.12.4
 
 ### Patch Changes

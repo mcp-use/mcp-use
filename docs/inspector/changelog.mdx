@@ -6,6 +6,48 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.34" description="November 2026">
+  ## Model-only chat content
+  Patch release paired with `mcp-use` v2.12.10 and @mcp-use/cli v5.4.1.
+
+- **Enhancement**: chat respects MCP `annotations.audience` on `ui/message` content from MCP Apps. Blocks whose audience omits `"user"` still reach the model but are no longer shown in the conversation, and a message that is entirely model-only no longer adds a user bubble or opens the fullscreen chat drawer. Unannotated messages render as before (`#3137`)
+- **Update**: Updated mcp-use to v2.12.10
+</Update>
+
+<Update label="v20.3.33" description="November 2026">
+  ## CLI evals release alignment
+  Patch release paired with `mcp-use` v2.12.9 and @mcp-use/cli v5.4.0. There are no Inspector-specific runtime changes.
+
+- **Update**: rebuild bundled workspace code and synchronize internal package metadata; see the [TypeScript changelog](/typescript/changelog) for the new `mcp-use evals` command
+- **Update**: Updated mcp-use to v2.12.9
+</Update>
+
+<Update label="v20.3.32" description="November 2026">
+  ## CLI checklist URL and profile release alignment
+  Patch release paired with `mcp-use` v2.12.8 and @mcp-use/cli v5.3.0. There are no Inspector-specific runtime changes.
+
+- **Update**: rebuild bundled workspace code and synchronize internal package metadata; see the [TypeScript changelog](/typescript/changelog) for the checklist `--url` and `--profile` changes
+- **Update**: Updated mcp-use to v2.12.8
+</Update>
+
+<Update label="v20.3.31" description="November 2026">
+  ## CLI checklist release alignment
+  Patch release paired with `mcp-use` v2.12.7 and @mcp-use/cli v5.2.0. There are no Inspector-specific runtime changes.
+
+- **Update**: rebuild bundled workspace code and synchronize internal package metadata; see the [TypeScript changelog](/typescript/changelog) for the checklist changes
+- **Update**: Updated mcp-use to v2.12.7
+</Update>
+
+<Update label="v20.3.30" description="November 2026">
+  ## Legacy MCP Apps views
+  Patch release restoring view rendering for servers that use the deprecated flat resource URI metadata key.
+
+- **Fix**: render MCP Apps views from tools that only send `_meta["ui/resourceUri"]`, keeping chat results, tool resource prefetch, and MCP Apps capability detection consistent (`#3097`)
+- **Update**: rebuild bundled workspace code with @mcp-use/client v2.4.6 and @mcp-use/agent v2.0.27, including the OAuth routing and code-mode logging fixes; see the [TypeScript changelog](/typescript/changelog)
+- **Update**: upgrade Playwright to v1.65.1 so Inspector E2E browser installation supports Ubuntu 26.04 runners (`#3109`)
+- **Update**: Updated mcp-use to v2.12.6
+</Update>
+
 <Update label="v20.3.29" description="November 2026">
   ## Framework compatibility refresh
   Canary release rebuilding bundled workspace code and synchronizing package metadata with the framework's view-cache and landing-page fixes. There are no Inspector-specific runtime changes.

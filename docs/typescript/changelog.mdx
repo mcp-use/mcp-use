@@ -6,6 +6,87 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.12.10" description="November 2026">
+  ## Stable view URIs and CLI eval resilience
+  Patch release bundling @mcp-use/cli v5.4.1, which keeps `evals run` going when a suite fails to start, and @mcp-use/inspector v20.3.34.
+
+- **Fix**: production view resource URIs stay at `ui://views/<name>.html` across deploys, and the build ID is sent as a `?v=<build ID>` cache key instead of in the path. Reads ignore the `?v=` value, and the `ui://views/<name>-<build ID>.html` URIs from 2.12 still resolve, so a host that reads a URI from an older tool catalog, such as a published ChatGPT app, gets the current view instead of resource-not-found. On `mixedAuth` servers those URIs of tool-bound views are readable signed out like the current one; unbound views stay gated (`#3135`)
+- **Fix** (@mcp-use/cli): `evals run` no longer stops at the first suite that fails to start. Dropped connections, timeouts, 5xx and 429 responses get up to 3 attempts, and a start whose answer was lost is retried only when the CLI finds no run it created in the meantime (best effort, so a suite can occasionally start twice). Suites without a run are listed under `notStarted` in the JSON, `--json-file` and Markdown report, and the command exits 1 (`#3142`)
+- **Fix** (@mcp-use/cli): when `evals run --wait` is stopped, each run is reported as it answers, so one slow cancel no longer hides the others, and a cancel Cloud hasn't answered yet is reported as requested instead of as a failure (`#3142`)
+- **Fix** (@mcp-use/cli): project-scoped Cloud commands such as `evals run` act in the organization that owns `--server` (or `MANUFACT_SERVER`) when no `--org`, `MANUFACT_ORG`, link or active organization applies, instead of failing with "No active organization." (`#3141`)
+- **Enhancement** (@mcp-use/inspector): chat hides MCP Apps `ui/message` content whose `annotations.audience` omits `"user"`; see the [Inspector changelog](/inspector/changelog) (`#3137`)
+- **Update**: Updated @mcp-use/cli to v5.4.1
+- **Update**: Updated @mcp-use/inspector to v20.3.34; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.12.9" description="November 2026">
+  ## Evals from the CLI and CI
+  Patch release bundling @mcp-use/cli v5.4.0, which adds `mcp-use evals` to keep eval suites as YAML files, run them on Manufact Cloud, and gate CI on the results.
+
+- **New** (@mcp-use/cli): `mcp-use evals` with `push`, `list`, `get`, `export`, `create`, `update`, `rm`, `run`, `runs`, `report`, `cancel`, `options` and `models`. Suite files use the dashboard's `kind:` steps and a keyed `clients` format, are validated locally, and reject unknown keys. A suite can be named by ID, name or file path; `push` and `run` also take directories (`#3124`)
+- **New** (@mcp-use/cli): `mcp-use evals run --wait` waits for the runs and exits 1 unless every run passes; `--timeout` caps the wait, and runs still going at the timeout keep running on Cloud (`#3124`)
+- **New** (@mcp-use/cli): `evals run --json-file <path>` and `--markdown-file <path>` write the JSON result and a Markdown report for pull request comments and job summaries, while the readable output still prints. After a timeout, both files get the runs as they stand (`#3124`)
+- **New** (@mcp-use/cli): `evals run --wait` streams progress: each suite's dashboard link, then a line per finished client and model with its score, duration and why it failed, and a closing summary. Reports show each client's tool calls and link failed executions to their report in the dashboard (`#3124`)
+- **New** (@mcp-use/cli): `mcp-use evals run --profile <id>` signs the runs in with that profile instead of the server's own. The output names the profile, and a run that Manufact Cloud starts without it is cancelled (`#3125`)
+- **Enhancement** (@mcp-use/cli): stopping `evals run --wait` with Ctrl+C, or cancelling the CI job, cancels the runs it started that haven't finished (`#3124`)
+- **Fix** (@mcp-use/cli): a key from `MANUFACT_TOKEN` or `MCP_USE_API_KEY` no longer inherits the organization saved with a different logged-in key, which failed with "The saved organization is no longer one of yours" (`#3124`)
+- **Documentation**: document `mcp-use evals` in the [CLI reference](/typescript/api-reference/cli-reference#evals-run) and the Manufact Cloud agent skill
+- **Update**: Updated @mcp-use/cli to v5.4.0
+- **Update**: Updated @mcp-use/inspector to v20.3.33; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.12.8" description="November 2026">
+  ## Publishing checklist for External URL servers
+  Patch release bundling @mcp-use/cli v5.3.0, which lets `mcp-use checklist run` check another MCP URL for External URL servers.
+
+- **New** (@mcp-use/cli): `mcp-use checklist run --url <url>` checks that MCP URL instead of the server's, such as a preview deployment. The URL must be an absolute `http` or `https` URL (`#3121`)
+- **New** (@mcp-use/cli): `mcp-use checklist run --profile <id>` authenticates the run with that profile instead of the server's. `--url` and `--profile` apply to External URL servers and can't be combined with `--branch` (`#3121`)
+- **Enhancement** (@mcp-use/cli): checklist reports show a `Checked <url>` line with the URL the run checked, in both the terminal report and the Markdown report (`#3121`)
+- **Documentation** (@mcp-use/cli): add `--url` and `--profile` and an example to `mcp-use checklist run --help` (`#3121`)
+- **Update**: Updated @mcp-use/cli to v5.3.0
+- **Update**: Updated @mcp-use/inspector to v20.3.32; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.12.7" description="November 2026">
+  ## Publishing checklist exit codes & reports
+  Patch release bundling @mcp-use/cli v5.2.0, which adds result-based exit codes and report files to `mcp-use checklist run`.
+
+- **New** (@mcp-use/cli): `mcp-use checklist run --fail-on <none|failed|warnings>` exits 1 when publishing checks fail, or also when they report warnings. Policy-review concerns count as warnings, as on the dashboard. The default `none` keeps exit code 0 for a finished run, and `--fail-on` can't be combined with `--no-wait` (`#3113`)
+- **New** (@mcp-use/cli): `--json-file <path>` writes the JSON result to a file while the readable report still prints (`#3113`)
+- **New** (@mcp-use/cli): `--markdown-file <path>` on `checklist run` and `checklist get` writes a Markdown report laid out like the dashboard, including the fix prompt in a collapsed "Prompt for AI agents" block (`#3113`)
+- **Enhancement** (@mcp-use/cli): the JSON result includes the run's `score` and `targetUrl`, and the terminal report counts policy concerns the same way as the dashboard (`#3113`)
+- **Fix** (@mcp-use/cli): while waiting for a run, `checklist run` retries status checks that fail with a network error, timeout, rate limit, or server error, using exponential backoff, instead of exiting while the run continues on Manufact Cloud (`#3113`)
+- **Documentation**: document the new flags in the [CLI reference](/typescript/api-reference/cli-reference#checklist-run)
+- **Update**: Updated @mcp-use/cli to v5.2.0
+- **Update**: Updated @mcp-use/inspector to v20.3.31; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.12.6" description="November 2026">
+  ## Client connections & CLI reliability
+  Patch release improving OAuth, client startup, scaffolding, and binary HTTP requests on top of the v2.12.5 CSP hotfix.
+
+- **Fix** (@mcp-use/client): route browser OAuth discovery, registration, and token requests through `oauthProxyUrl`, while keeping MCP transport requests on the configured fetch (`#3075`)
+- **Fix** (@mcp-use/client): accept bracketed IPv6 hostnames, preserve already percent-encoded URL paths and fragments, and keep slashes in SPA fragment routes (`#2545`)
+- **Fix** (@mcp-use/client): start stdio servers configured with a `command` and no `args` (`#3076`)
+- **Fix** (@mcp-use/client): preserve errors and their causes in code-mode console logs; logging circular objects, BigInt values, or values that throw during serialization no longer fails execution (`#2753`)
+- **Fix** (server, @mcp-use/client): stop telemetry from reading `localStorage` in Node. Use environment variables for Node telemetry settings without triggering Node 25's local-storage warning (`#3077`)
+- **Fix** (server): preserve binary request bodies through the Node bridge, including uploads containing bytes that are not valid UTF-8 (`#2703`)
+- **Fix** (@mcp-use/cli): reuse an installed client SDK, including the project's copy when running through `npx`; otherwise install it in `~/.mcp-use/client-sdk` and load it immediately without modifying the project's dependencies or lockfiles (`#3088`, `#3077`)
+- **Fix** (@mcp-use/cli): let `--auth-timeout` govern interactive OAuth, including the Enter prompt, and hide client SDK info logs unless `MCP_USE_LOG_LEVEL` or `DEBUG` enables them (`#3080`)
+- **Fix** (@mcp-use/cli): include the tool's error text in human-readable `mcp-use screenshot` failures (`#3079`)
+- **Fix** (create-mcp-use-app, @mcp-use/cli): reject unknown options, extra project names, and invalid names before creating files; print build paths with consistent separators on Windows (`#2657`, `#3078`)
+- **Update**: Updated @mcp-use/client to v2.4.6 and @mcp-use/agent to v2.0.27
+- **Update**: Updated @mcp-use/cli to v5.1.1 and create-mcp-use-app to v2.1.2
+- **Update**: Updated @mcp-use/inspector to v20.3.30 with support for legacy MCP Apps view metadata; see the [Inspector changelog](/inspector/changelog)
+</Update>
+
+<Update label="v2.12.5" description="November 2026">
+  ## Empty CSP domain hotfix
+  Patch release correcting view CSP metadata without promoting the pending canary changes.
+
+- **Fix** (server): omit `frameDomains` and `baseUriDomains` when their merged domain lists are empty, including explicitly configured empty arrays (`#3107`)
+</Update>
+
 <Update label="v2.12.4" description="November 2026">
   ## CLI analytics & view caching
   Canary release adding server analytics and explicit feedback commands, fixing production view cache identity, and linking landing pages to an available Inspector.

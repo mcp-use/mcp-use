@@ -31,6 +31,67 @@ describe("normalizeWidgetMessage", () => {
     });
   });
 
+  it("keeps assistant-only text for the model and hides it from the conversation", () => {
+    expect(
+      normalizeWidgetMessage([
+        {
+          type: "text",
+          text: "Internal app instruction: refresh the summary.",
+          annotations: { audience: ["assistant"] },
+        },
+      ])
+    ).toEqual({
+      text: "Internal app instruction: refresh the summary.",
+      attachments: [],
+      displayText: "",
+    });
+  });
+
+  it("shows only the user-visible blocks of a mixed message", () => {
+    expect(
+      normalizeWidgetMessage([
+        { type: "text", text: "Show me the summary." },
+        {
+          type: "text",
+          text: "Context: page 3, sort=price.",
+          annotations: { audience: ["assistant"] },
+        },
+        {
+          type: "image",
+          mimeType: "image/png",
+          data: "aGVsbG8=",
+          annotations: { audience: ["assistant"] },
+        },
+      ])
+    ).toEqual({
+      text: "Show me the summary.\nContext: page 3, sort=price.",
+      attachments: [
+        {
+          type: "image",
+          mimeType: "image/png",
+          data: "aGVsbG8=",
+          name: "widget-image-1",
+          size: 5,
+          modelOnly: true,
+        },
+      ],
+      displayText: "Show me the summary.",
+    });
+  });
+
+  it.each([
+    ["no annotations", undefined],
+    ["a user audience", { audience: ["user"] }],
+    ["a shared audience", { audience: ["user", "assistant"] }],
+    ["a malformed audience", { audience: "assistant" }],
+    ["an unknown audience role", { audience: ["system"] }],
+    ["an unknown role next to assistant", { audience: ["assistant", 42] }],
+  ])("shows text with %s", (_label, annotations) => {
+    expect(
+      normalizeWidgetMessage([{ type: "text", text: "Hi", annotations }])
+    ).toEqual({ text: "Hi", attachments: [] });
+  });
+
   it("rejects the complete message when any block is unsupported", () => {
     expect(() =>
       normalizeWidgetMessage([

@@ -1,5 +1,130 @@
 # @mcp-use/cli
 
+## 5.4.1
+
+### Patch Changes
+
+- 7f2abf9: `evals run` no longer stops at the first suite that fails to start. Dropped connections, timeouts, 5xx and 429 responses get up to 3 attempts. Before a start whose answer was lost is sent again, the CLI looks for a run it created (with the requested `--profile`) and uses it; this is best effort, so a suite can occasionally start twice. A suite Cloud rejects is skipped, and 401/403 stops further starts. The runs that started are still waited for and reported, and the suites without a run are listed under `notStarted` in the JSON, `--json-file` and the Markdown report, including when no suite started. The command exits 1 when any suite didn't start.
+
+  When `evals run --wait` is stopped, each run is reported as it answers, so one slow cancel no longer hides the others, and a cancel Cloud hasn't answered yet is reported as requested (with the command to check it) instead of as a failure.
+
+- 7f2abf9: Project-scoped Cloud commands such as `evals run` now act in the organization that owns `--server` (or `MANUFACT_SERVER`) when no `--org`, `MANUFACT_ORG`, link or active organization chooses one, instead of failing with "No active organization." for users in several organizations without a dashboard default.
+- 7f2abf9: Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 5.4.1-canary.1
+
+### Patch Changes
+
+- 3d64137: `evals run` no longer stops at the first suite that fails to start. Dropped connections, timeouts, 5xx and 429 responses get up to 3 attempts. Before a start whose answer was lost is sent again, the CLI looks for a run it created (with the requested `--profile`) and uses it; this is best effort, so a suite can occasionally start twice. A suite Cloud rejects is skipped, and 401/403 stops further starts. The runs that started are still waited for and reported, and the suites without a run are listed under `notStarted` in the JSON, `--json-file` and the Markdown report, including when no suite started. The command exits 1 when any suite didn't start.
+
+  When `evals run --wait` is stopped, each run is reported as it answers, so one slow cancel no longer hides the others, and a cancel Cloud hasn't answered yet is reported as requested (with the command to check it) instead of as a failure.
+
+- fc3efbe: Project-scoped Cloud commands such as `evals run` now act in the organization that owns `--server` (or `MANUFACT_SERVER`) when no `--org`, `MANUFACT_ORG`, link or active organization chooses one, instead of failing with "No active organization." for users in several organizations without a dashboard default.
+
+## 5.4.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 5.4.0
+
+### Minor Changes
+
+- 9663941: feat(cli): add `--profile <id>` to `mcp-use evals run` to sign in with a chosen profile instead of the server's own. If Manufact Cloud doesn't apply the profile, the run is cancelled and the command fails rather than reporting results for the wrong account.
+- 9663941: feat(cli): add `mcp-use evals` to define eval suites as YAML files, push them to Manufact Cloud, run them (`--wait` for CI), and read results. Files are validated locally and match the Manufact MCP eval tools' shape.
+
+### Patch Changes
+
+- 9663941: fix(cli): a key from `MANUFACT_TOKEN` or `MCP_USE_API_KEY` no longer inherits the organization saved with a different logged-in key, which failed with "The saved organization is no longer one of yours" when the two keys belong to different accounts or Clouds.
+
+## 5.4.0-canary.0
+
+### Minor Changes
+
+- d315301: feat(cli): add `--profile <id>` to `mcp-use evals run` to sign in with a chosen profile instead of the server's own. If Manufact Cloud doesn't apply the profile, the run is cancelled and the command fails rather than reporting results for the wrong account.
+- d1fc432: feat(cli): add `mcp-use evals` to define eval suites as YAML files, push them to Manufact Cloud, run them (`--wait` for CI), and read results. Files are validated locally and match the Manufact MCP eval tools' shape.
+
+### Patch Changes
+
+- d1fc432: fix(cli): a key from `MANUFACT_TOKEN` or `MCP_USE_API_KEY` no longer inherits the organization saved with a different logged-in key, which failed with "The saved organization is no longer one of yours" when the two keys belong to different accounts or Clouds.
+
+## 5.3.0
+
+### Minor Changes
+
+- 343a803: `mcp-use checklist run` takes `--url` and `--profile` for External URL servers: check another MCP URL, such as a preview deployment, and authenticate with a chosen profile instead of the server's.
+
+## 5.3.0-canary.0
+
+### Minor Changes
+
+- 2104fb8: `mcp-use checklist run` takes `--url` and `--profile` for External URL servers: check another MCP URL, such as a preview deployment, and authenticate with a chosen profile instead of the server's.
+
+## 5.2.0
+
+### Minor Changes
+
+- 33279c8: Add `--fail-on <none|failed|warnings>` to `mcp-use checklist run` so CI jobs can fail when publishing checks fail. Policy-review findings count as warnings, as on the dashboard. Add `--json-file <path>` to write the JSON result to a file while the readable report still prints. Add `--markdown-file <path>` to `checklist run` and `checklist get` to write a Markdown report laid out like the dashboard. It includes the dashboard's fix prompt in a collapsed "Prompt for AI agents" block. The JSON result now includes the run's `score` and `targetUrl`. The terminal report counts policy concerns the same way as the dashboard. While waiting for a run, `checklist run` now retries status checks that fail with a network error, timeout, rate limit or server error, using exponential backoff, instead of exiting while the run continues on Manufact Cloud.
+
+## 5.2.0-canary.0
+
+### Minor Changes
+
+- c5d21ce: Add `--fail-on <none|failed|warnings>` to `mcp-use checklist run` so CI jobs can fail when publishing checks fail. Policy-review findings count as warnings, as on the dashboard. Add `--json-file <path>` to write the JSON result to a file while the readable report still prints. Add `--markdown-file <path>` to `checklist run` and `checklist get` to write a Markdown report laid out like the dashboard. It includes the dashboard's fix prompt in a collapsed "Prompt for AI agents" block. The JSON result now includes the run's `score` and `targetUrl`. The terminal report counts policy concerns the same way as the dashboard. While waiting for a run, `checklist run` now retries status checks that fail with a network error, timeout, rate limit or server error, using exponential backoff, instead of exiting while the run continues on Manufact Cloud.
+
+## 5.1.1
+
+### Patch Changes
+
+- 4b2e49e: Load `@mcp-use/client` right after `mcp-use client` or `mcp-use screenshot` auto-installs it. On Node 24 and 25 the first run installed the package but still reported `@mcp-use/client is not installed`, because Node cached the failed lookup from the import that triggered the install. The CLI now finds the installed copy with `module.findPackageJSON` and imports its entry file. The CLI also no longer replaces `globalThis.localStorage` at startup and before loading the client; the client and server stop reading it in Node instead.
+- 4b2e49e: `mcp-use client` and `mcp-use screenshot` use the `@mcp-use/client` already installed in your project, including when the CLI runs through `npx`. When no copy is found, they install it into `~/.mcp-use/client-sdk` and no longer add it to your project. Before, running the CLI with `npx` in a pnpm project ran `npm install` there, which crashed with `Cannot read properties of null (reading 'matches')` or wrote a `package-lock.json` next to `pnpm-lock.yaml` (#3081).
+
+  With `--json`, a missing `@mcp-use/client` still fails with `client_install_required`, now without an `npm install` next step: the message says to install it in the project with its package manager.
+
+- 4b2e49e: Interactive OAuth in `mcp-use client` no longer fails after 10 seconds at the "Press Enter to open your browser" prompt. The prompt now runs outside the HTTP connection timeout, so `--auth-timeout` governs the whole sign-in, and it closes when that sign-in succeeds, times out or is cancelled. `mcp-use client` and `mcp-use screenshot` also hide the client SDK's info logs; set `MCP_USE_LOG_LEVEL` or `DEBUG` to show them.
+- 4b2e49e: create-mcp-use-app now applies the same project name rule to the command-line argument as to the interactive prompt: letters, numbers, hyphens and underscores only. A name like `"my app"` is rejected with a suggestion (`my-app`) instead of creating a directory whose `cd` hint breaks when pasted into a shell. `mcp-use build` now prints the output path with one separator style, so Windows shows `.mcp-use\build\index.js` instead of `.mcp-use\build/index.js`.
+- 4b2e49e: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 4b2e49e: Print a failed tool's error text with `mcp-use screenshot`. Before, the text output said only "Tool <name> returned an error." and the reason was visible only with `--json`. JSON output is unchanged.
+
+## 5.1.1-canary.5
+
+### Patch Changes
+
+- 0130e50: `mcp-use client` and `mcp-use screenshot` use the `@mcp-use/client` already installed in your project, including when the CLI runs through `npx`. When no copy is found, they install it into `~/.mcp-use/client-sdk` and no longer add it to your project. Before, running the CLI with `npx` in a pnpm project ran `npm install` there, which crashed with `Cannot read properties of null (reading 'matches')` or wrote a `package-lock.json` next to `pnpm-lock.yaml` (#3081).
+
+  With `--json`, a missing `@mcp-use/client` still fails with `client_install_required`, now without an `npm install` next step: the message says to install it in the project with its package manager.
+
+## 5.1.1-canary.4
+
+### Patch Changes
+
+- c8f90f5: Print a failed tool's error text with `mcp-use screenshot`. Before, the text output said only "Tool <name> returned an error." and the reason was visible only with `--json`. JSON output is unchanged.
+
+## 5.1.1-canary.3
+
+### Patch Changes
+
+- 018ba48: Interactive OAuth in `mcp-use client` no longer fails after 10 seconds at the "Press Enter to open your browser" prompt. The prompt now runs outside the HTTP connection timeout, so `--auth-timeout` governs the whole sign-in, and it closes when that sign-in succeeds, times out or is cancelled. `mcp-use client` and `mcp-use screenshot` also hide the client SDK's info logs; set `MCP_USE_LOG_LEVEL` or `DEBUG` to show them.
+
+## 5.1.1-canary.2
+
+### Patch Changes
+
+- 9eba5b3: create-mcp-use-app now applies the same project name rule to the command-line argument as to the interactive prompt: letters, numbers, hyphens and underscores only. A name like `"my app"` is rejected with a suggestion (`my-app`) instead of creating a directory whose `cd` hint breaks when pasted into a shell. `mcp-use build` now prints the output path with one separator style, so Windows shows `.mcp-use\build\index.js` instead of `.mcp-use\build/index.js`.
+
+## 5.1.1-canary.1
+
+### Patch Changes
+
+- c4c27e0: Load `@mcp-use/client` right after `mcp-use client` or `mcp-use screenshot` auto-installs it. On Node 24 and 25 the first run installed the package but still reported `@mcp-use/client is not installed`, because Node cached the failed lookup from the import that triggered the install. The CLI now finds the installed copy with `module.findPackageJSON` and imports its entry file. The CLI also no longer replaces `globalThis.localStorage` at startup and before loading the client; the client and server stop reading it in Node instead.
+
+## 5.1.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 5.1.0
 
 ### Minor Changes

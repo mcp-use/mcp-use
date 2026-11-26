@@ -56,6 +56,8 @@ export interface FakeResponse {
   body?: unknown;
   /** Extra response headers. */
   headers?: Record<string, string>;
+  /** Drop the connection without a response, like a TCP reset (ECONNRESET). */
+  reset?: boolean;
 }
 
 /** An untyped reply, for `onUndocumented`. */
@@ -159,12 +161,12 @@ type UndocumentedErrorReply<K extends RouteKey> = {
   body?: unknown;
 };
 
-/** A reply the spec allows for route `K`. */
-export type CloudReply<K extends RouteKey> = (
-  | SuccessReply<K>
-  | DocumentedErrorReply<K>
-  | UndocumentedErrorReply<K>
-) & { headers?: Record<string, string> };
+/** A reply the spec allows for route `K`, or a dropped connection. */
+export type CloudReply<K extends RouteKey> =
+  | ((SuccessReply<K> | DocumentedErrorReply<K> | UndocumentedErrorReply<K>) & {
+      headers?: Record<string, string>;
+    })
+  | { reset: true };
 
 type PathParams<K extends RouteKey> = CloudRoutes[K]["data"] extends {
   path: infer P;
@@ -286,6 +288,10 @@ export async function startFakeCloud(): Promise<FakeCloud> {
               },
             };
           }
+        }
+        if (response.reset === true) {
+          req.socket.destroy();
+          return;
         }
         const status =
           response.status ??

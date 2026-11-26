@@ -66,9 +66,23 @@ describe("buildMergedResourceCsp", () => {
       "https://platform.example.com",
     ]);
     expect(csp.connectDomains).toEqual(["https://platform.example.com"]);
-    expect(csp.frameDomains).toEqual([]);
-    expect(csp.baseUriDomains).toEqual([]);
+    expect(csp).not.toHaveProperty("frameDomains");
+    expect(csp).not.toHaveProperty("baseUriDomains");
   });
+
+  it.each([undefined, { csp: { frameDomains: [], baseUriDomains: [] } }])(
+    "omits empty frame and base-uri domains with author facts %j",
+    (authorFacts) => {
+      const csp = buildMergedResourceCsp(authorFacts, {
+        serverOrigin: "https://server.example.com",
+        assetsOrigin: "https://server.example.com",
+        explicitAssetsBase: false,
+      });
+
+      expect(csp).not.toHaveProperty("frameDomains");
+      expect(csp).not.toHaveProperty("baseUriDomains");
+    }
+  );
 
   it("only uses explicit env vars for frame and base-uri domains", () => {
     vi.stubEnv("CSP_URLS", "https://platform.example.com");

@@ -1,6 +1,6 @@
 ---
 name: manufact-cloud
-description: Deploy and manage MCP servers on Manufact Cloud with the mcp-use CLI, including authentication, projects, environments, deployments, domains, organizations, publishing checks, and YAML alerts.
+description: Deploy and manage MCP servers on Manufact Cloud with the mcp-use CLI, including authentication, projects, environments, deployments, domains, organizations, publishing checks, YAML alerts, and YAML eval suites.
 ---
 
 # Manufact Cloud CLI
@@ -42,8 +42,8 @@ the installed version's skills into `.agents/skills`, `.claude/skills`, and
 - Resolve project context before changing a server. `link --server <id-or-slug>`
   saves `.manufact/project.json`. Server selection is `--server`,
   `MANUFACT_SERVER`, then that link. Organization selection is `--org`,
-  `MANUFACT_ORG`, the link, the saved active organization, then the account
-  default. Use `org use <id-or-slug>` to change the active organization.
+  `MANUFACT_ORG`, the link, the saved active organization, the organization
+  that owns the server, then the account default. Use `org use <id-or-slug>` to change the active organization.
 - `deploy` waits for completion by default. With `--no-wait`, retain the
   returned deployment ID and inspect `deployments get <id> --json` later.
   Use `logs <id> --build` to diagnose a failed build or start.
@@ -77,6 +77,8 @@ Network failures and timeouts leave acceptance unknown; do not retry automatical
   [other Cloud commands](references/cloud-commands.md).
 - **Create or update alerts:** read [alert rules](references/alerts.md) for the
   dashboard YAML format, metric selection, and useful recovery conditions.
+- **Write, push, or run eval suites:** read [eval suites](references/evals.md)
+  for the YAML format, client selection, and CI usage.
 - **Analyze server usage, errors, latency, or clients:** use the bundled
   `manufact-analytics` skill for `analytics catalog` and read-only SQL queries.
 

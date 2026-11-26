@@ -404,14 +404,9 @@ async function callTool(
     { timeout }
   );
   if (result.isError === true) {
-    // JSON callers already get the full result in `details`, so only the
-    // text output needs the tool's own explanation added to the message.
-    const reason = json ? "" : toolErrorText(result);
     throw new CommandError(
       "tool_error",
-      reason === ""
-        ? `Tool ${tool} returned an error.`
-        : `Tool ${tool} returned an error:\n${reason}`,
+      toolErrorMessage(tool, result, json),
       result
     );
   }
@@ -420,6 +415,24 @@ async function callTool(
 }
 
 type ToolResult = Awaited<ReturnType<MCPConnection["callTool"]>>;
+
+/**
+ * The message for a tool result with `isError: true`. Human output adds the
+ * tool's text content; JSON callers already get the full result in
+ * `details`, so their message stays short.
+ *
+ * @internal
+ */
+export function toolErrorMessage(
+  tool: string,
+  result: ToolResult,
+  json: boolean
+): string {
+  const reason = json ? "" : toolErrorText(result);
+  return reason === ""
+    ? `Tool ${tool} returned an error.`
+    : `Tool ${tool} returned an error:\n${reason}`;
+}
 
 // Keeps each text block's leading whitespace (indented code frames, stack
 // traces) and drops only trailing whitespace, so blocks print one per line.
@@ -466,7 +479,16 @@ async function openConnection(
   const { createOAuthProvider, MCPClient, logger } = await loadClientPackage({
     allowInstall: !quiet,
   });
-  if (quiet) logger.level = "silent";
+  if (quiet) {
+    logger.level = "silent";
+  } else if (
+    process.env.MCP_USE_LOG_LEVEL === undefined &&
+    process.env.DEBUG === undefined
+  ) {
+    // SDK info logs ("Authentication required", ...) only add noise next to
+    // the CLI's own output. MCP_USE_LOG_LEVEL or DEBUG opt back in.
+    logger.level = "warn";
+  }
   let rejectOAuthInteraction: ((error: CommandError) => void) | undefined;
   const oauthInteractionRequired =
     quiet && definition.oauth
@@ -502,8 +524,16 @@ async function openConnection(
             process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
             return;
           }
-          await waitForOAuthEnter();
-          openBrowser(url);
+          // The SDK calls this inside its connection timeout, so it must
+          // return without waiting for the user; --auth-timeout governs the
+          // rest. Sign-in can also start after connect (auth login, a 401
+          // retry), so the prompt follows this attempt, not the connection.
+          const signIn = (
+            authProvider as unknown as {
+              getAuthorizationCode(): Promise<string>;
+            }
+          ).getAuthorizationCode();
+          void promptToOpenBrowser(url, signIn);
         },
         // Conditional exports select NodeOAuthOptions at runtime. TypeScript
         // resolves the package's browser-default declaration in this build.
@@ -674,14 +704,30 @@ function resolveBrowserMode(options: {
   return "ask";
 }
 
-async function waitForOAuthEnter(): Promise<void> {
+async function promptToOpenBrowser(
+  url: string,
+  signIn: Promise<unknown>
+): Promise<void> {
+  // Close the prompt once this sign-in succeeds, times out or is cancelled.
+  const controller = new AbortController();
+  const { signal } = controller;
+  const abort = () => controller.abort();
+  signIn.then(abort, abort);
   const prompt = createInterface({
     input: process.stdin,
     output: process.stderr,
   });
   try {
     await prompt.question(
-      "This server requires OAuth. Press Enter to open your browser."
+      "This server requires OAuth. Press Enter to open your browser.",
+      { signal }
+    );
+    if (!signal.aborted) openBrowser(url);
+  } catch {
+    // Aborted: the sign-in already succeeded or failed, so end the prompt
+    // line before the result. Otherwise stdin failed: fall back to the URL.
+    process.stderr.write(
+      signal.aborted ? "\n" : `\nOpen this URL to authenticate:\n${url}\n`
     );
   } finally {
     prompt.close();

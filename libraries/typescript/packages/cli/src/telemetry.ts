@@ -41,6 +41,21 @@ const COMMANDS: Record<string, readonly string[]> = {
   github: ["connect", "installations", "repos"],
   alerts: ["list", "get", "create", "update", "rm", "options"],
   checklist: ["run", "list", "get", "cancel"],
+  evals: [
+    "push",
+    "list",
+    "get",
+    "export",
+    "create",
+    "update",
+    "rm",
+    "run",
+    "runs",
+    "report",
+    "cancel",
+    "options",
+    "models",
+  ],
   client: ["connect", "list", "remove"],
 };
 const CLIENT_OPERATIONS: Record<string, readonly string[]> = {
