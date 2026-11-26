@@ -78,6 +78,8 @@ import type {
 } from "./events/define.js";
 import type { EventsRuntime } from "./events/runtime.js";
 import {
+  EVENTS_EXTENSION_ID,
+  asEventsListenRequest,
   asEventsRequest,
   rpcResponse,
   stampModernResult,
@@ -1911,25 +1913,36 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           path: basePath,
           ...(this.#events.size > 0 && {
             preflight: async (request, body, authInfo) => {
+              const listen = asEventsListenRequest(body);
+              if (listen !== undefined) {
+                if (await isLegacyRequest(request, body)) return undefined;
+                return (await this.#eventsRuntimeInstance()).listen(
+                  listen,
+                  request.signal,
+                  this.#eventBus
+                );
+              }
               const rpc = asEventsRequest(body);
               if (rpc === undefined) return undefined;
               const runtime = await this.#eventsRuntimeInstance();
-              const outcome = await runtime.handle(
+              const legacy = await isLegacyRequest(request, body);
+              const { outcome, status } = await runtime.handle(
                 rpc.method,
                 rpc.params,
                 authInfo,
-                eventsClientName(rpc.params)
+                { request, legacy, clientName: eventsClientName(rpc.params) }
               );
               return rpcResponse(
                 rpc.id,
-                "result" in outcome && !(await isLegacyRequest(request, body))
+                "result" in outcome && !legacy
                   ? {
                       result: stampModernResult(
                         outcome.result,
                         this.#implementationInfo(request)
                       ),
                     }
-                  : outcome
+                  : outcome,
+                status
               );
             },
           }),
@@ -2108,6 +2121,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
 
       if (this.#events.size > 0) {
+        // Start the runtime now so a changed catalog (hot reload, deploy)
+        // is detected and announced without waiting for a request.
+        void this.#eventsRuntimeInstance();
         httpApp.all(`${nestedBasePath}/_mcp-use/events/:action`, async (c) =>
           (await this.#eventsRuntimeInstance()).route(
             c.req.raw,
@@ -2237,8 +2253,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         prompts: { listChanged: true },
         resources: { listChanged: true, subscribe: true },
         ...(this.#events.size > 0 && { events: {} }),
-        ...((this.#skills !== undefined || this.#settings !== undefined) && {
+        ...((this.#skills !== undefined ||
+          this.#settings !== undefined ||
+          this.#events.size > 0) && {
           extensions: {
+            ...(this.#events.size > 0 && {
+              [EVENTS_EXTENSION_ID]: { listChanged: true },
+            }),
             ...(this.#skills !== undefined && {
               [SKILLS_EXTENSION_ID]: { directoryRead: true },
             }),

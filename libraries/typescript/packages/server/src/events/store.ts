@@ -1,7 +1,8 @@
 /**
- * Storage for MCP Events subscriptions and pending deliveries: an in-memory
- * store for development and tests, and Redis over the Upstash REST protocol
- * (Upstash, Manufact Cloud's Redis proxy, or any compatible endpoint).
+ * Storage for MCP Events subscriptions, pending deliveries and the poll log:
+ * an in-memory store for tests, a JSON file store for `mcp-use dev`, and
+ * Redis over the Upstash REST protocol (Upstash, Manufact Cloud's Redis
+ * proxy, or any compatible endpoint).
  */
 
 /** The small Redis subset MCP Events needs. Values are strings. */
@@ -10,16 +11,116 @@ export interface EventsStore {
   /** Set a value, optionally expiring after `ttlMs`. */
   set(key: string, value: string, ttlMs?: number): Promise<void>;
   del(key: string): Promise<void>;
+  /** Increment an integer counter and return the new value. */
+  incr(key: string): Promise<number>;
   sadd(key: string, member: string): Promise<void>;
   srem(key: string, member: string): Promise<void>;
   smembers(key: string): Promise<string[]>;
   zadd(key: string, score: number, member: string): Promise<void>;
   /** Members with a score up to `max`, lowest first, at most `limit`. */
   zdue(key: string, max: number, limit: number): Promise<string[]>;
+  /** Members with a score above `min` (exclusive), lowest first, at most `limit`. */
+  zafter(key: string, min: number, limit: number): Promise<string[]>;
   /** Members by rank, lowest score first (Redis `ZRANGE` index semantics). */
   zrange(key: string, start: number, stop: number): Promise<string[]>;
   /** Remove a member; `true` when this call removed it (a claim). */
   zrem(key: string, member: string): Promise<boolean>;
+}
+
+/** Plain-JSON state behind the memory and file stores. */
+interface State {
+  kv: Record<string, [string, number | null]>;
+  sets: Record<string, string[]>;
+  zsets: Record<string, Record<string, number>>;
+}
+
+const empty = (): State => ({ kv: {}, sets: {}, zsets: {} });
+
+function sorted(z: Record<string, number> | undefined): [string, number][] {
+  return Object.entries(z ?? {}).sort((a, b) => a[1] - b[1]);
+}
+
+function live(e: [string, number | null] | undefined): string | null {
+  return e && (e[1] === null || e[1] > Date.now()) ? e[0] : null;
+}
+
+/** A store over a state that `load` returns and `save` persists after writes. */
+function stateStore(
+  load: () => Promise<State>,
+  save: (state: State) => Promise<void>
+): EventsStore {
+  const read = async <T>(fn: (s: State) => T) => fn(await load());
+  // Writes run one at a time so a load-modify-save never loses an update.
+  let queue: Promise<unknown> = Promise.resolve();
+  const write = <T>(fn: (s: State) => T): Promise<T> => {
+    const run = queue.then(async () => {
+      const s = await load();
+      const out = fn(s);
+      await save(s);
+      return out;
+    });
+    queue = run.catch(() => undefined);
+    return run;
+  };
+  return {
+    get: (key) => read((s) => live(s.kv[key])),
+    set: (key, value, ttlMs) =>
+      write((s) => {
+        s.kv[key] = [value, ttlMs ? Date.now() + ttlMs : null];
+      }),
+    del: (key) =>
+      write((s) => {
+        delete s.kv[key];
+      }),
+    incr: (key) =>
+      write((s) => {
+        const n = Number(live(s.kv[key]) ?? 0) + 1;
+        s.kv[key] = [String(n), s.kv[key]?.[1] ?? null];
+        return n;
+      }),
+    sadd: (key, member) =>
+      write((s) => {
+        s.sets[key] = [...new Set(s.sets[key]).add(member)];
+      }),
+    srem: (key, member) =>
+      write((s) => {
+        s.sets[key] = (s.sets[key] ?? []).filter((m) => m !== member);
+      }),
+    smembers: (key) => read((s) => [...(s.sets[key] ?? [])]),
+    zadd: (key, score, member) =>
+      write((s) => {
+        (s.zsets[key] ??= {})[member] = score;
+      }),
+    zdue: (key, max, limit) =>
+      read((s) =>
+        sorted(s.zsets[key])
+          .filter(([, x]) => x <= max)
+          .slice(0, limit)
+          .map(([m]) => m)
+      ),
+    zafter: (key, min, limit) =>
+      read((s) =>
+        sorted(s.zsets[key])
+          .filter(([, x]) => x > min)
+          .slice(0, limit)
+          .map(([m]) => m)
+      ),
+    zrange: (key, start, stop) =>
+      read((s) => {
+        const all = sorted(s.zsets[key]).map(([m]) => m);
+        const n = all.length;
+        const from = start < 0 ? Math.max(n + start, 0) : start;
+        const to = stop < 0 ? n + stop : stop;
+        return to < from ? [] : all.slice(from, to + 1);
+      }),
+    zrem: (key, member) =>
+      write((s) => {
+        const z = s.zsets[key];
+        if (z === undefined || !(member in z)) return false;
+        delete z[member];
+        return true;
+      }),
+  };
 }
 
 /**
@@ -27,57 +128,44 @@ export interface EventsStore {
  * tests only.
  */
 export function memoryEventsStore(): EventsStore {
-  const kv = new Map<string, { value: string; expires: number }>();
-  const sets = new Map<string, Set<string>>();
-  const zsets = new Map<string, Map<string, number>>();
-  const set = (k: string) => sets.get(k) ?? sets.set(k, new Set()).get(k)!;
-  const zset = (k: string) => zsets.get(k) ?? zsets.set(k, new Map()).get(k)!;
-  return {
-    async get(key) {
-      const e = kv.get(key);
-      if (e === undefined) return null;
-      if (e.expires <= Date.now()) {
-        kv.delete(key);
-        return null;
+  const state = empty();
+  return stateStore(
+    async () => state,
+    async () => undefined
+  );
+}
+
+/**
+ * A JSON file store for local development: `mcp-use dev` uses it so
+ * subscriptions survive hot reloads and restarts. Node only, single process.
+ *
+ * @param dir - Directory that holds `store.json`.
+ */
+export function fileEventsStore(dir: string): EventsStore {
+  const fs = import("node:fs");
+  const file = `${dir.replace(/[\\/]+$/, "")}/store.json`;
+  return stateStore(
+    async () => {
+      const { readFileSync } = await fs;
+      try {
+        return {
+          ...empty(),
+          ...(JSON.parse(readFileSync(file, "utf8")) as State),
+        };
+      } catch {
+        return empty();
       }
-      return e.value;
     },
-    async set(key, value, ttlMs) {
-      kv.set(key, { value, expires: ttlMs ? Date.now() + ttlMs : Infinity });
-    },
-    async del(key) {
-      kv.delete(key);
-    },
-    async sadd(key, member) {
-      set(key).add(member);
-    },
-    async srem(key, member) {
-      set(key).delete(member);
-    },
-    async smembers(key) {
-      return [...set(key)];
-    },
-    async zadd(key, score, member) {
-      zset(key).set(member, score);
-    },
-    async zdue(key, max, limit) {
-      return [...zset(key)]
-        .filter(([, s]) => s <= max)
-        .sort((a, b) => a[1] - b[1])
-        .slice(0, limit)
-        .map(([m]) => m);
-    },
-    async zrange(key, start, stop) {
-      const all = [...zset(key)].sort((a, b) => a[1] - b[1]).map(([m]) => m);
-      const n = all.length;
-      const from = start < 0 ? Math.max(n + start, 0) : start;
-      const to = stop < 0 ? n + stop : stop;
-      return to < from ? [] : all.slice(from, to + 1);
-    },
-    async zrem(key, member) {
-      return zset(key).delete(member);
-    },
-  };
+    async (state) => {
+      const { mkdirSync, renameSync, writeFileSync } = await fs;
+      for (const [k, e] of Object.entries(state.kv))
+        if (live(e) === null) delete state.kv[k];
+      mkdirSync(dir, { recursive: true });
+      const tmp = `${file}.tmp`;
+      writeFileSync(tmp, JSON.stringify(state));
+      renameSync(tmp, file);
+    }
+  );
 }
 
 /** Options for {@link upstashEventsStore}. */
@@ -123,6 +211,8 @@ export function upstashEventsStore(
       throw new Error(`events store: ${json.error ?? `HTTP ${res.status}`}`);
     return json.result;
   };
+  const list = async (...args: (string | number)[]) =>
+    ((await cmd(...args)) as string[] | null) ?? [];
   return {
     async get(key) {
       return ((await cmd("GET", p + key)) as string | null) ?? null;
@@ -135,36 +225,24 @@ export function upstashEventsStore(
     async del(key) {
       await cmd("DEL", p + key);
     },
+    async incr(key) {
+      return Number(await cmd("INCR", p + key));
+    },
     async sadd(key, member) {
       await cmd("SADD", p + key, member);
     },
     async srem(key, member) {
       await cmd("SREM", p + key, member);
     },
-    async smembers(key) {
-      return ((await cmd("SMEMBERS", p + key)) as string[] | null) ?? [];
-    },
+    smembers: (key) => list("SMEMBERS", p + key),
     async zadd(key, score, member) {
       await cmd("ZADD", p + key, score, member);
     },
-    async zdue(key, max, limit) {
-      return (
-        ((await cmd(
-          "ZRANGEBYSCORE",
-          p + key,
-          "-inf",
-          max,
-          "LIMIT",
-          0,
-          limit
-        )) as string[] | null) ?? []
-      );
-    },
-    async zrange(key, start, stop) {
-      return (
-        ((await cmd("ZRANGE", p + key, start, stop)) as string[] | null) ?? []
-      );
-    },
+    zdue: (key, max, limit) =>
+      list("ZRANGEBYSCORE", p + key, "-inf", max, "LIMIT", 0, limit),
+    zafter: (key, min, limit) =>
+      list("ZRANGEBYSCORE", p + key, `(${min}`, "+inf", "LIMIT", 0, limit),
+    zrange: (key, start, stop) => list("ZRANGE", p + key, start, stop),
     async zrem(key, member) {
       return Number(await cmd("ZREM", p + key, member)) === 1;
     },

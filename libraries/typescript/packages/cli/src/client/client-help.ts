@@ -82,6 +82,7 @@ page("<name>", {
     ["tools", "List, describe, or call tools"],
     ["resources", "List or read resources"],
     ["prompts", "List or get prompts"],
+    ["events", "List, poll, or subscribe to MCP Events"],
     ["auth", "Authenticate or inspect saved OAuth state"],
   ],
   options: [HELP],
@@ -166,6 +167,59 @@ page("<name> prompts get", {
   ],
 });
 
+page("<name> events", {
+  usage: "mcp-use client <name> events <command>",
+  summary: "Use MCP Events on a saved MCP server.",
+  commands: [
+    ["list", "List events"],
+    ["poll <event> [args...]", "Poll an event (official extension)"],
+    ["subscribe <event> [args...]", "Subscribe a webhook URL"],
+    ["unsubscribe <event> [args...]", "Remove a webhook subscription"],
+  ],
+  options: [HELP],
+});
+
+page("<name> events list", {
+  usage: "mcp-use client <name> events list [options]",
+  summary: "List the events a server publishes.",
+  options: [JSON, HELP],
+});
+
+page("<name> events poll", {
+  usage: "mcp-use client <name> events poll <event> [args...] [options]",
+  summary: "Poll an event once, or keep polling with --follow.",
+  options: [
+    ["--cursor <cursor>", "Resume from a cursor (default: start from now)"],
+    ["--follow", "Keep polling and print events until interrupted"],
+    ["--max-events <n>", "Cap events per poll"],
+    JSON,
+    HELP,
+  ],
+  notes: [
+    "Arguments are one JSON object or key=value/key:=<json> pairs; do not mix forms.",
+  ],
+});
+
+page("<name> events subscribe", {
+  usage:
+    "mcp-use client <name> events subscribe <event> --url <url> [args...] [options]",
+  summary: "Subscribe a webhook URL to an event (also refreshes it).",
+  options: [
+    ["--url <url>", "HTTPS callback URL"],
+    ["--secret <whsec>", "Signing secret (default: generated and printed)"],
+    ["--ttl <ms>", "Requested lifetime in milliseconds"],
+    JSON,
+    HELP,
+  ],
+});
+
+page("<name> events unsubscribe", {
+  usage:
+    "mcp-use client <name> events unsubscribe <event> --url <url> [args...] [options]",
+  summary: "Remove a webhook subscription.",
+  options: [["--url <url>", "Callback URL used to subscribe"], JSON, HELP],
+});
+
 page("<name> auth", {
   usage: "mcp-use client <name> auth <command>",
   summary: "Manage saved OAuth state.",
@@ -219,7 +273,7 @@ export function resolveClientHelp(argv: readonly string[]): ClientHelpResult {
 
   const family = path[1];
   if (family === undefined) return { text: render(pages.get("<name>")!) };
-  if (!["tools", "resources", "prompts", "auth"].includes(family)) {
+  if (!["tools", "resources", "prompts", "events", "auth"].includes(family)) {
     return { error: `Unknown client command family: ${family}` };
   }
 

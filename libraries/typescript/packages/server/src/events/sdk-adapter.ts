@@ -6,6 +6,9 @@
  * @internal
  */
 
+/** Extension identifier of the official (SEP-3415) Events dialect. */
+export const EVENTS_EXTENSION_ID = "io.modelcontextprotocol/events";
+
 /** A single JSON-RPC request whose method is `events/*`. */
 interface EventsRequest {
   id: string | number;
@@ -32,16 +35,41 @@ export function asEventsRequest(body: unknown): EventsRequest | undefined {
 }
 
 /**
+ * Recognise a `subscriptions/listen` request that opts in to
+ * `eventsListChanged`; mcp-use serves those itself to own the acknowledged
+ * filter.
+ *
+ * @param body - The parsed request body.
+ */
+export function asEventsListenRequest(
+  body: unknown
+): { id: string | number; params: unknown } | undefined {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return;
+  const b = body as Record<string, unknown>;
+  const n = (b.params as { notifications?: { eventsListChanged?: unknown } })
+    ?.notifications;
+  if (
+    b.method !== "subscriptions/listen" ||
+    (typeof b.id !== "string" && typeof b.id !== "number") ||
+    n?.eventsListChanged !== true
+  )
+    return;
+  return { id: b.id, params: b.params };
+}
+
+/**
  * Wrap a JSON-RPC result or error in an HTTP response.
  *
  * @param id - Request id.
  * @param outcome - `{ result }` or `{ error }`.
+ * @param status - HTTP status; default 200.
  */
 export function rpcResponse(
   id: string | number,
-  outcome: { result: unknown } | { error: unknown }
+  outcome: { result: unknown } | { error: unknown },
+  status = 200
 ): Response {
-  return Response.json({ jsonrpc: "2.0", id, ...outcome });
+  return Response.json({ jsonrpc: "2.0", id, ...outcome }, { status });
 }
 
 /** `_meta` key under which 2026-07-28 results carry the server identity. */

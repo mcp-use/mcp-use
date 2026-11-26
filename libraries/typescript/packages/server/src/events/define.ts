@@ -1,5 +1,6 @@
 /**
- * Public types of MCP Events (the ChatGPT / OpenAI dialect, webhook delivery).
+ * Public types of MCP Events: the ChatGPT (OpenAI) dialect and the official
+ * SEP-3415 extension (webhook and poll delivery).
  * The runtime lives in `./runtime.ts` and loads on first use.
  */
 
@@ -36,7 +37,7 @@ type Infer<S, Fallback> = S extends StandardSchemaWithJSON
 
 /** Options for {@link EventHandle.emit}. */
 export interface EmitOptions {
-  /** Unique, stable id; sent as `eventId` and `webhook-id`. Generated when omitted. */
+  /** Unique, stable id (`eventId`). Generated when omitted. */
   eventId?: string;
   /** Occurrence time; defaults to now. */
   timestamp?: Date;
@@ -63,9 +64,12 @@ export interface EventHandle<P = unknown> {
 export interface EventsOptions {
   /**
    * Subscription storage. Defaults to Redis over Upstash REST when
-   * `MCP_USE_PLATFORM_STORAGE_URL` and `_TOKEN` are set, else memory.
+   * `MCP_USE_PLATFORM_STORAGE_URL` and `_TOKEN` are set, a file under
+   * `.mcp-use/state/events/` in `mcp-use dev`, else memory.
    */
   store?: EventsStore;
+  /** `nextPollMs` returned by `events/poll`. Default 5000. */
+  pollIntervalMs?: number;
   /** Lifetime granted when `ttlMs` is omitted. Default 24 hours. */
   defaultTtlMs?: number;
   /**

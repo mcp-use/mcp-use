@@ -1,8 +1,9 @@
 # MCP Events: notes server
 
 `create_note` emits `note.created`, delivered by webhook to subscribers
-(the ChatGPT MCP Events dialect). Nothing to configure in dev: subscriptions
-are kept in memory and reset on restart.
+(ChatGPT and the official MCP Events extension) and readable by polling
+(official extension). Nothing to configure in dev: subscriptions and the poll
+log are kept in `.mcp-use/state/events/` and survive restarts.
 
 ```sh
 pnpm dev
@@ -12,6 +13,19 @@ Open the Inspector's **Events** tab, subscribe to `note.created` with
 `{ "folder": "inbox" }` (the callback is the Inspector's webhook inbox), then
 call `create_note` with `{ "folder": "inbox", "title": "Hello" }`. The signed
 delivery appears in the inbox; its `webhook-id` is the note id.
+
+## Poll consumer
+
+With `pnpm dev` running, in another terminal:
+
+```sh
+pnpm poll inbox
+```
+
+`src/poll.ts` calls `events/poll` with `pollEvents` from `@mcp-use/client`,
+starting from now. Create a note in `inbox` and it is printed on the next poll.
+The CLI does the same: `mcp-use client notes events poll note.created folder=inbox --follow`
+after `mcp-use client connect notes http://localhost:3000/mcp`.
 
 ## Try it with ChatGPT
 

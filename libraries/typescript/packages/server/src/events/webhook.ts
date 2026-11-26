@@ -107,6 +107,8 @@ function isPrivateAddress(address: string): boolean {
 interface SendResult {
   status: number;
   body: string;
+  /** Network failure message when `status` is 0. */
+  error?: string;
 }
 
 /** Options for {@link postWebhook}. */
@@ -155,8 +157,15 @@ export async function postWebhook(
     }
     const res = await (options.fetch ?? fetch)(url, init);
     return { status: res.status, body: (await res.text()).slice(0, 4096) };
-  } catch {
-    return { status: 0, body: "" };
+  } catch (err) {
+    const e = err as { code?: string; cause?: { code?: string } };
+    return {
+      status: 0,
+      body: "",
+      error: String(
+        e?.code ?? e?.cause?.code ?? (err as Error)?.message ?? err
+      ).slice(0, 120),
+    };
   }
 }
 

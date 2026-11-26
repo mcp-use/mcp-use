@@ -1021,6 +1021,9 @@ importers:
 
   packages/server/examples/mcp-events:
     dependencies:
+      '@mcp-use/client':
+        specifier: workspace:*
+        version: link:../../../client
       mcp-use:
         specifier: workspace:*
         version: link:../..

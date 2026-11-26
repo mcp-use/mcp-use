@@ -61,6 +61,7 @@ describe("callback configuration", () => {
     expect(
       (connector as any).buildClientOptions().capabilities.extensions
     ).toEqual({
+      "io.modelcontextprotocol/events": {},
       "io.modelcontextprotocol/ui": {
         mimeTypes: ["text/html;profile=mcp-app"],
       },

@@ -1,8 +1,8 @@
 /**
- * MCP Events client helpers (ChatGPT dialect, webhook delivery): list,
- * subscribe (also used to refresh), unsubscribe, and a Fetch-style webhook
- * receiver that verifies Standard Webhooks signatures, answers the callback
- * verification challenge and drops duplicate `eventId`s.
+ * MCP Events client helpers: list, poll (official extension), subscribe
+ * (also used to refresh), unsubscribe, and a Fetch-style webhook receiver
+ * that verifies Standard Webhooks signatures, answers the callback
+ * verification challenge and drops duplicate deliveries.
  *
  * @packageDocumentation
  */
@@ -24,13 +24,38 @@ export interface EventInfo {
   payloadSchema: Record<string, unknown>;
 }
 
-/** An event delivered to a webhook. */
+/** An event delivered to a webhook or returned by a poll. */
 export interface EventEnvelope<T = unknown> {
   eventId: string;
   name: string;
   timestamp: string;
   data: T;
+  cursor?: string | null;
+}
+
+/** Parameters of {@link pollEvents}. */
+export interface PollParams {
+  name: string;
+  arguments?: Record<string, unknown>;
+  /** Cursor from the previous poll; `null` starts from now. */
+  cursor?: string | null;
+  /** Skip events older than this many ms when resuming. */
+  maxAgeMs?: number;
+  /** Cap on events returned. */
+  maxEvents?: number;
+}
+
+/** Result of {@link pollEvents}. */
+export interface PollResult<T = unknown> {
+  events: EventEnvelope<T>[];
+  /** Pass back on the next poll. */
   cursor: string | null;
+  /** Events may have been skipped since the supplied cursor. */
+  truncated: boolean;
+  /** More events are waiting: poll again now. */
+  hasMore: boolean;
+  /** Suggested delay before the next poll. */
+  nextPollMs: number;
 }
 
 /** Result of {@link subscribeEvent}. */
@@ -76,6 +101,65 @@ export async function listEvents(
 }
 
 /**
+ * Poll an event (official extension). Start with `cursor: null`, then pass
+ * back the returned cursor; poll again at once while `hasMore` is true, else
+ * after `nextPollMs`.
+ *
+ * @param session - A connected session.
+ * @param params - Event, filters and cursor.
+ */
+export async function pollEvents<T = unknown>(
+  session: EventsRequester,
+  params: PollParams
+): Promise<PollResult<T>> {
+  return (await session.request("events/poll", {
+    name: params.name,
+    arguments: params.arguments ?? {},
+    cursor: params.cursor ?? null,
+    ...(params.maxAgeMs !== undefined && { maxAgeMs: params.maxAgeMs }),
+    ...(params.maxEvents !== undefined && { maxEvents: params.maxEvents }),
+  })) as PollResult<T>;
+}
+
+/**
+ * Set `Mcp-Name` on outgoing `events/*` requests (SEP-2243), which the SDK
+ * client does not do for custom methods. Wraps a Streamable HTTP fetch.
+ *
+ * @param base - The fetch to wrap.
+ */
+export function withEventsHeaders(base: typeof fetch): typeof fetch {
+  return (input, init) => {
+    const body = init?.body;
+    if (typeof body === "string" && body.includes('"events/')) {
+      try {
+        const m = JSON.parse(body) as {
+          method?: unknown;
+          params?: { name?: unknown };
+        };
+        const name = m.params?.name;
+        if (
+          typeof m.method === "string" &&
+          m.method.startsWith("events/") &&
+          typeof name === "string"
+        ) {
+          const headers = new Headers(init?.headers);
+          headers.set(
+            "mcp-name",
+            /^[\x20-\x7e]*$/.test(name) && name.trim() === name
+              ? name
+              : `=?base64?${toBase64(new TextEncoder().encode(name))}?=`
+          );
+          return base(input, { ...init, headers });
+        }
+      } catch {
+        // not JSON-RPC; send as is
+      }
+    }
+    return base(input, init);
+  };
+}
+
+/**
  * Subscribe a webhook to an event. Call again with the same name, arguments
  * and URL before `refreshBefore` to refresh (or to rotate the secret).
  *
@@ -96,7 +180,8 @@ export async function subscribeEvent(
 }
 
 /**
- * Remove a subscription (idempotent).
+ * Remove a subscription. The official dialect answers `-32023` when it does
+ * not exist; the ChatGPT dialect ignores unknown subscriptions.
  *
  * @param session - A connected session.
  * @param params - Event name, arguments and callback URL used to subscribe.
@@ -175,7 +260,7 @@ export async function verifyWebhookSignature(
 export interface WebhookReceiverOptions {
   /** Accepted secrets (current first, plus the previous one while rotating). */
   secrets: readonly string[];
-  /** Called once per new `eventId`. */
+  /** Called once per new delivery (`webhook-id`, or `eventId` per subscription). */
   onEvent: (
     event: EventEnvelope,
     subscriptionId: string | null
@@ -210,16 +295,16 @@ export function createWebhookReceiver(
       return Response.json({ challenge: parsed.challenge });
     if (parsed.type !== undefined) return Response.json({});
     const event = parsed as unknown as EventEnvelope;
-    if (!seen.has(event.eventId)) {
-      seen.add(event.eventId);
+    const subscriptionId = request.headers.get("x-mcp-subscription-id");
+    // The same eventId on two subscriptions is two deliveries.
+    const key = `${subscriptionId ?? ""}\n${event.eventId}`;
+    if (!seen.has(key)) {
+      seen.add(key);
       if (seen.size > max) seen.delete(seen.values().next().value as string);
       try {
-        await options.onEvent(
-          event,
-          request.headers.get("x-mcp-subscription-id")
-        );
+        await options.onEvent(event, subscriptionId);
       } catch (error) {
-        seen.delete(event.eventId); // let the retry through
+        seen.delete(key); // let the retry through
         throw error;
       }
     }

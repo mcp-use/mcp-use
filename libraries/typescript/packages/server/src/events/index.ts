@@ -1,11 +1,13 @@
 /**
- * MCP Events storage adapters: `memoryEventsStore` (development, tests) and
- * `upstashEventsStore` (Redis over the Upstash REST protocol).
+ * MCP Events storage adapters: `memoryEventsStore` (tests), `fileEventsStore`
+ * (local development) and `upstashEventsStore` (Redis over the Upstash REST
+ * protocol).
  *
  * @packageDocumentation
  */
 
 export {
+  fileEventsStore,
   memoryEventsStore,
   upstashEventsStore,
   type EventsStore,

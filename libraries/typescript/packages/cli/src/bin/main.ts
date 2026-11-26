@@ -69,6 +69,7 @@ Cloud projects:
   deployments  Inspect and manage deployments
   env          Manage environment variables
   logs         Read build and runtime logs
+  events       Inspect MCP Events subscriptions and deliveries
   analytics    Discover and query server analytics
   domains      Manage server domains
   github       Manage GitHub App access
@@ -263,6 +264,10 @@ export async function main(
   if (command === "env") {
     const { runEnv } = await import("../cloud/environment/index.js");
     return runEnv(commandArgs);
+  }
+  if (command === "events") {
+    const { runEvents } = await import("../cloud/events/index.js");
+    return runEvents(commandArgs);
   }
   if (command === "logs") {
     const { runLogs } = await import("../cloud/logs/index.js");
