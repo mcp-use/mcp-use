@@ -70,18 +70,13 @@ import {
 } from "./middleware/mcp-middleware.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
-import { createLazyEventsHost } from "./events/lazy-host.js";
-import { installEventsDev, type EventsDevOptions } from "./events/dev/index.js";
-import type { EventsHost } from "./events/internal/host.js";
 import type {
   AnyEventDefinition,
-  EventArgs,
   EventDefinition,
-  EventPayloadIn,
-  EventRef,
-  EventSchema,
-  ServerEvents,
-} from "./events/types.js";
+  EventHandle,
+} from "./events/define.js";
+import type { EventsRuntime } from "./events/runtime.js";
+import { asEventsRequest, rpcResponse } from "./events/sdk-adapter.js";
 import {
   prepareSettings,
   type SettingsFields,
@@ -439,8 +434,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #httpApp: Hono<TEnv> | undefined;
   #handler: McpHttpHandler | undefined;
   #eventBus: ServerEventBus | undefined;
-  /** MCP Events host, created on the first Events API call. */
-  #eventsHost: EventsHost | undefined;
+  readonly #events = new Map<string, AnyEventDefinition>();
+  #eventsRuntime: Promise<EventsRuntime> | undefined;
   #httpServer: NodeHttpListener | undefined;
   #oauthResource: URL | undefined;
   #oauthResourceResolved = false;
@@ -516,17 +511,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   ) => Promise<Response>;
 
   /**
-   * Workers cron entrypoint (`export default server`): runs one MCP Events
-   * tick (due deliveries, retries and the sweep). A no-op on a server with no
-   * registered events.
-   */
-  readonly scheduled: (
-    controller: unknown,
-    env: TEnv["Bindings"],
-    ctx: { waitUntil(p: Promise<unknown>): void }
-  ) => Promise<void>;
-
-  /**
    * Create an MCP server from a parsed, bundled OpenAPI document.
    *
    * Each included OpenAPI operation becomes a tool that validates its input,
@@ -579,26 +563,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.patch = this.app.patch.bind(this.app) as Hono<TEnv>["patch"];
     this.delete = this.app.delete.bind(this.app) as Hono<TEnv>["delete"];
     this.all = this.app.all.bind(this.app) as Hono<TEnv>["all"];
-    this.scheduled = async (_controller, env, ctx) => {
-      const host = this.#eventsHost;
-      if (host === undefined || host.size === 0) return;
-      await host.scheduled(env, ctx);
-    };
     this.fetch = async (request, env, executionCtx) => {
-      // Thread the runtime waitUntil (Workers, Next, TanStack Start) to the
-      // Events drivers so background delivery outlives the response (D19).
-      if (this.#eventsHost !== undefined) {
-        let waitUntil: ((p: Promise<unknown>) => void) | undefined;
-        try {
-          const w = (
-            executionCtx as { waitUntil?: (p: Promise<unknown>) => void }
-          )?.waitUntil;
-          if (typeof w === "function") waitUntil = w.bind(executionCtx);
-        } catch {
-          waitUntil = undefined;
-        }
-        if (waitUntil !== undefined) this.#eventsHost.setWaitUntil(waitUntil);
-      }
       await this.#ensureSkillsPrimed();
       this.#ensureMounted("handler");
       return this.#httpApp!.fetch(request, env, executionCtx);
@@ -1002,6 +967,43 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   /**
+   * Register an MCP Event (ChatGPT dialect, webhook delivery). Clients
+   * discover it with `events/list` and subscribe with a callback URL.
+   *
+   * @returns A handle whose `emit(data, { eventId })` delivers the event to
+   * every matching subscription.
+   */
+  event<
+    I extends StandardSchemaWithJSON | undefined = undefined,
+    P extends StandardSchemaWithJSON | undefined = undefined,
+  >(
+    definition: EventDefinition<I, P>
+  ): EventHandle<
+    P extends StandardSchemaWithJSON
+      ? StandardSchemaWithJSON.InferInput<P>
+      : unknown
+  > {
+    this.#assertNotStarted("event", definition.name);
+    if (this.#events.has(definition.name))
+      throw new Error(`Event "${definition.name}" is already registered`);
+    this.#events.set(definition.name, definition as AnyEventDefinition);
+    const name = definition.name;
+    return {
+      name,
+      emit: async (data, options) =>
+        (await this.#eventsRuntimeInstance()).emit(name, data, options),
+    };
+  }
+
+  #eventsRuntimeInstance(): Promise<EventsRuntime> {
+    this.#eventsRuntime ??= import("./events/runtime.js").then(
+      ({ EventsRuntime }) =>
+        new EventsRuntime(this.#events, this.#config.events)
+    );
+    return this.#eventsRuntime;
+  }
+
+  /**
    * Compose upstream MCP servers into this server.
    *
    * A name-keyed HTTP config creates upstream connections through the optional
@@ -1127,57 +1129,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.#httpMiddlewareCount +=
       typeof patternOrHandler === "function" ? 1 : handlers.length;
     return this;
-  }
-
-  /**
-   * Register an MCP Event before start (PLAN.md §7.1). Throws
-   * `EventsConfigError` synchronously for an invalid definition. Returns a
-   * typed {@link EventRef} whose `emit` appends to the event log.
-   *
-   * @param definition - Name, description, schemas and delivery options.
-   */
-  event<
-    const Name extends string,
-    I extends EventSchema | undefined = undefined,
-    P extends EventSchema = EventSchema,
-  >(
-    definition: EventDefinition<Name, I, P, TUser, TEnv>
-  ): EventRef<Name, EventArgs<I>, EventPayloadIn<P>> {
-    this.#assertNotStarted("event", definition.name);
-    return this.#events().register(
-      definition as AnyEventDefinition
-    ) as EventRef<Name, EventArgs<I>, EventPayloadIn<P>>;
-  }
-
-  /**
-   * Install the MCP Events dev runtime for this process. Called by
-   * `mcp-use dev` on every generation with plain data (D44); not for
-   * application code.
-   *
-   * @param options - State directory, dev port, base path, tunnel origin and dev token.
-   * @internal
-   */
-  __setEventsDev(options: EventsDevOptions): void {
-    installEventsDev(options);
-  }
-
-  /**
-   * Runtime handle for MCP Events: emit by name, revoke, list, process due
-   * work, and read `info()` and `health()` (PLAN.md §7.2).
-   */
-  get events(): ServerEvents {
-    return this.#events().events;
-  }
-
-  /** Create the Events host on first use; zero-event servers never do. */
-  #events(): EventsHost {
-    this.#eventsHost ??= createLazyEventsHost({
-      config: this.#config.events,
-      storage: this.#config.storage,
-      oauth: this.#config.oauth !== undefined,
-      basePath: () => this.#basePath(),
-    });
-    return this.#eventsHost;
   }
 
   /**
@@ -1325,9 +1276,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const host = resolveListenHost(options.host, this.#config.host);
     const requestedPort = resolveListenPort(port, this.#config.port);
     this.#assertListenOAuthConfiguration(host);
-    if (this.#eventsHost !== undefined && this.#eventsHost.size > 0) {
-      await this.#eventsHost.start("listen");
-    }
 
     return new Promise((resolve, reject) => {
       let resolveFetch: ((fetch: FetchHandler) => void) | undefined;
@@ -1399,7 +1347,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   async close(): Promise<void> {
     this.#closed = true;
-    const eventsClose = this.#eventsHost?.close();
+    void this.#eventsRuntime?.then((runtime) => runtime.close());
     await Promise.allSettled([...this.#proxyOperations]);
 
     const errors: unknown[] = [];
@@ -1415,13 +1363,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       await this.#handler?.close();
     } catch (error) {
       errors.push(error);
-    }
-    if (eventsClose !== undefined) {
-      try {
-        await eventsClose;
-      } catch (error) {
-        errors.push(error);
-      }
     }
     const httpServer = this.#httpServer;
     if (httpServer !== undefined) {
@@ -1942,26 +1883,20 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
       this.#validateViewBindingsAtMount();
 
-      const eventsHost =
-        this.#eventsHost !== undefined && this.#eventsHost.size > 0
-          ? this.#eventsHost
-          : undefined;
-      if (eventsHost !== undefined) {
-        // Internal Events routes sit outside the OAuth gate (D41) and carry
-        // their own bearer auth.
-        httpApp.all(`${basePath}/_mcp-use/events/*`, async (context) => {
-          const response = await eventsHost.route(context.req.raw);
-          return response ?? context.notFound();
-        });
-      }
-
       const { handler, fetch: mcpFetch } = createMcpMount(
         (ctx) => this.#buildSdkServer(ctx),
         {
           path: basePath,
-          ...(eventsHost !== undefined && {
-            preflight: (request: Request, parsedBody: unknown) =>
-              eventsHost.preflight(request, parsedBody),
+          ...(this.#events.size > 0 && {
+            preflight: async (_request, body, authInfo) => {
+              const rpc = asEventsRequest(body);
+              if (rpc === undefined) return undefined;
+              const runtime = await this.#eventsRuntimeInstance();
+              return rpcResponse(
+                rpc.id,
+                await runtime.handle(rpc.method, rpc.params, authInfo)
+              );
+            },
           }),
           ...((this.#config.legacy !== undefined ||
             this.#eventBus !== undefined) && {
@@ -2137,6 +2072,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         );
       }
 
+      if (this.#events.size > 0) {
+        httpApp.all(`${nestedBasePath}/_mcp-use/events/:action`, async (c) =>
+          (await this.#eventsRuntimeInstance()).route(
+            c.req.raw,
+            c.req.param("action")
+          )
+        );
+      }
       this.app.all(basePath, (context) => endpointHandler(context.req.raw));
       httpApp.route("/", this.app);
       this.#httpApp = httpApp;
@@ -2219,33 +2162,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   /** Build a fully registered SDK server from the immutable registry. */
-  /**
-   * Which Events capability keys this request's handshake advertises (§6.4):
-   * the top-level `events` key for the ChatGPT dialect and the
-   * `io.modelcontextprotocol/events` extension on 2026-07-28 era requests.
-   * Nothing when no event is registered. Mirrors `advertiseFor` in
-   * `events/capabilities.ts` with no known-client row, inlined to keep the
-   * root entry inside its budget.
-   */
-  #eventsAdvertisement(request: Request | undefined): {
-    legacyKey: boolean;
-    extension: boolean;
-  } {
-    const on = (this.#eventsHost?.size ?? 0) > 0;
-    return {
-      legacyKey: on && this.#config.events?.compatibility?.openai !== false,
-      extension:
-        on &&
-        (request?.headers.get("mcp-protocol-version") ?? "") >= "2026-07-28",
-    };
-  }
-
   #buildSdkServer(ctx: McpRequestContext): SdkMcpServer {
     const { name, version, title, description } = this.#config;
     const instructions =
       this.#instructionsOverride ?? this.#config.instructions;
     const authInfo = ctx.authInfo;
-    const events = this.#eventsAdvertisement(ctx.requestInfo);
     const server = new SdkMcpServer(
       {
         name,
@@ -2269,14 +2190,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           tools: { listChanged: true },
           prompts: { listChanged: true },
           resources: { listChanged: true, subscribe: true },
-          ...(events.legacyKey && { events: {} }),
-          ...((this.#skills !== undefined ||
-            this.#settings !== undefined ||
-            events.extension) && {
+          ...(this.#events.size > 0 && { events: {} }),
+          ...((this.#skills !== undefined || this.#settings !== undefined) && {
             extensions: {
-              ...(events.extension && {
-                "io.modelcontextprotocol/events": { listChanged: true },
-              }),
               ...(this.#skills !== undefined && {
                 [SKILLS_EXTENSION_ID]: { directoryRead: true },
               }),
@@ -2505,14 +2421,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         _requestHandlers?: Map<string, RequestHandler>;
       }
     )._requestHandlers;
-    if (!(handlers instanceof Map)) {
-      throw Object.assign(
-        new Error(
-          "MCP_USE_SDK_INTERNALS_CHANGED: the installed @modelcontextprotocol/server " +
-            "no longer exposes _requestHandlers as a Map; list middleware cannot be installed."
-        ),
-        { code: "MCP_USE_SDK_INTERNALS_CHANGED" }
-      );
+    if (handlers === undefined) {
+      return;
     }
 
     type ListMethod = "tools/list" | "resources/list" | "prompts/list";

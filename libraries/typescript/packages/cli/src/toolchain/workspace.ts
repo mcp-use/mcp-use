@@ -30,7 +30,6 @@
 import { join } from "node:path";
 import type { ViewsManifest } from "../views/types.js";
 import type { SkillsSnapshot } from "../skills/types.js";
-import type { EventsCatalogSnapshot } from "./events-catalog.js";
 
 /**
  * Fixed name of the per-project workspace directory.
@@ -67,11 +66,6 @@ export interface BuildManifest {
   views: ViewsManifest;
   /** Immutable skills included by embedded framework integrations. */
   skills?: SkillsSnapshot;
-  /**
-   * The server's Events catalog (PLAN.md §11.5), from the duck-typed
-   * `__eventsCatalog()` hook. Absent for a server with no events.
-   */
-  events?: EventsCatalogSnapshot;
 }
 
 /**

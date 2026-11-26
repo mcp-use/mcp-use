@@ -50,9 +50,9 @@ permissions:
 
 on:
   push:
-    branches: [main, canary, feat/mcp-events]
+    branches: [main, canary]
   pull_request:
-    branches: [main, canary, feat/mcp-events]
+    branches: [main, canary]
   workflow_call:
     inputs:
       ref:
@@ -694,40 +694,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-    # Databases for the storage conformance and adapter tests. The tests read
-    # the MCP_USE_TEST_* variables below; under CI=true a missing one fails
-    # the run instead of skipping.
-    services:
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: mcp_use_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
-      # The Upstash REST protocol in front of the redis service.
-      serverless-redis-http:
-        image: hiett/serverless-redis-http:0.0.10
-        env:
-          SRH_MODE: env
-          SRH_TOKEN: mcp-use-ci-token
-          SRH_CONNECTION_STRING: redis://redis:6379
-        ports:
-          - 8079:80
     strategy:
       matrix:
         node-version: [22.23.1]
@@ -746,32 +712,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
-      # A 3-shard Redis Cluster. Service containers cannot take a command, so
-      # it runs as a step: three cluster-enabled servers in one container,
-      # announcing 127.0.0.1 so both the runner and the nodes reach every
-      # shard on the same published ports.
-      - name: Start Redis Cluster
-        working-directory: .
-        run: |
-          docker run -d --name redis-cluster -p 7000-7002:7000-7002 redis:7 sh -c '
-            for port in 7000 7001 7002; do
-              redis-server --port $port --cluster-enabled yes \
-                --cluster-config-file nodes-$port.conf \
-                --cluster-announce-ip 127.0.0.1 \
-                --save "" --appendonly no --daemonize yes
-            done
-            until redis-cli -p 7002 ping; do sleep 0.2; done
-            redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 \
-              127.0.0.1:7002 --cluster-replicas 0 --cluster-yes
-            tail -f /dev/null'
-          for attempt in $(seq 1 60); do
-            if docker exec redis-cluster redis-cli -p 7000 cluster info | grep -q "cluster_state:ok"; then
-              exit 0
-            fi
-            sleep 1
-          done
-          docker logs redis-cluster
-          exit 1
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Build Packages
@@ -783,15 +723,6 @@ jobs:
       - name: Run mcp-use Unit Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-          MCP_USE_TEST_REDIS_URL: redis://localhost:6379
-          MCP_USE_TEST_REDIS_CLUSTER_URL: redis://127.0.0.1:7000
-          MCP_USE_TEST_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/mcp_use_test
-          MCP_USE_TEST_UPSTASH_URL: http://localhost:8079
-          MCP_USE_TEST_UPSTASH_TOKEN: mcp-use-ci-token
-          # Real Upstash: present only where the repository's secrets are
-          # (same-repo PRs and pushes); the test skips it otherwise.
-          UPSTASH_TEST_REST_URL: ${{ secrets.UPSTASH_TEST_REST_URL }}
-          UPSTASH_TEST_REST_TOKEN: ${{ secrets.UPSTASH_TEST_REST_TOKEN }}
         run: pnpm --filter mcp-use test:run
       - name: Run @mcp-use/agent Unit Tests
         env:

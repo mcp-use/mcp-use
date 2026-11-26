@@ -7,11 +7,6 @@
  */
 import { resolve } from "node:path";
 
-/** Bundled MCP SDK version, defined by tsup; absent when run from source. */
-declare const __MCP_USE_BUNDLED_SDK_VERSION__: string | undefined;
-/** Bundled MCP SDK content hash, defined by tsup; absent when run from source. */
-declare const __MCP_USE_BUNDLED_SDK_HASH__: string | undefined;
-
 import {
   parseArgs,
   stripForwardingSeparator,
@@ -78,7 +73,6 @@ Cloud projects:
   domains      Manage server domains
   github       Manage GitHub App access
   alerts       Manage alert rules
-  events       Inspect and operate MCP Events state
   evals        Define and run eval suites
   checklist    Run publishing checks
 
@@ -192,28 +186,6 @@ export async function main(
       options
     );
   }
-  if (
-    argv.length === 2 &&
-    ["--version", "-v"].includes(argv[0] ?? "") &&
-    argv[1] === "--json"
-  ) {
-    // The SDK identity is compiled in by tsup (`scripts/sdk-identity.mjs`).
-    const sdk =
-      typeof __MCP_USE_BUNDLED_SDK_VERSION__ === "string"
-        ? __MCP_USE_BUNDLED_SDK_VERSION__
-        : null;
-    const sdkHash =
-      typeof __MCP_USE_BUNDLED_SDK_HASH__ === "string"
-        ? __MCP_USE_BUNDLED_SDK_HASH__
-        : null;
-    console.log(
-      JSON.stringify({
-        version: options.frameworkVersion,
-        sdk: { bundled: sdk, bundledHash: sdkHash },
-      })
-    );
-    return 0;
-  }
   if (argv.length === 1 && ["--version", "-v"].includes(argv[0] ?? "")) {
     console.log(options.frameworkVersion);
     return 0;
@@ -255,10 +227,6 @@ export async function main(
   if (command === "whoami") {
     const { runWhoami } = await import("../cloud/auth/whoami.js");
     return runWhoami(commandArgs);
-  }
-  if (command === "events") {
-    const { runEvents } = await import("../cloud/events/index.js");
-    return runEvents(commandArgs);
   }
   if (command === "alerts") {
     const { runAlerts } = await import("../cloud/alerts/index.js");

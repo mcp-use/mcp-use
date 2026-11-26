@@ -45,12 +45,6 @@ import { loadServerIcon } from "./useMcp-helpers.js";
 import { useMcpOperations } from "./useMcp-operations.js";
 import { getOAuthTokenExpiry } from "./token-expiry.js";
 import { SKILLS_EXTENSION_ID } from "../core/skills.js";
-import {
-  createSdkClientEventsAdapter,
-  type SdkClientEventsAdapter,
-} from "../events/sdk-adapter.js";
-import { EventsConnection } from "../events/connection.js";
-import type { EventDescriptor } from "@mcp-use/events-core";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
@@ -396,14 +390,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [skills, setSkills] = useState<import("../core/skills.js").Skill[]>([]);
-  // MCP Events (PLAN.md §9.6): the lane is installed on every connection.
-  const [events, setEvents] = useState<EventDescriptor[] | undefined>(
-    undefined
-  );
-  const [eventsConnection, setEventsConnection] = useState<
-    EventsConnection | undefined
-  >(undefined);
-  const eventsLaneRef = useRef<SdkClientEventsAdapter | null>(null);
   const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>(
     // Only use cached metadata if it has at least a name
     options._initialServerInfo?.name
@@ -664,10 +650,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         setResourceTemplates([]);
         setPrompts([]);
         setSkills([]);
-        setEvents(undefined);
-        setEventsConnection(undefined);
-        setEvents(undefined);
-        setEventsConnection(undefined);
         setError(undefined);
         setAuthUrl(undefined);
         setAuthTokens(undefined);
@@ -927,8 +909,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
       try {
         const serverName = USE_MCP_SERVER_NAME;
-        const eventsLane = createSdkClientEventsAdapter();
-        eventsLaneRef.current = eventsLane;
 
         // Build server config
         const serverConfig: any = {
@@ -937,11 +917,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           clientInfo: mergedClientInfo,
           // The connector wraps this with the provider's OAuth-proxy fetch
           // (`getProxyFetch`), so pass the caller's fetch unwrapped.
-          fetch: eventsLane.wrapFetch(
-            customFetch ??
-              ((input: RequestInfo | URL, init?: RequestInit) =>
-                globalThis.fetch(input, init))
-          ),
+          ...(customFetch ? { fetch: customFetch } : {}),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(effectiveClientOptions && {
             clientOptions: effectiveClientOptions,
@@ -1062,19 +1038,18 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
                 );
             }
           },
-          wrapTransport: (transport: Transport) => {
-            const inner = wrapTransport
-              ? (addLog(
+          wrapTransport: wrapTransport
+            ? (transport: Transport) => {
+                addLog(
                   "debug",
                   "Applying transport wrapper for server:",
                   serverName,
                   "url:",
                   url
-                ),
-                wrapTransport(transport, serverId ?? url))
-              : transport;
-            return eventsLane.wrapTransport(inner);
-          },
+                );
+                return wrapTransport(transport, serverId ?? url);
+              }
+            : undefined,
         });
 
         // MCPClient owns protocol negotiation and any legacy initialization.
@@ -1350,29 +1325,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             }
           } else {
             setSkills([]);
-          }
-        }
-
-        // Events populate like skills, from the raw capability (§9.2.1).
-        if (isMountedRef.current) {
-          const eventsConn = new EventsConnection(eventsLane);
-          setEventsConnection(eventsConn);
-          if (eventsConn.supportsEvents()) {
-            const loadEvents = () =>
-              eventsConn
-                .listAllEvents()
-                .then((r) => {
-                  if (isMountedRef.current) setEvents(r.events);
-                })
-                .catch((error: unknown) => {
-                  addLog("warn", "Failed to load events:", error);
-                  if (isMountedRef.current) setEvents([]);
-                });
-            eventsLane.onListChanged(() => void loadEvents());
-            eventsConn.optInListChanged();
-            await loadEvents();
-          } else {
-            setEvents(undefined);
           }
         }
 
@@ -2400,9 +2352,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     resourceTemplates,
     prompts,
     skills,
-    events,
-    eventsSupported: eventsConnection?.supportsEvents(),
-    eventsConnection,
     serverInfo,
     capabilities,
     protocolEra,

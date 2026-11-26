@@ -1,12 +1,7 @@
 import type { Hono } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { mountEventsInboxRoutes } from "./events/hook-routes.js";
-import {
-  openInboxFromEnv,
-  type StorageEventsInbox,
-} from "./events/inbox-store.js";
+import { mountEventsInbox } from "./events-inbox.js";
 import { mountMcpProxy, mountOAuthProxy } from "./proxy/index.js";
-import { getBundledSdkVersion, getInspectorVersion } from "./version.js";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
@@ -23,15 +18,6 @@ export type InspectorProxyRoutesConfig = {
   oauth?: boolean;
   /** Optional source label for logs when Inspector shares a dev server process. */
   logPrefix?: string;
-  /**
-   * MCP Events inbox store. Default: opened from `MCP_USE_STORAGE_URL`
-   * (hosted, shared across replicas) or an in-process store.
-   */
-  eventsInbox?: StorageEventsInbox | Promise<StorageEventsInbox>;
-  /** Public origin inbox callback URLs use (tunnel or hosted origin). */
-  eventsPublicOrigin?: string;
-  /** Dev token required to create inboxes (`mcp-use dev`). */
-  devToken?: string;
 };
 
 /**
@@ -55,24 +41,11 @@ export function registerInspectorProxyRoutes(
       status: "ok",
       protocol: "mcp-use-inspector-preview",
       version: 1,
-      capabilities: ["view-preview", "events-inbox"],
+      capabilities: ["view-preview"],
     });
   });
 
-  app.get(p("/inspector/api/version"), (c) =>
-    c.json({
-      version: getInspectorVersion(),
-      sdk: { bundled: getBundledSdkVersion() },
-    })
-  );
-
-  mountEventsInboxRoutes(app, {
-    basePath,
-    inbox: config?.eventsInbox ?? openInboxFromEnv(),
-    publicOrigin: config?.eventsPublicOrigin,
-    devToken: config?.devToken,
-    allowedOrigins: config?.oauthProxyAllowedOrigins,
-  });
+  mountEventsInbox(app, basePath);
 
   mountMcpProxy(app, {
     path: p("/inspector/api/proxy"),

@@ -1,10 +1,9 @@
+import type { EventsOptions } from "./events/define.js";
 import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
 
 import type { LoggingOptions } from "./logging.js";
 import type { OAuthMetadataSource, OAuthProvider } from "./oauth/index.js";
 import type { SkillsOptions } from "./skills/types.js";
-import type { EventsConfig } from "./events/config.js";
-import type { McpUseStorage } from "./storage/types.js";
 
 /**
  * Common server identity and behavior, passed to `new MCPServer(...)`.
@@ -232,13 +231,11 @@ interface BaseServerConfig {
    * ```
    */
   cors?: CorsOptions;
-
   /**
-   * Framework state store, used by MCP Events and by `oauthProxy` when its
-   * own storage is unset (PLAN.md §8.5). Omit under `mcp-use dev` and on
-   * Manufact Cloud.
+   * MCP Events (ChatGPT dialect): subscription storage and delivery options.
+   * Register events with `server.event()`.
    */
-  storage?: McpUseStorage;
+  events?: EventsOptions;
 }
 
 /**
@@ -350,10 +347,8 @@ export function assertServerConfig(config: {
  * callback from declaring authenticated context without authentication at
  * runtime. Omitting the type keeps the no-OAuth API ergonomic.
  */
-export type ServerConfig<TUser = never> = BaseServerConfig & {
-  /** MCP Events options. None are needed under `mcp-use dev` or on Manufact Cloud. */
-  events?: EventsConfig<TUser>;
-} & ([TUser] extends [never]
+export type ServerConfig<TUser = never> = BaseServerConfig &
+  ([TUser] extends [never]
     ? {
         /** OAuth is unavailable when no authenticated user type is declared. */
         oauth?: undefined;

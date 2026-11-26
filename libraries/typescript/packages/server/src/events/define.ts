@@ -1,87 +1,84 @@
 /**
- * `defineEvent` and `createEventsEmitter` (§7.1). Skeleton owned by WP-23.
- *
- * @packageDocumentation
+ * Public types of MCP Events (the ChatGPT / OpenAI dialect, webhook delivery).
+ * The runtime lives in `./runtime.ts` and loads on first use.
  */
 
-import type { EventsConfig } from "./config.js";
-import { EventsConfigError } from "./errors.js";
-import { buildRegisteredEvent, createEventsRegistry } from "./registry.js";
-import type {
-  AnyEventDefinition,
-  EmitOptions,
-  EmitResult,
-  EventDefinition,
-  EventPayloadIn,
-  EventSchema,
-} from "./types.js";
+import type { StandardSchemaWithJSON } from "@modelcontextprotocol/server";
 
-/**
- * Share an event definition with a separate emitter process. Runs the same
- * synchronous registration checks as `server.event()`.
- *
- * @param definition - The event definition.
- */
-export function defineEvent<
-  const Name extends string,
-  I extends EventSchema | undefined,
-  P extends EventSchema,
->(definition: EventDefinition<Name, I, P>): EventDefinition<Name, I, P> {
-  buildRegisteredEvent(definition as unknown as AnyEventDefinition);
-  return definition;
+import type { EventsStore } from "./store.js";
+
+/** An event a server publishes, listed by `events/list`. */
+export interface EventDefinition<
+  I extends StandardSchemaWithJSON | undefined = undefined,
+  P extends StandardSchemaWithJSON | undefined = undefined,
+> {
+  /** Event name, for example `message.created`. */
+  name: string;
+  /** What the event means, shown to users choosing what to monitor. */
+  description?: string;
+  /** Subscribe `arguments` (filters). Defaults to an empty object. */
+  inputSchema?: I;
+  /** The event `data`. Emitted data is validated against it. */
+  payloadSchema?: P;
+  /**
+   * Custom filter. By default a subscription matches when every argument
+   * whose name is also a top-level field of `data` has an equal value.
+   */
+  matches?: (
+    args: Infer<I, Record<string, unknown>>,
+    data: Infer<P, unknown>
+  ) => boolean;
 }
 
-/** An emitter for a process that serves no MCP. */
-export interface EventsEmitter {
-  /** Emit one occurrence of a shared definition. */
-  emit<D extends AnyEventDefinition>(
-    def: D,
-    data: EventPayloadIn<D["payloadSchema"]>,
-    options?: EmitOptions
-  ): Promise<EmitResult>;
-  /** Release the binding. */
-  close(): Promise<void>;
+type Infer<S, Fallback> = S extends StandardSchemaWithJSON
+  ? StandardSchemaWithJSON.InferOutput<S>
+  : Fallback;
+
+/** Options for {@link EventHandle.emit}. */
+export interface EmitOptions {
+  /** Unique, stable id; sent as `eventId` and `webhook-id`. Generated when omitted. */
+  eventId?: string;
+  /** Occurrence time; defaults to now. */
+  timestamp?: Date;
 }
 
-/**
- * Emit from a process that serves no MCP, over the same store binding as the server (§8.5).
- *
- * @param options - Shared definitions and Events configuration.
- */
-export function createEventsEmitter(options: {
-  events: readonly AnyEventDefinition[];
-  config?: EventsConfig;
-}): EventsEmitter {
-  const registry = createEventsRegistry({
-    config: options.config as EventsConfig<any> | undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
-  });
-  for (const def of options.events) registry.add(def);
-  let closed = false;
-  return {
-    async emit(def, data) {
-      if (closed) {
-        throw new EventsConfigError(
-          "EVENTS_BACKEND_UNAVAILABLE",
-          "events: emitter is closed."
-        );
-      }
-      const event = registry.get(def.name);
-      if (event === undefined) {
-        throw new EventsConfigError(
-          "EVENTS_CONFIG_INVALID",
-          `events: "${def.name}" is not one of this emitter's definitions.`,
-          { name: def.name }
-        );
-      }
-      await event.validatePayload(data);
-      // TODO(events): resolve the store binding (WP-24) and append through engine/emit.ts (WP-20).
-      throw new EventsConfigError(
-        "EVENTS_BACKEND_UNAVAILABLE",
-        "events: createEventsEmitter needs the Events engine binding, which is not built yet."
-      );
-    },
-    async close() {
-      closed = true;
-    },
-  };
+/** Result of {@link EventHandle.emit}. */
+export interface EmitResult {
+  eventId: string;
+  /** Matching subscriptions a delivery was queued for. */
+  deliveries: number;
 }
+
+/** Returned by `server.event()`. */
+export interface EventHandle<P = unknown> {
+  readonly name: string;
+  /**
+   * Deliver an event to every matching subscription. Resolves after the
+   * first delivery attempt of each; failed attempts are retried with backoff.
+   */
+  emit(data: P, options?: EmitOptions): Promise<EmitResult>;
+}
+
+/** `ServerConfig.events`. */
+export interface EventsOptions {
+  /**
+   * Subscription storage. Defaults to Redis over Upstash REST when
+   * `MCP_USE_PLATFORM_STORAGE_URL` and `_TOKEN` are set, else memory.
+   */
+  store?: EventsStore;
+  /** Lifetime granted when `ttlMs` is omitted. Default 24 hours. */
+  defaultTtlMs?: number;
+  /**
+   * Allow `http:` and private callback addresses. Development only; the
+   * `mcp-use dev` runtime sets `MCP_USE_EVENTS_INSECURE=1`.
+   */
+  allowInsecureCallbacks?: boolean;
+  /** Custom transport for deliveries (bypasses address checks). */
+  fetch?: typeof fetch;
+}
+
+/** @internal */
+export type AnyEventDefinition = EventDefinition<
+  StandardSchemaWithJSON | undefined,
+  StandardSchemaWithJSON | undefined
+>;

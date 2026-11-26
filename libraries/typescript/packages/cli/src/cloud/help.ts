@@ -34,24 +34,6 @@ const phase: Row = [
   "runtime, build, or both; preserves the existing setting",
 ];
 const envScope = [...project, environment, branch, phase];
-const eventsLocal: Row[] = [
-  ["--env-file <path>", "Local mode: read the store binding from this file"],
-  ["--storage-url <url>", "Local mode: storage URL"],
-  ["--storage-token <t>", "Local mode: storage token"],
-  ["--storage-prefix <p>", "Local mode: storage key prefix"],
-  ["--namespace <ns>", "Local mode: Events namespace"],
-  ["--secret <s>", "Local mode: Events keyring"],
-];
-const eventsScope: Row[] = [
-  ...project,
-  ["--branch <name>", "Cloud: the branch environment"],
-  ["--production", "Cloud: production (required for writes)"],
-  ...eventsLocal,
-];
-const eventsApp: Row[] = [
-  ["--url <app-url>", "Local mode: the running app"],
-  ["--admin-secret <s>", "Local mode: MCP_USE_EVENTS_ADMIN_SECRET"],
-];
 
 const pages: Record<string, Page> = {
   analytics: {
@@ -500,103 +482,6 @@ const pages: Record<string, Page> = {
         summary: "Show available alert metrics and notification options.",
         options: project,
         examples: ["mcp-use alerts options"],
-      },
-    },
-  },
-  events: {
-    summary:
-      "Inspect and operate MCP Events state, in Cloud (--server, --branch or --production) or locally (--env-file, or --storage-url, --namespace and --secret).",
-    examples: [
-      "mcp-use events status --branch feature-x",
-      "mcp-use events subscriptions --env-file .env.production",
-    ],
-    commands: {
-      status: {
-        summary: "Show the namespace status.",
-        options: eventsScope,
-        examples: ["mcp-use events status"],
-      },
-      catalog: {
-        summary: "Show the active catalog and its diff against the manifest.",
-        options: eventsScope,
-        examples: ["mcp-use events catalog --branch main"],
-      },
-      subscriptions: {
-        summary: "List subscriptions.",
-        options: [
-          ...eventsScope,
-          ["--event <name>", "Event name"],
-          ["--principal <p>", "Principal"],
-          ["--status <s>", "active or suspended"],
-          ["--mode <m>", "webhook, push or poll"],
-          ["--after <cursor>", "Page cursor"],
-          limit(200, 50),
-        ],
-        examples: ["mcp-use events subscriptions --event issue.opened"],
-      },
-      subscription: {
-        summary: "Show one subscription and its delivery attempts.",
-        args: "<id>",
-        options: eventsScope,
-        examples: ["mcp-use events subscription sub_123"],
-      },
-      deliveries: {
-        summary: "List deliveries, or dead letters with --dead-letters.",
-        options: [
-          ...eventsScope,
-          ["--failed", "Only failed deliveries"],
-          ["--dead-letters", "List dead letters"],
-          ["--subscription <id>", "One subscription"],
-          ["--after <cursor>", "Page cursor"],
-          limit(200, 50),
-        ],
-        examples: ["mcp-use events deliveries --failed --branch main"],
-      },
-      redeliver: {
-        summary:
-          "Redeliver a dead letter with its original body and webhook-id.",
-        args: "<deadLetterId>",
-        options: eventsScope,
-        examples: ["mcp-use events redeliver d.123 --branch main"],
-      },
-      revoke: {
-        summary: "Revoke subscriptions of a principal or one subscription.",
-        options: [
-          ...eventsScope,
-          ["--principal <p>", "Principal"],
-          ["--event <name>", "Event name"],
-          ["--subscription <id>", "Subscription id"],
-          ["--reason <text>", "Reason sent to the subscriber"],
-        ],
-        examples: ["mcp-use events revoke --principal user_1 --branch main"],
-      },
-      emit: {
-        summary:
-          "Emit an event. Production requires --production; locally needs --url and --admin-secret.",
-        args: "<name>",
-        options: [
-          ...eventsScope,
-          ["--data <json|@file>", "Event payload"],
-          ["--event-id <id>", "Idempotency key"],
-          ["--principal <p>", "Only this principal"],
-          ["--subscription <id>", "Only this subscription"],
-          ...eventsApp,
-          yes,
-        ],
-        examples: [
-          "mcp-use events emit issue.opened --data @issue.json --branch main",
-        ],
-      },
-      purge: {
-        summary: "Decommission and delete a branch's Events state.",
-        options: [...eventsScope, ...eventsApp, yes],
-        examples: ["mcp-use events purge --branch feature-x --yes"],
-      },
-      export: {
-        summary:
-          "Export webhook records as SDK WebhookSubscriptionRecord lines (local mode only; includes secrets).",
-        options: [...eventsLocal, ["--format sdk", "Required output format"]],
-        examples: ["mcp-use events export --format sdk --env-file .env"],
       },
     },
   },

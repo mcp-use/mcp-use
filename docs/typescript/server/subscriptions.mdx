@@ -69,16 +69,6 @@ await server.notifyResourcesChanged();
 The related helpers are `notifyToolsChanged()` and
 `notifyPromptsChanged()`.
 
-## Choose live listeners or durable Events
-
-`subscriptions/listen` streams change notifications to clients that are
-connected now; a client that disconnects misses them. When subscribers must
-receive every occurrence, including while offline or through a webhook, use
-[Events](/typescript/server/events): they are durable, filtered by arguments,
-and replayable from a cursor. A client that opts in on `subscriptions/listen`
-also receives `notifications/events/list_changed` when the event catalog
-changes.
-
 ## Design for missed events
 
 Treat notifications as cache invalidations:

@@ -26,7 +26,6 @@ import { networkInterfaces } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
-import { randomBytes } from "node:crypto";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import type { ComponentType } from "react";
@@ -82,13 +81,11 @@ import {
   type DevInspectorHandler,
   type ProjectInspectorModule,
 } from "./inspector.js";
-import { isInspectorPath, isInspectorRequest } from "./inspector-route.js";
 import {
-  type EventsDevHandoff,
-  type EventsDevHandoffReason,
-  tunnelPathDecision,
-  tunnelPublicOrigin,
-} from "./dev-events.js";
+  isInspectorEventsHook,
+  isInspectorPath,
+  isInspectorRequest,
+} from "./inspector-route.js";
 // Bundled into the CLI artifact without becoming a runtime dependency.
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { createTunnelManager } from "@mcp-use/tunnel";
@@ -170,11 +167,6 @@ function sameDiscoveredViews(
 interface ServerLike {
   fetch(request: Request): Response | Promise<Response>;
   __setEventBus(bus: ServerEventBus): void;
-  /**
-   * Hand the Events dev runtime plain data for this generation (D44). Optional:
-   * older `mcp-use` versions do not implement it (contract S16).
-   */
-  __setEventsDev?(options: EventsDevHandoff): void;
   __setRequestLogPrefix(prefix: string | undefined): void;
   __setInspectorPath?(path: string | undefined): void;
   __mount(): void;
@@ -439,10 +431,10 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  */
 export async function runDev(options: DevOptions): Promise<void> {
   process.env.MCP_USE_DEV_CLI = "1";
+  // MCP Events in development: allow http and loopback callbacks (the
+  // Inspector webhook inbox). Subscriptions live in memory and reset on restart.
+  process.env.MCP_USE_EVENTS_INSECURE ??= "1";
   const paths = resolveWorkspacePaths(options.cwd);
-  // One random dev token per process (D41); the runtime in `mcp-use` keeps it
-  // across generations, keyed by the state directory.
-  const eventsDevToken = randomBytes(32).toString("base64url");
   const eventBus = new InMemoryServerEventBus((error) => {
     console.error("[mcp-use] notification delivery failed:", error);
   });
@@ -880,21 +872,6 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   let currentHandler: WebHandler;
   let basePath: string;
-  let activeServer: ServerLike | undefined;
-  let eventsPublicOrigin: string | undefined;
-  const eventsDevHandoff = (
-    nextBasePath: string,
-    reason: EventsDevHandoffReason = "generation"
-  ): EventsDevHandoff => ({
-    stateDir: paths.state,
-    devPort: port,
-    basePath: nextBasePath,
-    ...(eventsPublicOrigin === undefined
-      ? {}
-      : { publicOrigin: eventsPublicOrigin }),
-    token: eventsDevToken,
-    reason,
-  });
   let currentSkillsDirectory: string | undefined;
   try {
     const {
@@ -904,8 +881,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     } = await importServer(currentViews, currentLandingPath);
     server.__setEventBus(eventBus);
     basePath = server.basePath ?? "/mcp";
-    server.__setEventsDev?.(eventsDevHandoff(basePath));
-    activeServer = server;
     if (options.inspector !== false) {
       const loadedInspector = await loadProjectInspector(options.cwd);
       if (loadedInspector.installed) {
@@ -965,7 +940,6 @@ export async function runDev(options: DevOptions): Promise<void> {
             frontendConfigs: candidateFrontendConfigs,
           } = await importServer(viewsSnapshot, landingSnapshot);
           server.__setEventBus(eventBus);
-          server.__setEventsDev?.(eventsDevHandoff(server.basePath ?? "/mcp"));
           server.__setRequestLogPrefix(
             inspectorHandler === undefined ? undefined : "[server]"
           );
@@ -990,7 +964,6 @@ export async function runDev(options: DevOptions): Promise<void> {
           const landingChanged = currentLandingPath !== landingSnapshot;
           currentLandingPath = landingSnapshot;
           currentHandler = nextHandler;
-          activeServer = server;
           basePath = nextBasePath;
           currentSkillsDirectory = skillsDirectory;
           frontendConfigs = candidateFrontendConfigs;
@@ -1163,25 +1136,6 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
   const tunnelManager = createTunnelManager(paths.tunnel);
-  // Tell the dev runtime the tunnel host whenever a tunnel starts or stops,
-  // from `--tunnel` or the Inspector, so tunnel requests never get the dev
-  // principal or loopback callbacks (D13 a, D33).
-  const syncEventsTunnel = (url: string | null): void => {
-    eventsPublicOrigin = tunnelPublicOrigin(url);
-    activeServer?.__setEventsDev?.(eventsDevHandoff(basePath, "tunnel"));
-  };
-  const eventsAwareTunnel: typeof tunnelManager = {
-    start: async (tunnelPort) => {
-      const started = await tunnelManager.start(tunnelPort);
-      syncEventsTunnel(started.url);
-      return started;
-    },
-    stop: async () => {
-      await tunnelManager.stop();
-      syncEventsTunnel(null);
-    },
-    status: () => tunnelManager.status(),
-  };
 
   // Vite owns the upgrade listener and validates Host before our HTTP request
   // guard runs. The public tunnel has already been validated by the proxy and
@@ -1278,7 +1232,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     {
       getBasePath: () => basePath,
       port,
-      tunnel: eventsAwareTunnel,
+      tunnel: tunnelManager,
     },
     (request) => {
       if (
@@ -1325,7 +1279,8 @@ export async function runDev(options: DevOptions): Promise<void> {
         (wildcardBind &&
           requestHostname !== undefined &&
           !["localhost", "127.0.0.1", "::1"].includes(requestHostname))) &&
-      tunnelPathDecision(req.method ?? "GET", pathname, basePath) === "block"
+      isInspectorPath(pathname, basePath) &&
+      !isInspectorEventsHook(req.method ?? "GET", pathname, basePath)
     ) {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("Not Found");
@@ -1452,9 +1407,6 @@ export async function runDev(options: DevOptions): Promise<void> {
   if (options.tunnel === true) {
     try {
       const { url } = await tunnelManager.start(port);
-      // Tell the dev runtime the tunnel host so tunnel requests never get the
-      // dev principal or loopback callbacks (D13 a, D33).
-      syncEventsTunnel(url);
       console.log(`  ➜ Tunnel:        ${url}${basePath}`);
     } catch (error) {
       await teardown();

@@ -239,30 +239,6 @@ The
 [maintained middleware example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/middleware)
 includes a runnable tool-call wrapper and a protected discovery request.
 
-## Observe Events operations
-
-`server.on("mcp:…")` registers read-only operation observers;
-`server.use("mcp:…")` wraps operations. Both cover `events/list`,
-`events/subscribe`, `events/unsubscribe`, `events/poll` and `events/stream`.
-
-```ts
-server.on("mcp:events/subscribe:complete", (ctx) => metrics.increment("events.subscribe", { name: ctx.params.name }));
-server.use("mcp:events/subscribe", async (ctx, next) => { audit.log(ctx.auth, ctx.params.name); return next(); });
-server.use("mcp:events/stream", async (ctx, next) => next()); // wraps the open step only
-server.on("mcp:events/stream:closed", () => metrics.gauge("events.streams", -1));
-```
-
-- For `events/stream`, middleware wraps the open step (validation,
-  `authorize`, start). `mcp:events/stream:complete` fires when the stream
-  opens and `mcp:events/stream:closed` when it ends.
-- `server.use("mcp:*")` also wraps `events/*`.
-- Webhook secrets are redacted: `ctx.params.delivery.secret` is
-  `"whsec_[redacted]"` in every middleware and observer.
-- `server.on("note.created")` throws `ON_NOT_EVENT`; observers watch MCP
-  operations, not your events.
-
-See [`examples/observers`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/observers).
-
 ## Next steps
 
 <CardGroup cols={2}>

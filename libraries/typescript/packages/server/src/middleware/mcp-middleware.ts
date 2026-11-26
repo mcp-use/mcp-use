@@ -14,83 +14,6 @@ import type {
   ResultTypeMap,
 } from "@modelcontextprotocol/server";
 import type { Context, Env, HonoRequest } from "hono";
-import type {
-  ListEventsRequestParams,
-  ListEventsResult,
-  PollEventsRequestParams,
-  PollEventsResult,
-  SubscribeEventsRequestParams,
-  SubscribeEventsResult,
-  UnsubscribeEventsRequestParams,
-  UnsubscribeEventsResult,
-} from "@mcp-use/events-core";
-import { EventsConfigError } from "../events/config-error.js";
-import { redactEventsParams } from "../events/confine.js";
-
-const EVENTS_MIDDLEWARE_METHODS = [
-  "events/list",
-  "events/subscribe",
-  "events/unsubscribe",
-  "events/poll",
-  "events/stream",
-] as const;
-
-/**
- * MCP Events methods wrapped by `MCPServer.use` (D43). They are kept
- * apart from {@link McpMiddlewareMethod} because the SDK never dispatches them:
- * the Events responder runs the chain around its own handlers.
- */
-export type EventsMiddlewareMethod = (typeof EVENTS_MIDDLEWARE_METHODS)[number];
-
-/**
- * Params and results of the `events/*` methods as middleware sees them (D43).
- * `params.delivery.secret` is always `"whsec_[redacted]"` (D42).
- */
-export interface EventsOperationMap {
-  /** `events/list`. */
-  "events/list": {
-    /** List params. */
-    params: ListEventsRequestParams;
-    /** List result. */
-    result: ListEventsResult;
-  };
-  /** `events/subscribe`. */
-  "events/subscribe": {
-    /** Subscribe params, with the secret redacted. */
-    params: SubscribeEventsRequestParams;
-    /** Subscribe result. */
-    result: SubscribeEventsResult;
-  };
-  /** `events/unsubscribe`. */
-  "events/unsubscribe": {
-    /** Unsubscribe params, with the secret redacted. */
-    params: UnsubscribeEventsRequestParams;
-    /** Unsubscribe result. */
-    result: UnsubscribeEventsResult;
-  };
-  /** `events/poll`. */
-  "events/poll": {
-    /** Poll params. */
-    params: PollEventsRequestParams;
-    /** Poll result. */
-    result: PollEventsResult;
-  };
-  /** `events/stream`; the chain wraps the open step only. */
-  "events/stream": {
-    /** Stream params. */
-    params: Record<string, unknown> & { name: string };
-    /** The open step's outcome (the stream itself is not a JSON result). */
-    result: unknown;
-  };
-}
-
-/** Why an `events/stream` ended, reported to `mcp:events/stream:closed` observers. */
-export type EventsStreamCloseReason =
-  | "rotated"
-  | "terminated"
-  | "aborted"
-  | "backlog"
-  | "shutdown";
 
 const MCP_MIDDLEWARE_METHODS = [
   "tools/call",
@@ -242,28 +165,6 @@ export type MiddlewareContext<
         : unknown)
   : never;
 
-/** Context passed to `mcp:events/*` middleware. */
-export type EventsMiddlewareContext<
-  M extends EventsMiddlewareMethod = EventsMiddlewareMethod,
-  TEnv extends Env = Env,
-> = M extends EventsMiddlewareMethod
-  ? MiddlewareContextCommon<TEnv> & {
-      /** The Events method. */
-      method: M;
-      /** Params with `delivery.secret` redacted. */
-      params: EventsOperationMap[M]["params"];
-    }
-  : never;
-
-/** Middleware for one exact Events method. */
-export type EventsExactMiddlewareFn<
-  M extends EventsMiddlewareMethod,
-  TEnv extends Env = Env,
-> = (
-  ctx: EventsMiddlewareContext<M, TEnv>,
-  next: () => Promise<EventsOperationMap[M]["result"]>
-) => Promise<EventsOperationMap[M]["result"]>;
-
 /** Preferred explicit name for the method-correlated middleware context. */
 export type McpMiddlewareContext<
   M extends McpMiddlewareMethod = McpMiddlewareMethod,
@@ -320,10 +221,7 @@ export type McpMiddlewareFn<
 ) => Promise<void>;
 
 /** Exact MCP middleware methods plus the global pass-through wildcard. */
-export type McpMiddlewarePatternBody =
-  | McpMiddlewareMethod
-  | EventsMiddlewareMethod
-  | "*";
+export type McpMiddlewarePatternBody = McpMiddlewareMethod | "*";
 
 /** Canonical `mcp:` middleware patterns. */
 export type McpMiddlewarePattern = `mcp:${McpMiddlewarePatternBody}`;
@@ -333,8 +231,7 @@ export type McpEventPatternBody =
   | McpMiddlewarePatternBody
   | "tools/*"
   | "resources/*"
-  | "prompts/*"
-  | "events/*";
+  | "prompts/*";
 
 type McpEventBasePattern = `mcp:${McpEventPatternBody}`;
 
@@ -366,9 +263,7 @@ export type McpMiddlewareFnFor<
   StripMcpPrefix<P> extends infer Body
     ? Body extends McpMiddlewareMethod
       ? McpExactMiddlewareFn<Body, TEnv>
-      : Body extends EventsMiddlewareMethod
-        ? EventsExactMiddlewareFn<Body, TEnv>
-        : McpMiddlewareFn<McpMiddlewareMethodsForPattern<P>, TEnv>
+      : McpMiddlewareFn<McpMiddlewareMethodsForPattern<P>, TEnv>
     : never;
 
 /**
@@ -405,11 +300,7 @@ export function createMcpMiddlewareEntry(
   const normalizedPattern = normalizeMcpMiddlewarePattern(pattern);
   const invoke = handler as McpMiddlewareEntry["handler"];
 
-  if (
-    normalizedPattern !== "*" &&
-    !isMcpMiddlewareMethod(normalizedPattern) &&
-    !isEventsMiddlewareMethod(normalizedPattern)
-  ) {
+  if (normalizedPattern !== "*" && !isMcpMiddlewareMethod(normalizedPattern)) {
     throw new TypeError(
       `Unsupported MCP middleware pattern "${pattern}". Use an exact MCP method or "mcp:*".`
     );
@@ -445,14 +336,7 @@ export function createMcpMiddlewareEntry(
 }
 
 /** Phase for MCP observer event listeners registered via `server.on()`. */
-export type McpObserverPhase = "before" | "complete" | "closed";
-
-/**
- * Phase for observers registered via `server.on()`.
- *
- * @deprecated Use {@link McpObserverPhase}. Kept permanently as a type alias.
- */
-export type McpEventPhase = McpObserverPhase;
+export type McpEventPhase = "before" | "complete";
 
 /** Read-only observer context correlated by MCP method. */
 export type ReadonlyMiddlewareContext<
@@ -513,17 +397,9 @@ type McpExactCompleteEventListenerFn<
 ) => void;
 
 /** MCP observer pattern, optionally targeting the completion phase. */
-export type McpObserverPattern =
+export type McpEventPattern =
   | McpEventBasePattern
-  | `${McpEventBasePattern}:complete`
-  | "mcp:events/stream:closed";
-
-/**
- * MCP observer pattern.
- *
- * @deprecated Use {@link McpObserverPattern}. Kept permanently as a type alias.
- */
-export type McpEventPattern = McpObserverPattern;
+  | `${McpEventBasePattern}:complete`;
 
 type StripCompleteSuffix<P extends string> = P extends `${infer Body}:complete`
   ? Body
@@ -533,38 +409,21 @@ type StripCompleteSuffix<P extends string> = P extends `${infer Body}:complete`
 export type McpEventListenerFnFor<
   P extends McpEventPattern,
   TEnv extends Env = Env,
-> = P extends "mcp:events/stream:closed"
-  ? (
-      ctx: Readonly<{
-        method: "events/stream";
-        params: Readonly<Record<string, unknown>>;
-      }>,
-      info: { reason: EventsStreamCloseReason }
-    ) => void
-  : StripCompleteSuffix<StripMcpPrefix<P>> extends infer Body
-    ? Body extends EventsMiddlewareMethod | "events/*"
-      ? (
-          ctx: Readonly<{
-            method: EventsMiddlewareMethod;
-            params: Readonly<Record<string, unknown>>;
-            auth?: Readonly<AuthInfo>;
-            state: ReadonlyMap<string, unknown>;
-          }>,
-          result?: unknown
-        ) => void
-      : Body extends McpMiddlewareMethod
-        ? P extends `${string}:complete`
-          ? McpExactCompleteEventListenerFn<Body, TEnv>
-          : McpExactEventListenerFn<Body, TEnv>
-        : P extends `${string}:complete`
-          ? McpCompleteEventListenerFn<
-              McpMiddlewareMethodsForPattern<StripCompleteSuffix<P>>,
-              TEnv
-            >
-          : McpEventListenerFn<
-              McpMiddlewareMethodsForPattern<StripCompleteSuffix<P>>,
-              TEnv
-            >
+> =
+  StripCompleteSuffix<StripMcpPrefix<P>> extends infer Body
+    ? Body extends McpMiddlewareMethod
+      ? P extends `${string}:complete`
+        ? McpExactCompleteEventListenerFn<Body, TEnv>
+        : McpExactEventListenerFn<Body, TEnv>
+      : P extends `${string}:complete`
+        ? McpCompleteEventListenerFn<
+            McpMiddlewareMethodsForPattern<StripCompleteSuffix<P>>,
+            TEnv
+          >
+        : McpEventListenerFn<
+            McpMiddlewareMethodsForPattern<StripCompleteSuffix<P>>,
+            TEnv
+          >
     : never;
 
 /** Internal type-erased observer entry. @internal */
@@ -584,7 +443,6 @@ export function createMcpEventListenerEntry(
   pattern: McpEventPattern,
   handler: McpEventListenerFnFor<McpEventPattern>
 ): McpEventListenerEntry {
-  assertObserverPattern(pattern);
   const { pattern: normalizedPattern, phase } = parseMcpPattern(pattern);
   const invoke = handler as McpEventListenerEntry["handler"];
 
@@ -603,12 +461,6 @@ export function matchesPattern(pattern: string, method: string): boolean {
     return method.startsWith(prefix);
   }
   return pattern === method;
-}
-
-function isEventsMiddlewareMethod(
-  value: string
-): value is EventsMiddlewareMethod {
-  return EVENTS_MIDDLEWARE_METHODS.some((method) => method === value);
 }
 
 function isMcpMiddlewareMethod(value: string): value is McpMiddlewareMethod {
@@ -800,9 +652,6 @@ export function parseMcpPattern(raw: string): {
   phase: McpEventPhase;
 } {
   const pattern = raw.startsWith("mcp:") ? raw.slice(4) : raw;
-  if (pattern.endsWith(":closed")) {
-    return { pattern: pattern.slice(0, -":closed".length), phase: "closed" };
-  }
   if (pattern.endsWith(":complete")) {
     return {
       pattern: pattern.slice(0, -":complete".length),
@@ -816,138 +665,3 @@ export function parseMcpPattern(raw: string): {
 export function normalizeMcpMiddlewarePattern(raw: string): string {
   return raw.startsWith("mcp:") ? raw.slice(4) : raw;
 }
-
-/**
- * `server.on()` takes operation patterns (`mcp:tools/call`). An event-shaped
- * pattern such as `note.created` is a mistake for an MCP Event name and
- * throws `ON_NOT_EVENT` (D3). Other patterns are accepted as before.
- *
- * @param pattern - The pattern passed to `server.on()`.
- */
-export function assertObserverPattern(pattern: string): void {
-  const body = pattern.startsWith("mcp:") ? pattern.slice(4) : pattern;
-  if (/^[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9_:-]+)+$/.test(body)) {
-    throw new EventsConfigError(
-      "ON_NOT_EVENT",
-      `server.on("${pattern}") observes MCP operations, not MCP Events. To emit "${body}", use server.event(); to observe subscriptions, use server.on("mcp:events/subscribe").`,
-      { pattern }
-    );
-  }
-}
-
-/**
- * Run the `mcp:events/*` middleware chain and observers around an Events
- * handler (D43). Middleware and observers see params with
- * `delivery.secret` redacted (D42); the handler keeps the original params in
- * its own closure. For `events/stream` the chain wraps the open step.
- *
- * @param middlewares - Registered middleware entries.
- * @param observers - Registered observer entries.
- * @param method - The Events method.
- * @param ctx - Context fields (auth, request, session, state) without params.
- * @param params - The original params (redacted before exposure).
- * @param innerFn - The Events handler.
- */
-export async function runEventsOperation<M extends EventsMiddlewareMethod>(
-  middlewares: McpMiddlewareEntry[],
-  observers: McpEventListenerEntry[],
-  method: M,
-  ctx: Record<string, unknown> & { state?: Map<string, unknown> },
-  params: unknown,
-  innerFn: () => Promise<EventsOperationMap[M]["result"]>
-): Promise<EventsOperationMap[M]["result"]> {
-  const fullCtx = {
-    state: new Map<string, unknown>(),
-    ...ctx,
-    method,
-    params: redactEventsParams(params),
-  } as unknown as MiddlewareContext;
-  dispatchObservers(observers, method, "before", fullCtx);
-  const matching = middlewares.filter((entry) =>
-    matchesPattern(entry.pattern, method)
-  );
-  let index = -1;
-  const dispatch = (i: number): Promise<unknown> => {
-    if (i <= index) {
-      return Promise.reject(new Error("next() called multiple times"));
-    }
-    index = i;
-    if (i === matching.length) return innerFn();
-    return matching[i]!.handler(fullCtx, () => dispatch(i + 1));
-  };
-  const result = await dispatch(0);
-  if (
-    method !== "events/stream" &&
-    (typeof result !== "object" || result === null || Array.isArray(result))
-  ) {
-    throw new TypeError(
-      `[mcp-use] ${method} middleware returned an invalid result: expected an object`
-    );
-  }
-  dispatchObservers(observers, method, "complete", fullCtx, result);
-  return result as EventsOperationMap[M]["result"];
-}
-
-/**
- * Notify `mcp:events/stream:closed` observers.
- *
- * @param observers - Registered observer entries.
- * @param params - The stream's original params (redacted before exposure).
- * @param reason - Why the stream ended.
- */
-export function dispatchEventsStreamClosed(
-  observers: McpEventListenerEntry[],
-  params: unknown,
-  reason: EventsStreamCloseReason
-): void {
-  const ctx = {
-    method: "events/stream",
-    params: redactEventsParams(params),
-    state: new Map(),
-  } as unknown as MiddlewareContext;
-  dispatchObservers(observers, "events/stream", "closed", ctx, { reason });
-}
-
-function dispatchObservers(
-  observers: McpEventListenerEntry[],
-  method: string,
-  phase: McpObserverPhase,
-  ctx: MiddlewareContext,
-  result?: unknown
-): void {
-  const frozen = freezeMiddlewareContext(ctx);
-  for (const entry of observers) {
-    if (entry.phase !== phase || !matchesPattern(entry.pattern, method)) {
-      continue;
-    }
-    try {
-      entry.handler(frozen as unknown as ReadonlyMiddlewareContext, result);
-    } catch (error) {
-      console.error(
-        `[mcp-use] MCP observer for "${entry.pattern}" (${phase}) threw:`,
-        error
-      );
-    }
-  }
-}
-
-/** Operation observer invoked before a method runs. */
-export type McpObserverFn<
-  Methods extends McpMiddlewareMethod = McpMiddlewareMethod,
-  TEnv extends Env = Env,
-> = McpEventListenerFn<Methods, TEnv>;
-
-/** Operation observer invoked after a method completes. */
-export type McpCompleteObserverFn<
-  Methods extends McpMiddlewareMethod = McpMiddlewareMethod,
-  TEnv extends Env = Env,
-> = McpCompleteEventListenerFn<Methods, TEnv>;
-
-/** Typed operation observer for pattern `P`. */
-export type McpObserverFnFor<
-  P extends McpObserverPattern,
-  TEnv extends Env = Env,
-> = McpEventListenerFnFor<P, TEnv>;
-
-/** Operation observer pattern body (`tools/call`, `tools/*`, `events/*`, …). */
-export type McpObserverPatternBody = McpEventPatternBody;

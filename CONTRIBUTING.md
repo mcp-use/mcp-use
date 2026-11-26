@@ -350,27 +350,6 @@ concurrent branch updates.
 - Prefer `const` over `let`
 - Use async/await over raw promises
 
-### Bumping the MCP SDK
-
-`@modelcontextprotocol/{server,client,core}` share one exact pin in the
-`mcp-sdk` catalog of `libraries/typescript/pnpm-workspace.yaml`. The SDK is
-compiled into `mcp-use`, the CLI and the Inspector, so a bump is verified with
-a full workspace build per SDK version (the SDK matrix):
-
-1. Use the Renovate `mcp-sdk` PR (label `sdk-bump`) or a branch named
-   `sdk-bump/<version>`. Change only the catalog pin, plus
-   `libraries/typescript/patches/sdk/<version>.patch` if the old patch no longer
-   applies (never `allowUnusedPatches`).
-2. The `Events SDK matrix` workflow runs the `candidate` leg. It must be green on
-   every suite: build and typecheck, SDK contract tests, Events conformance (both
-   dialects), interop, and subscription continuity in both directions.
-3. Check that no open `sdk-compat-blocker` issue names the version.
-4. Run the Manufact dev-space E2E on the candidate when it is available.
-5. Never auto-merge. A maintainer merges, and the candidate becomes `pinned`.
-
-To try a leg locally, run it in a throwaway worktree, never your checkout:
-`node scripts/sdk-matrix/apply.mjs <leg> --scratch`.
-
 ---
 
 ## Pull Request Process

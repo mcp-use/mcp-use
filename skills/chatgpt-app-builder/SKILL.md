@@ -17,7 +17,6 @@ Treat the installed `mcp-use` package, its exported types, generated declaration
    - [Authentication](references/auth.md) for OAuth providers, verified identity, scopes, permissions, and authorization.
    - [Skills over MCP](references/skills-over-mcp.md) when a server should ship reusable workflows alongside its tools.
    - [Advanced features](references/advanced-features.md) for OpenAPI, proxying, notifications, subscriptions, and elicitation.
-   - [Events](references/events.md) for MCP Events: `server.event()`, `emit()`, descriptions, replay, delivery modes, ChatGPT automations, and hosting.
    - [Migration](references/migration.md) only when retired or compatibility-only imports, helpers, registration shapes, UI patterns, or session assumptions are present.
    - [Verification](references/verification.md) before reporting implementation work complete.
 4. Implement against installed types. Prefer the framework's current conventions over copied examples or historical changelogs.

@@ -17,12 +17,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm run build:events-core && pnpm run build:client && pnpm run build:tunnel && pnpm run build:mcp-use && pnpm run build:other",
-    "build:events-core": "pnpm --filter @mcp-use/events-core build",
+    "build": "pnpm run build:client && pnpm run build:tunnel && pnpm run build:mcp-use && pnpm run build:other",
     "build:client": "pnpm --filter @mcp-use/client build",
     "build:tunnel": "pnpm --filter @mcp-use/tunnel build",
     "build:mcp-use": "pnpm --filter mcp-use build",
-    "build:other": "pnpm --filter \"{packages/*}\" --filter \"!mcp-use\" --filter \"!@mcp-use/client\" --filter \"!@mcp-use/tunnel\" --filter \"!@mcp-use/events-core\" build",
+    "build:other": "pnpm --filter \"{packages/*}\" --filter \"!mcp-use\" --filter \"!@mcp-use/client\" --filter \"!@mcp-use/tunnel\" build",
     "test": "pnpm run -r test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -38,7 +37,6 @@
     "version": "node scripts/version-packages.mjs && pnpm install --no-frozen-lockfile",
     "version:exit-prerelease": "node scripts/version-packages.mjs",
     "release-channel": "node scripts/release-channel.mjs",
-    "test:events-ci": "node --test scripts/sdk-matrix/native-events-detector.test.mjs e2e/live/record.test.mjs",
     "test:release-channel": "node --test scripts/release-channel.test.mjs scripts/release-propagation.test.mjs",
     "release": "pnpm build && changeset publish",
     "version:check": "changeset status",

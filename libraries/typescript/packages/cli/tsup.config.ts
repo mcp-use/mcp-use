@@ -1,7 +1,5 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "tsup";
-import { sdkIdentityDefine } from "../../scripts/sdk-identity.mjs";
 import {
   POSTHOG_API_KEY,
   POSTHOG_HOST,
@@ -67,8 +65,6 @@ export default defineConfig({
   noExternal: ["@mcp-use/tunnel", "openapi-fetch"],
   define: {
     __MCP_USE_CLI_VERSION__: JSON.stringify(cliPackage.version),
-    // The CLI bundles the official SDK; record which one (PLAN.md D82).
-    ...sdkIdentityDefine(fileURLToPath(new URL(".", import.meta.url))),
     // Reuse the SDK's public ingestion project at build time. The CLI stays
     // independent of the optional client package at runtime.
     __MCP_USE_POSTHOG_HOST__: JSON.stringify(

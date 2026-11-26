@@ -243,13 +243,6 @@ export interface CustomOAuthProviderOptions<
   /** Maps verified SDK auth information into mcp-use callback identity data. */
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
   /**
-   * Stable principal for MCP Events subscriptions (D13), computed once per
-   * verified token into `authInfo.extra.principal` and exposed as
-   * `ctx.auth.principal`. Defaults to `"{iss}|{sub}"` from the verified
-   * token claims; return `undefined` when the token carries no identity.
-   */
-  principal?: (authInfo: OAuthAuthInfo) => string | undefined;
-  /**
    * Optional hook invoked once while the server mounts. Providers use it to
    * install MCP middleware, provider-owned tools, resources, and prompts, or
    * instructions text that the authorization model requires. See
@@ -347,7 +340,6 @@ export function oauthCustomProvider<
     oauthMetadata: options.oauthMetadata,
     mapAuthInfo: options.mapAuthInfo,
     ...(options.setup !== undefined && { setup: options.setup }),
-    ...(options.principal !== undefined && { principal: options.principal }),
     ...(options.resource !== undefined && { resource: options.resource }),
     ...(options.requiredScopes !== undefined && {
       requiredScopes: [...options.requiredScopes],

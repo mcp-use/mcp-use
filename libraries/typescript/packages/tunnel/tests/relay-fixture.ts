@@ -142,14 +142,6 @@ export async function createRelayFixture(): Promise<{
 
       const requestId = randomUUID();
       pending.set(requestId, { response });
-      // Like the production relay: a public client that goes away before
-      // response-end cancels the local request.
-      response.once("close", () => {
-        if (!pending.delete(requestId)) return;
-        if (tunnel?.socket.readyState === WebSocket.OPEN) {
-          tunnel.socket.send(JSON.stringify({ type: "cancel", requestId }));
-        }
-      });
       tunnel.socket.send(
         JSON.stringify({
           type: "request-start",

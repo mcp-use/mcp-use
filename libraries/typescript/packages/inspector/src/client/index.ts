@@ -64,17 +64,6 @@ export {
 } from "./components/ResourcesTab.js";
 export { PromptsTab, type PromptsTabRef } from "./components/PromptsTab.js";
 export { SkillsTab, type SkillsTabProps } from "./components/SkillsTab.js";
-export { EventsTab, type EventsTabProps } from "./components/EventsTab.js";
-export {
-  HttpEventsInboxProvider,
-  type EventsInbox,
-  type EventsInboxCheck,
-  type EventsInboxDelivery,
-  type EventsInboxFault,
-  type EventsInboxPatch,
-  type EventsInboxProfile,
-  type EventsInboxProvider,
-} from "./utils/events-inbox-provider.js";
 
 // ---------------------------------------------------------------------------
 // Chat components – embeddable chat UI for MCP servers

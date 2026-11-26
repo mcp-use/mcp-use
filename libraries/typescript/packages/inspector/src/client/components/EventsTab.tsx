@@ -1,324 +1,225 @@
 import type { McpServer } from "@mcp-use/client/react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  listEvents,
+  subscribeEvent,
+  unsubscribeEvent,
+  type EventInfo,
+  type EventsRequester,
+} from "@mcp-use/client/events";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/client/components/ui/button";
-import { useEventsInbox } from "@/client/hooks/useEventsInbox";
-import {
-  supportsEvents,
-  useEventSubscriptions,
-  type InspectorEventDescriptor,
-} from "@/client/hooks/useEventSubscriptions";
-import {
-  HttpEventsInboxProvider,
-  type EventsInboxDelivery,
-  type EventsInboxProfile,
-  type EventsInboxProvider,
-} from "@/client/utils/events-inbox-provider";
-import { Faults } from "./events/Faults";
-import { Inbox } from "./events/Inbox";
-import { PollPanel } from "./events/PollPanel";
+import { inspectorApi } from "@/client/utils/basePath";
 
-/** Props of {@link EventsTab}. */
-export interface EventsTabProps {
-  /** The connected server. */
-  server: McpServer;
-  /** Inbox backend; default the Inspector server's routes. */
-  inboxProvider?: EventsInboxProvider;
-  /** Prefix the Inspector server is mounted under, for the default provider. */
-  basePath?: string;
-  /** Forwards an event delivery to the Chat tab, wrapped as untrusted data. */
-  onRunInChat?: (text: string) => void;
+/** Whether the server advertises MCP Events (`capabilities.events`). */
+export function supportsEvents(server: McpServer | undefined): boolean {
+  return server?.capabilities?.events !== undefined;
 }
 
-const PROFILES: Array<{ value: EventsInboxProfile; label: string }> = [
-  { value: "auto", label: "Auto" },
-  { value: "sep-3415", label: "SEP-3415" },
-  { value: "openai", label: "ChatGPT emulation" },
-];
-
-declare global {
-  interface Window {
-    __MCP_USE_DEV_TOKEN__?: string;
-  }
+interface InboxDelivery {
+  receivedAt: string;
+  webhookId: string | null;
+  subscriptionId: string | null;
+  verified: boolean;
+  kind: "verification" | "event";
+  body: unknown;
 }
 
-function parseJsonObject(text: string): Record<string, unknown> | string {
-  if (!text.trim()) return {};
-  try {
-    const v = JSON.parse(text);
-    return v && typeof v === "object" && !Array.isArray(v)
-      ? (v as Record<string, unknown>)
-      : "arguments must be a JSON object";
-  } catch (e) {
-    return (e as Error).message;
-  }
+interface ActiveSubscription {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+  url: string;
+  refreshBefore: string | null;
+}
+
+function sessionOf(server: McpServer): EventsRequester | undefined {
+  const client = server.client;
+  const name = client?.activeSessions[0];
+  const session = name ? client?.getSession(name) : null;
+  return session ?? undefined;
 }
 
 /**
- * The Events tab (§10.3): catalog, client profile, webhook subscribe with the
- * Inspector inbox as the receiver, live deliveries with checks, fault presets
- * and the poll panel.
- *
- * TODO(events): push panel (`StreamPanel`), server subscriptions panel
- * (admin routes), conformance panel, lint, legacy-`initialize` ChatGPT
- * emulation, auto-refresh timers and "Expose inbox" are not built yet.
+ * The Events tab: the server's events, a subscribe form whose callback is
+ * the Inspector's webhook inbox, and the deliveries the inbox received.
  */
-export function EventsTab({
-  server,
-  inboxProvider,
-  basePath = "",
-  onRunInChat,
-}: EventsTabProps) {
-  const provider = useMemo(
-    () =>
-      inboxProvider ??
-      new HttpEventsInboxProvider(
-        basePath,
-        typeof window !== "undefined" ? window.__MCP_USE_DEV_TOKEN__ : undefined
-      ),
-    [inboxProvider, basePath]
-  );
-  const [profile, setProfile] = useState<EventsInboxProfile>("auto");
-  const inbox = useEventsInbox(provider, profile);
-  const subs = useEventSubscriptions(server);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [argsText, setArgsText] = useState("{}");
-  const [cursor, setCursor] = useState("");
-  const [maxAgeMs, setMaxAgeMs] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
+export function EventsTab({ server }: { server: McpServer }) {
+  const [events, setEvents] = useState<EventInfo[]>([]);
+  const [selected, setSelected] = useState("");
+  const [args, setArgs] = useState("{}");
+  const [inbox, setInbox] = useState<{
+    id: string;
+    secret: string;
+    url: string;
+  }>();
+  const [subs, setSubs] = useState<ActiveSubscription[]>([]);
+  const [deliveries, setDeliveries] = useState<InboxDelivery[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const ready = server.state === "ready";
 
-  const event: InspectorEventDescriptor | undefined =
-    subs.events.find((e) => e.name === selected) ?? subs.events[0];
-
-  // A `terminated` delivery ends its subscription row.
   useEffect(() => {
-    const last = inbox.deliveries[inbox.deliveries.length - 1];
-    const subId = last?.headers["x-mcp-subscription-id"];
-    if (last?.kind === "terminated" && subId) subs.markEnded(subId);
-  }, [inbox.deliveries, subs.markEnded]);
+    const session = sessionOf(server);
+    if (!ready || !session) return;
+    listEvents(session)
+      .then((list) => {
+        setEvents(list);
+        setSelected((s) => s || list[0]?.name || "");
+      })
+      .catch((e: Error) => setError(e.message));
+  }, [server, ready]);
 
-  if (!supportsEvents(server)) {
-    return (
-      <div className="p-6 text-sm text-muted-foreground">
-        This server does not advertise MCP Events.
-      </div>
-    );
-  }
+  useEffect(() => {
+    fetch(inspectorApi("events/inboxes"), { method: "POST" })
+      .then((r) => r.json())
+      .then((b: { id: string; secret: string; path: string }) =>
+        setInbox({
+          id: b.id,
+          secret: b.secret,
+          url: `${window.location.origin}${b.path}`,
+        })
+      )
+      .catch((e: Error) => setError(`inbox: ${e.message}`));
+  }, []);
 
-  const readForm = () => {
-    const args = parseJsonObject(argsText);
-    if (typeof args === "string") {
-      setFormError(args);
-      return undefined;
+  useEffect(() => {
+    if (!inbox) return;
+    const timer = setInterval(() => {
+      fetch(inspectorApi(`events/inboxes/${inbox.id}`))
+        .then((r) => r.json())
+        .then((b: { deliveries?: InboxDelivery[] }) =>
+          setDeliveries(b.deliveries ?? [])
+        )
+        .catch(() => undefined);
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [inbox]);
+
+  const subscribe = useCallback(async () => {
+    setError(null);
+    const session = sessionOf(server);
+    if (!session || !inbox) return;
+    try {
+      const parsed = JSON.parse(args || "{}") as Record<string, unknown>;
+      const result = await subscribeEvent(session, {
+        name: selected,
+        arguments: parsed,
+        url: inbox.url,
+        secret: inbox.secret,
+      });
+      setSubs((all) => [
+        ...all.filter((s) => s.id !== result.id),
+        {
+          id: result.id,
+          name: selected,
+          arguments: parsed,
+          url: inbox.url,
+          refreshBefore: result.refreshBefore,
+        },
+      ]);
+    } catch (e) {
+      setError((e as Error).message);
     }
-    setFormError(null);
-    const age = maxAgeMs.trim() ? Number(maxAgeMs) : undefined;
-    return {
-      name: event!.name,
-      arguments: args,
-      cursor: cursor.trim() ? cursor.trim() : undefined,
-      maxAgeMs: Number.isFinite(age) ? age : undefined,
-    };
-  };
+  }, [server, inbox, args, selected]);
 
-  const subscribeWebhook = async (fromCursor?: string | null) => {
-    const form = readForm();
-    if (!form) return;
-    const box = await inbox.ensure();
-    const sub = await subs.subscribe({
-      ...form,
-      cursor: fromCursor !== undefined ? fromCursor : form.cursor,
-      url: box.callbackUrl,
-      secret: box.secret,
-    });
-    if (sub?.cursor) setCursor(sub.cursor);
-  };
+  const unsubscribe = useCallback(
+    async (sub: ActiveSubscription) => {
+      const session = sessionOf(server);
+      if (!session) return;
+      try {
+        await unsubscribeEvent(session, sub);
+        setSubs((all) => all.filter((s) => s.id !== sub.id));
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    },
+    [server]
+  );
 
-  const pollOnce = async () => {
-    const form = readForm();
-    if (!form) return;
-    const res = await subs.poll(form);
-    if (res?.result.cursor) setCursor(res.result.cursor);
-  };
-
-  const runInChat = onRunInChat
-    ? (d: EventsInboxDelivery) =>
-        onRunInChat(`<untrusted-mcp-event>\n${d.body}\n</untrusted-mcp-event>`)
-    : undefined;
+  const current = events.find((e) => e.name === selected);
 
   return (
-    <div className="flex h-full min-h-0" data-testid="events-tab">
-      <aside className="w-72 shrink-0 space-y-4 overflow-auto border-r border-border p-3 text-sm">
-        <fieldset className="space-y-1">
-          <legend className="font-semibold">Client profile</legend>
-          {PROFILES.map((p) => (
-            <label key={p.value} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="events-profile"
-                checked={profile === p.value}
-                onChange={() => {
-                  setProfile(p.value);
-                  if (inbox.inbox) void inbox.setProfile(p.value);
-                }}
-              />
-              {p.label}
-            </label>
-          ))}
-        </fieldset>
-        <div>
-          <div className="mb-1 flex items-center justify-between">
-            <span className="font-semibold">Events</span>
-            <button
-              type="button"
-              className="text-xs underline"
-              onClick={() => void subs.refreshCatalog()}
-            >
-              {subs.loading ? "Loading…" : "Refresh"}
-            </button>
-          </div>
-          <ul data-testid="events-catalog">
-            {subs.events.map((e) => (
-              <li key={e.name}>
-                <button
-                  type="button"
-                  className={`w-full rounded px-2 py-1 text-left ${
-                    e.name === event?.name ? "bg-muted" : ""
-                  }`}
-                  onClick={() => setSelected(e.name)}
-                >
-                  <span className="font-mono">{e.name}</span>{" "}
-                  <span className="text-xs text-muted-foreground">
-                    {e.delivery.join(" · ")}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <span className="font-semibold">My subscriptions</span>
-          <ul
-            className="mt-1 space-y-1 text-xs"
-            data-testid="events-subscriptions"
-          >
-            {subs.subscriptions.map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center justify-between gap-1"
+    <div className="h-full overflow-auto p-4 space-y-6 text-sm">
+      {error && <div className="text-red-600">{error}</div>}
+      <section className="space-y-2">
+        <h2 className="font-semibold">Events</h2>
+        {events.length === 0 && (
+          <p className="text-muted-foreground">No events.</p>
+        )}
+        <ul className="space-y-1">
+          {events.map((e) => (
+            <li key={e.name}>
+              <button
+                type="button"
+                className={`text-left ${e.name === selected ? "font-semibold" : ""}`}
+                onClick={() => setSelected(e.name)}
               >
-                <span className="truncate font-mono" title={s.id}>
-                  {s.id.slice(0, 10)}… {s.name} {s.status}
-                </span>
-                {s.status === "active" && (
-                  <button
-                    type="button"
-                    className="underline"
-                    onClick={() => void subs.unsubscribe(s)}
-                  >
-                    Unsubscribe
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </aside>
-      <section className="min-w-0 flex-1 space-y-4 overflow-auto p-4">
-        {event ? (
-          <>
-            <header>
-              <h2 className="font-mono text-base font-semibold">
-                {event.name}
-              </h2>
-              {event.description && (
-                <p className="text-sm text-muted-foreground">
-                  {event.description}
-                </p>
+                {e.name}
+              </button>
+              {e.description && (
+                <span className="text-muted-foreground"> {e.description}</span>
               )}
-            </header>
-            <div className="space-y-2 rounded border border-border p-3 text-sm">
-              <label className="block">
-                Arguments (JSON, per inputSchema)
-                <textarea
-                  aria-label="Event arguments"
-                  className="mt-1 w-full rounded border border-border bg-background p-2 font-mono text-xs"
-                  rows={3}
-                  value={argsText}
-                  onChange={(e) => setArgsText(e.target.value)}
-                />
-              </label>
-              <div className="flex flex-wrap gap-3">
-                <label className="flex items-center gap-1">
-                  Cursor
-                  <input
-                    aria-label="Cursor"
-                    className="rounded border border-border bg-background px-1 font-mono text-xs"
-                    value={cursor}
-                    onChange={(e) => setCursor(e.target.value)}
-                  />
-                </label>
-                <label className="flex items-center gap-1">
-                  maxAgeMs
-                  <input
-                    aria-label="maxAgeMs"
-                    inputMode="numeric"
-                    className="w-24 rounded border border-border bg-background px-1 text-xs"
-                    value={maxAgeMs}
-                    onChange={(e) => setMaxAgeMs(e.target.value)}
-                  />
-                </label>
-              </div>
-              {formError && <p className="text-xs text-red-600">{formError}</p>}
-              <div className="flex flex-wrap gap-2">
-                {event.delivery.includes("webhook") && (
-                  <Button size="sm" onClick={() => void subscribeWebhook()}>
-                    Subscribe (webhook)
-                  </Button>
-                )}
-                {event.delivery.includes("poll") && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void pollOnce()}
-                  >
-                    Poll once
-                  </Button>
-                )}
-              </div>
-              {inbox.inbox && (
-                <p className="text-xs text-muted-foreground">
-                  Callback{" "}
-                  <span className="font-mono">{inbox.inbox.callbackUrl}</span> ·
-                  secret <span className="font-mono">whsec_••••</span>
-                </p>
-              )}
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {subs.loading ? "Loading events…" : "The server lists no events."}
-          </p>
-        )}
-        {(subs.error || inbox.error) && (
-          <p className="text-sm text-red-600" role="alert">
-            {subs.error ?? inbox.error}
-          </p>
-        )}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Deliveries (live)</h3>
-            <Faults
-              fault={inbox.inbox?.fault ?? null}
-              onChange={(f) => void inbox.setFault(f)}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {current && (
+        <section className="space-y-2">
+          <h2 className="font-semibold">Subscribe to {current.name}</h2>
+          <pre className="text-xs bg-muted p-2 rounded overflow-auto">
+            {JSON.stringify(current.inputSchema, null, 2)}
+          </pre>
+          <label className="block">
+            Arguments (JSON)
+            <textarea
+              aria-label="Arguments"
+              className="block w-full font-mono text-xs border rounded p-2 mt-1"
+              rows={4}
+              value={args}
+              onChange={(e) => setArgs(e.target.value)}
             />
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Callback: {inbox?.url ?? "creating inbox..."}
+          </p>
+          <Button onClick={subscribe} disabled={!inbox || !ready}>
+            Subscribe
+          </Button>
+        </section>
+      )}
+
+      {subs.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="font-semibold">Subscriptions</h2>
+          {subs.map((s) => (
+            <div key={s.id} className="flex items-center gap-2">
+              <code className="text-xs">{s.name}</code>
+              <code className="text-xs">{JSON.stringify(s.arguments)}</code>
+              <span className="text-xs text-muted-foreground">
+                refresh before {s.refreshBefore ?? "never"}
+              </span>
+              <Button variant="outline" onClick={() => unsubscribe(s)}>
+                Unsubscribe
+              </Button>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section className="space-y-2">
+        <h2 className="font-semibold">Webhook inbox ({deliveries.length})</h2>
+        {deliveries.map((d, i) => (
+          <div key={`${d.webhookId}-${i}`} className="border rounded p-2">
+            <div className="text-xs text-muted-foreground">
+              {d.receivedAt} · {d.kind} ·{" "}
+              {d.verified ? "signature ok" : "INVALID signature"} · webhook-id{" "}
+              {d.webhookId}
+            </div>
+            <pre className="text-xs overflow-auto">
+              {JSON.stringify(d.body, null, 2)}
+            </pre>
           </div>
-          <Inbox
-            deliveries={inbox.deliveries}
-            onResubscribeFromCursor={(c) => void subscribeWebhook(c)}
-            onRunInChat={runInChat}
-          />
-        </div>
-        <PollPanel polls={subs.polls} />
+        ))}
       </section>
     </div>
   );

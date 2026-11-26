@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "Example: MCP Events (webhook, poll and push delivery with replay) with mcp-use.",
+  "description": "Example: MCP Events (ChatGPT dialect, webhook delivery) with mcp-use.",
   "engines": { "node": ">=22.22.2" },
   "scripts": {
     "dev": "mcp-use dev",

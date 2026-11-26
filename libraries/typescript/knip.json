@@ -18,8 +18,7 @@
     "packages/server": {
       "entry": ["src/oauth/**/*.ts", "tests/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreUnresolved": ["#mcp-use-node-http", "#mcp-use-skills-loader", "#mcp-use-vite-handler"],
-      "ignoreDependencies": ["miniflare"]
+      "ignoreUnresolved": ["#mcp-use-node-http", "#mcp-use-skills-loader", "#mcp-use-vite-handler"]
     },
     "packages/agent": {
       "entry": ["tests/**/*.ts", "examples/**/*.ts"],
@@ -34,10 +33,6 @@
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{mjs,ts,tsx}"],
       "ignore": ["src/cloud/api/generated/**"],
       "ignoreDependencies": ["@types/react-dom", "mcp-use", "react-dom"]
-    },
-    "packages/events-core": {
-      "entry": ["tests/**/*.ts"],
-      "project": ["src/**/*.ts", "tests/**/*.ts"]
     },
     "packages/client": {
       "entry": ["tests/**/*.{ts,tsx}"],

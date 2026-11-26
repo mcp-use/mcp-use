@@ -32,8 +32,6 @@ export type {
 export { SKILLS_EXTENSION_ID } from "../core/skills.js";
 export { pickPersistedServerConfig, toPersistedServerConfig } from "./types.js";
 export { useMcp } from "./useMcp.js";
-export { useMcpEvent, MAX_BROWSER_STREAMS } from "./useMcpEvent.js";
-export type { UseMcpEventOptions, UseMcpEventSource } from "./useMcpEvent.js";
 export { detectFavicon } from "../utils/favicon.js";
 
 // Re-export auth callback handler for the OAuth flow

@@ -74,14 +74,6 @@ Tunnels are for local testing before deployment:
 
 For a stable public URL, deploy the server instead of relying on a local tunnel.
 
-## Receive event webhooks
-
-`mcp-use dev --tunnel` lets ChatGPT and other clients subscribe to your
-[Events](/typescript/server/events) with webhooks and lets push streams run
-over SSE through the tunnel. Subscriptions created through a tunnel live only
-as long as the tunnel (at most 24 hours). Tunnels are for development only:
-the internal Events routes (`/_mcp-use/events/*`) are blocked through them.
-
 ## Next steps
 
 - Use the [TypeScript quickstart](/typescript/getting-started/quickstart) to create a local MCP server.

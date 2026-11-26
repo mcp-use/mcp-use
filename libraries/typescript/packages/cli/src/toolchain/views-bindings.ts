@@ -120,8 +120,7 @@ export async function validateViewBindingsAtBuild(
   entry: string,
   viewsManifest: ViewsManifest,
   projectRoot: string,
-  conventionalSkillsDirectory: string,
-  onEventsCatalog?: (snapshot: unknown) => void
+  conventionalSkillsDirectory: string
 ): Promise<SkillsSnapshot | undefined> {
   const runner = createServerModuleRunner(environment, {
     hmr: false,
@@ -162,11 +161,6 @@ export async function validateViewBindingsAtBuild(
       server.__primeViews(viewsManifest);
       server.__primeSkills(skillsSnapshot);
       server.__mount();
-      // Duck-typed like __skillsConfig: servers without Events lack it.
-      const catalogHook = (server as { __eventsCatalog?: () => unknown })
-        .__eventsCatalog;
-      if (onEventsCatalog !== undefined && typeof catalogHook === "function")
-        onEventsCatalog(await catalogHook.call(server));
       return skillsSnapshot;
     });
   } finally {

@@ -62,11 +62,6 @@ test(
     const inspectorRoot = fileURLToPath(
       new URL("../../inspector", import.meta.url)
     );
-    // mcp-use depends on the unpublished workspace @mcp-use/events-core, so
-    // the consumer installs its packed tarball too.
-    const eventsCoreRoot = fileURLToPath(
-      new URL("../../events-core", import.meta.url)
-    );
     const scratch = await mkdtemp(join(tmpdir(), "mcp-use-cli-bin-"));
     const artifacts = join(scratch, "artifacts");
     const consumer = join(scratch, "consumer");
@@ -89,7 +84,6 @@ test(
     const cliTarball = await pack(cliRoot);
     const serverTarball = await pack(serverRoot);
     const inspectorTarball = await pack(inspectorRoot);
-    const eventsCoreTarball = await pack(eventsCoreRoot);
     await execFileAsync(
       "npm",
       [
@@ -101,7 +95,6 @@ test(
         cliTarball,
         serverTarball,
         inspectorTarball,
-        eventsCoreTarball,
       ],
       { cwd: consumer }
     );

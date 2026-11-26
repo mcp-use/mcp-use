@@ -510,14 +510,6 @@ export type UseMcpResult = {
   prompts: Prompt[];
   /** Skills advertised through the experimental Skills over MCP extension. */
   skills: import("../core/skills.js").Skill[];
-  /** MCP Events listed by the server; `undefined` until loaded or when unsupported. */
-  events: import("@mcp-use/events-core").EventDescriptor[] | undefined;
-  /** Raw Events capability: `undefined` before the handshake. */
-  eventsSupported: boolean | undefined;
-  /** The Events surface of the current connection (used by `useMcpEvent`). */
-  eventsConnection:
-    | import("../events/connection.js").EventsConnection
-    | undefined;
   /** Server information normalized for the active connection. */
   serverInfo?: {
     /** Optional human-readable server title. */

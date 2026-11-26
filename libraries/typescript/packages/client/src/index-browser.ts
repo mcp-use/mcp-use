@@ -49,5 +49,5 @@ export {
 export { getPackageVersion, VERSION } from "./utils/version.js";
 export { detectFavicon } from "./utils/favicon.js";
 
-/** MCP Events client contract (types and `EventsClientError`). */
-export * from "./events/index.js";
+// MCP Events (ChatGPT dialect, webhook delivery)
+export * from "./events.js";

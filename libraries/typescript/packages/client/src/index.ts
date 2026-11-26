@@ -53,5 +53,5 @@ export {
 } from "./telemetry/index.js";
 export { logger } from "./utils/logging.js";
 
-/** MCP Events client contract (types and `EventsClientError`). */
-export * from "./events/index.js";
+// MCP Events (ChatGPT dialect, webhook delivery)
+export * from "./events.js";

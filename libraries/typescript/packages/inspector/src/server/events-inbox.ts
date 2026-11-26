@@ -1,0 +1,94 @@
+/**
+ * MCP Events webhook inbox for the Events tab: in-memory inboxes, each with
+ * its own `whsec_` secret, that verify deliveries, answer the verification
+ * challenge and keep the most recent deliveries for the UI.
+ */
+import {
+  generateWebhookSecret,
+  verifyWebhookSignature,
+} from "@mcp-use/client/events";
+import type { Hono } from "hono";
+
+const MAX_INBOXES = 50;
+const MAX_DELIVERIES = 200;
+const MAX_BODY = 256 * 1024;
+
+/** One received POST. */
+interface InboxDelivery {
+  receivedAt: string;
+  webhookId: string | null;
+  subscriptionId: string | null;
+  verified: boolean;
+  /** `verification` for a challenge, `event` otherwise. */
+  kind: "verification" | "event";
+  body: unknown;
+}
+
+interface Inbox {
+  secret: string;
+  deliveries: InboxDelivery[];
+}
+
+/**
+ * Mount `POST {base}/inspector/api/events/inboxes` (create),
+ * `GET .../inboxes/:id` (deliveries) and `POST .../hooks/:id` (the callback).
+ *
+ * @param app - The Inspector Hono app.
+ * @param basePath - Prefix the Inspector is mounted under.
+ */
+export function mountEventsInbox(app: Hono, basePath = ""): void {
+  const inboxes = new Map<string, Inbox>();
+  const root = `${basePath}/inspector/api/events`;
+
+  app.post(`${root}/inboxes`, (c) => {
+    if (inboxes.size >= MAX_INBOXES) {
+      inboxes.delete(inboxes.keys().next().value as string);
+    }
+    const id = crypto.randomUUID();
+    const secret = generateWebhookSecret();
+    inboxes.set(id, { secret, deliveries: [] });
+    return c.json({ id, secret, path: `${root}/hooks/${id}` });
+  });
+
+  app.get(`${root}/inboxes/:id`, (c) => {
+    const inbox = inboxes.get(c.req.param("id"));
+    if (inbox === undefined) return c.json({ error: "not found" }, 404);
+    return c.json({ deliveries: inbox.deliveries });
+  });
+
+  app.post(`${root}/hooks/:id`, async (c) => {
+    const inbox = inboxes.get(c.req.param("id"));
+    if (inbox === undefined) return c.json({ error: "not found" }, 410);
+    const text = await c.req.text();
+    if (text.length > MAX_BODY) return c.json({ error: "too large" }, 413);
+    const headers = c.req.raw.headers;
+    const verified = await verifyWebhookSignature(
+      [inbox.secret],
+      headers,
+      text
+    );
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = text;
+    }
+    const type = (body as { type?: unknown } | null)?.type;
+    inbox.deliveries.unshift({
+      receivedAt: new Date().toISOString(),
+      webhookId: headers.get("webhook-id"),
+      subscriptionId: headers.get("x-mcp-subscription-id"),
+      verified,
+      kind: type === "verification" ? "verification" : "event",
+      body,
+    });
+    inbox.deliveries.length = Math.min(inbox.deliveries.length, MAX_DELIVERIES);
+    if (!verified) return c.json({ error: "invalid signature" }, 401);
+    if (type === "verification") {
+      return c.json({
+        challenge: (body as { challenge?: unknown }).challenge,
+      });
+    }
+    return c.json({});
+  });
+}

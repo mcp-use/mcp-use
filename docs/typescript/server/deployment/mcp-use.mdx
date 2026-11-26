@@ -81,38 +81,6 @@ Deploy also accepts repeatable `--env KEY=VALUE` and `--env-file` options. It
 writes production values when the deployment branch matches the saved production
 branch; other branches receive a branch-specific preview override.
 
-## Events on Manufact Cloud
-
-[Events](/typescript/server/events) need no configuration on Manufact Cloud.
-The platform injects a store binding, so `emit()`, webhook delivery, push and
-poll work on the first deploy.
-
-- **Previews and namespaces.** Each environment and preview branch gets its
-  own namespace; subscriptions never cross environments.
-- **Rollbacks and dormancy.** A rollback keeps the namespace, so
-  subscriptions survive. Sleeping deployments are woken when deliveries are
-  due (the wake guarantee), and a poll wakes a sleeping container.
-- **Slug renames and custom domains.** Subscriptions keep their callbacks;
-  clients reconnect to the new URL after a ChatGPT **Refresh tools**.
-- **Static egress.** Deliveries leave from published static IP ranges so
-  receivers can allowlist them.
-- **Dashboard and CLI.** The Events page and `mcp-use events` show status,
-  catalog, subscriptions and deliveries, and can redeliver, revoke, emit test
-  events and purge.
-- **Decommission.** Deleting a branch revokes its subscriptions, runs
-  `onUnsubscribe(…, "closed")` and purges the namespace.
-- **Bring your own storage.** Setting `MCP_USE_STORAGE_URL` takes precedence
-  over the platform binding.
-
-```bash
-npx mcp-use events status
-npx mcp-use events subscriptions --json
-npx mcp-use events deliveries --failed
-npx mcp-use events redeliver DEAD_LETTER_ID
-```
-
-{/* TODO(events): add the published static egress ranges and plan limits once Manufact publishes them. */}
-
 ## Progress and logs
 
 Deploy waits by default. Use `--no-wait` to return the deployment ID immediately,

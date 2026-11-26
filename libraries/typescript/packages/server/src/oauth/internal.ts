@@ -119,15 +119,10 @@ export function wrapOAuthTokenVerifier<TUser>(
       }
       assertMappedExtra(mapped);
 
-      const principal = computePrincipal(provider, authInfo, mapped);
       return {
         ...authInfo,
         scopes: [...authInfo.scopes],
-        extra: {
-          ...authInfo.extra,
-          ...mapped,
-          ...(principal !== undefined && { principal }),
-        },
+        extra: { ...authInfo.extra, ...mapped },
       };
     },
   };
@@ -296,26 +291,4 @@ function normalizePathname(pathname: string): string {
   let end = pathname.length;
   while (end > 0 && pathname.charCodeAt(end - 1) === 47) end--;
   return pathname.slice(0, end);
-}
-
-/**
- * The Events principal for a verified token (D13): the provider's
- * `principal()` when defined, else `"{iss}|{sub}"` from the verified claims.
- *
- * @internal
- */
-export function computePrincipal<TUser>(
-  provider: Pick<OAuthProvider<TUser, OAuthMetadataSource>, "principal">,
-  authInfo: AuthInfo,
-  mapped: { payload?: Record<string, unknown> }
-): string | undefined {
-  if (typeof provider.principal === "function") {
-    const value = provider.principal(authInfo as never);
-    return typeof value === "string" && value !== "" ? value : undefined;
-  }
-  const payload = mapped.payload ?? {};
-  const iss = payload.iss;
-  const sub = payload.sub;
-  if (typeof sub !== "string" || sub === "") return undefined;
-  return typeof iss === "string" && iss !== "" ? `${iss}|${sub}` : sub;
 }

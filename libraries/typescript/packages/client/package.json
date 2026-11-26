@@ -40,13 +40,13 @@
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
     },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js"
+    },
     "./sandbox": {
       "types": "./dist/sandbox.d.ts",
       "import": "./dist/sandbox.js"
-    },
-    "./webhooks": {
-      "types": "./dist/events/webhooks.d.ts",
-      "import": "./dist/events/webhooks.js"
     }
   },
   "module": "./dist/index.js",
@@ -64,9 +64,8 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@mcp-use/events-core": "workspace:*",
-    "@modelcontextprotocol/client": "catalog:mcp-sdk",
-    "@modelcontextprotocol/core": "catalog:mcp-sdk",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/core": "2.3.1",
     "@modelcontextprotocol/ext-apps": "2.0.3"
   },
   "peerDependencies": {

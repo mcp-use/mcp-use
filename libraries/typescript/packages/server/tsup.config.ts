@@ -1,7 +1,5 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { defineConfig, type Options } from "tsup";
-import { sdkIdentityDefine } from "../../scripts/sdk-identity.mjs";
 
 const frameworkPackage = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8")
@@ -9,8 +7,6 @@ const frameworkPackage = JSON.parse(
 
 const packageVersionDefine = {
   __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
-  // The Node entry inlines the official SDK; record which one (PLAN.md D82).
-  ...sdkIdentityDefine(fileURLToPath(new URL(".", import.meta.url))),
 };
 
 // Every build must use the same module-local response/request identity maps.
@@ -52,6 +48,7 @@ export default defineConfig([
       "oauth/scalekit": "src/oauth/scalekit.ts",
       "oauth/convex": "src/oauth/convex.ts",
       "oauth/storage": "src/oauth/storage.ts",
+      "events/index": "src/events/index.ts",
       // Keep the OpenAPI integration in a sibling chunk. `MCPServer` imports
       // it synchronously so `fromOpenAPI()` stays a synchronous constructor,
       // while the root entry retains its independently enforced size budget.
@@ -77,14 +74,6 @@ export default defineConfig([
       "tanstack-start/index": "src/tanstack-start/index.ts",
       "tanstack-start/vite": "src/tanstack-start/vite.ts",
       "vite/index": "src/vite/index.ts",
-      // MCP Events and storage subpaths (PLAN.md §8.6). The engine is loaded
-      // lazily behind src/events/internal/host.ts (D28).
-      "events/index": "src/events/index.ts",
-      "events/admin/index": "src/events/admin/index.ts",
-      "events/testing/index": "src/events/testing/index.ts",
-      "storage/index": "src/storage/index.ts",
-      "storage/node": "src/storage/node.ts",
-      "storage/testing": "src/storage/testing.ts",
       "internal/vite-handler": "src/vite/handler-unavailable.ts",
     },
     // ESM-only: the v2 @modelcontextprotocol/* packages ship no CJS entry, so a
@@ -102,8 +91,6 @@ export default defineConfig([
       "#mcp-use-skills-loader",
       "#mcp-use-vite-handler",
     ],
-    // events-core is inlined so the wire contract ships inside mcp-use.
-    noExternal: ["@mcp-use/events-core"],
     define: packageVersionDefine,
     esbuildPlugins: sharedBufferedResponse,
     esbuildOptions: minifyFrameworkOutput,
@@ -125,8 +112,6 @@ export default defineConfig([
       "#mcp-use-skills-loader",
       "#mcp-use-vite-handler",
     ],
-    // events-core is inlined so the wire contract ships inside mcp-use.
-    noExternal: ["@mcp-use/events-core"],
     define: packageVersionDefine,
     esbuildPlugins: sharedBufferedResponse,
     esbuildOptions(options) {
@@ -154,7 +139,6 @@ export default defineConfig([
       "@modelcontextprotocol/core",
       "@modelcontextprotocol/server",
       "zod",
-      "@mcp-use/events-core",
     ],
     define: packageVersionDefine,
     esbuildPlugins: sharedBufferedResponse,
