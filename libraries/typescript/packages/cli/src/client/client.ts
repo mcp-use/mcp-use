@@ -202,8 +202,12 @@ async function savedServerCommand(
   const saved = await readServers();
   const definition = saved.servers[name];
   if (definition === undefined) {
+    // Commands take a saved name; a URL here means the server was not saved.
+    const isUrl = /^https?:\/\//i.test(name);
     throw new UsageError(
-      `Unknown saved server: ${name}. Run \`mcp-use client connect ${name} <url>\`.`
+      isUrl
+        ? `Unknown saved server: ${name}. Commands take a saved server name: run \`mcp-use client connect <name> ${name}\`, then \`mcp-use client <name> ...\`.`
+        : `Unknown saved server: ${name}. Run \`mcp-use client connect ${name} <url>\`.`
     );
   }
   const family = argv[0];

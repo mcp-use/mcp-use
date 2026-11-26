@@ -87,6 +87,26 @@ interface Occurrence {
   data: unknown;
 }
 
+/**
+ * Send an `events/*` request that declares the official events extension in
+ * the per-request `_meta`, so the server answers in the official dialect even
+ * when the loaded `@mcp-use/client` predates declaring it itself.
+ */
+function request(
+  connection: MCPConnection,
+  method: string,
+  params: Record<string, unknown>
+): Promise<unknown> {
+  return connection.request(method, {
+    ...params,
+    _meta: {
+      "io.modelcontextprotocol/clientCapabilities": {
+        extensions: { "io.modelcontextprotocol/events": {} },
+      },
+    },
+  });
+}
+
 /** Run a parsed `events` command over an open connection. */
 export async function runEventsCommand(
   connection: MCPConnection,
@@ -96,7 +116,7 @@ export async function runEventsCommand(
 ): Promise<number> {
   const name = args.event!;
   if (args.operation === "list") {
-    const { events = [] } = (await connection.request("events/list", {})) as {
+    const { events = [] } = (await request(connection, "events/list", {})) as {
       events?: { name: string; description?: string; delivery?: string[] }[];
     };
     printResult(
@@ -113,7 +133,7 @@ export async function runEventsCommand(
   }
   if (args.operation === "subscribe") {
     const secret = args.secret ?? `whsec_${randomBytes(32).toString("base64")}`;
-    const result = await connection.request("events/subscribe", {
+    const result = await request(connection, "events/subscribe", {
       name,
       arguments: parsedArguments,
       delivery: { mode: "webhook", url: args.url, secret },
@@ -132,7 +152,7 @@ export async function runEventsCommand(
     return 0;
   }
   if (args.operation === "unsubscribe") {
-    await connection.request("events/unsubscribe", {
+    await request(connection, "events/unsubscribe", {
       name,
       arguments: parsedArguments,
       delivery: { mode: "webhook", url: args.url },
@@ -146,7 +166,7 @@ export async function runEventsCommand(
   if (args.follow) process.once("SIGINT", stop);
   try {
     for (;;) {
-      const page = (await connection.request("events/poll", {
+      const page = (await request(connection, "events/poll", {
         name,
         arguments: parsedArguments,
         cursor,
