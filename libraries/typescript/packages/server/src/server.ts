@@ -9,6 +9,7 @@ import {
   PROTOCOL_VERSION_META_KEY,
   isJSONRPCRequest,
   isInputRequiredResult,
+  isLegacyRequest,
   ResourceNotFoundError,
   type ClientCapabilities,
   type McpHttpHandler,
@@ -76,7 +77,11 @@ import type {
   EventHandle,
 } from "./events/define.js";
 import type { EventsRuntime } from "./events/runtime.js";
-import { asEventsRequest, rpcResponse } from "./events/sdk-adapter.js";
+import {
+  asEventsRequest,
+  rpcResponse,
+  stampModernResult,
+} from "./events/sdk-adapter.js";
 import {
   prepareSettings,
   type SettingsFields,
@@ -1888,13 +1893,25 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         {
           path: basePath,
           ...(this.#events.size > 0 && {
-            preflight: async (_request, body, authInfo) => {
+            preflight: async (request, body, authInfo) => {
               const rpc = asEventsRequest(body);
               if (rpc === undefined) return undefined;
               const runtime = await this.#eventsRuntimeInstance();
+              const outcome = await runtime.handle(
+                rpc.method,
+                rpc.params,
+                authInfo
+              );
               return rpcResponse(
                 rpc.id,
-                await runtime.handle(rpc.method, rpc.params, authInfo)
+                "result" in outcome && !(await isLegacyRequest(request, body))
+                  ? {
+                      result: stampModernResult(
+                        outcome.result,
+                        this.#implementationInfo(request)
+                      ),
+                    }
+                  : outcome
               );
             },
           }),
@@ -2161,29 +2178,34 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
   }
 
+  /** The server's `Implementation` identity (`serverInfo`) for a request. */
+  #implementationInfo(request: Request | undefined) {
+    const { name, version, title, description } = this.#config;
+    return {
+      name,
+      version,
+      ...(title !== undefined && { title }),
+      ...(description !== undefined && { description }),
+      ...(this.#branding.websiteUrl !== undefined && {
+        websiteUrl: this.#branding.websiteUrl,
+      }),
+      ...(this.#branding.icons !== undefined && {
+        icons: resolveImplementationIcons(
+          this.#branding.icons,
+          request,
+          this.#basePath()
+        ),
+      }),
+    };
+  }
+
   /** Build a fully registered SDK server from the immutable registry. */
   #buildSdkServer(ctx: McpRequestContext): SdkMcpServer {
-    const { name, version, title, description } = this.#config;
     const instructions =
       this.#instructionsOverride ?? this.#config.instructions;
     const authInfo = ctx.authInfo;
     const server = new SdkMcpServer(
-      {
-        name,
-        version,
-        ...(title !== undefined && { title }),
-        ...(description !== undefined && { description }),
-        ...(this.#branding.websiteUrl !== undefined && {
-          websiteUrl: this.#branding.websiteUrl,
-        }),
-        ...(this.#branding.icons !== undefined && {
-          icons: resolveImplementationIcons(
-            this.#branding.icons,
-            ctx.requestInfo,
-            this.#basePath()
-          ),
-        }),
-      },
+      this.#implementationInfo(ctx.requestInfo),
       {
         capabilities: {
           logging: {},

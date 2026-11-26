@@ -664,6 +664,7 @@ export class HttpConnector extends BaseConnector {
         // Keep the connection timeout outside the SDK request options so it
         // cannot leak onto streams opened during connection setup.
         let connectTimeout: ReturnType<typeof setTimeout> | undefined;
+        this.captureRawCapabilities(transport);
         await Promise.race([
           this.client.connect(transport),
           new Promise<never>((_, reject) => {
