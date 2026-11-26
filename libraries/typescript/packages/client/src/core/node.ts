@@ -39,7 +39,7 @@ import { getPackageVersion } from "../utils/version.js";
 
 /** Read and parse a JSON MCP client config file. Node-only. */
 export function loadConfigFile(filepath: string): Record<string, any> {
-  return JSON.parse(fs.readFileSync(filepath, "utf-8"));
+  return JSON.parse(fs.readFileSync(filepath, "utf-8").replace(/^\uFEFF/, ""));
 }
 
 function trackNodeClientInit(
