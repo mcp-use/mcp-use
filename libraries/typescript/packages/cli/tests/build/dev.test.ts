@@ -1317,6 +1317,88 @@ describe("runDev (views)", () => {
     expect(viteClient).toContain("const hmrPort = 443");
   });
 
+  it("loads view modules from the dev server when .env sets MCP_ASSETS_URL", async () => {
+    const originalAssetsUrl = process.env["MCP_ASSETS_URL"];
+    delete process.env["MCP_ASSETS_URL"];
+    cleanups.push(() => {
+      if (originalAssetsUrl === undefined) {
+        delete process.env["MCP_ASSETS_URL"];
+      } else {
+        process.env["MCP_ASSETS_URL"] = originalAssetsUrl;
+      }
+    });
+    const cwd = copyFixture("dev-assets-url-env", "views");
+    cleanups.push(() => removeDir(cwd));
+    // A production CDN prefix in `.env`, as the CSP guide shows it.
+    writeFileSync(
+      join(cwd, ".env"),
+      "MCP_ASSETS_URL=https://cdn.example.com/widgets\n"
+    );
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+    expect(process.env["MCP_ASSETS_URL"]).toBe(
+      "https://cdn.example.com/widgets"
+    );
+    const notice = dev.logs.find((line) => line.includes("MCP_ASSETS_URL"));
+    expect(notice).toContain("mcp-use build && mcp-use start");
+    expect(notice).toContain("https://cdn.example.com/widgets");
+    const base = dev.url.replace(/\/mcp$/, "");
+
+    const readBody = await mcpRequest(
+      dev.url,
+      "resources/read",
+      { uri: "ui://views/product-search-result.html" },
+      { ui: true }
+    );
+    const content = (
+      readBody["result"] as {
+        contents: {
+          text: string;
+          _meta: { ui: { csp: { resourceDomains: string[] } } };
+        }[];
+      }
+    ).contents[0]!;
+    const scripts = [
+      ...content.text.matchAll(/<script[^>]+src="([^"]+)"/g),
+    ].map((match) => match[1]!);
+    expect(scripts).toContain(`${base}/@vite/client`);
+    expect(scripts).toContain(
+      `${base}/@id/__x00__virtual:mcp-use/views/product-search-result`
+    );
+    for (const src of scripts) {
+      expect((await fetch(src)).status).toBe(200);
+    }
+    expect(content.text).toContain(`"/":"${base}/"`);
+    expect(content._meta.ui.csp.resourceDomains).toContain(base);
+    expect(content._meta.ui.csp.resourceDomains).not.toContain(
+      "https://cdn.example.com"
+    );
+  }, 30_000);
+
+  it("prints no MCP_ASSETS_URL notice when the value isn't a URL", async () => {
+    const originalAssetsUrl = process.env["MCP_ASSETS_URL"];
+    delete process.env["MCP_ASSETS_URL"];
+    cleanups.push(() => {
+      if (originalAssetsUrl === undefined) {
+        delete process.env["MCP_ASSETS_URL"];
+      } else {
+        process.env["MCP_ASSETS_URL"] = originalAssetsUrl;
+      }
+    });
+    const cwd = copyFixture("dev-assets-url-invalid", "views");
+    cleanups.push(() => removeDir(cwd));
+    writeFileSync(join(cwd, ".env"), "MCP_ASSETS_URL=not-a-url\n");
+
+    const dev = await startDev(cwd, await getFreePort());
+    cleanups.push(dev.stop);
+    expect(process.env["MCP_ASSETS_URL"]).toBe("not-a-url");
+    expect(dev.logs.some((line) => line.includes("MCP_ASSETS_URL"))).toBe(
+      false
+    );
+  }, 30_000);
+
   it("shuts down with active MCP subscriptions and HMR WebSockets", async () => {
     const cwd = copyFixture("dev-active-connections-shutdown", "views");
     cleanups.push(() => removeDir(cwd));

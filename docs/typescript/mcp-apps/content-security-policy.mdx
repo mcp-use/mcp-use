@@ -24,6 +24,8 @@ When `MCP_ASSETS_URL` is unset, assets use the same origin as `MCP_URL` (or the 
 
 At **`mcp-use build`**, `MCP_ASSETS_URL` rewrites manifest paths to full `https://` URLs for static upload workflows.
 
+**`mcp-use dev`** ignores `MCP_ASSETS_URL`: views load their modules from the dev server, which a CDN can't serve. To test assets served from `MCP_ASSETS_URL` locally, run `mcp-use build` and then `mcp-use start`.
+
 ## Separate the UI origin from the MCP endpoint
 
 Set `view.domain` to the dedicated HTTPS origin you want ChatGPT to use, such as
