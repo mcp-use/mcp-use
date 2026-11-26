@@ -239,6 +239,12 @@ function productId(value: unknown, fallback: string): string {
     : fallback;
 }
 
+function eventsClientName(params: unknown): string | null {
+  const meta = record(record(params)?.["_meta"]);
+  const name = record(meta?.[CLIENT_INFO_META_KEY])?.["name"];
+  return typeof name === "string" ? productId(name, "") || null : null;
+}
+
 function clientUsageFromBody(body: unknown): ClientUsage | undefined {
   if (!isJSONRPCRequest(body)) return undefined;
   const params = record(body.params);
@@ -1900,7 +1906,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
               const outcome = await runtime.handle(
                 rpc.method,
                 rpc.params,
-                authInfo
+                authInfo,
+                eventsClientName(rpc.params)
               );
               return rpcResponse(
                 rpc.id,
@@ -2096,6 +2103,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             c.req.param("action")
           )
         );
+        httpApp.get(
+          `${nestedBasePath}/_mcp-use/events/admin/:resource`,
+          async (c) =>
+            (await this.#eventsRuntimeInstance()).route(
+              c.req.raw,
+              `admin/${c.req.param("resource")}`
+            )
+        );
       }
       this.app.all(basePath, (context) => endpointHandler(context.req.raw));
       httpApp.route("/", this.app);
@@ -2204,36 +2219,33 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const instructions =
       this.#instructionsOverride ?? this.#config.instructions;
     const authInfo = ctx.authInfo;
-    const server = new SdkMcpServer(
-      this.#implementationInfo(ctx.requestInfo),
-      {
-        capabilities: {
-          logging: {},
-          tools: { listChanged: true },
-          prompts: { listChanged: true },
-          resources: { listChanged: true, subscribe: true },
-          ...(this.#events.size > 0 && { events: {} }),
-          ...((this.#skills !== undefined || this.#settings !== undefined) && {
-            extensions: {
-              ...(this.#skills !== undefined && {
-                [SKILLS_EXTENSION_ID]: { directoryRead: true },
-              }),
-              ...(this.#settings !== undefined && {
-                "openai/settings": this.#settings.capability,
-              }),
-            },
-          }),
-          ...(this.#settings !== undefined && {
-            experimental: { "openai/settings": this.#settings.capability },
-          }),
-        },
-        ...(instructions !== undefined && { instructions }),
-        ...(authInfo !== undefined && { authInfo }),
-        ...(this.#config.requestState !== undefined && {
-          requestState: this.#config.requestState,
+    const server = new SdkMcpServer(this.#implementationInfo(ctx.requestInfo), {
+      capabilities: {
+        logging: {},
+        tools: { listChanged: true },
+        prompts: { listChanged: true },
+        resources: { listChanged: true, subscribe: true },
+        ...(this.#events.size > 0 && { events: {} }),
+        ...((this.#skills !== undefined || this.#settings !== undefined) && {
+          extensions: {
+            ...(this.#skills !== undefined && {
+              [SKILLS_EXTENSION_ID]: { directoryRead: true },
+            }),
+            ...(this.#settings !== undefined && {
+              "openai/settings": this.#settings.capability,
+            }),
+          },
         }),
-      }
-    );
+        ...(this.#settings !== undefined && {
+          experimental: { "openai/settings": this.#settings.capability },
+        }),
+      },
+      ...(instructions !== undefined && { instructions }),
+      ...(authInfo !== undefined && { authInfo }),
+      ...(this.#config.requestState !== undefined && {
+        requestState: this.#config.requestState,
+      }),
+    });
 
     const request = ctx.requestInfo;
     const viewMetaOptions =

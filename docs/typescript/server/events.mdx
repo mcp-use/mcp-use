@@ -140,6 +140,29 @@ curl -X POST https://example.com/mcp/_mcp-use/events/tick \
   -H "Authorization: Bearer $CRON_SECRET"
 ```
 
+### Delivery history and admin routes
+
+Every webhook attempt (verification challenges, event deliveries, retries and
+final failures) is logged as one line,
+`[mcp-use] events delivery <name> <subscriptionId> -> <origin> <status|error> <ms>ms attempt <n>`,
+and recorded in the events store for 7 days (at most 1000 records). A record
+holds `id`, `kind` (`verification` or `event`), `eventId`, `name`,
+`subscriptionId`, `callbackOrigin` (scheme, host and port only), `attempt`,
+`status` (`null` on a network error), `ok`, `error`, `durationMs` and `at`.
+Recording never fails a delivery.
+
+Two read-only routes expose this. They accept only
+`MCP_USE_PLATFORM_ADMIN_SECRET` (not `CRON_SECRET`) and return 404 when it is
+unset:
+
+- `GET /mcp/_mcp-use/events/admin/subscriptions` returns
+  `{ subscriptions: [{ id, name, arguments, callbackOrigin, clientName, createdAt, refreshBefore, expiresAt, lastDelivery }] }`.
+  `lastDelivery` is `{ at, ok, status }` or `null`.
+- `GET /mcp/_mcp-use/events/admin/deliveries?subscriptionId=&limit=` returns
+  `{ deliveries: [...] }`, newest first (`limit` 1-200, default 50).
+
+Neither route returns webhook secrets or full callback URLs.
+
 ## Receive events in a client
 
 ```ts

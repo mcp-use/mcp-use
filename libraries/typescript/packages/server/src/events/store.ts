@@ -16,6 +16,8 @@ export interface EventsStore {
   zadd(key: string, score: number, member: string): Promise<void>;
   /** Members with a score up to `max`, lowest first, at most `limit`. */
   zdue(key: string, max: number, limit: number): Promise<string[]>;
+  /** Members by rank, lowest score first (Redis `ZRANGE` index semantics). */
+  zrange(key: string, start: number, stop: number): Promise<string[]>;
   /** Remove a member; `true` when this call removed it (a claim). */
   zrem(key: string, member: string): Promise<boolean>;
 }
@@ -64,6 +66,13 @@ export function memoryEventsStore(): EventsStore {
         .sort((a, b) => a[1] - b[1])
         .slice(0, limit)
         .map(([m]) => m);
+    },
+    async zrange(key, start, stop) {
+      const all = [...zset(key)].sort((a, b) => a[1] - b[1]).map(([m]) => m);
+      const n = all.length;
+      const from = start < 0 ? Math.max(n + start, 0) : start;
+      const to = stop < 0 ? n + stop : stop;
+      return to < from ? [] : all.slice(from, to + 1);
     },
     async zrem(key, member) {
       return zset(key).delete(member);
@@ -149,6 +158,11 @@ export function upstashEventsStore(
           0,
           limit
         )) as string[] | null) ?? []
+      );
+    },
+    async zrange(key, start, stop) {
+      return (
+        ((await cmd("ZRANGE", p + key, start, stop)) as string[] | null) ?? []
       );
     },
     async zrem(key, member) {
