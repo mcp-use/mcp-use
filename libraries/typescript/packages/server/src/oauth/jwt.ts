@@ -267,7 +267,11 @@ function verifiedResource(
     throw invalidToken("Token audience claim must be a string or string array");
   }
   const audiences = typeof audience === "string" ? [audience] : audience;
-  if (!audiences.includes(configuredResource.href)) {
+  if (
+    !audiences.some(
+      (value) => canonicalAudience(value) === configuredResource.href
+    )
+  ) {
     throw invalidToken(
       "Token audience does not include the protected resource"
     );
@@ -329,6 +333,18 @@ function configuredResourceUrl(value: URL | string): URL {
 
 const RESOURCE_URL_REQUIREMENT =
   "resource must use HTTPS, or HTTP for localhost, without credentials, query, or fragment";
+
+/**
+ * Canonicalizes a URL-shaped audience for resource matching, leaving
+ * non-URL provider identifiers untouched rather than rejecting them.
+ */
+function canonicalAudience(value: string): string {
+  try {
+    return canonicalUrl(value).href;
+  } catch {
+    return value;
+  }
+}
 
 /** Canonicalizes the `resource` claim carried by a token. */
 function canonicalUrl(value: string): URL {

@@ -190,6 +190,63 @@ describe("OAuth core", () => {
     });
   });
 
+  it("canonicalizes URL audiences before matching the protected resource", async () => {
+    const key = new TextEncoder().encode(
+      "a sufficiently long test signing key"
+    );
+    const issuer = "https://issuer.example.test";
+    const sign = (claims: Record<string, unknown>) =>
+      new SignJWT({ sub: "user-1", client_id: "client-1", ...claims })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(issuer)
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
+        .sign(key);
+    const verifierFor = (resource: URL) =>
+      createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
+        key,
+        algorithms: ["HS256"],
+        resource,
+      });
+    const verifier = verifierFor(canonicalResource);
+
+    // A trailing slash on an otherwise identical audience still binds.
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({ aud: `${canonicalResource.href}/` })
+      )
+    ).resolves.toMatchObject({ resource: canonicalResource });
+
+    // Host case and an explicit default port are canonicalized by URL too.
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({ aud: "https://API.Example.test:443/mcp/" })
+      )
+    ).resolves.toMatchObject({ resource: canonicalResource });
+
+    // A non-URL audience beside a URL audience does not throw or bind alone.
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({ aud: ["provider-api", `${canonicalResource.href}/`] })
+      )
+    ).resolves.toMatchObject({ resource: canonicalResource });
+
+    // An origin resource always ends in "/"; a slashless audience for that
+    // origin must still match the canonical origin.
+    const originResource = new URL("https://api.example.test/");
+    await expect(
+      verifierFor(originResource).verifyAccessToken(
+        await sign({ aud: "https://api.example.test" })
+      )
+    ).resolves.toMatchObject({ resource: originResource });
+
+    // A bare provider identifier remains non-binding on the aud path.
+    await expect(
+      verifier.verifyAccessToken(await sign({ aud: "provider-api" }))
+    ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+  });
+
   it("accepts aud arrays or resource claims and rejects unbound JWTs", async () => {
     const key = new TextEncoder().encode(
       "a sufficiently long test signing key"
