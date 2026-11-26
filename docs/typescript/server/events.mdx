@@ -33,7 +33,7 @@ const messageCreated = server.event({
 // Later, when a message is posted:
 await messageCreated.emit(
   { channel_id: "c1", message_id: "m42", preview: "Hi" },
-  { eventId: "m42" }
+  { eventId: "m42" },
 );
 ```
 
@@ -45,17 +45,26 @@ await messageCreated.emit(
   It is generated when omitted.
 - `emit` validates `data` against `payloadSchema`, rejects bodies over 256 KiB,
   and resolves after the first delivery attempt to each matching subscription.
+- `emit` throws if the store is unreachable. When the event follows a write
+  that already succeeded, catch the error and log it so the tool call does not
+  fail:
+
+  ```ts
+  await noteCreated
+    .emit({ folder, noteId, title }, { eventId: noteId })
+    .catch((err) => console.error(`note.created emit failed: ${err}`));
+  ```
 
 ## What the server does
 
 Registering an event advertises `capabilities.events: {}` on `initialize` (and
 `server/discover`) and serves:
 
-| Method | Behaviour |
-| --- | --- |
-| `events/list` | Event names, descriptions, `delivery: ["webhook"]`, `inputSchema`, `payloadSchema`. |
-| `events/subscribe` | Validates the name, arguments and `whsec_` secret (24-64 bytes), verifies the callback, stores the subscription. Returns `{ id, refreshBefore, cursor: null, truncated: false }`. |
-| `events/unsubscribe` | Removes the subscription matched by name, arguments and callback URL. Idempotent; returns `{}`. |
+| Method               | Behaviour                                                                                                                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `events/list`        | Event names, descriptions, `delivery: ["webhook"]`, `inputSchema`, `payloadSchema`.                                                                                               |
+| `events/subscribe`   | Validates the name, arguments and `whsec_` secret (24-64 bytes), verifies the callback, stores the subscription. Returns `{ id, refreshBefore, cursor: null, truncated: false }`. |
+| `events/unsubscribe` | Removes the subscription matched by name, arguments and callback URL. Idempotent; returns `{}`.                                                                                   |
 
 mcp-use answers `events/*` before the MCP SDK handler, so a future SDK version
 with its own Events handlers cannot take these methods over.
@@ -87,11 +96,11 @@ request times out after 10 s.
 
 ## Storage
 
-| Where | Store |
-| --- | --- |
-| `mcp-use dev` | Memory (resets on restart). `http:` and loopback callbacks are allowed. |
+| Where          | Store                                                                                                                |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `mcp-use dev`  | Memory (resets on restart). `http:` and loopback callbacks are allowed.                                              |
 | Manufact Cloud | Redis through the platform proxy, from `MCP_USE_PLATFORM_STORAGE_URL`, `_TOKEN` and `_PREFIX`. Nothing to configure. |
-| Self-hosted | Any Upstash REST endpoint: |
+| Self-hosted    | Any Upstash REST endpoint:                                                                                           |
 
 ```ts
 import { upstashEventsStore } from "mcp-use/events";
@@ -108,11 +117,28 @@ new MCPServer({
 });
 ```
 
-Other platform variables: `MCP_USE_PLATFORM_NAMESPACE` (key namespace),
+Other platform variables: `MCP_USE_PLATFORM_NAMESPACE` (key namespace) and
 `MCP_USE_PLATFORM_SECRET` (encrypts stored webhook secrets; comma-separated for
-rotation), and `MCP_USE_PLATFORM_ADMIN_SECRET` or `CRON_SECRET` (bearer for
-`GET|POST <base>/_mcp-use/events/tick`, which runs due retries on serverless
-hosts, and `GET <base>/_mcp-use/events/health`).
+rotation). At startup the server logs which store is active (in-memory, custom,
+or Upstash REST with the host only, never the token).
+
+### Tick and health routes
+
+Both routes live under the MCP path (`basePath`, `/mcp` by default), not the
+server root:
+
+- `GET|POST /mcp/_mcp-use/events/tick` runs due delivery retries. Call it from
+  a cron on serverless hosts, where no background timer survives.
+- `GET /mcp/_mcp-use/events/health` reports the Events runtime status.
+
+Both require `Authorization: Bearer <secret>`, where the secret is a value of
+`MCP_USE_PLATFORM_ADMIN_SECRET` or `CRON_SECRET` (each may be a comma-separated
+list). When neither variable is set, the routes are disabled.
+
+```bash
+curl -X POST https://example.com/mcp/_mcp-use/events/tick \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
 
 ## Receive events in a client
 

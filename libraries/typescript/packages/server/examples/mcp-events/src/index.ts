@@ -45,7 +45,11 @@ export const createNote = server.tool(
     const noteId = `note_${runId}_${nextId++}`;
     notes.push({ noteId, folder, title });
     // The note id is the eventId: stable across retries, used as webhook-id.
-    await noteCreated.emit({ folder, noteId, title }, { eventId: noteId });
+    // The note is already saved, so a failed emit (e.g. store outage) is
+    // logged instead of failing the tool call.
+    await noteCreated
+      .emit({ folder, noteId, title }, { eventId: noteId })
+      .catch((err) => console.error(`note.created emit failed: ${err}`));
     return { content: [{ type: "text", text: `Created ${noteId}` }] };
   }
 );

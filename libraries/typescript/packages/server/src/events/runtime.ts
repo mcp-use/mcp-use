@@ -160,6 +160,14 @@ function declarativeMatch(args: Record<string, unknown>, data: unknown) {
   );
 }
 
+function safeHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "invalid URL";
+  }
+}
+
 /** The Events runtime of one server. */
 export class EventsRuntime {
   readonly #defs: ReadonlyMap<string, AnyEventDefinition>;
@@ -195,6 +203,15 @@ export class EventsRuntime {
             prefix: `${e.MCP_USE_PLATFORM_STORAGE_PREFIX ?? ""}${ns ? `${ns}:` : ""}events:`,
           })
         : memoryEventsStore());
+    console.info(
+      `[mcp-use] Events store: ${
+        options.store
+          ? "custom"
+          : url && token
+            ? `Upstash REST (platform storage, host ${safeHost(url)})`
+            : "in-memory (not shared across instances)"
+      }`
+    );
     this.#sealKeys = Promise.all(
       list(e.MCP_USE_PLATFORM_SECRET).map(async (s) =>
         crypto.subtle.importKey(
@@ -342,12 +359,30 @@ export class EventsRuntime {
       ...(previousUntil !== undefined && { previousUntil }),
       expiresAt,
     };
+    // Write the record, then the index. If indexing fails, roll the record
+    // back to its previous state so a failed subscribe leaves nothing behind.
+    const key = `sub:${id}`;
     await this.#store.set(
-      `sub:${id}`,
+      key,
       JSON.stringify(sub),
       expiresAt === null ? undefined : expiresAt - now
     );
-    await this.#store.sadd(`subs:${def.name}`, id);
+    try {
+      await this.#store.sadd(`subs:${def.name}`, id);
+    } catch (err) {
+      await (
+        existing
+          ? this.#store.set(
+              key,
+              JSON.stringify(existing),
+              existing.expiresAt === null
+                ? undefined
+                : Math.max(existing.expiresAt - now, 1)
+            )
+          : this.#store.del(key)
+      ).catch(() => undefined);
+      throw err;
+    }
     return {
       id,
       refreshBefore:
