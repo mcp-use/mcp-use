@@ -12,7 +12,8 @@ pnpm dev
 Open the Inspector's **Events** tab, subscribe to `note.created` with
 `{ "folder": "inbox" }` (the callback is the Inspector's webhook inbox), then
 call `create_note` with `{ "folder": "inbox", "title": "Hello" }`. The signed
-delivery appears in the inbox; its `webhook-id` is the note id.
+delivery appears in the inbox; its `eventId` is the note id (the
+`webhook-id` header is a server-generated `msg_...` id, kept across retries).
 
 ## Poll consumer
 

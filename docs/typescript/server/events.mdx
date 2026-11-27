@@ -52,7 +52,8 @@ await messageCreated.emit(
 - `emit` validates `data` against `payloadSchema`, rejects bodies over 256 KiB,
   appends the event to the poll log, and resolves after the first delivery
   attempt to each matching webhook subscription.
-- `emit` throws if the store is unreachable. When the event follows a write
+- `emit` throws if the store is unreachable while it looks up subscriptions or
+  queues deliveries. A failed poll-log append is logged, not thrown. When the event follows a write
   that already succeeded, catch the error and log it so the tool call does not
   fail:
 
@@ -162,11 +163,11 @@ request times out after 10 s.
 
 ## Storage
 
-| Where          | Store                                                                                                                                                             |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mcp-use dev`  | A JSON file in `.mcp-use/state/events/`, so subscriptions and the poll log survive hot reloads and restarts. `http:` and loopback callbacks are allowed.          |
-| Manufact Cloud | Redis through the platform proxy, from `MCP_USE_PLATFORM_STORAGE_URL`, `_TOKEN` and `_PREFIX`. Enable **MCP Events storage** in the server settings and redeploy. |
-| Self-hosted    | Any Upstash REST endpoint:                                                                                                                                        |
+| Where          | Store                                                                                                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mcp-use dev`  | A JSON file in `.mcp-use/state/events/`, so subscriptions and the poll log survive hot reloads and restarts. `http:` and loopback callbacks are allowed.                                                          |
+| Manufact Cloud | Redis through the platform proxy, from `MCP_USE_PLATFORM_STORAGE_URL`, `MCP_USE_PLATFORM_STORAGE_TOKEN` and `MCP_USE_PLATFORM_STORAGE_PREFIX`. Enable **MCP Events storage** in the server settings and redeploy. |
+| Self-hosted    | Any Upstash REST endpoint:                                                                                                                                                                                        |
 
 ```ts
 import { upstashEventsStore } from "mcp-use/events";
