@@ -44,3 +44,33 @@ describe("captureRawCapabilities", () => {
     expect(received).toEqual([{ jsonrpc: "2.0", id: 1, result: {} }]);
   });
 });
+
+describe("initialize", () => {
+  it("returns the captured capabilities, including events", async () => {
+    const transport: { onmessage?: (m: any) => void } = {};
+    const connector = new TestConnector();
+    connector.capture(transport);
+    transport.onmessage = () => {};
+    transport.onmessage?.({
+      jsonrpc: "2.0",
+      id: 0,
+      result: {
+        protocolVersion: "2025-11-25",
+        capabilities: { tools: {}, events: { listChanged: false } },
+        serverInfo: { name: "s", version: "1" },
+      },
+    });
+    // The SDK client parses capabilities with a schema that drops `events`.
+    (connector as any).client = {
+      getServerCapabilities: () => ({ tools: {} }),
+      getServerVersion: () => ({ name: "s", version: "1" }),
+      listTools: async () => ({ tools: [] }),
+    };
+    const caps = await connector.initialize();
+    expect(caps).toEqual({ tools: {}, events: { listChanged: false } });
+    expect(connector.serverCapabilities).toEqual({
+      tools: {},
+      events: { listChanged: false },
+    });
+  });
+});

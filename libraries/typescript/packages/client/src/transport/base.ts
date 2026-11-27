@@ -645,7 +645,10 @@ export abstract class BaseConnector {
 
     logger.debug("Server capabilities:", capabilities);
     logger.debug("Server info:", serverInfo);
-    return capabilities;
+    // Same value as `serverCapabilities`, including keys the SDK drops.
+    return (this.capabilitiesCache ?? undefined) as ReturnType<
+      Client["getServerCapabilities"]
+    >;
   }
 
   /**
