@@ -670,26 +670,46 @@ export abstract class BaseConnector {
     onmessage?: (message: any, ...rest: any[]) => void;
   }): void {
     this.rawCapabilities = undefined;
+    // Keep an existing accessor (e.g. a wrapTransport wrapper that forwards
+    // onmessage to the inner transport): store through it instead of
+    // shadowing it, or handlers set during connect never reach the transport
+    // that receives messages.
+    let desc: PropertyDescriptor | undefined;
+    for (
+      let o: object | null = transport;
+      o && !desc;
+      o = Object.getPrototypeOf(o)
+    )
+      desc = Object.getOwnPropertyDescriptor(o, "onmessage");
+    const forward = desc?.set ? desc : undefined;
     let handler = transport.onmessage;
+    type Handler = typeof handler;
+    const read = (): Handler =>
+      forward ? forward.get?.call(transport) : handler;
+    const write = (next: Handler) => {
+      if (forward) forward.set!.call(transport, next);
+      else handler = next;
+    };
     Object.defineProperty(transport, "onmessage", {
       configurable: true,
       enumerable: true,
-      get: () => handler,
-      set: (next: typeof handler) => {
-        handler =
+      get: read,
+      set: (next: Handler) => {
+        write(
           next &&
-          ((message: any, ...rest: any[]) => {
-            const caps = message?.result?.capabilities;
-            if (
-              caps !== null &&
-              typeof caps === "object" &&
-              !Array.isArray(caps) &&
-              (typeof message.result.protocolVersion === "string" ||
-                Array.isArray(message.result.supportedVersions))
-            )
-              this.rawCapabilities = caps;
-            return next(message, ...rest);
-          });
+            ((message: any, ...rest: any[]) => {
+              const caps = message?.result?.capabilities;
+              if (
+                caps !== null &&
+                typeof caps === "object" &&
+                !Array.isArray(caps) &&
+                (typeof message.result.protocolVersion === "string" ||
+                  Array.isArray(message.result.supportedVersions))
+              )
+                this.rawCapabilities = caps;
+              return next(message, ...rest);
+            })
+        );
       },
     });
   }
