@@ -9,9 +9,13 @@ export interface UseMcpEventOptions {
   arguments?: Record<string, unknown>;
   /** Pause polling when false. Default true. */
   enabled?: boolean;
-  /** Keep at most this many events, newest last. Default 100. */
+  /** Keep at most this many events, newest last (minimum 1). Default 100. */
   maxEvents?: number;
-  /** Lower bound on the delay between polls, in ms. Default 1000. */
+  /**
+   * Lower bound on the delay between polls, in ms, when the server reports no
+   * more waiting events. While `hasMore` is true the next poll runs at once.
+   * Default 1000.
+   */
   minIntervalMs?: number;
 }
 
@@ -30,7 +34,8 @@ export interface UseMcpEventResult<T> {
 /**
  * Follow an MCP Event by polling (`events/poll`, official extension). Starts
  * from now once the connection is ready and appends new events as they
- * arrive.
+ * arrive. Changing `name` or `arguments` clears `events` and `truncated` and
+ * starts a new stream from now.
  *
  * @example
  * ```tsx
@@ -59,6 +64,13 @@ export function useMcpEvent<T = unknown>(
   const enabled = options.enabled ?? true;
   const floor = options.minIntervalMs ?? 1000;
 
+  // A new event or filter is a new stream: drop what the old one collected.
+  useEffect(() => {
+    setEvents([]);
+    setTruncated(false);
+    setError(null);
+  }, [name, argsKey]);
+
   useEffect(() => {
     const client = mcp.client;
     if (!enabled || mcp.state !== "ready" || client === null) {
@@ -70,6 +82,7 @@ export function useMcpEvent<T = unknown>(
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cursor: string | null = null;
+    setState("polling");
     const args = JSON.parse(argsKey) as Record<string, unknown>;
     const tick = async () => {
       let delay = floor;
