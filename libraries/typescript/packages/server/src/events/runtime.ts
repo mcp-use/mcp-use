@@ -55,6 +55,8 @@ const RETRY_DELAYS = [10_000, 60_000, 300_000, 1_800_000, 7_200_000];
 const QUEUE = "queue";
 /** How often queued retries are checked while any are pending. */
 const RETRY_POLL_MS = 60_000;
+/** How long a sequence gap in the poll log is treated as an in-flight emit. */
+const IN_FLIGHT_MS = 5_000;
 /**
  * `chatgpt`: OpenAI's dialect (`-32015`, `webhook-id` = `eventId`, webhook
  * only). `sep`: the official extension (`-32023..-32027`, server-generated
@@ -298,6 +300,21 @@ async function validate(
     : { ok: true, value: r.value };
 }
 
+/** Validate subscribe/poll `arguments`: always an object, then the schema. */
+async function validateArgs(def: AnyEventDefinition, value: unknown) {
+  const v = value ?? {};
+  if (typeof v !== "object" || Array.isArray(v))
+    throw new RpcError(INVALID_PARAMS, "Invalid arguments", {
+      issues: [{ message: "arguments must be an object" }],
+    });
+  const args = await validate(def.inputSchema, v);
+  if (!args.ok)
+    throw new RpcError(INVALID_PARAMS, "Invalid arguments", {
+      issues: args.issues,
+    });
+  return args;
+}
+
 /** Default filter: same-named argument and top-level data fields must be equal. */
 function declarativeMatch(args: Record<string, unknown>, data: unknown) {
   if (data === null || typeof data !== "object") return true;
@@ -334,7 +351,10 @@ export class EventsRuntime {
   #retryAt = 0;
   #processing: Promise<void> | undefined;
   #epoch: Promise<string> | undefined;
-  readonly #catalog: Promise<string>;
+  readonly #catalog: Promise<string | null>;
+  #rerun: Promise<void> | undefined;
+  /** Teardowns of open listen streams, run by {@link close}. */
+  readonly #streams = new Set<() => void>();
   readonly #headerParams = new Map<string, Promise<Record<string, string>>>();
   #warnedMissingName = false;
 
@@ -397,9 +417,11 @@ export class EventsRuntime {
    * Hash the event catalog; when it differs from the stored hash (a hot
    * reload, deploy or rollback), store it and wake every listen stream.
    */
-  async #syncCatalog(): Promise<string> {
-    const hash = await sha256(canonical(await this.#list("sep")));
+  async #syncCatalog(): Promise<string | null> {
+    // Never rejects: nothing awaits this promise until a listen stream opens.
+    let hash: string | null = null;
     try {
+      hash = await sha256(canonical(await this.#list("sep")));
       if ((await this.#store.get("catalog")) !== hash) {
         await this.#store.set("catalog", hash);
         for (const listener of catalogListeners()) listener(hash);
@@ -575,11 +597,7 @@ export class EventsRuntime {
       !(this.#insecure && url.protocol === "http:")
     )
       throw new RpcError(INVALID_PARAMS, "delivery.url must use https");
-    const args = await validate(def.inputSchema, p.arguments ?? {});
-    if (!args.ok)
-      throw new RpcError(INVALID_PARAMS, "Invalid arguments", {
-        issues: args.issues,
-      });
+    const args = await validateArgs(def, p.arguments);
     const argumentsValue = (args.value ?? {}) as Record<string, unknown>;
     const id = `sub_${(
       await sha256(
@@ -651,7 +669,10 @@ export class EventsRuntime {
         : now +
           (typeof ttl === "number"
             ? Math.min(Math.max(ttl, MIN_TTL), MAX_TTL)
-            : (this.#options.defaultTtlMs ?? DAY));
+            : Math.min(
+                Math.max(this.#options.defaultTtlMs ?? DAY, MIN_TTL),
+                MAX_TTL
+              ));
     const sub: Subscription = {
       id,
       dialect,
@@ -868,9 +889,20 @@ export class EventsRuntime {
     return { eventId, deliveries };
   }
 
-  /** Attempt every due delivery. */
+  /**
+   * Attempt every due delivery. A call during a running drain schedules one
+   * more drain after it, so jobs queued meanwhile are attempted right away.
+   */
   process(): Promise<void> {
-    this.#processing ??= this.#drain().finally(() => {
+    if (this.#processing !== undefined) {
+      const again = () => {
+        this.#rerun = undefined;
+        return this.process();
+      };
+      this.#rerun ??= this.#processing.then(again, again);
+      return this.#rerun;
+    }
+    this.#processing = this.#drain().finally(() => {
       this.#processing = undefined;
     });
     return this.#processing;
@@ -887,6 +919,22 @@ export class EventsRuntime {
 
   async #attempt(jobId: string) {
     if (!(await this.#store.zrem(QUEUE, jobId))) return;
+    try {
+      await this.#deliver(jobId);
+    } catch (err) {
+      // A store or unseal failure must not lose the job: queue it again. A
+      // job that keeps failing ends when its `job:` key expires (2 days).
+      console.warn(
+        `[mcp-use] events delivery ${jobId} failed, retrying: ${(err as Error)?.message ?? err}`
+      );
+      await this.#store
+        .zadd(QUEUE, Date.now() + RETRY_POLL_MS, jobId)
+        .then(() => this.#scheduleRetry(RETRY_POLL_MS))
+        .catch(() => undefined);
+    }
+  }
+
+  async #deliver(jobId: string) {
     const raw = await this.#store.get(`job:${jobId}`);
     const job = raw ? (JSON.parse(raw) as Job) : undefined;
     const sub = job ? await this.#getSub(job.subId) : undefined;
@@ -948,8 +996,9 @@ export class EventsRuntime {
     (this.#retryTimer as { unref?: () => void }).unref?.();
   }
 
-  /** Stop the in-process retry timer. */
+  /** Stop the in-process retry timer and end open listen streams. */
   close() {
+    for (const teardown of [...this.#streams]) teardown();
     if (this.#retryTimer !== undefined) clearTimeout(this.#retryTimer);
     this.#retryTimer = undefined;
   }
@@ -962,6 +1011,10 @@ export class EventsRuntime {
       await this.#store.set("log:epoch", epoch);
       return epoch;
     })();
+    // Don't cache a failed read: the next poll tries again.
+    this.#epoch.catch(() => {
+      this.#epoch = undefined;
+    });
     return this.#epoch;
   }
 
@@ -995,11 +1048,7 @@ export class EventsRuntime {
   /** `events/poll`: stateless; the opaque cursor is a position in the log. */
   async #poll(p: Record<string, unknown>, dialect: Dialect) {
     const def = this.#def(p, dialect);
-    const args = await validate(def.inputSchema, p.arguments ?? {});
-    if (!args.ok)
-      throw new RpcError(INVALID_PARAMS, "Invalid arguments", {
-        issues: args.issues,
-      });
+    const args = await validateArgs(def, p.arguments);
     const max =
       typeof p.maxEvents === "number" && p.maxEvents >= 1
         ? Math.min(Math.floor(p.maxEvents), 1000)
@@ -1030,6 +1079,10 @@ export class EventsRuntime {
       const batch = await s.zafter(`log:${def.name}`, last, 200);
       for (const m of batch) {
         const e = JSON.parse(m) as LogEntry;
+        // A gap before a recent entry is most likely an emit between its
+        // `incr` and `zadd`: stop before it so the next poll sees it.
+        // Gaps from trimming are old, and a lost append stalls only briefly.
+        if (e.seq > last + 1 && e.at > Date.now() - IN_FLIGHT_MS) break scan;
         last = e.seq;
         if (e.at < minAt) {
           truncated = true;
@@ -1051,7 +1104,9 @@ export class EventsRuntime {
     }
     return {
       events,
-      cursor: encodeCursor(epoch, hasMore ? last : Math.max(head, last)),
+      // Only as far as the last entry read: a higher `head` may belong to
+      // an emit whose entry is not written yet.
+      cursor: encodeCursor(epoch, last),
       truncated,
       hasMore,
       nextPollMs,
@@ -1108,6 +1163,7 @@ export class EventsRuntime {
     const teardown = () => {
       if (closed) return;
       closed = true;
+      this.#streams.delete(teardown);
       for (const fn of cleanup) fn();
       try {
         controller.close();
@@ -1136,6 +1192,8 @@ export class EventsRuntime {
             })
           );
         let seen = await this.#catalog;
+        // Aborted while waiting: teardown already ran, register nothing.
+        if (closed) return;
         const changed = (hash: string | null) => {
           if (hash === null || hash === seen) return;
           seen = hash;
@@ -1159,7 +1217,10 @@ export class EventsRuntime {
       cancel: teardown,
     });
     if (signal?.aborted) teardown();
-    else signal?.addEventListener("abort", teardown, { once: true });
+    else {
+      this.#streams.add(teardown);
+      signal?.addEventListener("abort", teardown, { once: true });
+    }
     return new Response(readable, {
       headers: {
         "content-type": "text/event-stream",
