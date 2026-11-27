@@ -21,6 +21,7 @@ export interface UseMcpEventResult<T> {
   events: EventEnvelope<T>[];
   /** `idle` until the connection is ready, then `polling`; `error` after a failed poll (retried). */
   state: "idle" | "polling" | "error";
+  /** Error from the last failed poll; `null` after a successful one. */
   error: Error | null;
   /** A poll reported a gap (events may have been missed). */
   truncated: boolean;

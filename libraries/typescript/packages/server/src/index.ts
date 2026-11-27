@@ -14,6 +14,7 @@ export type {
   EventDefinition,
   EventHandle,
   EventsOptions,
+  InferEventSchema,
 } from "./events/define.js";
 export type { EventsStore } from "./events/store.js";
 export { isBuilding } from "./build-phase.js";

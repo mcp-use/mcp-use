@@ -7,15 +7,21 @@
 
 /** The small Redis subset MCP Events needs. Values are strings. */
 export interface EventsStore {
+  /** Value at `key`, or `null` when missing or expired. */
   get(key: string): Promise<string | null>;
   /** Set a value, optionally expiring after `ttlMs`. */
   set(key: string, value: string, ttlMs?: number): Promise<void>;
+  /** Delete `key`, whatever it holds; a missing key is a no-op. */
   del(key: string): Promise<void>;
   /** Increment an integer counter and return the new value. */
   incr(key: string): Promise<number>;
+  /** Add `member` to the set at `key`. */
   sadd(key: string, member: string): Promise<void>;
+  /** Remove `member` from the set at `key`. */
   srem(key: string, member: string): Promise<void>;
+  /** All members of the set at `key`, in no particular order. */
   smembers(key: string): Promise<string[]>;
+  /** Add `member` to the sorted set at `key`, or update its `score`. */
   zadd(key: string, score: number, member: string): Promise<void>;
   /** Members with a score up to `max`, lowest first, at most `limit`. */
   zdue(key: string, max: number, limit: number): Promise<string[]>;

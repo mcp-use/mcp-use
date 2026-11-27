@@ -9,6 +9,7 @@
 
 /** Anything with a raw JSON-RPC `request`, such as an `MCPSession`. */
 export interface EventsRequester {
+  /** Send a JSON-RPC request and resolve with its `result`. */
   request(
     method: string,
     params: Record<string, unknown> | null
@@ -17,25 +18,37 @@ export interface EventsRequester {
 
 /** An event definition returned by `events/list`. */
 export interface EventInfo {
+  /** Event name, used in poll and subscribe requests. */
   name: string;
+  /** Human-readable description from the server. */
   description?: string;
+  /** Delivery modes the server supports for this event, such as `webhook` and `poll`. */
   delivery: string[];
+  /** JSON Schema of the subscription `arguments`. */
   inputSchema: Record<string, unknown>;
+  /** JSON Schema of each event's `data`. */
   payloadSchema: Record<string, unknown>;
 }
 
 /** An event delivered to a webhook or returned by a poll. */
 export interface EventEnvelope<T = unknown> {
+  /** Unique, stable id; use it to drop duplicate deliveries. */
   eventId: string;
+  /** Name of the event that occurred. */
   name: string;
+  /** Occurrence time as an ISO 8601 string. */
   timestamp: string;
+  /** Event payload, matching the event's `payloadSchema`. */
   data: T;
+  /** Poll position just after this event, when the server reports one. */
   cursor?: string | null;
 }
 
 /** Parameters of {@link pollEvents}. */
 export interface PollParams {
+  /** Event to poll. */
   name: string;
+  /** Subscription arguments that filter which events are returned. */
   arguments?: Record<string, unknown>;
   /** Cursor from the previous poll; `null` starts from now. */
   cursor?: string | null;
@@ -47,6 +60,7 @@ export interface PollParams {
 
 /** Result of {@link pollEvents}. */
 export interface PollResult<T = unknown> {
+  /** Events after the supplied cursor, oldest first. */
   events: EventEnvelope<T>[];
   /** Pass back on the next poll. */
   cursor: string | null;
@@ -60,16 +74,21 @@ export interface PollResult<T = unknown> {
 
 /** Result of {@link subscribeEvent}. */
 export interface SubscribeResult {
+  /** Subscription id, also sent in each delivery's `x-mcp-subscription-id` header. */
   id: string;
   /** Re-subscribe before this time to keep the subscription; `null` = no expiry. */
   refreshBefore: string | null;
+  /** Poll position at subscribe time, when the server reports one; otherwise `null`. */
   cursor: string | null;
+  /** Events may have been skipped since a previous subscription; `false` when unknown. */
   truncated: boolean;
 }
 
 /** Parameters of {@link subscribeEvent}. */
 export interface SubscribeParams {
+  /** Event to subscribe to. */
   name: string;
+  /** Subscription arguments that filter which events are delivered. */
   arguments?: Record<string, unknown>;
   /** HTTPS callback URL. */
   url: string;

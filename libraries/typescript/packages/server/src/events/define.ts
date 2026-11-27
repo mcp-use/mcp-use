@@ -26,12 +26,16 @@ export interface EventDefinition<
    * whose name is also a top-level field of `data` has an equal value.
    */
   matches?: (
-    args: Infer<I, Record<string, unknown>>,
-    data: Infer<P, unknown>
+    args: InferEventSchema<I, Record<string, unknown>>,
+    data: InferEventSchema<P, unknown>
   ) => boolean;
 }
 
-type Infer<S, Fallback> = S extends StandardSchemaWithJSON
+/**
+ * Output type of an event's `inputSchema` or `payloadSchema`, or `Fallback`
+ * when the definition has no schema.
+ */
+export type InferEventSchema<S, Fallback> = S extends StandardSchemaWithJSON
   ? StandardSchemaWithJSON.InferOutput<S>
   : Fallback;
 
@@ -45,6 +49,7 @@ export interface EmitOptions {
 
 /** Result of {@link EventHandle.emit}. */
 export interface EmitResult {
+  /** Id of the emitted event: `options.eventId`, or the generated one. */
   eventId: string;
   /** Matching subscriptions a delivery was queued for. */
   deliveries: number;
@@ -52,6 +57,7 @@ export interface EmitResult {
 
 /** Returned by `server.event()`. */
 export interface EventHandle<P = unknown> {
+  /** Event name, as declared in the definition passed to `server.event()`. */
   readonly name: string;
   /**
    * Deliver an event to every matching subscription. Resolves after the
