@@ -62,6 +62,8 @@ function stateStore(
     const run = queue.then(async () => {
       const s = await load();
       const out = fn(s);
+      for (const [k, e] of Object.entries(s.kv))
+        if (live(e) === null) delete s.kv[k];
       await save(s);
       return out;
     });
@@ -153,22 +155,23 @@ export function fileEventsStore(dir: string): EventsStore {
   return stateStore(
     async () => {
       const { readFileSync } = await fs;
+      let text: string;
       try {
-        return {
-          ...empty(),
-          ...(JSON.parse(readFileSync(file, "utf8")) as State),
-        };
-      } catch {
-        return empty();
+        text = readFileSync(file, "utf8");
+      } catch (err) {
+        if ((err as { code?: string }).code === "ENOENT") return empty();
+        throw err;
       }
+      // A corrupt file throws instead of reading as empty, so the next
+      // write can't wipe it.
+      return { ...empty(), ...(JSON.parse(text) as State) };
     },
     async (state) => {
       const { mkdirSync, renameSync, writeFileSync } = await fs;
-      for (const [k, e] of Object.entries(state.kv))
-        if (live(e) === null) delete state.kv[k];
       mkdirSync(dir, { recursive: true });
       const tmp = `${file}.tmp`;
-      writeFileSync(tmp, JSON.stringify(state));
+      // Owner-only: subscriptions may hold webhook secrets.
+      writeFileSync(tmp, JSON.stringify(state), { mode: 0o600 });
       renameSync(tmp, file);
     }
   );

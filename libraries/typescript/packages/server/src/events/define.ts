@@ -60,8 +60,10 @@ export interface EventHandle<P = unknown> {
   /** Event name, as declared in the definition passed to `server.event()`. */
   readonly name: string;
   /**
-   * Deliver an event to every matching subscription. Resolves after the
-   * first delivery attempt of each; failed attempts are retried with backoff.
+   * Deliver an event to every matching subscription. Resolves once the
+   * deliveries are queued and, normally, after their first attempt (a large
+   * backlog is attempted in batches); failed attempts are retried with
+   * backoff.
    */
   emit(data: P, options?: EmitOptions): Promise<EmitResult>;
 }
@@ -79,11 +81,15 @@ export interface EventsOptions {
   /** Lifetime granted when `ttlMs` is omitted. Default 24 hours. */
   defaultTtlMs?: number;
   /**
-   * Allow `http:` and private callback addresses. Development only; the
+   * Allow `http:` and private callback addresses, and webhook subscriptions
+   * from unauthenticated clients (official dialect). Development only; the
    * `mcp-use dev` runtime sets `MCP_USE_EVENTS_INSECURE=1`.
    */
   allowInsecureCallbacks?: boolean;
-  /** Custom transport for deliveries (bypasses address checks). */
+  /**
+   * Custom transport for deliveries. Skips the DNS-resolved address check;
+   * callback URLs with a literal private IP are still rejected.
+   */
   fetch?: typeof fetch;
 }
 

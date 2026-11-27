@@ -49,6 +49,7 @@ export function asEventsListenRequest(
   const n = (b.params as { notifications?: { eventsListChanged?: unknown } })
     ?.notifications;
   if (
+    b.jsonrpc !== "2.0" ||
     b.method !== "subscriptions/listen" ||
     (typeof b.id !== "string" && typeof b.id !== "number") ||
     n?.eventsListChanged !== true
