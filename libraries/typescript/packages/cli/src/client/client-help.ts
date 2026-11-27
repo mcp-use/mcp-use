@@ -173,8 +173,11 @@ page("<name> events", {
   commands: [
     ["list", "List events"],
     ["poll <event> [args...]", "Poll an event (official extension)"],
-    ["subscribe <event> [args...]", "Subscribe a webhook URL"],
-    ["unsubscribe <event> [args...]", "Remove a webhook subscription"],
+    ["subscribe <event> --url <url> [args...]", "Subscribe a webhook URL"],
+    [
+      "unsubscribe <event> --url <url> [args...]",
+      "Remove a webhook subscription",
+    ],
   ],
   options: [HELP],
 });
@@ -211,6 +214,9 @@ page("<name> events subscribe", {
     JSON,
     HELP,
   ],
+  notes: [
+    "Arguments are one JSON object or key=value/key:=<json> pairs; do not mix forms.",
+  ],
 });
 
 page("<name> events unsubscribe", {
@@ -218,6 +224,9 @@ page("<name> events unsubscribe", {
     "mcp-use client <name> events unsubscribe <event> --url <url> [args...] [options]",
   summary: "Remove a webhook subscription.",
   options: [["--url <url>", "Callback URL used to subscribe"], JSON, HELP],
+  notes: [
+    "Arguments are one JSON object or key=value/key:=<json> pairs; do not mix forms.",
+  ],
 });
 
 page("<name> auth", {
