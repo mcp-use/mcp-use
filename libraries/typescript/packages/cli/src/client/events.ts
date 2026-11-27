@@ -51,10 +51,19 @@ export function parseEventsArgs(
   const op = operation as EventsArgs["operation"];
   const positive = (v: string | undefined, flag: string) => {
     if (v === undefined) return undefined;
-    if (!/^\d+$/.test(v) || Number(v) < 1)
+    if (!/^\d+$/.test(v) || Number(v) < 1 || !Number.isSafeInteger(Number(v)))
       throw new UsageError(`${flag} must be a positive integer.`);
     return Number(v);
   };
+  const allowed: Record<EventsArgs["operation"], readonly string[]> = {
+    list: [],
+    poll: ["cursor", "follow", "max-events"],
+    subscribe: ["url", "secret", "ttl"],
+    unsubscribe: ["url"],
+  };
+  for (const flag of Object.keys(values))
+    if (!allowed[op].includes(flag))
+      throw new UsageError(`--${flag} does not apply to events ${op}.`);
   if (op === "list") {
     if (positionals.length > 0) throw new UsageError(usage);
     return { operation: op, rest: [], follow: false };
@@ -188,7 +197,7 @@ export async function runEventsCommand(
             ...page.events.map(
               (e) => `${e.timestamp}\t${e.eventId}\t${JSON.stringify(e.data)}`
             ),
-            `cursor: ${page.cursor}${page.truncated ? " (truncated)" : ""}`,
+            `cursor: ${page.cursor}${page.truncated ? " (truncated)" : ""}${page.hasMore ? " (more available)" : ""}`,
           ].join("\n")
         );
         return 0;
@@ -199,7 +208,7 @@ export async function runEventsCommand(
           json,
           `${e.timestamp}\t${e.eventId}\t${JSON.stringify(e.data)}`
         );
-      if (page.truncated && !json)
+      if (page.truncated)
         process.stderr.write("Events may have been missed (truncated).\n");
       try {
         await delay(

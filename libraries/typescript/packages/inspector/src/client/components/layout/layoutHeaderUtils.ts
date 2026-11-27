@@ -1,7 +1,7 @@
 import type { McpServer } from "@mcp-use/client/react";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
-import { supportsEvents } from "@/client/components/EventsTab";
+import { supportsEvents } from "@/client/utils/eventsProtocol";
 export { isMcpUseTunnelUrl } from "@/client/utils/servers";
 
 export function tunnelOriginFromMcpUrl(mcpUrl: string | null): string | null {

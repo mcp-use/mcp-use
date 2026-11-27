@@ -95,6 +95,31 @@ test.describe("Events tab", () => {
     );
   });
 
+  test("falls back to Tools when the selected server lacks MCP Events", async ({
+    page,
+  }) => {
+    const { inspectorUrl, serverUrl } = getTestMatrix();
+    await page.goto(
+      `${inspectorUrl}?autoConnect=${encodeURIComponent(serverUrl)}&tab=events`
+    );
+    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await expect(page.getByTestId("tool-item-test_simple_text")).toBeVisible();
+    await expect(page.getByTestId("events-tab-title")).toHaveCount(0);
+  });
+
+  test("keeps JSON argument edits when switching back to Form", async ({
+    page,
+  }) => {
+    await connect(page, devServer.url, "create_note");
+    await selectNoteCreated(page);
+    await page.getByTestId("events-toggle-json").click();
+    await page
+      .getByTestId("event-arguments-json")
+      .fill('{ "folder": "from-json" }');
+    await page.getByTestId("events-toggle-form").click();
+    await expect(visibleParam(page, "folder")).toHaveValue("from-json");
+  });
+
   test("is shown for an events server and lists its events", async ({
     page,
   }) => {

@@ -3,6 +3,7 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { mountEventsInbox } from "./events-inbox.js";
 import { mountMcpProxy, mountOAuthProxy } from "./proxy/index.js";
 import {
+  inspectorApiRateLimit,
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
 } from "./rate-limit.js";
@@ -45,7 +46,7 @@ export function registerInspectorProxyRoutes(
     });
   });
 
-  mountEventsInbox(app, basePath);
+  mountEventsInbox(app, basePath, inspectorApiRateLimit(apiRateLimiter));
 
   mountMcpProxy(app, {
     path: p("/inspector/api/proxy"),

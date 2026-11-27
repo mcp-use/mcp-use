@@ -67,14 +67,11 @@ function needsSignIn(error: TabError | null): boolean {
   return reason === "unauthenticated" || reason === "principal_required";
 }
 
-/** Whether the server advertises MCP Events (`capabilities.events`). */
-/** Tooltip shown when the connected server does not advertise MCP Events. */
-export const EVENTS_UNSUPPORTED_MESSAGE =
-  "This server does not support MCP Events.";
-
-export function supportsEvents(server: McpServer | undefined): boolean {
-  return server?.capabilities?.events !== undefined;
-}
+import { isLocalhostServerUrl } from "@/client/utils/servers";
+export {
+  EVENTS_UNSUPPORTED_MESSAGE,
+  supportsEvents,
+} from "@/client/utils/eventsProtocol";
 
 type DeliveryMode = "webhook" | "poll";
 
@@ -109,7 +106,17 @@ interface OwnSubscription {
   refreshBefore: string | null;
   cursor: string | null;
   polled: Delivery[];
+  /** The last poll reported `truncated`: events may have been missed. */
+  truncated?: boolean;
   error?: string;
+}
+
+/** A unique local key; `crypto.randomUUID` needs a secure context. */
+function localKey(): string {
+  return typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function sessionOf(server: McpServer): EventsRequester | undefined {
@@ -296,9 +303,13 @@ export function EventsTab({ server }: { server: McpServer }) {
       .catch((e: Error) => setError(`inbox: ${e.message}`));
   }, []);
 
+  // Fetch the inbox only while a webhook subscription exists and the page is
+  // visible.
+  const hasWebhookSub = subs.some((s) => s.mode === "webhook");
   useEffect(() => {
-    if (!inbox) return;
+    if (!inbox || !hasWebhookSub) return;
     const timer = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       fetch(inspectorApi(`events/inboxes/${inbox.id}`))
         .then((r) => r.json())
         .then((b: { deliveries?: InboxDelivery[] }) =>
@@ -307,18 +318,22 @@ export function EventsTab({ server }: { server: McpServer }) {
         .catch(() => undefined);
     }, 1500);
     return () => clearInterval(timer);
-  }, [inbox]);
+  }, [inbox, hasWebhookSub]);
 
   // Poll subscriptions: one events/poll per subscription every few seconds.
+  // At most one request in flight per subscription, so a slow response can
+  // never land after a newer one and move the cursor backwards.
   const subsRef = useRef(subs);
   subsRef.current = subs;
+  const inFlight = useRef(new Set<string>());
   useEffect(() => {
     if (!ready) return;
     const timer = setInterval(() => {
       const session = sessionOf(server);
       if (!session) return;
       for (const sub of subsRef.current) {
-        if (sub.mode !== "poll") continue;
+        if (sub.mode !== "poll" || inFlight.current.has(sub.key)) continue;
+        inFlight.current.add(sub.key);
         pollEvents(session, {
           name: sub.name,
           arguments: sub.arguments,
@@ -334,6 +349,7 @@ export function EventsTab({ server }: { server: McpServer }) {
                 body: ev,
               })
             );
+            const newestFirst = [...fresh].reverse();
             setSubs((all) =>
               all.map((s) =>
                 s.key === sub.key
@@ -341,7 +357,8 @@ export function EventsTab({ server }: { server: McpServer }) {
                       ...s,
                       cursor: result.cursor,
                       error: undefined,
-                      polled: [...fresh.reverse(), ...s.polled].slice(0, 200),
+                      truncated: result.truncated,
+                      polled: [...newestFirst, ...s.polled].slice(0, 200),
                     }
                   : s
               )
@@ -353,7 +370,8 @@ export function EventsTab({ server }: { server: McpServer }) {
                 s.key === sub.key ? { ...s, error: e.message } : s
               )
             )
-          );
+          )
+          .finally(() => inFlight.current.delete(sub.key));
       }
     }, 3000);
     return () => clearInterval(timer);
@@ -438,7 +456,36 @@ export function EventsTab({ server }: { server: McpServer }) {
   }, [formArgs, properties, rootSchema]);
 
   const switchInputMode = (next: "form" | "json") => {
-    if (next === "json") setJsonArgs(JSON.stringify(formPayload, null, 2));
+    if (next === inputMode) return;
+    if (next === "json") {
+      setJsonArgs(JSON.stringify(formPayload, null, 2));
+    } else {
+      // Carry JSON edits back into the form; stay in JSON if they don't parse.
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(jsonArgs || "{}");
+      } catch (e) {
+        setError(`Invalid JSON: ${(e as Error).message}`);
+        return;
+      }
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
+        setError("Arguments must be a JSON object");
+        return;
+      }
+      setFormArgs(
+        Object.fromEntries(
+          Object.entries(parsed).map(([k, v]) => [
+            k,
+            v !== null && typeof v === "object" ? JSON.stringify(v) : v,
+          ])
+        )
+      );
+      setError(null);
+    }
     setInputMode(next);
   };
 
@@ -457,7 +504,7 @@ export function EventsTab({ server }: { server: McpServer }) {
       const now = new Date().toISOString();
       if (how === "poll") {
         const first = await pollEvents(session, { name, arguments: args });
-        const key = `poll-${crypto.randomUUID()}`;
+        const key = `poll-${localKey()}`;
         setSubs((all) => [
           {
             key,
@@ -561,8 +608,8 @@ export function EventsTab({ server }: { server: McpServer }) {
       ? sub.polled
       : inboxDeliveries
           .filter((d) => d.subscriptionId === sub.id)
-          .map((d, i) => ({
-            key: `${d.webhookId}-${i}`,
+          .map((d) => ({
+            key: `${d.webhookId ?? "none"}-${d.receivedAt}`,
             receivedAt: d.receivedAt,
             label:
               d.kind === "verification"
@@ -788,6 +835,19 @@ export function EventsTab({ server }: { server: McpServer }) {
               ? `Callback: ${inbox?.url ?? "creating inbox..."}`
               : "The Inspector calls events/poll every 3 seconds."}
           </p>
+          {mode === "webhook" &&
+            inbox &&
+            isLocalhostServerUrl(inbox.url) &&
+            server.url !== undefined &&
+            !isLocalhostServerUrl(server.url) && (
+              <p
+                className="text-xs text-amber-600 dark:text-amber-400"
+                data-testid="events-callback-unreachable"
+              >
+                This callback is on localhost, so a remote server probably
+                cannot reach it. Use poll delivery instead.
+              </p>
+            )}
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -901,6 +961,11 @@ export function EventsTab({ server }: { server: McpServer }) {
                     Unsubscribe
                   </Button>
                 </div>
+                {sub.truncated && (
+                  <div className="px-4 pb-2 text-xs text-amber-600 dark:text-amber-400">
+                    Some events may have been missed (truncated).
+                  </div>
+                )}
                 {sub.error && (
                   <div className="px-4 pb-2 text-xs text-red-600 dark:text-red-400">
                     {sub.error}

@@ -18,7 +18,7 @@ import type { McpServer } from "@mcp-use/client/react";
 import {
   EVENTS_UNSUPPORTED_MESSAGE,
   supportsEvents,
-} from "@/client/components/EventsTab";
+} from "@/client/utils/eventsProtocol";
 import { useState } from "react";
 import { toast } from "sonner";
 import { HostedUserMenu } from "@/client/components/HostedUserMenu";

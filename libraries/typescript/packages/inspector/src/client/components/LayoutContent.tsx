@@ -15,7 +15,7 @@ import { PromptsTab } from "@/client/components/PromptsTab";
 import { ResourcesTab } from "@/client/components/ResourcesTab";
 import { SkillsTab } from "@/client/components/SkillsTab";
 import { EventsTab } from "@/client/components/EventsTab";
-import { supportsEvents } from "@/client/components/EventsTab";
+import { supportsEvents } from "@/client/utils/eventsProtocol";
 import { SamplingTab } from "@/client/components/SamplingTab";
 import { ServerMetadataTab } from "@/client/components/ServerMetadataTab";
 import { ToolsTab } from "@/client/components/ToolsTab";

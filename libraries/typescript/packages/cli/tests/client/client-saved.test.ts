@@ -204,3 +204,62 @@ describe("client option validation", () => {
     expect(cloud.requestsTo("POST", "/mcp").length).toBeGreaterThan(0);
   });
 });
+
+describe("client <name> events argument validation", () => {
+  test.for([
+    [["poll", "ticks", "--url", "https://hook.example.com"]],
+    [["subscribe", "ticks", "--url", "https://hook.example.com", "--follow"]],
+    [
+      [
+        "unsubscribe",
+        "ticks",
+        "--url",
+        "https://hook.example.com",
+        "--ttl",
+        "5",
+      ],
+    ],
+    [["poll", "ticks", "--max-events", "99999999999999999999"]],
+    [
+      [
+        "subscribe",
+        "ticks",
+        "--url",
+        "https://h.example.com",
+        "--ttl",
+        "9".repeat(400),
+      ],
+    ],
+  ] as const)("%s is a usage error", async ([args], { cli }) => {
+    await seedServers(cli, { demo: DEMO });
+
+    const result = await cli.run([
+      "client",
+      "demo",
+      "events",
+      ...args,
+      "--json",
+    ]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.errorJson).toMatchObject({ error: { code: "usage_error" } });
+  });
+});
+
+describe("client <url> without a saved server", () => {
+  test("does not echo credentials from the URL", async ({ cli }) => {
+    const result = await cli.run([
+      "client",
+      "https://user:hunter2@demo.example.com/mcp?token=s3cret",
+      "tools",
+      "--json",
+    ]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.errorJson).toMatchObject({ error: { code: "usage_error" } });
+    const message = JSON.stringify(result.errorJson);
+    expect(message).toContain("demo.example.com");
+    expect(message).not.toContain("hunter2");
+    expect(message).not.toContain("s3cret");
+  });
+});
