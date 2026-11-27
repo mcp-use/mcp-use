@@ -3,11 +3,12 @@
  * its own `whsec_` secret, that verify deliveries, answer the verification
  * challenge and keep the most recent deliveries for the UI.
  */
-import {
-  generateWebhookSecret,
-  verifyWebhookSignature,
-} from "@mcp-use/client/events";
 import type { Hono } from "hono";
+
+// Loaded on first use: this module is reachable from vite.config.ts (via the
+// dev API plugin), and tools such as knip load that config before
+// @mcp-use/client is built, when its "./events" export has no dist yet.
+const loadEvents = () => import("@mcp-use/client/events");
 
 const MAX_INBOXES = 50;
 const MAX_DELIVERIES = 200;
@@ -51,12 +52,12 @@ export function mountEventsInbox(app: Hono, basePath = ""): void {
   const inboxes = new Map<string, Inbox>();
   const root = `${basePath}/inspector/api/events`;
 
-  app.post(`${root}/inboxes`, (c) => {
+  app.post(`${root}/inboxes`, async (c) => {
     if (inboxes.size >= MAX_INBOXES) {
       inboxes.delete(inboxes.keys().next().value as string);
     }
     const id = crypto.randomUUID();
-    const secret = generateWebhookSecret();
+    const secret = (await loadEvents()).generateWebhookSecret();
     inboxes.set(id, { secret, deliveries: [] });
     return c.json({ id, secret, path: `${root}/hooks/${id}` });
   });
@@ -73,6 +74,7 @@ export function mountEventsInbox(app: Hono, basePath = ""): void {
     const text = await c.req.text();
     if (text.length > MAX_BODY) return c.json({ error: "too large" }, 413);
     const headers = c.req.raw.headers;
+    const { verifyWebhookSignature } = await loadEvents();
     const verified = await verifyWebhookSignature(
       [inbox.secret],
       headers,
