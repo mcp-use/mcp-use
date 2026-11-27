@@ -341,6 +341,26 @@ describe("mixed auth: signed-out discovery", () => {
     }
   });
 
+  it("lists MCP Events signed out but requires sign-in to subscribe or poll", async () => {
+    const server = oauthServer();
+    server.event({ name: "note.created" });
+    const list = await server.fetch(post(rpc("events/list")));
+    expect(list.status).toBe(200);
+    const body = (await list.json()) as {
+      result: { events: Array<{ name: string }> };
+    };
+    expect(body.result.events.map((event) => event.name)).toEqual([
+      "note.created",
+    ]);
+
+    for (const method of ["events/subscribe", "events/poll"]) {
+      const response = await server.fetch(
+        post(rpc(method, { name: "note.created", arguments: {} }))
+      );
+      expect(response.status, method).toBe(401);
+    }
+  });
+
   it("serves a mixedAuth server that has no noauth tools without warning", async () => {
     const warn = vi.spyOn(console, "warn");
     try {
