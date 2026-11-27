@@ -576,6 +576,56 @@ describe("runDev", () => {
     expect(new URL(link!).searchParams.get("autoConnect")).toBe(dev.url);
   });
 
+  describe("MCP Events dev defaults", () => {
+    const keys = ["MCP_USE_EVENTS_INSECURE", "MCP_USE_EVENTS_STATE_DIR"];
+    let saved: (string | undefined)[] = [];
+    beforeEach(() => {
+      saved = keys.map((k) => process.env[k]);
+      for (const k of keys) delete process.env[k];
+    });
+    afterEach(() => {
+      keys.forEach((k, i) => {
+        if (saved[i] === undefined) delete process.env[k];
+        else process.env[k] = saved[i];
+      });
+    });
+
+    it("allows insecure event callbacks on a loopback listener", async () => {
+      const cwd = copyFixture("dev-tools-declaration");
+      cleanups.push(() => removeDir(cwd));
+      const dev = await startDev(cwd, await getFreePort());
+      cleanups.push(dev.stop);
+
+      expect(process.env["MCP_USE_EVENTS_INSECURE"]).toBe("1");
+      expect(process.env["MCP_USE_EVENTS_STATE_DIR"]).toBe(
+        join(cwd, ".mcp-use", "state", "events")
+      );
+    });
+
+    it("keeps event callback guards on a wildcard listener", async () => {
+      const cwd = copyFixture("dev-tools-declaration");
+      cleanups.push(() => removeDir(cwd));
+      const dev = await startDev(cwd, await getFreePort("0.0.0.0"), "0.0.0.0");
+      cleanups.push(dev.stop);
+
+      expect(process.env["MCP_USE_EVENTS_INSECURE"]).toBeUndefined();
+    });
+
+    it("lets the project .env override the events defaults", async () => {
+      const cwd = copyFixture("dev-tools-declaration");
+      cleanups.push(() => removeDir(cwd));
+      writeFileSync(
+        join(cwd, ".env"),
+        "MCP_USE_EVENTS_INSECURE=0\nMCP_USE_EVENTS_STATE_DIR=/tmp/custom-events\n"
+      );
+      const dev = await startDev(cwd, await getFreePort());
+      cleanups.push(dev.stop);
+
+      expect(process.env["MCP_USE_EVENTS_INSECURE"]).toBe("0");
+      expect(process.env["MCP_USE_EVENTS_STATE_DIR"]).toBe("/tmp/custom-events");
+    });
+  });
+
   it("creates a missing root mcp-env.d.ts", async () => {
     const cwd = copyFixture("dev-tools-declaration");
     cleanups.push(() => removeDir(cwd));

@@ -431,16 +431,6 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  */
 export async function runDev(options: DevOptions): Promise<void> {
   process.env.MCP_USE_DEV_CLI = "1";
-  // MCP Events in development: allow http and loopback callbacks (the
-  // Inspector webhook inbox), and keep subscriptions and the poll log in a
-  // file so they survive hot reloads and restarts.
-  process.env.MCP_USE_EVENTS_INSECURE ??= "1";
-  process.env.MCP_USE_EVENTS_STATE_DIR ??= join(
-    options.cwd,
-    ".mcp-use",
-    "state",
-    "events"
-  );
   const paths = resolveWorkspacePaths(options.cwd);
   const eventBus = new InMemoryServerEventBus((error) => {
     console.error("[mcp-use] notification delivery failed:", error);
@@ -450,6 +440,20 @@ export async function runDev(options: DevOptions): Promise<void> {
   const host = resolveHost(options.host);
   const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
   const wildcardBind = host === "0.0.0.0" || host === "::";
+
+  // MCP Events in development: keep subscriptions and the poll log in a file
+  // so they survive hot reloads and restarts. On a loopback-only listener
+  // without a tunnel, also allow http and loopback callbacks (the Inspector
+  // webhook inbox); anything reachable from outside keeps the SSRF guards.
+  // Set after loadProjectEnv so the project's .env can override both.
+  if (localhostBind && options.tunnel !== true)
+    process.env.MCP_USE_EVENTS_INSECURE ??= "1";
+  process.env.MCP_USE_EVENTS_STATE_DIR ??= join(
+    options.cwd,
+    ".mcp-use",
+    "state",
+    "events"
+  );
 
   // Resolve the listener before importing the entry so module-scope OAuth
   // configuration observes the canonical port that this CLI will own.
