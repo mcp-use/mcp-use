@@ -71,35 +71,110 @@ export async function signWebhook(
   return out.join(" ");
 }
 
-/** True for an IPv4/IPv6 literal that is not a public unicast address. */
-function isPrivateAddress(address: string): boolean {
-  const a = address.toLowerCase().replace(/^\[|\]$/g, "");
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(a);
-  if (mapped) return isPrivateAddress(mapped[1]!);
-  const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(a);
-  if (v4) {
-    const [x, y] = [Number(v4[1]), Number(v4[2])];
-    return (
-      x === 0 ||
-      x === 10 ||
-      x === 127 ||
-      x >= 224 ||
-      (x === 100 && y >= 64 && y <= 127) ||
-      (x === 169 && y === 254) ||
-      (x === 172 && y >= 16 && y <= 31) ||
-      (x === 192 && (y === 168 || y === 0)) ||
-      (x === 198 && (y === 18 || y === 19))
-    );
+/** Parse a dotted-quad IPv4 address into its four octets. */
+function parseIPv4(a: string): number[] | undefined {
+  const parts = a.split(".");
+  if (parts.length !== 4) return;
+  const out: number[] = [];
+  for (const p of parts) {
+    if (!/^\d{1,3}$/.test(p) || Number(p) > 255) return;
+    out.push(Number(p));
   }
-  if (!a.includes(":")) return false;
+  return out;
+}
+
+/**
+ * Parse an IPv6 address (any textual form: compressed, embedded dotted
+ * IPv4, zone id) into eight 16-bit groups.
+ */
+function parseIPv6(input: string): number[] | undefined {
+  let a = input;
+  const zone = a.indexOf("%");
+  if (zone !== -1) a = a.slice(0, zone);
+  // A trailing dotted IPv4 is the last two groups; rewrite it as hex.
+  const lastColon = a.lastIndexOf(":");
+  if (lastColon !== -1 && a.slice(lastColon + 1).includes(".")) {
+    const v4 = parseIPv4(a.slice(lastColon + 1));
+    if (v4 === undefined) return;
+    const hex = (hi: number, lo: number) => ((hi << 8) | lo).toString(16);
+    a = `${a.slice(0, lastColon + 1)}${hex(v4[0]!, v4[1]!)}:${hex(v4[2]!, v4[3]!)}`;
+  }
+  const halves = a.split("::");
+  if (halves.length > 2) return;
+  const group = (h: string): number[] | undefined => {
+    if (h === "") return [];
+    const out: number[] = [];
+    for (const g of h.split(":")) {
+      if (!/^[0-9a-f]{1,4}$/.test(g)) return;
+      out.push(parseInt(g, 16));
+    }
+    return out;
+  };
+  const head = group(halves[0]!);
+  const rest = halves.length === 2 ? group(halves[1]!) : [];
+  if (head === undefined || rest === undefined) return;
+  let groups = head;
+  if (halves.length === 2) {
+    const fill = 8 - head.length - rest.length;
+    if (fill < 1) return;
+    groups = [...head, ...new Array<number>(fill).fill(0), ...rest];
+  }
+  return groups.length === 8 ? groups : undefined;
+}
+
+function isPrivateIPv4([x, y]: number[]): boolean {
   return (
-    a === "::" ||
-    a === "::1" ||
-    /^f[c-d]/.test(a) ||
-    /^fe[89ab]/.test(a) ||
-    a.startsWith("ff") ||
-    a.startsWith("64:ff9b:") ||
-    a.startsWith("2001:db8:")
+    x === 0 ||
+    x === 10 ||
+    x === 127 ||
+    x! >= 224 ||
+    (x === 100 && y! >= 64 && y! <= 127) ||
+    (x === 169 && y === 254) ||
+    (x === 172 && y! >= 16 && y! <= 31) ||
+    (x === 192 && (y === 168 || y === 0)) ||
+    (x === 198 && (y === 18 || y === 19))
+  );
+}
+
+/** The IPv4 address in the low 32 bits of IPv6 groups 6-7. */
+function low32(g: number[]): number[] {
+  return [g[6]! >> 8, g[6]! & 255, g[7]! >> 8, g[7]! & 255];
+}
+
+/**
+ * True for an IPv4/IPv6 literal that is not a public unicast address.
+ * IPv6 addresses that embed an IPv4 address (mapped, compatible, translated,
+ * NAT64, 6to4) are judged by that IPv4 address. Unparseable IPv6 is private.
+ *
+ * @internal Exported for tests.
+ */
+export function isPrivateAddress(address: string): boolean {
+  const a = address.toLowerCase().replace(/^\[|\]$/g, "");
+  const v4 = parseIPv4(a);
+  if (v4) return isPrivateIPv4(v4);
+  if (!a.includes(":")) return false;
+  const g = parseIPv6(a);
+  if (g === undefined) return true;
+  const zero = (from: number, to: number) =>
+    g.slice(from, to).every((x) => x === 0);
+  if (zero(0, 6)) return true; // ::, ::1, IPv4-compatible ::a.b.c.d
+  if (zero(0, 5) && g[5] === 0xffff) return isPrivateIPv4(low32(g)); // ::ffff:a.b.c.d
+  if (zero(0, 4) && g[4] === 0xffff && g[5] === 0)
+    return isPrivateIPv4(low32(g)); // ::ffff:0:a.b.c.d (SIIT)
+  if (g[0] === 0x64 && g[1] === 0xff9b) {
+    if (zero(2, 6)) return isPrivateIPv4(low32(g)); // 64:ff9b::/96 NAT64
+    return true; // 64:ff9b:1::/48 local-use NAT64
+  }
+  if (g[0] === 0x2002)
+    return isPrivateIPv4([g[1]! >> 8, g[1]! & 255, g[2]! >> 8, g[2]! & 255]); // 6to4
+  return (
+    (g[0]! & 0xfe00) === 0xfc00 || // fc00::/7 unique local
+    (g[0]! & 0xffc0) === 0xfe80 || // fe80::/10 link-local
+    (g[0]! & 0xffc0) === 0xfec0 || // fec0::/10 site-local
+    (g[0]! & 0xff00) === 0xff00 || // ff00::/8 multicast
+    (g[0] === 0x2001 && g[1] === 0) || // 2001::/32 Teredo
+    (g[0] === 0x2001 && g[1] === 0xdb8) || // documentation
+    (g[0] === 0x100 && zero(1, 4)) // 100::/64 discard
   );
 }
 
@@ -115,7 +190,10 @@ interface SendResult {
 interface PostOptions {
   /** Allow `http:` and private addresses (local development only). */
   allowInsecure: boolean;
-  /** Custom transport; bypasses the address checks (tests, proxies). */
+  /**
+   * Custom transport (tests, proxies). Skips the resolved-address check;
+   * literal IP hosts are still rejected.
+   */
   fetch?: typeof fetch | undefined;
 }
 
@@ -156,7 +234,7 @@ export async function postWebhook(
       return await postNode(target, init.headers, body);
     }
     const res = await (options.fetch ?? fetch)(url, init);
-    return { status: res.status, body: (await res.text()).slice(0, 4096) };
+    return { status: res.status, body: await readCapped(res, 4096) };
   } catch (err) {
     const e = err as { code?: string; cause?: { code?: string } };
     return {
@@ -167,6 +245,24 @@ export async function postWebhook(
       ).slice(0, 120),
     };
   }
+}
+
+/** Read at most `max` characters of a response body, then cancel it. */
+async function readCapped(res: Response, max: number): Promise<string> {
+  if (res.body === null) return "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  try {
+    while (text.length < max) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    void reader.cancel().catch(() => undefined);
+  }
+  return text.slice(0, max);
 }
 
 function isNode(): boolean {
@@ -192,6 +288,8 @@ async function postNode(
         method: "POST",
         headers: { ...headers, "content-length": encoder.encode(body).length },
         timeout: 10_000,
+        // Caps the whole exchange; `timeout` alone only catches idle sockets.
+        signal: AbortSignal.timeout(10_000),
         // Resolve, validate, then dial the validated address; TLS keeps the hostname.
         lookup: (host, opts, cb) => {
           dns.lookup(host, { all: true }, (err, addresses) => {
@@ -218,6 +316,10 @@ async function postNode(
         res.on("end", () =>
           resolve({ status: res.statusCode ?? 0, body: text })
         );
+        // A body cut off mid-stream emits "error" or only "close"; settle
+        // either way (a no-op after "end" resolved).
+        res.on("error", reject);
+        res.on("close", () => reject(new Error("response closed early")));
       }
     );
     req.on("timeout", () => req.destroy(new Error("timeout")));
