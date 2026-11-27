@@ -6,7 +6,10 @@ import {
   STATELESS_SAMPLING_UNSUPPORTED_MESSAGE,
 } from "@/client/utils/samplingProtocol";
 import type { McpServer } from "@mcp-use/client/react";
-import { supportsEvents } from "@/client/components/EventsTab";
+import {
+  EVENTS_UNSUPPORTED_MESSAGE,
+  supportsEvents,
+} from "@/client/components/EventsTab";
 import {
   Tooltip,
   TooltipContent,
@@ -66,16 +69,11 @@ export function InspectorSidebarNav({
 }: InspectorSidebarNavProps) {
   const getRowRef = useSidebarProximityRowRefs();
 
-  const filteredTabs: NavTab[] = (
-    visibleTabs
-      ? LAYOUT_TABS.filter(
-          (t): t is NavTab => isNavTab(t) && visibleTabs.includes(t.id)
-        )
-      : LAYOUT_TABS.filter(isNavTab)
-  ).filter(
-    // Events only exists for servers that advertise MCP Events.
-    (t) => t.id !== "events" || supportsEvents(selectedServer)
-  );
+  const filteredTabs: NavTab[] = visibleTabs
+    ? LAYOUT_TABS.filter(
+        (t): t is NavTab => isNavTab(t) && visibleTabs.includes(t.id)
+      )
+    : LAYOUT_TABS.filter(isNavTab);
 
   return (
     <ul
@@ -93,13 +91,16 @@ export function InspectorSidebarNav({
         const isDisabled =
           (tab.id === "sampling" &&
             !isInspectorSamplingAvailable(selectedServer)) ||
-          (skillsState !== undefined && skillsState !== "available");
+          (skillsState !== undefined && skillsState !== "available") ||
+          (tab.id === "events" && !supportsEvents(selectedServer));
         const disabledMessage =
-          tab.id === "skills"
-            ? skillsState === "empty"
-              ? SKILLS_EMPTY_CATALOG_MESSAGE
-              : SKILLS_UNSUPPORTED_MESSAGE
-            : STATELESS_SAMPLING_UNSUPPORTED_MESSAGE;
+          tab.id === "events"
+            ? EVENTS_UNSUPPORTED_MESSAGE
+            : tab.id === "skills"
+              ? skillsState === "empty"
+                ? SKILLS_EMPTY_CATALOG_MESSAGE
+                : SKILLS_UNSUPPORTED_MESSAGE
+              : STATELESS_SAMPLING_UNSUPPORTED_MESSAGE;
         const hasTrailing = count > 0 || showDot;
 
         const row = (

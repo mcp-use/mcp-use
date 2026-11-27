@@ -83,11 +83,16 @@ function nextNote(folder = "inbox") {
 }
 
 test.describe("Events tab", () => {
-  test("is hidden for a server without MCP Events", async ({ page }) => {
+  test("is disabled for a server without MCP Events", async ({ page }) => {
     const { serverUrl } = getTestMatrix();
     await connect(page, serverUrl, "test_simple_text");
-    await expect(tabLocator(page, "tools")).toBeVisible();
-    await expect(tabLocator(page, "events")).toHaveCount(0);
+    const eventsTab = tabLocator(page, "events");
+    await expect(eventsTab).toBeVisible();
+    await expect(eventsTab).toHaveAttribute("aria-disabled", "true");
+    await expect(eventsTab).toHaveAttribute(
+      "title",
+      /does not support MCP Events/
+    );
   });
 
   test("is shown for an events server and lists its events", async ({

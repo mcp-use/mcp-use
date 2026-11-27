@@ -68,6 +68,10 @@ function needsSignIn(error: TabError | null): boolean {
 }
 
 /** Whether the server advertises MCP Events (`capabilities.events`). */
+/** Tooltip shown when the connected server does not advertise MCP Events. */
+export const EVENTS_UNSUPPORTED_MESSAGE =
+  "This server does not support MCP Events.";
+
 export function supportsEvents(server: McpServer | undefined): boolean {
   return server?.capabilities?.events !== undefined;
 }
