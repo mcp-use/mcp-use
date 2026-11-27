@@ -7,6 +7,21 @@
  * @packageDocumentation
  */
 
+import { encodeMcpHeaderValue } from "./transport/mcp-param-headers.js";
+
+/** Extension id of the official MCP Events extension. */
+export const EVENTS_EXTENSION_ID = "io.modelcontextprotocol/events";
+
+/**
+ * Request `_meta` declaring the official Events extension, so servers pick
+ * the official dialect even without the `Mcp-Name` header (stdio).
+ */
+const EVENTS_META = {
+  "io.modelcontextprotocol/clientCapabilities": {
+    extensions: { [EVENTS_EXTENSION_ID]: {} },
+  },
+};
+
 /** Anything with a raw JSON-RPC `request`, such as an `MCPSession`. */
 export interface EventsRequester {
   /** Send a JSON-RPC request and resolve with its `result`. */
@@ -113,7 +128,9 @@ export function generateWebhookSecret(): string {
 export async function listEvents(
   session: EventsRequester
 ): Promise<EventInfo[]> {
-  const result = (await session.request("events/list", {})) as {
+  const result = (await session.request("events/list", {
+    _meta: EVENTS_META,
+  })) as {
     events?: EventInfo[];
   };
   return result.events ?? [];
@@ -132,6 +149,7 @@ export async function pollEvents<T = unknown>(
   params: PollParams
 ): Promise<PollResult<T>> {
   return (await session.request("events/poll", {
+    _meta: EVENTS_META,
     name: params.name,
     arguments: params.arguments ?? {},
     cursor: params.cursor ?? null,
@@ -162,12 +180,7 @@ export function withEventsHeaders(base: typeof fetch): typeof fetch {
           typeof name === "string"
         ) {
           const headers = new Headers(init?.headers);
-          headers.set(
-            "mcp-name",
-            /^[\x20-\x7e]*$/.test(name) && name.trim() === name
-              ? name
-              : `=?base64?${toBase64(new TextEncoder().encode(name))}?=`
-          );
+          headers.set("mcp-name", encodeMcpHeaderValue(name));
           return base(input, { ...init, headers });
         }
       } catch {
@@ -190,6 +203,7 @@ export async function subscribeEvent(
   params: SubscribeParams
 ): Promise<SubscribeResult> {
   return (await session.request("events/subscribe", {
+    _meta: EVENTS_META,
     name: params.name,
     arguments: params.arguments ?? {},
     delivery: { mode: "webhook", url: params.url, secret: params.secret },
@@ -210,6 +224,7 @@ export async function unsubscribeEvent(
   params: Omit<SubscribeParams, "secret" | "ttlMs">
 ): Promise<void> {
   await session.request("events/unsubscribe", {
+    _meta: EVENTS_META,
     name: params.name,
     arguments: params.arguments ?? {},
     delivery: { mode: "webhook", url: params.url },
@@ -260,13 +275,18 @@ export async function verifyWebhookSignature(
   const content = new TextEncoder().encode(`${id}.${ts}.${body}`);
   for (const secret of secrets) {
     if (!secret.startsWith("whsec_")) continue;
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new Uint8Array(fromBase64(secret.slice(6))),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
-    );
+    let key: CryptoKey;
+    try {
+      key = await crypto.subtle.importKey(
+        "raw",
+        new Uint8Array(fromBase64(secret.slice(6))),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+      );
+    } catch {
+      continue; // malformed secret: it can match nothing
+    }
     const mac = toBase64(
       new Uint8Array(await crypto.subtle.sign("HMAC", key, content))
     );
@@ -279,7 +299,10 @@ export async function verifyWebhookSignature(
 export interface WebhookReceiverOptions {
   /** Accepted secrets (current first, plus the previous one while rotating). */
   secrets: readonly string[];
-  /** Called once per new delivery (`webhook-id`, or `eventId` per subscription). */
+  /**
+   * Called once per new delivery, keyed by `eventId` per subscription
+   * (`x-mcp-subscription-id`); the `webhook-id` header is not used.
+   */
   onEvent: (
     event: EventEnvelope,
     subscriptionId: string | null
@@ -298,7 +321,9 @@ export interface WebhookReceiverOptions {
 export function createWebhookReceiver(
   options: WebhookReceiverOptions
 ): (request: Request) => Promise<Response> {
-  const seen = new Set<string>();
+  // Value: the in-flight (or finished) onEvent run for that delivery, so a
+  // duplicate that arrives while it runs gets the same outcome.
+  const seen = new Map<string, Promise<void>>();
   const max = options.dedupeSize ?? 1000;
   return async (request) => {
     const body = await request.text();
@@ -317,16 +342,17 @@ export function createWebhookReceiver(
     const subscriptionId = request.headers.get("x-mcp-subscription-id");
     // The same eventId on two subscriptions is two deliveries.
     const key = `${subscriptionId ?? ""}\n${event.eventId}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      if (seen.size > max) seen.delete(seen.values().next().value as string);
-      try {
-        await options.onEvent(event, subscriptionId);
-      } catch (error) {
-        seen.delete(key); // let the retry through
-        throw error;
-      }
+    let run = seen.get(key);
+    if (run === undefined) {
+      run = (async () => options.onEvent(event, subscriptionId))();
+      seen.set(key, run);
+      if (seen.size > max) seen.delete(seen.keys().next().value as string);
+      // Forget a failed run so the next retry calls onEvent again.
+      run.catch(() => {
+        if (seen.get(key) === run) seen.delete(key);
+      });
     }
+    await run;
     return Response.json({});
   };
 }
