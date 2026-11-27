@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { Badge } from "@/client/components/ui/badge";
 import { Button, buttonToolbarClass } from "@/client/components/ui/button";
 import { NotFound } from "@/client/components/ui/not-found";
@@ -28,6 +29,7 @@ import {
 } from "@/client/components/ui/resizable";
 import { Spinner } from "@/client/components/ui/spinner";
 import { Textarea } from "@/client/components/ui/textarea";
+import { useInspector } from "@/client/context/InspectorContext";
 import { cn } from "@/client/lib/utils";
 import { inspectorApi } from "@/client/utils/basePath";
 import { InspectorScrollArea, ListItem, SearchTabHeader } from "./shared";
@@ -38,6 +40,32 @@ import {
   coerceTextInputValueByType,
   getToolPropertyType,
 } from "./tools/schema-utils";
+
+/** JSON-RPC code for a refused subscription (SEP-3415 `forbidden`). */
+const FORBIDDEN = -32024;
+
+/** A subscribe/poll failure, keeping the JSON-RPC code and data when present. */
+interface TabError {
+  message: string;
+  code?: number;
+  data?: unknown;
+}
+
+function toTabError(e: unknown): TabError {
+  const err = e as { message?: string; code?: unknown; data?: unknown };
+  return {
+    message: String(err?.message ?? e),
+    code: typeof err?.code === "number" ? err.code : undefined,
+    data: err?.data,
+  };
+}
+
+/** Webhook refused because the server needs an authenticated principal. */
+function needsSignIn(error: TabError | null): boolean {
+  if (!error || error.code !== FORBIDDEN) return false;
+  const reason = (error.data as { reason?: unknown } | undefined)?.reason;
+  return reason === "unauthenticated" || reason === "principal_required";
+}
 
 /** Whether the server advertises MCP Events (`capabilities.events`). */
 export function supportsEvents(server: McpServer | undefined): boolean {
@@ -217,7 +245,21 @@ export function EventsTab({ server }: { server: McpServer }) {
   const [subs, setSubs] = useState<OwnSubscription[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<TabError | null>(null);
+  const setError = useCallback(
+    (e: TabError | string | null) =>
+      setErrorState(typeof e === "string" ? { message: e } : e),
+    []
+  );
+  const { setActiveTab } = useInspector();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const openConnectionSettings = () => {
+    setActiveTab("connection-settings");
+    const params = new URLSearchParams(location.search);
+    params.set("tab", "connection-settings");
+    navigate(`/?${params.toString()}`, { replace: true });
+  };
   const ready = server.state === "ready";
 
   const refreshEvents = useCallback(async () => {
@@ -463,7 +505,21 @@ export function EventsTab({ server }: { server: McpServer }) {
     try {
       await subscribe(currentArgs(), selected.name, mode);
     } catch (e) {
-      setError((e as Error).message);
+      setError(toTabError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const switchToPoll = async () => {
+    if (!selected) return;
+    setMode("poll");
+    setError(null);
+    setBusy(true);
+    try {
+      await subscribe(currentArgs(), selected.name, "poll");
+    } catch (e) {
+      setError(toTabError(e));
     } finally {
       setBusy(false);
     }
@@ -492,7 +548,7 @@ export function EventsTab({ server }: { server: McpServer }) {
     try {
       await subscribe(sub.arguments, sub.name, "webhook");
     } catch (e) {
-      setError((e as Error).message);
+      setError(toTabError(e));
     }
   };
 
@@ -643,11 +699,59 @@ export function EventsTab({ server }: { server: McpServer }) {
             {selected.description}
           </p>
         )}
-        {error && (
-          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-3">
-            {error}
+        {error && needsSignIn(error) ? (
+          <div
+            data-testid="events-auth-notice"
+            className="text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 space-y-2"
+          >
+            <p className="font-medium">Webhook subscription needs sign-in</p>
+            <p>
+              This server only accepts webhook subscriptions from signed-in
+              clients (MCP Events spec). The Inspector isn&apos;t signed in to
+              this server.
+            </p>
+            <p>
+              {supportsPoll
+                ? "Use Poll delivery instead, or connect with authentication."
+                : "Connect with authentication to use webhooks."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {supportsPoll && (
+                <Button
+                  data-testid="events-auth-use-poll"
+                  size="sm"
+                  onClick={switchToPoll}
+                  disabled={busy || !ready}
+                >
+                  Use Poll
+                </Button>
+              )}
+              <Button
+                data-testid="events-auth-open-settings"
+                size="sm"
+                variant="outline"
+                onClick={openConnectionSettings}
+              >
+                Connection settings
+              </Button>
+            </div>
           </div>
-        )}
+        ) : error ? (
+          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-3 space-y-1">
+            <p className="break-words">
+              {error.code !== undefined && (
+                <span className="font-mono mr-1">{error.code}</span>
+              )}
+              {error.message}
+            </p>
+            {error.data !== undefined && (
+              <details className="text-xs">
+                <summary className="cursor-pointer">Details</summary>
+                <JSONDisplay data={error.data} />
+              </details>
+            )}
+          </div>
+        ) : null}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">Arguments</h4>
