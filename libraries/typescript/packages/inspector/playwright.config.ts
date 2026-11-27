@@ -82,7 +82,16 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        // Optional: reuse a locally installed Chromium instead of the
+        // revision this Playwright version downloads.
+        ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH && {
+          launchOptions: {
+            executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+          },
+        }),
+      },
     },
     // {
     //   name: "firefox",
