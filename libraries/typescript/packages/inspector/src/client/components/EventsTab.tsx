@@ -16,7 +16,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Trash2,
-  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/client/components/ui/badge";
@@ -637,7 +636,7 @@ export function EventsTab({ server }: { server: McpServer }) {
             }
             className={buttonExecuteClass}
           >
-            {busy ? <Spinner /> : <Zap />}
+            {busy && <Spinner />}
             Subscribe
           </Button>
         </div>

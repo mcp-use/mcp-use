@@ -641,26 +641,13 @@ const pages: Record<string, Page> = {
     },
   },
   events: {
-    summary:
-      "Inspect MCP Events on a deployed server: webhook subscriptions and delivery history.",
-    examples: [
-      "mcp-use events subscriptions",
-      "mcp-use events deliveries --limit 20",
-    ],
+    summary: "Inspect MCP Events on a deployed server: webhook subscriptions.",
+    examples: ["mcp-use events subscriptions"],
     commands: {
       subscriptions: {
         summary: "List active webhook subscriptions.",
         options: project,
         examples: ["mcp-use events subscriptions --server my-server --json"],
-      },
-      deliveries: {
-        summary: "List recent webhook delivery attempts, newest first.",
-        options: [
-          ...project,
-          limit(200, 50),
-          ["--subscription <id>", "Only this subscription"],
-        ],
-        examples: ["mcp-use events deliveries --subscription sub_123"],
       },
     },
   },

@@ -189,56 +189,21 @@ rotation). When the Events runtime starts, the server logs which store is
 active (in-memory, file, custom, or Upstash REST with the host only, never the
 token). Outside these cases the store is in memory and resets on restart.
 
-### Tick and health routes
+### Retries and failures
 
-Both routes live under the MCP path (`basePath`, `/mcp` by default), not the
-server root:
-
-- `GET|POST /mcp/_mcp-use/events/tick` runs due delivery retries. Call it from
-  a cron on serverless hosts, where no background timer survives.
-- `GET /mcp/_mcp-use/events/health` reports the Events runtime status.
-
-Both require `Authorization: Bearer <secret>`, where the secret is a value of
-`MCP_USE_PLATFORM_ADMIN_SECRET` or `CRON_SECRET` (each may be a comma-separated
-list). When neither variable is set, the routes are disabled.
-
-```bash
-curl -X POST https://example.com/mcp/_mcp-use/events/tick \
-  -H "Authorization: Bearer $CRON_SECRET"
-```
-
-### Delivery history and admin routes
-
-Every webhook attempt (verification challenges, event deliveries, retries and
-final failures) is logged as one line,
-`[mcp-use] events delivery <name> <subscriptionId> -> <origin> <status|error> <ms>ms attempt <n>`,
-and recorded in the events store for 7 days (at most 1000 records). A record
-holds `id`, `kind` (`verification` or `event`), `eventId`, `name`,
-`subscriptionId`, `callbackOrigin` (scheme, host and port only), `attempt`,
-`status` (`null` on a network error), `ok`, `error`, `durationMs` and `at`.
-Recording never fails a delivery.
-
-Two read-only routes expose this. They accept only
-`MCP_USE_PLATFORM_ADMIN_SECRET` (not `CRON_SECRET`) and return 404 when it is
-unset:
-
-- `GET /mcp/_mcp-use/events/admin/subscriptions` returns
-  `{ subscriptions: [{ id, name, arguments, callbackOrigin, clientName, dialect, createdAt, refreshBefore, expiresAt, lastDelivery }] }`.
-  `lastDelivery` is `{ at, ok, status }` or `null`.
-- `GET /mcp/_mcp-use/events/admin/deliveries?subscriptionId=&limit=` returns
-  `{ deliveries: [...] }`, newest first (`limit` 1-200, default 50).
-
-Neither route returns webhook secrets or full callback URLs.
+Due retries run on an in-process timer, so they need a long-running server
+(`mcp-use dev`, `node`, a container). On serverless hosts a retry runs the next
+time the server handles an event emit. A failed attempt is logged as
+`[mcp-use] events delivery failed: <name> <subscriptionId> -> <origin> <status|error> attempt <n>`.
 
 ### On Manufact Cloud
 
-With **MCP Events storage** enabled and the server redeployed, subscriptions
-and delivery history appear in the dashboard's **Events** tab and survive
-redeploys. From a terminal:
+Enable **MCP Events storage** in the server settings and redeploy.
+Subscriptions then survive redeploys and are shared across instances. To list
+them from a terminal:
 
 ```bash
 mcp-use events subscriptions
-mcp-use events deliveries --limit 20 --subscription sub_123
 ```
 
 ## ChatGPT
@@ -250,8 +215,7 @@ Observed in live testing:
 - The workspace needs **Developer mode** and **Allow event-triggered scheduled
   tasks** turned on.
 - ChatGPT uses the 2026-07-28 `server/discover` handshake and identifies as
-  client `openai-mcp (Codex)/<version>`, which is recorded as the
-  subscription's client name.
+  client `openai-mcp (Codex)/<version>`.
 - Servers without OAuth work.
 - Each delivered event triggers one automation run. ChatGPT deduplicates by
   `eventId`, so retries of the same event do not run twice.

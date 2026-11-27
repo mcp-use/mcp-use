@@ -2124,20 +2124,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         // Start the runtime now so a changed catalog (hot reload, deploy)
         // is detected and announced without waiting for a request.
         void this.#eventsRuntimeInstance();
-        httpApp.all(`${nestedBasePath}/_mcp-use/events/:action`, async (c) =>
-          (await this.#eventsRuntimeInstance()).route(
-            c.req.raw,
-            c.req.param("action")
-          )
-        );
-        httpApp.get(
-          `${nestedBasePath}/_mcp-use/events/admin/:resource`,
-          async (c) =>
-            (await this.#eventsRuntimeInstance()).route(
-              c.req.raw,
-              `admin/${c.req.param("resource")}`
-            )
-        );
       }
       this.app.all(basePath, (context) => endpointHandler(context.req.raw));
       httpApp.route("/", this.app);

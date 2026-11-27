@@ -53,26 +53,8 @@ const ROTATION_WINDOW = DAY;
 const VERIFIED_TTL = 3_600_000;
 const RETRY_DELAYS = [10_000, 60_000, 300_000, 1_800_000, 7_200_000];
 const QUEUE = "queue";
-const LOG = "deliveries";
-const LOG_TTL = 7 * DAY;
-const LOG_CAP = 1000;
-
-/** One webhook attempt, as kept in the delivery log. */
-interface DeliveryRecord {
-  id: string;
-  kind: "verification" | "event";
-  eventId: string | null;
-  name: string;
-  subscriptionId: string;
-  callbackOrigin: string;
-  attempt: number;
-  status: number | null;
-  ok: boolean;
-  error: string | null;
-  durationMs: number;
-  at: string;
-}
-
+/** How often queued retries are checked while any are pending. */
+const RETRY_POLL_MS = 60_000;
 /**
  * `chatgpt`: OpenAI's dialect (`-32015`, `webhook-id` = `eventId`, webhook
  * only). `sep`: the official extension (`-32023..-32027`, server-generated
@@ -99,8 +81,6 @@ interface Subscription {
   secrets: string[];
   previousUntil?: number;
   expiresAt: number | null;
-  clientName?: string | null;
-  createdAt?: number;
 }
 
 interface Job {
@@ -351,6 +331,7 @@ export class EventsRuntime {
   readonly #sealKeys: Promise<CryptoKey[]>;
   readonly #insecure: boolean;
   #retryTimer: ReturnType<typeof setTimeout> | undefined;
+  #retryAt = 0;
   #processing: Promise<void> | undefined;
   #epoch: Promise<string> | undefined;
   readonly #catalog: Promise<string>;
@@ -408,6 +389,8 @@ export class EventsRuntime {
       )
     );
     this.#catalog = this.#syncCatalog();
+    // Resume retries persisted by a previous process (file or Upstash store).
+    void this.process().catch(() => undefined);
   }
 
   /**
@@ -449,12 +432,7 @@ export class EventsRuntime {
         case "events/subscribe":
           return {
             outcome: {
-              result: await this.#subscribe(
-                p,
-                principalOf(authInfo),
-                ctx.clientName,
-                dialect
-              ),
+              result: await this.#subscribe(p, principalOf(authInfo), dialect),
             },
           };
         case "events/unsubscribe":
@@ -614,7 +592,6 @@ export class EventsRuntime {
   async #subscribe(
     p: Record<string, unknown>,
     principal: string,
-    clientName: string | null,
     dialect: Dialect
   ) {
     if (dialect === "sep" && principal === "anonymous" && !this.#insecure)
@@ -685,8 +662,6 @@ export class EventsRuntime {
       secrets,
       ...(previousUntil !== undefined && { previousUntil }),
       expiresAt,
-      clientName: clientName ?? existing?.clientName ?? null,
-      createdAt: existing?.createdAt ?? now,
     };
     // Write the record, then the index. If indexing fails, roll the record
     // back to its previous state so a failed subscribe leaves nothing behind.
@@ -749,7 +724,6 @@ export class EventsRuntime {
     if ((await this.#store.get(key)) !== null) return;
     const challenge = randomId();
     const body = JSON.stringify({ type: "verification", challenge });
-    const started = Date.now();
     const res = await this.#post(
       url,
       [secret],
@@ -768,25 +742,6 @@ export class EventsRuntime {
       res.status < 300 &&
       typeof echoed === "string" &&
       constantTimeEqual(echoed, challenge);
-    await this.#record({
-      kind: "verification",
-      eventId: null,
-      name,
-      subscriptionId: subId,
-      url,
-      attempt: 1,
-      status: res.status,
-      ok: passed,
-      error:
-        res.status === 0
-          ? res.error
-          : passed
-            ? null
-            : res.status >= 200 && res.status < 300
-              ? "challenge mismatch"
-              : `HTTP ${res.status}`,
-      started,
-    });
     const code = CODES[dialect].callback;
     if (res.status === 0)
       throw new RpcError(code, "Callback endpoint unreachable", {
@@ -841,65 +796,18 @@ export class EventsRuntime {
     );
   }
 
-  /** Log one attempt and append it to the delivery log. Never throws. */
-  async #record(a: {
-    kind: DeliveryRecord["kind"];
-    eventId: string | null;
+  /** Log a failed attempt so delivery failures are visible. */
+  #logFailure(a: {
     name: string;
     subscriptionId: string;
     url: string;
     attempt: number;
     status: number;
-    ok: boolean;
     error: string | null;
-    started: number;
   }) {
-    const now = Date.now();
-    const rec: DeliveryRecord = {
-      id: `dlv_${randomId()}`,
-      kind: a.kind,
-      eventId: a.eventId,
-      name: a.name,
-      subscriptionId: a.subscriptionId,
-      callbackOrigin: originOf(a.url),
-      attempt: a.attempt,
-      status: a.status === 0 ? null : a.status,
-      ok: a.ok,
-      error: a.error,
-      durationMs: now - a.started,
-      at: new Date(now).toISOString(),
-    };
-    console.info(
-      `[mcp-use] events delivery ${rec.name} ${rec.subscriptionId} -> ${rec.callbackOrigin} ${rec.status ?? rec.error} ${rec.durationMs}ms attempt ${rec.attempt}`
+    console.warn(
+      `[mcp-use] events delivery failed: ${a.name} ${a.subscriptionId} -> ${originOf(a.url)} ${a.status === 0 ? a.error : a.status} attempt ${a.attempt}`
     );
-    try {
-      const s = this.#store;
-      await s.set(`dlv:${rec.id}`, JSON.stringify(rec), LOG_TTL);
-      await s.zadd(LOG, now, rec.id);
-      const stale = [
-        ...(await s.zdue(LOG, now - LOG_TTL, 200)),
-        ...(await s.zrange(LOG, 0, -(LOG_CAP + 1))),
-      ];
-      for (const id of new Set(stale)) {
-        await s.zrem(LOG, id);
-        await s.del(`dlv:${id}`);
-      }
-    } catch (err) {
-      console.warn(
-        `[mcp-use] events delivery log write failed: ${(err as Error)?.message ?? err}`
-      );
-    }
-  }
-
-  /** Delivery records, newest first. */
-  async #deliveries(): Promise<DeliveryRecord[]> {
-    const ids = (await this.#store.zrange(LOG, -LOG_CAP, -1)).reverse();
-    const out: DeliveryRecord[] = [];
-    for (const id of ids) {
-      const raw = await this.#store.get(`dlv:${id}`);
-      if (raw) out.push(JSON.parse(raw) as DeliveryRecord);
-    }
-    return out;
   }
 
   /** Fan an event out to matching subscriptions and attempt delivery once. */
@@ -960,7 +868,7 @@ export class EventsRuntime {
     return { eventId, deliveries };
   }
 
-  /** Attempt every due delivery (also run by the platform tick route). */
+  /** Attempt every due delivery. */
   process(): Promise<void> {
     this.#processing ??= this.#drain().finally(() => {
       this.#processing = undefined;
@@ -971,6 +879,10 @@ export class EventsRuntime {
   async #drain() {
     const due = await this.#store.zdue(QUEUE, Date.now(), 100);
     await Promise.all(due.map((jobId) => this.#attempt(jobId)));
+    // Jobs still queued (later retries, a full batch, or jobs persisted
+    // before a restart) need the timer re-armed.
+    if ((await this.#store.zrange(QUEUE, 0, 0)).length > 0)
+      this.#scheduleRetry(due.length >= 100 ? 1000 : RETRY_POLL_MS);
   }
 
   async #attempt(jobId: string) {
@@ -988,7 +900,6 @@ export class EventsRuntime {
         ? sub.secrets
         : sub.secrets.slice(0, 1);
     const secrets = await Promise.all(sealed.map((s) => this.#unseal(s)));
-    const started = Date.now();
     const res = await this.#post(
       sub.url,
       secrets,
@@ -997,18 +908,15 @@ export class EventsRuntime {
       sub.id
     );
     const ok = res.status >= 200 && res.status < 300;
-    await this.#record({
-      kind: "event",
-      eventId: job.eventId,
-      name: sub.name,
-      subscriptionId: sub.id,
-      url: sub.url,
-      attempt: job.attempt + 1,
-      status: res.status,
-      ok,
-      error: res.status === 0 ? res.error : ok ? null : `HTTP ${res.status}`,
-      started,
-    });
+    if (!ok)
+      this.#logFailure({
+        name: sub.name,
+        subscriptionId: sub.id,
+        url: sub.url,
+        attempt: job.attempt + 1,
+        status: res.status,
+        error: res.error,
+      });
     if (res.status === 410) {
       await this.#store.del(`sub:${sub.id}`);
       await this.#store.srem(`subs:${sub.name}`, sub.id);
@@ -1024,8 +932,15 @@ export class EventsRuntime {
     this.#scheduleRetry(delay);
   }
 
+  /**
+   * Arm the in-process timer that runs due retries, keeping the earliest
+   * deadline. Long-running servers rely on it; nothing else wakes retries.
+   */
   #scheduleRetry(delay: number) {
-    if (this.#retryTimer !== undefined) return;
+    const at = Date.now() + delay;
+    if (this.#retryTimer !== undefined && this.#retryAt <= at) return;
+    if (this.#retryTimer !== undefined) clearTimeout(this.#retryTimer);
+    this.#retryAt = at;
     this.#retryTimer = setTimeout(() => {
       this.#retryTimer = undefined;
       void this.process().catch(() => undefined);
@@ -1037,92 +952,6 @@ export class EventsRuntime {
   close() {
     if (this.#retryTimer !== undefined) clearTimeout(this.#retryTimer);
     this.#retryTimer = undefined;
-  }
-
-  /**
-   * Serve `GET|POST <base>/_mcp-use/events/tick` and `GET .../health` for
-   * the platform wake. Bearer: `MCP_USE_PLATFORM_ADMIN_SECRET` or
-   * `CRON_SECRET` (comma-separated lists). Disabled when neither is set.
-   * `GET .../admin/subscriptions` and `GET .../admin/deliveries` are
-   * read-only views that accept only `MCP_USE_PLATFORM_ADMIN_SECRET`.
-   */
-  async route(request: Request, action: string): Promise<Response> {
-    const e = env();
-    const admin = action.startsWith("admin/");
-    const accepted = [
-      ...list(e.MCP_USE_PLATFORM_ADMIN_SECRET),
-      ...(admin ? [] : list(e.CRON_SECRET)),
-    ];
-    const token = /^Bearer\s+(.+)$/i.exec(
-      request.headers.get("authorization") ?? ""
-    )?.[1];
-    if (accepted.length === 0)
-      return new Response("Not Found", { status: 404 });
-    if (
-      token === undefined ||
-      !accepted.some((a) => constantTimeEqual(a, token))
-    )
-      return Response.json({ error: "unauthorized" }, { status: 401 });
-    if (admin && request.method === "GET") {
-      if (action === "admin/deliveries") {
-        const q = new URL(request.url).searchParams;
-        const n = Number(q.get("limit") ?? 50);
-        const limit = Number.isFinite(n)
-          ? Math.min(Math.max(Math.floor(n), 1), 200)
-          : 50;
-        const subId = q.get("subscriptionId");
-        const deliveries = (await this.#deliveries())
-          .filter((d) => !subId || d.subscriptionId === subId)
-          .slice(0, limit);
-        return Response.json({ deliveries });
-      }
-      if (action === "admin/subscriptions") {
-        const log = await this.#deliveries();
-        const ids = new Set<string>();
-        for (const name of this.#defs.keys())
-          for (const id of await this.#store.smembers(`subs:${name}`))
-            ids.add(id);
-        const subscriptions = [];
-        for (const id of ids) {
-          const sub = await this.#getSub(id);
-          if (sub === undefined) continue;
-          const last = log.find(
-            (d) => d.kind === "event" && d.subscriptionId === id
-          );
-          const iso = (t: number | null | undefined) =>
-            t == null ? null : new Date(t).toISOString();
-          subscriptions.push({
-            id: sub.id,
-            name: sub.name,
-            arguments: sub.arguments,
-            callbackOrigin: originOf(sub.url),
-            clientName: sub.clientName ?? null,
-            dialect: sub.dialect ?? "chatgpt",
-            createdAt: iso(sub.createdAt),
-            refreshBefore: iso(sub.expiresAt),
-            expiresAt: iso(sub.expiresAt),
-            lastDelivery: last
-              ? { at: last.at, ok: last.ok, status: last.status }
-              : null,
-          });
-        }
-        return Response.json({ subscriptions });
-      }
-    }
-    if (action === "health" && request.method === "GET")
-      return Response.json({ state: "ok", events: this.#defs.size });
-    if (
-      action === "tick" &&
-      (request.method === "GET" || request.method === "POST")
-    ) {
-      try {
-        await this.process();
-        return Response.json({ state: "ok" });
-      } catch {
-        return Response.json({ state: "degraded" }, { status: 503 });
-      }
-    }
-    return new Response("Not Found", { status: 404 });
   }
 
   #storeEpoch(): Promise<string> {

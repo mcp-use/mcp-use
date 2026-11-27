@@ -69,7 +69,7 @@ Cloud projects:
   deployments  Inspect and manage deployments
   env          Manage environment variables
   logs         Read build and runtime logs
-  events       Inspect MCP Events subscriptions and deliveries
+  events       Inspect MCP Events subscriptions
   analytics    Discover and query server analytics
   domains      Manage server domains
   github       Manage GitHub App access
