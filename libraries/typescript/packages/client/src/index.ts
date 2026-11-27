@@ -53,5 +53,6 @@ export {
 } from "./telemetry/index.js";
 export { logger } from "./utils/logging.js";
 
-// MCP Events (ChatGPT dialect, webhook delivery)
+// MCP Events: list, poll (official extension), subscribe/unsubscribe and
+// a webhook receiver (official and ChatGPT dialects)
 export * from "./events.js";
