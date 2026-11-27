@@ -19,11 +19,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/client/components/ui/badge";
-import {
-  Button,
-  buttonExecuteClass,
-  buttonToolbarClass,
-} from "@/client/components/ui/button";
+import { Button, buttonToolbarClass } from "@/client/components/ui/button";
 import { NotFound } from "@/client/components/ui/not-found";
 import {
   ResizableHandle,
@@ -634,7 +630,7 @@ export function EventsTab({ server }: { server: McpServer }) {
             disabled={
               busy || !ready || (mode === "webhook" && inbox === undefined)
             }
-            className={buttonExecuteClass}
+            className={buttonToolbarClass}
           >
             {busy && <Spinner />}
             Subscribe
