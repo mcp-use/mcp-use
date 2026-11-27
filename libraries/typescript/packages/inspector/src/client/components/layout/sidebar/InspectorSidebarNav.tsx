@@ -6,6 +6,7 @@ import {
   STATELESS_SAMPLING_UNSUPPORTED_MESSAGE,
 } from "@/client/utils/samplingProtocol";
 import type { McpServer } from "@mcp-use/client/react";
+import { supportsEvents } from "@/client/components/EventsTab";
 import {
   Tooltip,
   TooltipContent,
@@ -65,11 +66,16 @@ export function InspectorSidebarNav({
 }: InspectorSidebarNavProps) {
   const getRowRef = useSidebarProximityRowRefs();
 
-  const filteredTabs: NavTab[] = visibleTabs
-    ? LAYOUT_TABS.filter(
-        (t): t is NavTab => isNavTab(t) && visibleTabs.includes(t.id)
-      )
-    : LAYOUT_TABS.filter(isNavTab);
+  const filteredTabs: NavTab[] = (
+    visibleTabs
+      ? LAYOUT_TABS.filter(
+          (t): t is NavTab => isNavTab(t) && visibleTabs.includes(t.id)
+        )
+      : LAYOUT_TABS.filter(isNavTab)
+  ).filter(
+    // Events only exists for servers that advertise MCP Events.
+    (t) => t.id !== "events" || supportsEvents(selectedServer)
+  );
 
   return (
     <ul

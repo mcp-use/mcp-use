@@ -15,6 +15,7 @@ import {
 } from "@/client/utils/samplingProtocol";
 import { ChevronDown, CircleAlert, Plus } from "lucide-react";
 import type { McpServer } from "@mcp-use/client/react";
+import { supportsEvents } from "@/client/components/EventsTab";
 import { useState } from "react";
 import { toast } from "sonner";
 import { HostedUserMenu } from "@/client/components/HostedUserMenu";
@@ -80,13 +81,18 @@ export function LayoutHeader({
     return null;
   }
 
-  const filteredTabs = embeddedConfig.visibleTabs
-    ? LAYOUT_TABS.filter(
-        (t) =>
-          t.id === "separator" ||
-          embeddedConfig.visibleTabs!.includes(t.id as TabType)
-      )
-    : LAYOUT_TABS;
+  const filteredTabs = (
+    embeddedConfig.visibleTabs
+      ? LAYOUT_TABS.filter(
+          (t) =>
+            t.id === "separator" ||
+            embeddedConfig.visibleTabs!.includes(t.id as TabType)
+        )
+      : LAYOUT_TABS
+  ).filter(
+    // Events only exists for servers that advertise MCP Events.
+    (t) => t.id !== "events" || supportsEvents(selectedServer)
+  );
 
   const onServerRoute = !!selectedServer;
 
