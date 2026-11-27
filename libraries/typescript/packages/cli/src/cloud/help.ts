@@ -641,11 +641,12 @@ const pages: Record<string, Page> = {
     },
   },
   events: {
-    summary: "Inspect MCP Events on a deployed server: webhook subscriptions.",
+    summary: "Inspect MCP Events on a deployed server: its subscriptions.",
     examples: ["mcp-use events subscriptions"],
     commands: {
       subscriptions: {
-        summary: "List active webhook subscriptions.",
+        summary:
+          "List active subscriptions (webhook and poll) seen by the gateway.",
         options: project,
         examples: ["mcp-use events subscriptions --server my-server --json"],
       },
