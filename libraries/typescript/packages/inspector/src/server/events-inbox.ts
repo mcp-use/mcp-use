@@ -3,7 +3,7 @@
  * its own `whsec_` secret, that verify deliveries, answer the verification
  * challenge and keep the most recent deliveries for the UI.
  */
-import type { Hono } from "hono";
+import type { Hono, MiddlewareHandler } from "hono";
 
 // Loaded on first use: this module is reachable from vite.config.ts (via the
 // dev API plugin), and tools such as knip load that config before
@@ -47,10 +47,16 @@ interface Inbox {
  *
  * @param app - The Inspector Hono app.
  * @param basePath - Prefix the Inspector is mounted under.
+ * @param rateLimit - Optional middleware applied to every inbox route.
  */
-export function mountEventsInbox(app: Hono, basePath = ""): void {
+export function mountEventsInbox(
+  app: Hono,
+  basePath = "",
+  rateLimit?: MiddlewareHandler
+): void {
   const inboxes = new Map<string, Inbox>();
   const root = `${basePath}/inspector/api/events`;
+  if (rateLimit) app.use(`${root}/*`, rateLimit);
 
   app.post(`${root}/inboxes`, async (c) => {
     if (inboxes.size >= MAX_INBOXES) {
@@ -71,6 +77,9 @@ export function mountEventsInbox(app: Hono, basePath = ""): void {
   app.post(`${root}/hooks/:id`, async (c) => {
     const inbox = inboxes.get(c.req.param("id"));
     if (inbox === undefined) return c.json({ error: "not found" }, 410);
+    // Reject a declared oversize body before buffering it.
+    if (Number(c.req.header("content-length") ?? 0) > MAX_BODY)
+      return c.json({ error: "too large" }, 413);
     const text = await c.req.text();
     if (text.length > MAX_BODY) return c.json({ error: "too large" }, 413);
     const headers = c.req.raw.headers;
