@@ -1208,8 +1208,21 @@ export class EventsRuntime {
   }
 }
 
+/**
+ * The subject a subscription belongs to. mcp-use OAuth providers put the
+ * verified claims on `extra.payload`; the canonical form is `iss|sub`. A
+ * bare `extra.sub` (custom verifiers) is also accepted. Falling back to the
+ * OAuth client would let every user of one client share subscriptions.
+ */
 function principalOf(authInfo: AuthInfo | undefined): string {
-  const sub = (authInfo?.extra as { sub?: unknown } | undefined)?.sub;
-  if (typeof sub === "string") return `user:${sub}`;
+  const extra = record(authInfo?.extra);
+  const payload = record(extra?.payload);
+  const sub = payload?.sub ?? extra?.sub;
+  if (typeof sub === "string" && sub !== "") {
+    const iss = payload?.iss;
+    return typeof iss === "string" && iss !== ""
+      ? `${iss}|${sub}`
+      : `user:${sub}`;
+  }
   return authInfo?.clientId ? `client:${authInfo.clientId}` : "anonymous";
 }
