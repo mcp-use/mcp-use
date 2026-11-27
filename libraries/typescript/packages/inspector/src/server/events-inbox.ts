@@ -21,8 +21,19 @@ interface InboxDelivery {
   verified: boolean;
   /** `verification` for a challenge, `event` otherwise. */
   kind: "verification" | "event";
+  /** Webhook-relevant request headers (signature and ids). */
+  headers: Record<string, string>;
   body: unknown;
 }
+
+const KEPT_HEADERS = [
+  "content-type",
+  "webhook-id",
+  "webhook-timestamp",
+  "webhook-signature",
+  "x-mcp-subscription-id",
+  "user-agent",
+];
 
 interface Inbox {
   secret: string;
@@ -80,6 +91,12 @@ export function mountEventsInbox(app: Hono, basePath = ""): void {
       subscriptionId: headers.get("x-mcp-subscription-id"),
       verified,
       kind: type === "verification" ? "verification" : "event",
+      headers: Object.fromEntries(
+        KEPT_HEADERS.flatMap((h) => {
+          const v = headers.get(h);
+          return v === null ? [] : [[h, v]];
+        })
+      ),
       body,
     });
     inbox.deliveries.length = Math.min(inbox.deliveries.length, MAX_DELIVERIES);

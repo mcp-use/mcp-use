@@ -1,19 +1,55 @@
-import type { McpServer } from "@mcp-use/client/react";
+import type { McpServer, Tool } from "@mcp-use/client/react";
 import {
   listEvents,
+  pollEvents,
   subscribeEvent,
   unsubscribeEvent,
+  type EventEnvelope,
   type EventInfo,
   type EventsRequester,
 } from "@mcp-use/client/events";
-import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/client/components/ui/button";
+import {
+  BellRing,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  Trash2,
+  Zap,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Badge } from "@/client/components/ui/badge";
+import {
+  Button,
+  buttonExecuteClass,
+  buttonToolbarClass,
+} from "@/client/components/ui/button";
+import { NotFound } from "@/client/components/ui/not-found";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/client/components/ui/resizable";
+import { Spinner } from "@/client/components/ui/spinner";
+import { Textarea } from "@/client/components/ui/textarea";
+import { cn } from "@/client/lib/utils";
 import { inspectorApi } from "@/client/utils/basePath";
+import { InspectorScrollArea, ListItem, SearchTabHeader } from "./shared";
+import { JSONDisplay } from "./shared/JSONDisplay";
+import { ToolInputForm } from "./tools/ToolInputForm";
+import {
+  coerceExecutionArgByType,
+  coerceTextInputValueByType,
+  getToolPropertyType,
+} from "./tools/schema-utils";
 
 /** Whether the server advertises MCP Events (`capabilities.events`). */
 export function supportsEvents(server: McpServer | undefined): boolean {
   return server?.capabilities?.events !== undefined;
 }
+
+type DeliveryMode = "webhook" | "poll";
 
 interface InboxDelivery {
   receivedAt: string;
@@ -21,15 +57,32 @@ interface InboxDelivery {
   subscriptionId: string | null;
   verified: boolean;
   kind: "verification" | "event";
+  headers?: Record<string, string>;
   body: unknown;
 }
 
-interface ActiveSubscription {
-  id: string;
+/** One delivery shown under a subscription (webhook POST or poll result). */
+interface Delivery {
+  key: string;
+  receivedAt: string;
+  label: string;
+  verified?: boolean;
+  headers?: Record<string, string>;
+  body: unknown;
+}
+
+interface OwnSubscription {
+  key: string;
+  /** Server id (webhook) or null (poll). */
+  id: string | null;
+  mode: DeliveryMode;
   name: string;
   arguments: Record<string, unknown>;
-  url: string;
+  createdAt: string;
   refreshBefore: string | null;
+  cursor: string | null;
+  polled: Delivery[];
+  error?: string;
 }
 
 function sessionOf(server: McpServer): EventsRequester | undefined {
@@ -39,34 +92,155 @@ function sessionOf(server: McpServer): EventsRequester | undefined {
   return session ?? undefined;
 }
 
+function time(iso: string | null | undefined): string {
+  if (!iso) return "never";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString();
+}
+
+/** Toggle text buttons, as in the Tools response header. */
+function TextToggle<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string; disabled?: boolean }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {options.map((o, i) => (
+        <span key={o.value} className="flex items-center gap-2">
+          {i > 0 && <span className="text-xs text-zinc-400">|</span>}
+          <button
+            type="button"
+            disabled={o.disabled}
+            data-testid={`events-toggle-${o.value}`}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "text-xs font-medium disabled:opacity-40",
+              value === o.value
+                ? "text-black dark:text-white"
+                : "text-zinc-500 dark:text-zinc-400"
+            )}
+          >
+            {o.label}
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DeliveryRow({ delivery }: { delivery: Delivery }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b last:border-b-0 border-gray-200 dark:border-zinc-700">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        data-testid="events-delivery-row"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+      >
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+        <span className="font-mono text-xs truncate">{delivery.label}</span>
+        {delivery.verified !== undefined &&
+          (delivery.verified ? (
+            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 shrink-0">
+              <ShieldCheck className="h-3 w-3" /> signature ok
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 shrink-0">
+              <ShieldAlert className="h-3 w-3" /> invalid signature
+            </span>
+          ))}
+        <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 shrink-0">
+          {time(delivery.receivedAt)}
+        </span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-3">
+          {delivery.headers && Object.keys(delivery.headers).length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Headers
+              </div>
+              <div className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 font-mono text-xs space-y-0.5">
+                {Object.entries(delivery.headers).map(([k, v]) => (
+                  <div key={k} className="break-all">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {k}:
+                    </span>{" "}
+                    {v}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              Body
+            </div>
+            <div className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3">
+              <JSONDisplay data={delivery.body} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
- * The Events tab: the server's events, a subscribe form whose callback is
- * the Inspector's webhook inbox, and the deliveries the inbox received.
+ * The Events tab: the server's events on the left (like the Tools list), the
+ * selected event's subscribe form top right, and this Inspector's
+ * subscriptions with their deliveries bottom right.
  */
 export function EventsTab({ server }: { server: McpServer }) {
   const [events, setEvents] = useState<EventInfo[]>([]);
-  const [selected, setSelected] = useState("");
-  const [args, setArgs] = useState("{}");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [inputMode, setInputMode] = useState<"form" | "json">("form");
+  const [formArgs, setFormArgs] = useState<Record<string, unknown>>({});
+  const [jsonArgs, setJsonArgs] = useState("{}");
+  const [mode, setMode] = useState<DeliveryMode>("webhook");
+  const [schemaView, setSchemaView] = useState<"input" | "payload">("input");
   const [inbox, setInbox] = useState<{
     id: string;
     secret: string;
     url: string;
   }>();
-  const [subs, setSubs] = useState<ActiveSubscription[]>([]);
-  const [deliveries, setDeliveries] = useState<InboxDelivery[]>([]);
+  const [inboxDeliveries, setInboxDeliveries] = useState<InboxDelivery[]>([]);
+  const [subs, setSubs] = useState<OwnSubscription[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ready = server.state === "ready";
 
-  useEffect(() => {
+  const refreshEvents = useCallback(async () => {
     const session = sessionOf(server);
-    if (!ready || !session) return;
-    listEvents(session)
-      .then((list) => {
-        setEvents(list);
-        setSelected((s) => s || list[0]?.name || "");
-      })
-      .catch((e: Error) => setError(e.message));
-  }, [server, ready]);
+    if (!session) return;
+    setIsRefreshing(true);
+    try {
+      setEvents(await listEvents(session));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [server]);
+
+  useEffect(() => {
+    if (ready) void refreshEvents();
+  }, [ready, refreshEvents]);
 
   useEffect(() => {
     fetch(inspectorApi("events/inboxes"), { method: "POST" })
@@ -87,140 +261,594 @@ export function EventsTab({ server }: { server: McpServer }) {
       fetch(inspectorApi(`events/inboxes/${inbox.id}`))
         .then((r) => r.json())
         .then((b: { deliveries?: InboxDelivery[] }) =>
-          setDeliveries(b.deliveries ?? [])
+          setInboxDeliveries(b.deliveries ?? [])
         )
         .catch(() => undefined);
     }, 1500);
     return () => clearInterval(timer);
   }, [inbox]);
 
-  const subscribe = useCallback(async () => {
+  // Poll subscriptions: one events/poll per subscription every few seconds.
+  const subsRef = useRef(subs);
+  subsRef.current = subs;
+  useEffect(() => {
+    if (!ready) return;
+    const timer = setInterval(() => {
+      const session = sessionOf(server);
+      if (!session) return;
+      for (const sub of subsRef.current) {
+        if (sub.mode !== "poll") continue;
+        pollEvents(session, {
+          name: sub.name,
+          arguments: sub.arguments,
+          cursor: sub.cursor,
+        })
+          .then((result) => {
+            const received = new Date().toISOString();
+            const fresh: Delivery[] = result.events.map(
+              (ev: EventEnvelope) => ({
+                key: `${sub.key}-${ev.eventId}`,
+                receivedAt: received,
+                label: `${ev.name} · ${ev.eventId}`,
+                body: ev,
+              })
+            );
+            setSubs((all) =>
+              all.map((s) =>
+                s.key === sub.key
+                  ? {
+                      ...s,
+                      cursor: result.cursor,
+                      error: undefined,
+                      polled: [...fresh.reverse(), ...s.polled].slice(0, 200),
+                    }
+                  : s
+              )
+            );
+          })
+          .catch((e: Error) =>
+            setSubs((all) =>
+              all.map((s) =>
+                s.key === sub.key ? { ...s, error: e.message } : s
+              )
+            )
+          );
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [server, ready]);
+
+  const filteredEvents = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return events;
+    return events.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        (e.description ?? "").toLowerCase().includes(q)
+    );
+  }, [events, searchQuery]);
+
+  const selected = events.find((e) => e.name === selectedName) ?? null;
+  const supportsPoll = selected?.delivery.includes("poll") ?? false;
+  const supportsWebhook = selected
+    ? selected.delivery.length === 0 || selected.delivery.includes("webhook")
+    : true;
+
+  // Tool-shaped view of the event so ToolInputForm renders its arguments.
+  const asTool = useMemo(
+    () =>
+      selected
+        ? ({
+            name: selected.name,
+            description: selected.description,
+            inputSchema: selected.inputSchema,
+          } as unknown as Tool)
+        : null,
+    [selected]
+  );
+
+  const selectEvent = useCallback((event: EventInfo) => {
+    setSelectedName(event.name);
+    setFormArgs({});
+    setJsonArgs("{}");
+    setMode(
+      event.delivery.length === 0 || event.delivery.includes("webhook")
+        ? "webhook"
+        : "poll"
+    );
     setError(null);
-    const session = sessionOf(server);
-    if (!session || !inbox) return;
-    try {
-      const parsed = JSON.parse(args || "{}") as Record<string, unknown>;
+  }, []);
+
+  const rootSchema = useMemo(
+    () => (selected?.inputSchema ?? {}) as Record<string, unknown>,
+    [selected]
+  );
+  const properties = useMemo(
+    () => (rootSchema.properties ?? {}) as Record<string, unknown>,
+    [rootSchema]
+  );
+
+  const handleArgChange = useCallback(
+    (key: string, value: string) => {
+      const type = properties[key]
+        ? getToolPropertyType(properties[key], rootSchema)
+        : "string";
+      setFormArgs((prev) => ({
+        ...prev,
+        [key]:
+          type === "object" || type === "array" || type === "string"
+            ? value
+            : coerceTextInputValueByType(value, type),
+      }));
+    },
+    [properties, rootSchema]
+  );
+
+  const formPayload = useMemo(() => {
+    const out: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(formArgs)) {
+      if (raw === undefined || String(raw).trim() === "") continue;
+      const type = properties[key]
+        ? getToolPropertyType(properties[key], rootSchema)
+        : "string";
+      out[key] = coerceExecutionArgByType(raw, type);
+    }
+    return out;
+  }, [formArgs, properties, rootSchema]);
+
+  const switchInputMode = (next: "form" | "json") => {
+    if (next === "json") setJsonArgs(JSON.stringify(formPayload, null, 2));
+    setInputMode(next);
+  };
+
+  const currentArgs = (): Record<string, unknown> => {
+    if (inputMode === "form") return formPayload;
+    const parsed = JSON.parse(jsonArgs || "{}") as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      throw new Error("Arguments must be a JSON object");
+    return parsed as Record<string, unknown>;
+  };
+
+  const subscribe = useCallback(
+    async (args: Record<string, unknown>, name: string, how: DeliveryMode) => {
+      const session = sessionOf(server);
+      if (!session) throw new Error("Not connected");
+      const now = new Date().toISOString();
+      if (how === "poll") {
+        const first = await pollEvents(session, { name, arguments: args });
+        const key = `poll-${crypto.randomUUID()}`;
+        setSubs((all) => [
+          {
+            key,
+            id: null,
+            mode: "poll",
+            name,
+            arguments: args,
+            createdAt: now,
+            refreshBefore: null,
+            cursor: first.cursor,
+            polled: [],
+          },
+          ...all,
+        ]);
+        setExpanded((s) => new Set(s).add(key));
+        return;
+      }
+      if (!inbox) throw new Error("Webhook inbox not ready");
       const result = await subscribeEvent(session, {
-        name: selected,
-        arguments: parsed,
+        name,
+        arguments: args,
         url: inbox.url,
         secret: inbox.secret,
       });
-      setSubs((all) => [
-        ...all.filter((s) => s.id !== result.id),
-        {
+      setSubs((all) => {
+        const existing = all.find((s) => s.id === result.id);
+        const next: OwnSubscription = {
+          key: existing?.key ?? `webhook-${result.id}`,
           id: result.id,
-          name: selected,
-          arguments: parsed,
-          url: inbox.url,
+          mode: "webhook",
+          name,
+          arguments: args,
+          createdAt: existing?.createdAt ?? now,
           refreshBefore: result.refreshBefore,
-        },
-      ]);
+          cursor: result.cursor,
+          polled: [],
+        };
+        return [next, ...all.filter((s) => s.id !== result.id)];
+      });
+      setExpanded((s) => new Set(s).add(`webhook-${result.id}`));
+    },
+    [server, inbox]
+  );
+
+  const handleSubscribe = async () => {
+    if (!selected) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await subscribe(currentArgs(), selected.name, mode);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unsubscribe = async (sub: OwnSubscription) => {
+    setError(null);
+    try {
+      if (sub.mode === "webhook" && inbox) {
+        const session = sessionOf(server);
+        if (session)
+          await unsubscribeEvent(session, {
+            name: sub.name,
+            arguments: sub.arguments,
+            url: inbox.url,
+          });
+      }
+      setSubs((all) => all.filter((s) => s.key !== sub.key));
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [server, inbox, args, selected]);
+  };
 
-  const unsubscribe = useCallback(
-    async (sub: ActiveSubscription) => {
-      const session = sessionOf(server);
-      if (!session) return;
-      try {
-        await unsubscribeEvent(session, sub);
-        setSubs((all) => all.filter((s) => s.id !== sub.id));
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    },
-    [server]
+  const refresh = async (sub: OwnSubscription) => {
+    setError(null);
+    try {
+      await subscribe(sub.arguments, sub.name, "webhook");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const deliveriesOf = (sub: OwnSubscription): Delivery[] =>
+    sub.mode === "poll"
+      ? sub.polled
+      : inboxDeliveries
+          .filter((d) => d.subscriptionId === sub.id)
+          .map((d, i) => ({
+            key: `${d.webhookId}-${i}`,
+            receivedAt: d.receivedAt,
+            label:
+              d.kind === "verification"
+                ? "verification"
+                : `${(d.body as { name?: string } | null)?.name ?? "event"} · ${d.webhookId ?? ""}`,
+            verified: d.verified,
+            headers:
+              d.headers ?? (d.webhookId ? { "webhook-id": d.webhookId } : {}),
+            body: d.body,
+          }));
+
+  const toggle = (key: string) =>
+    setExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+
+  const totalDeliveries = subs.reduce((n, s) => n + deliveriesOf(s).length, 0);
+
+  const leftPanel = (
+    <div className="flex h-full flex-col overflow-hidden border-r dark:border-zinc-700">
+      <InspectorScrollArea>
+        {(isScrolled) => (
+          <>
+            <SearchTabHeader
+              isScrolled={isScrolled}
+              title="Events"
+              titleTestId="events-tab-title"
+              icon={BellRing}
+              count={filteredEvents.length}
+              isSearchExpanded={isSearchExpanded}
+              searchQuery={searchQuery}
+              searchPlaceholder="Search events..."
+              onSearchExpand={() => {
+                setIsSearchExpanded(true);
+                setTimeout(() => searchInputRef.current?.focus(), 0);
+              }}
+              onSearchChange={setSearchQuery}
+              onSearchBlur={() => {
+                if (!searchQuery.trim()) setIsSearchExpanded(false);
+              }}
+              searchInputRef={
+                searchInputRef as React.RefObject<HTMLInputElement>
+              }
+              onRefresh={() => void refreshEvents()}
+              isRefreshing={isRefreshing}
+            />
+            {filteredEvents.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
+                <BellRing className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
+                <p className="text-gray-500 dark:text-gray-400">
+                  No events available
+                </p>
+              </div>
+            ) : (
+              filteredEvents.map((event) => (
+                <ListItem
+                  key={event.name}
+                  id={`event-${event.name}`}
+                  data-testid={`event-item-${event.name}`}
+                  isSelected={selectedName === event.name}
+                  isFocused={false}
+                  title={event.name}
+                  description={event.description}
+                  metadata={
+                    <div className="flex items-center gap-1">
+                      {event.delivery.map((d) => (
+                        <Badge
+                          key={d}
+                          variant="outline"
+                          className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
+                        >
+                          {d}
+                        </Badge>
+                      ))}
+                    </div>
+                  }
+                  onClick={() => selectEvent(event)}
+                />
+              ))
+            )}
+          </>
+        )}
+      </InspectorScrollArea>
+    </div>
   );
 
-  const current = events.find((e) => e.name === selected);
-
-  return (
-    <div className="h-full overflow-auto p-4 space-y-6 text-sm">
-      {error && <div className="text-red-600">{error}</div>}
-      <section className="space-y-2">
-        <h2 className="font-semibold">Events</h2>
-        {events.length === 0 && (
-          <p className="text-muted-foreground">No events.</p>
-        )}
-        <ul className="space-y-1">
-          {events.map((e) => (
-            <li key={e.name}>
-              <button
-                type="button"
-                className={`text-left ${e.name === selected ? "font-semibold" : ""}`}
-                onClick={() => setSelected(e.name)}
-              >
-                {e.name}
-              </button>
-              {e.description && (
-                <span className="text-muted-foreground"> {e.description}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {current && (
-        <section className="space-y-2">
-          <h2 className="font-semibold">Subscribe to {current.name}</h2>
-          <pre className="text-xs bg-muted p-2 rounded overflow-auto">
-            {JSON.stringify(current.inputSchema, null, 2)}
-          </pre>
-          <label className="block">
-            Arguments (JSON)
-            <textarea
-              aria-label="Arguments"
-              className="block w-full font-mono text-xs border rounded p-2 mt-1"
-              rows={4}
-              value={args}
-              onChange={(e) => setArgs(e.target.value)}
-            />
-          </label>
-          <p className="text-xs text-muted-foreground">
-            Callback: {inbox?.url ?? "creating inbox..."}
-          </p>
-          <Button onClick={subscribe} disabled={!inbox || !ready}>
+  const detailPanel = !selected ? (
+    <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+      <p className="text-gray-500 dark:text-gray-400 mb-2">
+        Select an event to get started
+      </p>
+      <p className="text-xs text-gray-400 dark:text-gray-500">
+        Choose an event from the list to view its schemas and subscribe to it
+      </p>
+    </div>
+  ) : (
+    <div className="flex flex-col h-full">
+      <div className="shrink-0 p-3 sm:p-5 pt-3 sm:pt-4 pb-2 sm:pb-2 sm:pr-4 flex items-center justify-between gap-2">
+        <h3
+          className="text-base sm:text-lg font-semibold truncate"
+          data-testid="event-detail-title"
+        >
+          {selected.name}
+        </h3>
+        <div className="flex gap-3 shrink-0 items-center">
+          <TextToggle
+            value={mode}
+            onChange={setMode}
+            options={[
+              {
+                value: "webhook",
+                label: "Webhook (Inspector inbox)",
+                disabled: !supportsWebhook,
+              },
+              { value: "poll", label: "Poll", disabled: !supportsPoll },
+            ]}
+          />
+          <Button
+            data-testid="event-subscribe-button"
+            size="sm"
+            onClick={handleSubscribe}
+            disabled={
+              busy || !ready || (mode === "webhook" && inbox === undefined)
+            }
+            className={buttonExecuteClass}
+          >
+            {busy ? <Spinner /> : <Zap />}
             Subscribe
           </Button>
-        </section>
-      )}
-
-      {subs.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="font-semibold">Subscriptions</h2>
-          {subs.map((s) => (
-            <div key={s.id} className="flex items-center gap-2">
-              <code className="text-xs">{s.name}</code>
-              <code className="text-xs">{JSON.stringify(s.arguments)}</code>
-              <span className="text-xs text-muted-foreground">
-                refresh before {s.refreshBefore ?? "never"}
-              </span>
-              <Button variant="outline" onClick={() => unsubscribe(s)}>
-                Unsubscribe
-              </Button>
-            </div>
-          ))}
-        </section>
-      )}
-
-      <section className="space-y-2">
-        <h2 className="font-semibold">Webhook inbox ({deliveries.length})</h2>
-        {deliveries.map((d, i) => (
-          <div key={`${d.webhookId}-${i}`} className="border rounded p-2">
-            <div className="text-xs text-muted-foreground">
-              {d.receivedAt} · {d.kind} ·{" "}
-              {d.verified ? "signature ok" : "INVALID signature"} · webhook-id{" "}
-              {d.webhookId}
-            </div>
-            <pre className="text-xs overflow-auto">
-              {JSON.stringify(d.body, null, 2)}
-            </pre>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 pb-4 pr-3 space-y-6">
+        {selected.description && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+            {selected.description}
+          </p>
+        )}
+        {error && (
+          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-3">
+            {error}
           </div>
-        ))}
-      </section>
+        )}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">Arguments</h4>
+            <TextToggle
+              value={inputMode}
+              onChange={switchInputMode}
+              options={[
+                { value: "form", label: "Form" },
+                { value: "json", label: "JSON" },
+              ]}
+            />
+          </div>
+          {inputMode === "form" && asTool ? (
+            <ToolInputForm
+              selectedTool={asTool}
+              toolArgs={formArgs}
+              onArgChange={handleArgChange}
+            />
+          ) : (
+            <Textarea
+              aria-label="Arguments"
+              data-testid="event-arguments-json"
+              className="font-mono text-xs min-h-28"
+              value={jsonArgs}
+              onChange={(e) => setJsonArgs(e.target.value)}
+            />
+          )}
+          <p className="text-xs text-gray-500 dark:text-gray-400 break-all">
+            {mode === "webhook"
+              ? `Callback: ${inbox?.url ?? "creating inbox..."}`
+              : "The Inspector calls events/poll every 3 seconds."}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">Schema</h4>
+            <TextToggle
+              value={schemaView}
+              onChange={setSchemaView}
+              options={[
+                { value: "input", label: "Input" },
+                { value: "payload", label: "Payload" },
+              ]}
+            />
+          </div>
+          <div className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3">
+            <JSONDisplay
+              data={
+                schemaView === "input"
+                  ? selected.inputSchema
+                  : selected.payloadSchema
+              }
+            />
+          </div>
+        </div>
+      </div>
     </div>
+  );
+
+  const subscriptionsPanel = (
+    <div className="relative flex flex-col h-full bg-white dark:bg-black">
+      <div className="sticky top-0 z-40 flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-zinc-600 backdrop-blur-xs bg-white/50 dark:bg-black/50">
+        <h3 className="text-sm font-medium">Subscriptions &amp; deliveries</h3>
+        <Badge
+          className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
+          variant="outline"
+        >
+          {subs.length}
+        </Badge>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {totalDeliveries} deliveries
+        </span>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {subs.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <NotFound
+              vertical
+              noBorder
+              message="No subscriptions yet. Subscribe to an event to see its deliveries here."
+            />
+          </div>
+        ) : (
+          subs.map((sub) => {
+            const list = deliveriesOf(sub);
+            const isOpen = expanded.has(sub.key);
+            return (
+              <div
+                key={sub.key}
+                data-testid="events-subscription"
+                className="border-b border-gray-200 dark:border-zinc-700"
+              >
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => toggle(sub.key)}
+                    className="flex flex-1 min-w-0 items-center gap-2 text-left"
+                  >
+                    {isOpen ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
+                    <span className="font-mono text-sm font-medium truncate">
+                      {sub.name}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
+                    >
+                      {sub.mode}
+                    </Badge>
+                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {JSON.stringify(sub.arguments)}
+                    </span>
+                  </button>
+                  <span className="hidden md:inline text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    {list.length} deliveries
+                    {sub.mode === "webhook" &&
+                      ` · refresh before ${time(sub.refreshBefore)}`}
+                  </span>
+                  {sub.mode === "webhook" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={buttonToolbarClass}
+                      onClick={() => void refresh(sub)}
+                      title="Refresh subscription"
+                    >
+                      <RefreshCw />
+                      Refresh
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={buttonToolbarClass}
+                    onClick={() => void unsubscribe(sub)}
+                    data-testid="events-unsubscribe-button"
+                    title="Unsubscribe"
+                  >
+                    <Trash2 />
+                    Unsubscribe
+                  </Button>
+                </div>
+                {sub.error && (
+                  <div className="px-4 pb-2 text-xs text-red-600 dark:text-red-400">
+                    {sub.error}
+                  </div>
+                )}
+                {isOpen && (
+                  <div className="mx-4 mb-3 rounded-lg border border-gray-200 dark:border-zinc-700">
+                    {sub.id && (
+                      <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-zinc-700 font-mono break-all">
+                        id {sub.id} · created {time(sub.createdAt)}
+                      </div>
+                    )}
+                    {list.length === 0 ? (
+                      <div className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">
+                        Waiting for deliveries...
+                      </div>
+                    ) : (
+                      list.map((d) => <DeliveryRow key={d.key} delivery={d} />)
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <ResizablePanelGroup orientation="horizontal" className="h-full">
+      <ResizablePanel
+        id="events-left-panel"
+        defaultSize="33%"
+        collapsible
+        className="flex flex-col h-full relative"
+      >
+        {leftPanel}
+      </ResizablePanel>
+      <ResizableHandle withHandle />
+      <ResizablePanel defaultSize="67%">
+        <ResizablePanelGroup orientation="vertical">
+          <ResizablePanel defaultSize="50%" collapsible>
+            {detailPanel}
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize="50%">
+            {subscriptionsPanel}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }
