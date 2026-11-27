@@ -44,7 +44,8 @@ export const createNote = server.tool(
   async ({ folder, title }) => {
     const noteId = `note_${runId}_${nextId++}`;
     notes.push({ noteId, folder, title });
-    // The note id is the eventId: stable across retries, used as webhook-id.
+    // The note id is the eventId: stable across retries. ChatGPT-dialect
+    // deliveries also use it as webhook-id; official-dialect ones get msg_... ids.
     // The note is already saved, so a failed emit (e.g. store outage) is
     // logged instead of failing the tool call.
     await noteCreated

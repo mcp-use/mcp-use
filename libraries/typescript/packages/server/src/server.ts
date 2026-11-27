@@ -1371,7 +1371,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   async close(): Promise<void> {
     this.#closed = true;
-    void this.#eventsRuntime?.then((runtime) => runtime.close());
+    // A runtime that failed to start has nothing to close; its error was
+    // already reported when it was created.
+    void this.#eventsRuntime?.then(
+      (runtime) => runtime.close(),
+      () => undefined
+    );
     await Promise.allSettled([...this.#proxyOperations]);
 
     const errors: unknown[] = [];
@@ -2123,7 +2128,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       if (this.#events.size > 0) {
         // Start the runtime now so a changed catalog (hot reload, deploy)
         // is detected and announced without waiting for a request.
-        void this.#eventsRuntimeInstance();
+        // The cached promise still rejects for events requests and `emit`;
+        // this handler only keeps the eager start from becoming an
+        // unhandled rejection.
+        this.#eventsRuntimeInstance().catch((error: unknown) => {
+          console.error("[mcp-use] MCP Events runtime failed to start:", error);
+        });
       }
       this.app.all(basePath, (context) => endpointHandler(context.req.raw));
       httpApp.route("/", this.app);

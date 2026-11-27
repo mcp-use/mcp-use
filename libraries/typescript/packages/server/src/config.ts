@@ -232,7 +232,8 @@ interface BaseServerConfig {
    */
   cors?: CorsOptions;
   /**
-   * MCP Events (ChatGPT dialect): subscription storage and delivery options.
+   * MCP Events (both the official and ChatGPT dialects): subscription storage
+   * and delivery options.
    * Register events with `server.event()`.
    */
   events?: EventsOptions;

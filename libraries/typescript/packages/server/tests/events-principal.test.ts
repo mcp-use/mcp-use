@@ -65,7 +65,13 @@ describe("events subscription ownership with OAuth", () => {
     expect(aliceId).not.toBe(bobId);
 
     // Bob unsubscribing removes only his subscription.
-    await runtime.handle("events/unsubscribe", subscribe, user("bob"), ctx());
+    const bobUnsubscribe = await runtime.handle(
+      "events/unsubscribe",
+      subscribe,
+      user("bob"),
+      ctx()
+    );
+    expect(bobUnsubscribe.outcome).toEqual({ result: {} });
     const aliceUnsubscribe = await runtime.handle(
       "events/unsubscribe",
       subscribe,
