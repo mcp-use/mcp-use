@@ -40,6 +40,10 @@
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
     },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js"
+    },
     "./sandbox": {
       "types": "./dist/sandbox.d.ts",
       "import": "./dist/sandbox.js"

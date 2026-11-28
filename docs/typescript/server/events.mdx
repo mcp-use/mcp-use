@@ -1,0 +1,334 @@
+---
+title: "MCP Events"
+description: "Publish events that ChatGPT and other clients receive by webhook or by polling."
+icon: "zap"
+tag: "New"
+---
+
+MCP Events let a client subscribe to updates from your server, such as a new
+message in a channel, and receive each one as a signed webhook or by polling.
+mcp-use serves two dialects from the same `server.event()` definitions:
+
+- **ChatGPT** ([OpenAI MCP Events](https://developers.openai.com/plugins/build/mcp-events)):
+  webhook delivery only.
+- **Official extension** (`io.modelcontextprotocol/events`,
+  [SEP-3415](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/3415-events-extension.md)):
+  webhook and poll delivery, `notifications/events/list_changed`, and
+  `Mcp-Name` routing headers. Push (`events/stream`) and webhook replay are not
+  implemented.
+
+New to MCP Events? Read [What are MCP events?](https://manufact.com/blog/what-are-mcp-events)
+for how they work and when to use them instead of a tool or an MCP Task.
+
+## Define and emit an event
+
+```ts
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "chat", version: "1.0.0" });
+
+const messageCreated = server.event({
+  name: "message.created",
+  description: "A message was posted in a channel you follow.",
+  inputSchema: z.object({ channel_id: z.string() }),
+  payloadSchema: z.object({
+    channel_id: z.string(),
+    message_id: z.string(),
+    preview: z.string(),
+  }),
+});
+
+// Later, when a message is posted:
+await messageCreated.emit(
+  { channel_id: "c1", message_id: "m42", preview: "Hi" },
+  { eventId: "m42" },
+);
+```
+
+- A subscription matches when every argument that has a same-named top-level
+  field in `data` is equal (`channel_id` above). Pass `matches(args, data)` to
+  filter differently.
+- `eventId` should be stable for the underlying change; receivers deduplicate
+  on it. It is generated when omitted. ChatGPT deliveries also use it as the
+  `webhook-id` header; official-dialect deliveries get a server-generated
+  `msg_...` `webhook-id`, kept across retries.
+- `emit` validates `data` against `payloadSchema`, rejects bodies over 256 KiB,
+  appends the event to the poll log, and resolves after the first delivery
+  attempt to each matching webhook subscription.
+- `emit` throws if the store is unreachable while it looks up subscriptions or
+  queues deliveries. A failed poll-log append is logged, not thrown. When the event follows a write
+  that already succeeded, catch the error and log it so the tool call does not
+  fail:
+
+  ```ts
+  await noteCreated
+    .emit({ folder, noteId, title }, { eventId: noteId })
+    .catch((err) => console.error(`note.created emit failed: ${err}`));
+  ```
+
+## What the server does
+
+Registering an event advertises `capabilities.events: {}` (ChatGPT) and
+`capabilities.extensions["io.modelcontextprotocol/events"]: { listChanged: true }`
+(official) on `initialize` and `server/discover`, and serves:
+
+| Method               | Behaviour                                                                                                                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `events/list`        | Event names, descriptions, `delivery`, `inputSchema`, `payloadSchema`. `delivery` is `["webhook"]` for ChatGPT and `["webhook", "poll"]` for official-dialect clients.            |
+| `events/subscribe`   | Validates the name, arguments and `whsec_` secret (24-64 bytes), verifies the callback, stores the subscription. Returns `{ id, refreshBefore, cursor: null, truncated: false }`. |
+| `events/unsubscribe` | Removes the subscription matched by name, arguments and callback URL. Returns `{}`. ChatGPT: idempotent. Official: `-32023` when no such subscription exists.                     |
+| `events/poll`        | Official dialect. Stateless poll with an opaque cursor; see [Poll](#poll).                                                                                                        |
+
+mcp-use answers `events/*` before the MCP SDK handler, so a future SDK version
+with its own Events handlers cannot take these methods over.
+
+### Dialects
+
+The dialect is chosen per request and stored on each subscription, so its
+deliveries keep using it:
+
+1. **ChatGPT** when the client name (`_meta` client info) starts with
+   `openai-mcp`, the callback host is on `openai.com`, or the request uses a
+   pre-2026-07-28 protocol revision.
+2. Otherwise **official** when the client declares
+   `io.modelcontextprotocol/events` in its per-request capabilities or sends
+   an `Mcp-Name` header.
+3. Otherwise ChatGPT.
+
+|                                            | ChatGPT                       | Official                                                         |
+| ------------------------------------------ | ----------------------------- | ---------------------------------------------------------------- |
+| Unknown event                              | `-32602`                      | `-32023` `NotFound`, `data.kind: "event"`                        |
+| Callback verification failed               | `-32015`                      | `-32027` `CallbackEndpointError`                                 |
+| `data.reason`                              | `challenge_failed`, `timeout` | `challenge_failed`, `timeout`, `connection_refused`, `tls_error` |
+| `webhook-id`                               | `eventId`                     | `msg_<random>` per delivery                                      |
+| Webhook without an authenticated principal | Allowed                       | `-32024` `Forbidden` (allowed under `mcp-use dev`)               |
+| `events/poll`                              | Not listed                    | Listed and served                                                |
+
+### Poll
+
+`events/poll` takes `{ name, arguments, cursor, maxEvents?, maxAgeMs? }` and
+returns `{ events, cursor, truncated, hasMore, nextPollMs }`. The server keeps
+no per-client state: every emitted event is appended to a per-event log in the
+store (kept for 1 hour, at most 1000 entries per event), and the cursor is a
+position in that log.
+
+- `cursor: null` starts from now: no events, a fresh cursor.
+- Events are filtered with the same matching as webhook subscriptions.
+- `hasMore: true` means poll again at once; otherwise wait `nextPollMs`
+  (5000 by default, `events.pollIntervalMs`).
+- `truncated: true` means events may have been skipped: the cursor is older
+  than the retained log, comes from a store that was reset, or `maxAgeMs`
+  dropped older events.
+
+### List changes
+
+The server answers a `subscriptions/listen` request whose filter sets
+`eventsListChanged: true` itself: the acknowledged filter echoes
+`eventsListChanged` with the tool, prompt and resource fields it honors, and
+the stream sends `notifications/events/list_changed` when the event catalog
+changes. The catalog hash is kept in the store, so a change is detected on a
+hot reload in `mcp-use dev`, and after a deploy or rollback by streams on
+instances that share the store (checked every 30 seconds).
+
+### Routing headers
+
+On `events/subscribe`, `events/unsubscribe` and `events/poll`, an `Mcp-Name`
+header must equal `params.name`, and an `Mcp-Param-<Header>` header must equal
+the argument whose `inputSchema` property declares `"x-mcp-header": "<Header>"`
+(Base64 sentinel values `=?base64?...?=` are decoded). A mismatch is HTTP 400
+with JSON-RPC error `-32020` (`HeaderMismatch`). Missing headers are accepted;
+the server logs one warning. The `@mcp-use/client` HTTP connector sets
+`Mcp-Name` on its `events/*` requests.
+
+**Subscription identity.** The id is derived from the authenticated principal,
+callback URL, event name and arguments. Subscribing again with the same values
+refreshes it. `ttlMs` omitted grants 24 hours (configurable with
+`events.defaultTtlMs`), a number is clamped to 1 minute - 30 days, and `null`
+means no expiry (`refreshBefore: null`).
+
+**Callback verification.** Before the first subscription for a principal and
+URL, the server POSTs a signed `{"type":"verification","challenge":"..."}` and
+expects a 2xx response echoing `{"challenge": "..."}`. Success is cached for an
+hour. Failure returns the dialect's callback error with `data.reason`.
+
+**Delivery.** One event per POST with body
+`{ eventId, name, timestamp, data, cursor: null }` and headers `webhook-id`,
+`webhook-timestamp`, `webhook-signature` (`v1,<base64 HMAC-SHA256>`) and
+`X-MCP-Subscription-Id`. Failures are retried after 10 s, 1 min, 5 min, 30 min
+and 2 h with the same `eventId` and `webhook-id`; `410` (which also removes the subscription)
+and `413` are not retried. When a subscribe call brings a new secret, deliveries
+are signed with both secrets for 24 hours.
+
+**Callback safety.** Callbacks must be HTTPS. On Node, the sender resolves the
+host, rejects private, loopback and link-local addresses, and connects to the
+validated address (no DNS rebinding); redirects are not followed and each
+request times out after 10 s.
+
+## Storage
+
+| Where          | Store                                                                                                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mcp-use dev`  | A JSON file in `.mcp-use/state/events/`, so subscriptions and the poll log survive hot reloads and restarts. `http:` and loopback callbacks are allowed.                                                          |
+| Manufact Cloud | Redis through the platform proxy, from `MCP_USE_PLATFORM_STORAGE_URL`, `MCP_USE_PLATFORM_STORAGE_TOKEN` and `MCP_USE_PLATFORM_STORAGE_PREFIX`. Enable **MCP Events storage** in the server settings and redeploy. |
+| Self-hosted    | Any Upstash REST endpoint:                                                                                                                                                                                        |
+
+```ts
+import { upstashEventsStore } from "mcp-use/events";
+
+new MCPServer({
+  name: "chat",
+  version: "1.0.0",
+  events: {
+    store: upstashEventsStore({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    }),
+  },
+});
+```
+
+Other platform variables: `MCP_USE_PLATFORM_NAMESPACE` (key namespace) and
+`MCP_USE_PLATFORM_SECRET` (encrypts stored webhook secrets; comma-separated for
+rotation). When the Events runtime starts, the server logs which store is
+active (in-memory, file, custom, or Upstash REST with the host only, never the
+token). Outside these cases the store is in memory and resets on restart.
+
+### Retries and failures
+
+Due retries run on an in-process timer, so they need a long-running server
+(`mcp-use dev`, `node`, a container). On serverless hosts a retry runs the next
+time the server handles an event emit. A failed attempt is logged as
+`[mcp-use] events delivery failed: <name> <subscriptionId> -> <origin> <status|error> attempt <n>`.
+
+### On Manufact Cloud
+
+Enable **MCP Events storage** in the server settings and redeploy.
+Subscriptions then survive redeploys and are shared across instances. To list
+them from a terminal:
+
+```bash
+mcp-use events subscriptions
+```
+
+## ChatGPT
+
+Observed in live testing:
+
+- Subscriptions are created only from ChatGPT Work chats with **Cloud**
+  selected. A local Codex chat delegates the subscription to a Work Cloud chat.
+- The workspace needs **Developer mode** and **Allow event-triggered scheduled
+  tasks** turned on.
+- ChatGPT uses the 2026-07-28 `server/discover` handshake and identifies as
+  client `openai-mcp (Codex)/<version>`.
+- Servers without OAuth work.
+- Each delivered event triggers one automation run. ChatGPT deduplicates by
+  `eventId`, so retries of the same event do not run twice.
+- A successful callback verification is cached for 1 hour per principal and
+  callback URL, so re-subscribing within the hour skips the challenge.
+
+## Receive events in a client
+
+```ts
+import {
+  createWebhookReceiver,
+  generateWebhookSecret,
+  subscribeEvent,
+  unsubscribeEvent,
+} from "@mcp-use/client";
+
+const secret = generateWebhookSecret();
+const handler = createWebhookReceiver({
+  secrets: [secret],
+  onEvent: (event) => console.log(event.name, event.data),
+});
+// Serve `handler` (a Fetch handler) at https://example.com/hooks/mcp
+
+await subscribeEvent(session, {
+  name: "message.created",
+  arguments: { channel_id: "c1" },
+  url: "https://example.com/hooks/mcp",
+  secret,
+});
+```
+
+The receiver checks the signature and timestamp, answers the verification
+challenge and ignores an `eventId` it already processed for the same
+subscription. Call `subscribeEvent` again before `refreshBefore` to keep the
+subscription; `unsubscribeEvent` stops delivery.
+
+### Poll instead of a webhook
+
+No callback URL is needed:
+
+```ts
+import { pollEvents } from "@mcp-use/client";
+
+let cursor: string | null = null;
+for (;;) {
+  const page = await pollEvents(session, {
+    name: "message.created",
+    arguments: { channel_id: "c1" },
+    cursor,
+  });
+  for (const event of page.events) console.log(event.eventId, event.data);
+  cursor = page.cursor;
+  if (!page.hasMore)
+    await new Promise((r) => setTimeout(r, Math.max(page.nextPollMs, 1000)));
+}
+```
+
+In React, `useMcpEvent` runs that loop for a `useMcp` connection:
+
+```tsx
+import { useMcp, useMcpEvent } from "@mcp-use/client/react";
+
+function Messages() {
+  const mcp = useMcp({ url: "http://localhost:3000/mcp" });
+  const { events, state } = useMcpEvent(mcp, "message.created", {
+    arguments: { channel_id: "c1" },
+  });
+  return (
+    <ul>
+      {events.map((e) => (
+        <li key={e.eventId}>{String(e.data)}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### From the CLI
+
+```bash
+# Save the server under a name of your choice ("my-server" here), then use that name
+mcp-use client connect my-server http://localhost:3000/mcp
+mcp-use client my-server events list
+mcp-use client my-server events poll message.created channel_id=c1 --follow
+mcp-use client my-server events subscribe message.created channel_id=c1 --url https://example.com/hooks/mcp
+mcp-use client my-server events unsubscribe message.created channel_id=c1 --url https://example.com/hooks/mcp
+```
+
+`events` sits next to `tools`, `resources` and `prompts` under `mcp-use client <name>`.
+`subscribe` generates and prints a `whsec_` secret unless you pass `--secret`.
+
+<Frame caption="Subscribe a local receiver, create a note, see the delivery, then unsubscribe.">
+  <img src="/images/events/cli-subscribe.gif" alt="mcp-use client subscribing a webhook to note.created, receiving a delivery, and unsubscribing" />
+</Frame>
+
+<Frame caption="Poll from a cursor: only the inbox note is returned.">
+  <img src="/images/events/cli-poll.gif" alt="mcp-use client polling note.created with a cursor" />
+</Frame>
+
+## Inspector
+
+The Inspector's **Events** tab lists the server's events and subscribes with
+the Inspector's built-in webhook inbox as the callback. Each delivery shows its
+`webhook-id`, signature check and body. Under `mcp-use dev --tunnel` the inbox
+callback path is the only Inspector path reachable through the tunnel.
+
+<Frame caption="Subscribe from the Events tab, call create_note from Tools, inspect the delivery, then unsubscribe.">
+  <img src="/images/events/inspector-events.gif" alt="Inspector Events tab subscribing to note.created and showing a signed delivery" />
+</Frame>
+
+See [`examples/mcp-events`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/mcp-events) for a complete server.

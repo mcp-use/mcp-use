@@ -640,6 +640,18 @@ const pages: Record<string, Page> = {
       },
     },
   },
+  events: {
+    summary: "Inspect MCP Events on a deployed server: its subscriptions.",
+    examples: ["mcp-use events subscriptions"],
+    commands: {
+      subscriptions: {
+        summary:
+          "List active subscriptions (webhook and poll) seen by the gateway.",
+        options: project,
+        examples: ["mcp-use events subscriptions --server my-server --json"],
+      },
+    },
+  },
   logs: {
     summary:
       "Read Cloud build or runtime logs. Follow until interrupted; build logs stop at completion.",

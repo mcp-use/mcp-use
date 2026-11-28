@@ -120,7 +120,14 @@ function utf8ToBase64(value: string): string {
   return btoa(binary);
 }
 
-function encodeValue(value: string): string {
+/**
+ * Encodes one SEP-2243 header value, using the `=?base64?...?=` sentinel
+ * when the value cannot be sent as is.
+ *
+ * @param value - The raw value.
+ * @returns The header value.
+ */
+export function encodeMcpHeaderValue(value: string): string {
   return needsBase64(value)
     ? `${BASE64_SENTINEL_PREFIX}${utf8ToBase64(value)}${BASE64_SENTINEL_SUFFIX}`
     : value;
@@ -147,7 +154,8 @@ export function buildMcpParamHeaders(
     if (raw === undefined || raw === null) continue;
     const value = primitiveToString(raw);
     if (value === undefined) continue;
-    headers[`${MCP_PARAM_HEADER_PREFIX}${headerName}`] = encodeValue(value);
+    headers[`${MCP_PARAM_HEADER_PREFIX}${headerName}`] =
+      encodeMcpHeaderValue(value);
   }
   return headers;
 }

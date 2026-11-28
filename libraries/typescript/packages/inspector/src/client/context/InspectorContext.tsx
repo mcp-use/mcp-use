@@ -7,6 +7,7 @@ export type TabType =
   | "prompts"
   | "resources"
   | "skills"
+  | "events"
   | "chat"
   | "sampling"
   | "elicitation"

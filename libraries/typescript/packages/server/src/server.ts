@@ -9,6 +9,7 @@ import {
   PROTOCOL_VERSION_META_KEY,
   isJSONRPCRequest,
   isInputRequiredResult,
+  isLegacyRequest,
   ResourceNotFoundError,
   type ClientCapabilities,
   type McpHttpHandler,
@@ -70,6 +71,19 @@ import {
 } from "./middleware/mcp-middleware.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
+import type {
+  AnyEventDefinition,
+  EventDefinition,
+  EventHandle,
+} from "./events/define.js";
+import type { EventsRuntime } from "./events/runtime.js";
+import {
+  EVENTS_EXTENSION_ID,
+  asEventsListenRequest,
+  asEventsRequest,
+  rpcResponse,
+  stampModernResult,
+} from "./events/sdk-adapter.js";
 import {
   prepareSettings,
   type SettingsFields,
@@ -225,6 +239,23 @@ function productId(value: unknown, fallback: string): string {
     })
     ? normalized
     : fallback;
+}
+
+function eventsClientName(params: unknown): string | null {
+  const meta = record(record(params)?.["_meta"]);
+  const name = record(meta?.[CLIENT_INFO_META_KEY])?.["name"];
+  if (typeof name !== "string") return null;
+  // Keep long names such as "openai-mcp (Codex)/<version>" (cut, not dropped);
+  // strip control characters so the name is safe to display.
+  const clean = [...name]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    })
+    .join("")
+    .trim()
+    .slice(0, 128);
+  return clean.length > 0 ? clean : null;
 }
 
 function clientUsageFromBody(body: unknown): ClientUsage | undefined {
@@ -427,6 +458,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #httpApp: Hono<TEnv> | undefined;
   #handler: McpHttpHandler | undefined;
   #eventBus: ServerEventBus | undefined;
+  readonly #events = new Map<string, AnyEventDefinition>();
+  #eventsRuntime: Promise<EventsRuntime> | undefined;
   #httpServer: NodeHttpListener | undefined;
   #oauthResource: URL | undefined;
   #oauthResourceResolved = false;
@@ -958,6 +991,43 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   /**
+   * Register an MCP Event (ChatGPT dialect, webhook delivery). Clients
+   * discover it with `events/list` and subscribe with a callback URL.
+   *
+   * @returns A handle whose `emit(data, { eventId })` delivers the event to
+   * every matching subscription.
+   */
+  event<
+    I extends StandardSchemaWithJSON | undefined = undefined,
+    P extends StandardSchemaWithJSON | undefined = undefined,
+  >(
+    definition: EventDefinition<I, P>
+  ): EventHandle<
+    P extends StandardSchemaWithJSON
+      ? StandardSchemaWithJSON.InferInput<P>
+      : unknown
+  > {
+    this.#assertNotStarted("event", definition.name);
+    if (this.#events.has(definition.name))
+      throw new Error(`Event "${definition.name}" is already registered`);
+    this.#events.set(definition.name, definition as AnyEventDefinition);
+    const name = definition.name;
+    return {
+      name,
+      emit: async (data, options) =>
+        (await this.#eventsRuntimeInstance()).emit(name, data, options),
+    };
+  }
+
+  #eventsRuntimeInstance(): Promise<EventsRuntime> {
+    this.#eventsRuntime ??= import("./events/runtime.js").then(
+      ({ EventsRuntime }) =>
+        new EventsRuntime(this.#events, this.#config.events)
+    );
+    return this.#eventsRuntime;
+  }
+
+  /**
    * Compose upstream MCP servers into this server.
    *
    * A name-keyed HTTP config creates upstream connections through the optional
@@ -1301,6 +1371,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   async close(): Promise<void> {
     this.#closed = true;
+    // A runtime that failed to start has nothing to close; its error was
+    // already reported when it was created.
+    void this.#eventsRuntime?.then(
+      (runtime) => runtime.close(),
+      () => undefined
+    );
     await Promise.allSettled([...this.#proxyOperations]);
 
     const errors: unknown[] = [];
@@ -1840,6 +1916,41 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         (ctx) => this.#buildSdkServer(ctx),
         {
           path: basePath,
+          ...(this.#events.size > 0 && {
+            preflight: async (request, body, authInfo) => {
+              const listen = asEventsListenRequest(body);
+              if (listen !== undefined) {
+                if (await isLegacyRequest(request, body)) return undefined;
+                return (await this.#eventsRuntimeInstance()).listen(
+                  listen,
+                  request.signal,
+                  this.#eventBus
+                );
+              }
+              const rpc = asEventsRequest(body);
+              if (rpc === undefined) return undefined;
+              const runtime = await this.#eventsRuntimeInstance();
+              const legacy = await isLegacyRequest(request, body);
+              const { outcome, status } = await runtime.handle(
+                rpc.method,
+                rpc.params,
+                authInfo,
+                { request, legacy, clientName: eventsClientName(rpc.params) }
+              );
+              return rpcResponse(
+                rpc.id,
+                "result" in outcome && !legacy
+                  ? {
+                      result: stampModernResult(
+                        outcome.result,
+                        this.#implementationInfo(request)
+                      ),
+                    }
+                  : outcome,
+                status
+              );
+            },
+          }),
           ...((this.#config.legacy !== undefined ||
             this.#eventBus !== undefined) && {
             handler: {
@@ -2014,6 +2125,16 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         );
       }
 
+      if (this.#events.size > 0) {
+        // Start the runtime now so a changed catalog (hot reload, deploy)
+        // is detected and announced without waiting for a request.
+        // The cached promise still rejects for events requests and `emit`;
+        // this handler only keeps the eager start from becoming an
+        // unhandled rejection.
+        this.#eventsRuntimeInstance().catch((error: unknown) => {
+          console.error("[mcp-use] MCP Events runtime failed to start:", error);
+        });
+      }
       this.app.all(basePath, (context) => endpointHandler(context.req.raw));
       httpApp.route("/", this.app);
       this.#httpApp = httpApp;
@@ -2095,56 +2216,64 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
   }
 
+  /** The server's `Implementation` identity (`serverInfo`) for a request. */
+  #implementationInfo(request: Request | undefined) {
+    const { name, version, title, description } = this.#config;
+    return {
+      name,
+      version,
+      ...(title !== undefined && { title }),
+      ...(description !== undefined && { description }),
+      ...(this.#branding.websiteUrl !== undefined && {
+        websiteUrl: this.#branding.websiteUrl,
+      }),
+      ...(this.#branding.icons !== undefined && {
+        icons: resolveImplementationIcons(
+          this.#branding.icons,
+          request,
+          this.#basePath()
+        ),
+      }),
+    };
+  }
+
   /** Build a fully registered SDK server from the immutable registry. */
   #buildSdkServer(ctx: McpRequestContext): SdkMcpServer {
-    const { name, version, title, description } = this.#config;
     const instructions =
       this.#instructionsOverride ?? this.#config.instructions;
     const authInfo = ctx.authInfo;
-    const server = new SdkMcpServer(
-      {
-        name,
-        version,
-        ...(title !== undefined && { title }),
-        ...(description !== undefined && { description }),
-        ...(this.#branding.websiteUrl !== undefined && {
-          websiteUrl: this.#branding.websiteUrl,
+    const server = new SdkMcpServer(this.#implementationInfo(ctx.requestInfo), {
+      capabilities: {
+        logging: {},
+        tools: { listChanged: true },
+        prompts: { listChanged: true },
+        resources: { listChanged: true, subscribe: true },
+        ...(this.#events.size > 0 && { events: {} }),
+        ...((this.#skills !== undefined ||
+          this.#settings !== undefined ||
+          this.#events.size > 0) && {
+          extensions: {
+            ...(this.#events.size > 0 && {
+              [EVENTS_EXTENSION_ID]: { listChanged: true },
+            }),
+            ...(this.#skills !== undefined && {
+              [SKILLS_EXTENSION_ID]: { directoryRead: true },
+            }),
+            ...(this.#settings !== undefined && {
+              "openai/settings": this.#settings.capability,
+            }),
+          },
         }),
-        ...(this.#branding.icons !== undefined && {
-          icons: resolveImplementationIcons(
-            this.#branding.icons,
-            ctx.requestInfo,
-            this.#basePath()
-          ),
+        ...(this.#settings !== undefined && {
+          experimental: { "openai/settings": this.#settings.capability },
         }),
       },
-      {
-        capabilities: {
-          logging: {},
-          tools: { listChanged: true },
-          prompts: { listChanged: true },
-          resources: { listChanged: true, subscribe: true },
-          ...((this.#skills !== undefined || this.#settings !== undefined) && {
-            extensions: {
-              ...(this.#skills !== undefined && {
-                [SKILLS_EXTENSION_ID]: { directoryRead: true },
-              }),
-              ...(this.#settings !== undefined && {
-                "openai/settings": this.#settings.capability,
-              }),
-            },
-          }),
-          ...(this.#settings !== undefined && {
-            experimental: { "openai/settings": this.#settings.capability },
-          }),
-        },
-        ...(instructions !== undefined && { instructions }),
-        ...(authInfo !== undefined && { authInfo }),
-        ...(this.#config.requestState !== undefined && {
-          requestState: this.#config.requestState,
-        }),
-      }
-    );
+      ...(instructions !== undefined && { instructions }),
+      ...(authInfo !== undefined && { authInfo }),
+      ...(this.#config.requestState !== undefined && {
+        requestState: this.#config.requestState,
+      }),
+    });
 
     const request = ctx.requestInfo;
     const viewMetaOptions =

@@ -184,6 +184,7 @@ export class StdioConnector extends BaseConnector {
         "Roots/sampling/elicitation handlers registered before connect (stdio)"
       );
 
+      this.captureRawCapabilities(transport);
       await this.client.connect(transport);
 
       this.setupNotificationHandler();

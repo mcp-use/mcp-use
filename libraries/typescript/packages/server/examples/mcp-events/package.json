@@ -1,0 +1,19 @@
+{
+  "name": "mcp-use-example-mcp-events",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: MCP Events (webhook and poll delivery) with mcp-use.",
+  "engines": { "node": ">=22.22.2" },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "dev:tunnel": "mcp-use dev --tunnel",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "poll": "node src/poll.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../verify-examples.mjs --example=mcp-events"
+  },
+  "dependencies": { "@mcp-use/client": "workspace:*", "mcp-use": "workspace:*", "zod": "^4.6.6" },
+  "devDependencies": { "@types/node": "^22.20.0", "typescript": "^7.0.2", "vite": "^8.1.6" }
+}

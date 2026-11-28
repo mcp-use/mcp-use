@@ -7,6 +7,10 @@ import {
 } from "@/client/utils/samplingProtocol";
 import type { McpServer } from "@mcp-use/client/react";
 import {
+  EVENTS_UNSUPPORTED_MESSAGE,
+  supportsEvents,
+} from "@/client/utils/eventsProtocol";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -87,13 +91,16 @@ export function InspectorSidebarNav({
         const isDisabled =
           (tab.id === "sampling" &&
             !isInspectorSamplingAvailable(selectedServer)) ||
-          (skillsState !== undefined && skillsState !== "available");
+          (skillsState !== undefined && skillsState !== "available") ||
+          (tab.id === "events" && !supportsEvents(selectedServer));
         const disabledMessage =
-          tab.id === "skills"
-            ? skillsState === "empty"
-              ? SKILLS_EMPTY_CATALOG_MESSAGE
-              : SKILLS_UNSUPPORTED_MESSAGE
-            : STATELESS_SAMPLING_UNSUPPORTED_MESSAGE;
+          tab.id === "events"
+            ? EVENTS_UNSUPPORTED_MESSAGE
+            : tab.id === "skills"
+              ? skillsState === "empty"
+                ? SKILLS_EMPTY_CATALOG_MESSAGE
+                : SKILLS_UNSUPPORTED_MESSAGE
+              : STATELESS_SAMPLING_UNSUPPORTED_MESSAGE;
         const hasTrailing = count > 0 || showDot;
 
         const row = (

@@ -142,6 +142,8 @@ export abstract class BaseConnector {
   protected connectionManager: ConnectionManager<any> | null = null;
   protected toolsCache: Tool[] | null = null;
   protected capabilitiesCache: Record<string, unknown> | null = null;
+  /** Capabilities as sent on the wire (`initialize` or `server/discover`). */
+  private rawCapabilities: Record<string, unknown> | undefined;
   protected serverInfoCache: MCPServerInfo | null = null;
   protected authorizationCache: MCPAuthorizationInfo | undefined;
   protected connected = false;
@@ -595,8 +597,16 @@ export abstract class BaseConnector {
     logger.debug("Caching server capabilities & tools");
 
     // Cache server capabilities for callers who need them.
+    // The SDK's capability schema drops keys it does not know (for example
+    // MCP Events' `events`); keep them from the raw handshake result.
     const capabilities = this.client.getServerCapabilities();
-    this.capabilitiesCache = (capabilities as Record<string, unknown>) || null;
+    this.capabilitiesCache =
+      capabilities || this.rawCapabilities
+        ? {
+            ...this.rawCapabilities,
+            ...(capabilities as Record<string, unknown> | undefined),
+          }
+        : null;
 
     // The SDK normalizes identity from legacy initialize responses and modern
     // result metadata. Modern servers may remain anonymous.
@@ -635,7 +645,10 @@ export abstract class BaseConnector {
 
     logger.debug("Server capabilities:", capabilities);
     logger.debug("Server info:", serverInfo);
-    return capabilities;
+    // Same value as `serverCapabilities`, including keys the SDK drops.
+    return (this.capabilitiesCache ?? undefined) as ReturnType<
+      Client["getServerCapabilities"]
+    >;
   }
 
   /**
@@ -648,6 +661,60 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not initialized; call initialize() first");
     }
     return this.toolsCache;
+  }
+
+  /**
+   * Record the server capabilities exactly as received, before the SDK parses
+   * them. Call before `client.connect(transport)`.
+   *
+   * @param transport - The transport the SDK client will connect over.
+   */
+  protected captureRawCapabilities(transport: {
+    onmessage?: (message: any, ...rest: any[]) => void;
+  }): void {
+    this.rawCapabilities = undefined;
+    // Keep an existing accessor (e.g. a wrapTransport wrapper that forwards
+    // onmessage to the inner transport): store through it instead of
+    // shadowing it, or handlers set during connect never reach the transport
+    // that receives messages.
+    let desc: PropertyDescriptor | undefined;
+    for (
+      let o: object | null = transport;
+      o && !desc;
+      o = Object.getPrototypeOf(o)
+    )
+      desc = Object.getOwnPropertyDescriptor(o, "onmessage");
+    const forward = desc?.set ? desc : undefined;
+    let handler = transport.onmessage;
+    type Handler = typeof handler;
+    const read = (): Handler =>
+      forward ? forward.get?.call(transport) : handler;
+    const write = (next: Handler) => {
+      if (forward) forward.set!.call(transport, next);
+      else handler = next;
+    };
+    Object.defineProperty(transport, "onmessage", {
+      configurable: true,
+      enumerable: true,
+      get: read,
+      set: (next: Handler) => {
+        write(
+          next &&
+            ((message: any, ...rest: any[]) => {
+              const caps = message?.result?.capabilities;
+              if (
+                caps !== null &&
+                typeof caps === "object" &&
+                !Array.isArray(caps) &&
+                (typeof message.result.protocolVersion === "string" ||
+                  Array.isArray(message.result.supportedVersions))
+              )
+                this.rawCapabilities = caps;
+              return next(message, ...rest);
+            })
+        );
+      },
+    });
   }
 
   /** Capabilities cached during initialization, or an empty object. */

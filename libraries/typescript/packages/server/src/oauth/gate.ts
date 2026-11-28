@@ -55,6 +55,9 @@ const SIGNED_OUT_METHODS = new Set([
   "resources/list",
   "resources/templates/list",
   "prompts/list",
+  // MCP Events discovery follows tools/list. Subscribing and polling still
+  // require sign-in.
+  "events/list",
   "logging/setLevel",
 ]);
 

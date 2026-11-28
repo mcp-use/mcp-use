@@ -314,6 +314,7 @@
                       "typescript/server/examples",
                       "typescript/server/landing-page",
                       "typescript/server/skills",
+                      "typescript/server/events",
                       {
                         "group": "Core Components",
                         "icon": "box",

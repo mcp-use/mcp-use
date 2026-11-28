@@ -51,6 +51,12 @@ pnpm test:e2e:mix
   - Skips: HMR tests (auth-flows and oauth-emulate start their own fixture servers)
   - Execution: Serial (1 worker) - Dev server can be affected by concurrent operations
 
+`events.test.ts` runs in all three modes. It starts two MCP Events fixture servers (`fixtures/events-server.ts`) on ports 3010 (dev-like, insecure callbacks allowed) and 3011 (webhooks need sign-in).
+
+To reuse a locally installed Chromium instead of the revision Playwright downloads, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to its executable.
+
+Passing extra arguments in builtin mode turns off the automatic `--workers=1`; add `--workers=1` yourself when the run includes `hmr.test.ts`.
+
 **Run specific test files or individual tests:**
 
 You can pass additional arguments to run specific test files or individual tests:

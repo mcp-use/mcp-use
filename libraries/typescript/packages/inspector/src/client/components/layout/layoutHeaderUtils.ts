@@ -1,6 +1,7 @@
 import type { McpServer } from "@mcp-use/client/react";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
+import { supportsEvents } from "@/client/utils/eventsProtocol";
 export { isMcpUseTunnelUrl } from "@/client/utils/servers";
 
 export function tunnelOriginFromMcpUrl(mcpUrl: string | null): string | null {
@@ -69,6 +70,7 @@ export function getSkillsAccessibleLabel(
 export function isTabUsable(tabId: TabType, server: McpServer): boolean {
   if (tabId === "skills") return getSkillsState(server) === "available";
   if (tabId === "sampling") return isInspectorSamplingAvailable(server);
+  if (tabId === "events") return supportsEvents(server);
   return true;
 }
 

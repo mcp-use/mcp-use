@@ -13,6 +13,7 @@ export type InspectorTabId =
   | "sampling"
   | "elicitation"
   | "notifications"
+  | "events"
   | "connection-settings";
 
 /**

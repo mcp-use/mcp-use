@@ -48,6 +48,7 @@ export default defineConfig([
       "oauth/scalekit": "src/oauth/scalekit.ts",
       "oauth/convex": "src/oauth/convex.ts",
       "oauth/storage": "src/oauth/storage.ts",
+      "events/index": "src/events/index.ts",
       // Keep the OpenAPI integration in a sibling chunk. `MCPServer` imports
       // it synchronously so `fromOpenAPI()` stays a synchronous constructor,
       // while the root entry retains its independently enforced size budget.

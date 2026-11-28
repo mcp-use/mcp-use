@@ -31,6 +31,15 @@ export interface MountMcpOptions {
    * runs. When omitted, requests are served without authenticated identity.
    */
   authInfo?: (request: Request) => AuthInfo | undefined;
+  /**
+   * Answer a request before the SDK handler sees it: return a `Response`, or
+   * `undefined` to continue. MCP Events answers `events/*` here.
+   */
+  preflight?: (
+    request: Request,
+    parsedBody: unknown,
+    authInfo: AuthInfo | undefined
+  ) => Promise<Response | undefined>;
 }
 
 /** Result of {@link createMcpMount}. */
@@ -66,6 +75,7 @@ export function createMcpMount(
     path = "/mcp",
     handler: handlerOptions,
     authInfo: getAuthInfo,
+    preflight,
   } = options;
   const legacyMode = handlerOptions?.legacy ?? "stateless";
   const handler = createMcpHandler(factory, {
@@ -103,6 +113,10 @@ export function createMcpMount(
     }
 
     const authInfo = getAuthInfo?.(request) ?? bag.authInfo;
+    if (preflight !== undefined) {
+      const answered = await preflight(request, parsedBody, authInfo);
+      if (answered !== undefined) return answered;
+    }
     const response = await handler.fetch(request, {
       ...(parsedBody !== undefined && { parsedBody }),
       ...(authInfo !== undefined && { authInfo }),

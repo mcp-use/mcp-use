@@ -1,3 +1,4 @@
+import type { EventsOptions } from "./events/define.js";
 import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
 
 import type { LoggingOptions } from "./logging.js";
@@ -230,6 +231,12 @@ interface BaseServerConfig {
    * ```
    */
   cors?: CorsOptions;
+  /**
+   * MCP Events (both the official and ChatGPT dialects): subscription storage
+   * and delivery options.
+   * Register events with `server.event()`.
+   */
+  events?: EventsOptions;
 }
 
 /**

@@ -48,3 +48,6 @@ export {
 } from "./telemetry/tel-fetch.js";
 export { getPackageVersion, VERSION } from "./utils/version.js";
 export { detectFavicon } from "./utils/favicon.js";
+
+// MCP Events (ChatGPT dialect, webhook delivery)
+export * from "./events.js";

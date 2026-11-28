@@ -19,3 +19,21 @@ export function isInspectorPath(pathname: string, basePath: string): boolean {
   const inspectorPath = pathUnderBase(basePath, "inspector");
   return pathname === inspectorPath || pathname.startsWith(`${inspectorPath}/`);
 }
+
+/**
+ * Whether a request is a delivery to the Inspector's MCP Events webhook inbox
+ * (`POST <inspector>/api/events/hooks/<id>`): the only Inspector path served
+ * through a tunnel, so callbacks from a remote server can reach it.
+ */
+export function isInspectorEventsHook(
+  method: string,
+  pathname: string,
+  basePath: string
+): boolean {
+  const prefix = `${pathUnderBase(basePath, "inspector")}/api/events/hooks/`;
+  return (
+    method.toUpperCase() === "POST" &&
+    pathname.startsWith(prefix) &&
+    pathname.length > prefix.length
+  );
+}

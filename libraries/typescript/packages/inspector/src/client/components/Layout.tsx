@@ -27,6 +27,7 @@ import {
   toMcpServerConfig,
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
+import { supportsEvents } from "@/client/utils/eventsProtocol";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
 import { getSkillsFallbackTab } from "./layout/layoutHeaderUtils";
 import { getServerDisplayName } from "@/client/utils/servers";
@@ -196,6 +197,7 @@ export function Layout({ children }: LayoutProps) {
         "prompts",
         "resources",
         "skills",
+        "events",
         "chat",
         "sampling",
         "elicitation",
@@ -280,6 +282,21 @@ export function Layout({ children }: LayoutProps) {
       activeTab === "sampling" &&
       selectedServer &&
       !isInspectorSamplingAvailable(selectedServer)
+    ) {
+      handleTabChange("tools");
+    }
+  }, [activeTab, connections, selectedServerId, handleTabChange]);
+
+  // Leave the Events tab once the selected server is known not to support MCP
+  // Events (e.g. after switching servers), like Sampling above.
+  useEffect(() => {
+    const selectedServer = connections.find(
+      (connection) => connection.id === selectedServerId
+    );
+    if (
+      activeTab === "events" &&
+      selectedServer?.state === "ready" &&
+      !supportsEvents(selectedServer)
     ) {
       handleTabChange("tools");
     }

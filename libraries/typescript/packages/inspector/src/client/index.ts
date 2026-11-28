@@ -150,3 +150,4 @@ export { useChatTitleGeneration } from "./chat-history/useChatTitleGeneration.js
 
 // MCP Prompts hook (used by ChatTab, useful standalone)
 export { useMCPPrompts, type PromptResult } from "./hooks/useMCPPrompts.js";
+export { EventsTab, supportsEvents } from "./components/EventsTab.js";

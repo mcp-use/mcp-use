@@ -15,6 +15,10 @@ import {
 } from "@/client/utils/samplingProtocol";
 import { ChevronDown, CircleAlert, Plus } from "lucide-react";
 import type { McpServer } from "@mcp-use/client/react";
+import {
+  EVENTS_UNSUPPORTED_MESSAGE,
+  supportsEvents,
+} from "@/client/utils/eventsProtocol";
 import { useState } from "react";
 import { toast } from "sonner";
 import { HostedUserMenu } from "@/client/components/HostedUserMenu";
@@ -308,13 +312,16 @@ export function LayoutHeader({
                       (tab.id === "sampling" &&
                         !isInspectorSamplingAvailable(selectedServer)) ||
                       (skillsState !== undefined &&
-                        skillsState !== "available");
+                        skillsState !== "available") ||
+                      (tab.id === "events" && !supportsEvents(selectedServer));
                     const disabledTooltip =
-                      tab.id === "skills"
-                        ? skillsState === "empty"
-                          ? SKILLS_EMPTY_CATALOG_MESSAGE
-                          : SKILLS_UNSUPPORTED_MESSAGE
-                        : STATELESS_SAMPLING_UNSUPPORTED_MESSAGE;
+                      tab.id === "events"
+                        ? EVENTS_UNSUPPORTED_MESSAGE
+                        : tab.id === "skills"
+                          ? skillsState === "empty"
+                            ? SKILLS_EMPTY_CATALOG_MESSAGE
+                            : SKILLS_UNSUPPORTED_MESSAGE
+                          : STATELESS_SAMPLING_UNSUPPORTED_MESSAGE;
 
                     const trigger = (
                       <TabsTrigger

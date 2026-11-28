@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import type { MCPConnection } from "@mcp-use/client";
 
 import { resolveClientHelp } from "./client-help.js";
+import { parseEventsArgs, runEventsCommand } from "./events.js";
 import { loadClientPackage } from "./load-client.js";
 import { CommandError, UsageError } from "../core/errors.js";
 import {
@@ -201,8 +202,20 @@ async function savedServerCommand(
   const saved = await readServers();
   const definition = saved.servers[name];
   if (definition === undefined) {
+    // Commands take a saved name; a URL here means the server was not saved.
+    const isUrl = /^https?:\/\//i.test(name);
+    let shown = name;
+    if (isUrl) {
+      try {
+        shown = safeUrlForOutput(name);
+      } catch {
+        // Unparseable: echo as typed.
+      }
+    }
     throw new UsageError(
-      `Unknown saved server: ${name}. Run \`mcp-use client connect ${name} <url>\`.`
+      isUrl
+        ? `Unknown saved server: ${shown}. Commands take a saved server name: run \`mcp-use client connect <name> ${shown}\`, then \`mcp-use client <name> ...\`.`
+        : `Unknown saved server: ${name}. Run \`mcp-use client connect ${name} <url>\`.`
     );
   }
   const family = argv[0];
@@ -339,8 +352,17 @@ async function savedServerCommand(
         return 0;
       }
     }
+    if (family === "events") {
+      const parsed = parseEventsArgs(name, operation, argv.slice(2));
+      return await runEventsCommand(
+        connection,
+        parsed,
+        parseMcpArguments(parsed.rest),
+        json
+      );
+    }
     throw new UsageError(
-      `Usage: mcp-use client ${name} <tools|resources|prompts|auth> ...`
+      `Usage: mcp-use client ${name} <tools|resources|prompts|events|auth> ...`
     );
   } finally {
     await connection.disconnect();
@@ -377,6 +399,10 @@ function validateSavedCommandArgs(
     one(args, `mcp-use client ${name} resources read <uri>`);
     return;
   }
+  if (family === "events") {
+    parseMcpArguments(parseEventsArgs(name, operation, args).rest);
+    return;
+  }
   if (family === "prompts" && operation === "get") {
     if (args[0] === undefined) {
       throw new UsageError(
@@ -387,7 +413,7 @@ function validateSavedCommandArgs(
     return;
   }
   throw new UsageError(
-    `Usage: mcp-use client ${name} <tools|resources|prompts|auth> ...`
+    `Usage: mcp-use client ${name} <tools|resources|prompts|events|auth> ...`
   );
 }
 

@@ -8,6 +8,15 @@
 export { MCPServer } from "./server.js";
 export type { ListenOptions } from "./server.js";
 export { createMcpMount } from "./mount-mcp.js";
+export type {
+  EmitOptions,
+  EmitResult,
+  EventDefinition,
+  EventHandle,
+  EventsOptions,
+  InferEventSchema,
+} from "./events/define.js";
+export type { EventsStore } from "./events/store.js";
 export { isBuilding } from "./build-phase.js";
 export type { MountMcpOptions, McpMount } from "./mount-mcp.js";
 export {

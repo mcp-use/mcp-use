@@ -55,6 +55,10 @@
       "types": "./dist/landing.d.ts",
       "import": "./dist/landing.js"
     },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "import": "./dist/events/index.js"
+    },
     "./oauth": {
       "types": "./dist/oauth/index.d.ts",
       "import": "./dist/oauth/index.js"

@@ -81,7 +81,11 @@ import {
   type DevInspectorHandler,
   type ProjectInspectorModule,
 } from "./inspector.js";
-import { isInspectorPath, isInspectorRequest } from "./inspector-route.js";
+import {
+  isInspectorEventsHook,
+  isInspectorPath,
+  isInspectorRequest,
+} from "./inspector-route.js";
 // Bundled into the CLI artifact without becoming a runtime dependency.
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { createTunnelManager } from "@mcp-use/tunnel";
@@ -436,6 +440,20 @@ export async function runDev(options: DevOptions): Promise<void> {
   const host = resolveHost(options.host);
   const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
   const wildcardBind = host === "0.0.0.0" || host === "::";
+
+  // MCP Events in development: keep subscriptions and the poll log in a file
+  // so they survive hot reloads and restarts. On a loopback-only listener
+  // without a tunnel, also allow http and loopback callbacks (the Inspector
+  // webhook inbox); anything reachable from outside keeps the SSRF guards.
+  // Set after loadProjectEnv so the project's .env can override both.
+  if (localhostBind && options.tunnel !== true)
+    process.env.MCP_USE_EVENTS_INSECURE ??= "1";
+  process.env.MCP_USE_EVENTS_STATE_DIR ??= join(
+    options.cwd,
+    ".mcp-use",
+    "state",
+    "events"
+  );
 
   // Resolve the listener before importing the entry so module-scope OAuth
   // configuration observes the canonical port that this CLI will own.
@@ -1272,7 +1290,8 @@ export async function runDev(options: DevOptions): Promise<void> {
         (wildcardBind &&
           requestHostname !== undefined &&
           !["localhost", "127.0.0.1", "::1"].includes(requestHostname))) &&
-      isInspectorPath(pathname, basePath)
+      isInspectorPath(pathname, basePath) &&
+      !isInspectorEventsHook(req.method ?? "GET", pathname, basePath)
     ) {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("Not Found");
