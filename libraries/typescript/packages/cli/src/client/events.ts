@@ -101,19 +101,52 @@ interface Occurrence {
  * the per-request `_meta`, so the server answers in the official dialect even
  * when the loaded `@mcp-use/client` predates declaring it itself.
  */
-function request(
+async function request(
   connection: MCPConnection,
   method: string,
   params: Record<string, unknown>
 ): Promise<unknown> {
-  return connection.request(method, {
-    ...params,
-    _meta: {
-      "io.modelcontextprotocol/clientCapabilities": {
-        extensions: { "io.modelcontextprotocol/events": {} },
+  try {
+    return await connection.request(method, {
+      ...params,
+      _meta: {
+        "io.modelcontextprotocol/clientCapabilities": {
+          extensions: { "io.modelcontextprotocol/events": {} },
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code === -32601) {
+      const webhook =
+        method === "events/subscribe" || method === "events/unsubscribe";
+      throw new UsageError(
+        webhook
+          ? `The server does not support webhook delivery (${method} is not implemented). Use \`events poll\` instead.`
+          : `The server does not implement ${method}.`,
+        webhook ? { code: "webhook_unsupported" } : {}
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Refuse a webhook subscribe/unsubscribe for an event whose `events/list`
+ * entry does not offer webhook delivery.
+ */
+async function assertWebhookOffered(
+  connection: MCPConnection,
+  name: string
+): Promise<void> {
+  const { events = [] } = (await request(connection, "events/list", {})) as {
+    events?: { name: string; delivery?: string[] }[];
+  };
+  const delivery = events.find((e) => e.name === name)?.delivery;
+  if (!Array.isArray(delivery) || delivery.includes("webhook")) return;
+  throw new UsageError(
+    `Event "${name}" supports only ${delivery.join(", ") || "no"} delivery, not webhook. Use \`events poll ${name}\` instead.`,
+    { code: "webhook_unsupported" }
+  );
 }
 
 /** Run a parsed `events` command over an open connection. */
@@ -141,6 +174,7 @@ export async function runEventsCommand(
     return 0;
   }
   if (args.operation === "subscribe") {
+    await assertWebhookOffered(connection, name);
     const secret = args.secret ?? `whsec_${randomBytes(32).toString("base64")}`;
     const result = await request(connection, "events/subscribe", {
       name,
