@@ -189,6 +189,16 @@ test.describe("Events tab", () => {
     await expect(sub).toContainText("webhook-signature");
     await expect(sub).toContainText("From the tools tab");
 
+    // A reload reuses the same webhook inbox and lists the subscription made
+    // before it, so it can still be unsubscribed.
+    const callback = await page.getByText(/Callback: http/).textContent();
+    await page.reload();
+    await expect(tabLocator(page, "events")).toBeVisible();
+    await selectNoteCreated(page);
+    await expect(page.getByText(/Callback: http/)).toHaveText(callback!);
+    await expect(sub).toHaveCount(1);
+    await expect(sub).toContainText("note.created");
+
     await sub.getByTestId("events-unsubscribe-button").click();
     await expect(page.getByTestId("events-subscription")).toHaveCount(0);
     await expect(page.getByText(/No subscriptions yet/)).toBeVisible();

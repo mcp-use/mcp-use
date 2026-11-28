@@ -230,6 +230,52 @@ function DeliveryRow({ delivery }: { delivery: Delivery }) {
   );
 }
 
+interface StoredInbox {
+  id: string;
+  secret: string;
+  path: string;
+  subs: OwnSubscription[];
+}
+
+/** Read the persisted inbox for a server; undefined when absent or invalid. */
+function readStoredInbox(key: string): StoredInbox | undefined {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return undefined;
+    const v = JSON.parse(raw) as Partial<StoredInbox>;
+    if (
+      typeof v.id !== "string" ||
+      typeof v.secret !== "string" ||
+      typeof v.path !== "string"
+    )
+      return undefined;
+    return {
+      id: v.id,
+      secret: v.secret,
+      path: v.path,
+      subs: Array.isArray(v.subs)
+        ? v.subs.filter(
+            (s) =>
+              s &&
+              s.mode === "webhook" &&
+              typeof s.id === "string" &&
+              typeof s.name === "string"
+          )
+        : [],
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredInbox(key: string, value: StoredInbox): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage unavailable (private mode, quota): the inbox lasts this page only.
+  }
+}
+
 /**
  * The Events tab: the server's events on the left (like the Tools list), the
  * selected event's subscribe form top right, and this Inspector's
@@ -290,18 +336,70 @@ export function EventsTab({ server }: { server: McpServer }) {
     if (ready) void refreshEvents();
   }, [ready, refreshEvents]);
 
+  // Reuse this server's webhook inbox across page loads (kept in
+  // localStorage), so webhook subscriptions made earlier stay visible and can
+  // be unsubscribed. Inboxes live in the Inspector server's memory: when the
+  // stored one is gone, start a new one.
+  const storageKey = `mcp-use:events-inbox:${server.id}`;
+  const [restored, setRestored] = useState(false);
+  const [inboxPath, setInboxPath] = useState<string>();
   useEffect(() => {
-    fetch(inspectorApi("events/inboxes"), { method: "POST" })
-      .then((r) => r.json())
-      .then((b: { id: string; secret: string; path: string }) =>
-        setInbox({
-          id: b.id,
-          secret: b.secret,
-          url: `${window.location.origin}${b.path}`,
-        })
-      )
-      .catch((e: Error) => setError(`inbox: ${e.message}`));
-  }, []);
+    let cancelled = false;
+    setRestored(false);
+    const stored = readStoredInbox(storageKey);
+    const toUrl = (path: string) => `${window.location.origin}${path}`;
+    const reuse = stored
+      ? fetch(inspectorApi(`events/inboxes/${stored.id}`)).then((r) =>
+          r.ok ? stored : undefined
+        )
+      : Promise.resolve(undefined);
+    reuse
+      .catch(() => undefined)
+      .then(async (found) => {
+        if (found) return { inbox: found, subs: found.subs };
+        const r = await fetch(inspectorApi("events/inboxes"), {
+          method: "POST",
+        });
+        const b = (await r.json()) as {
+          id: string;
+          secret: string;
+          path: string;
+        };
+        return {
+          inbox: { id: b.id, secret: b.secret, path: b.path, subs: [] },
+          subs: [] as OwnSubscription[],
+        };
+      })
+      .then(({ inbox: next, subs: saved }) => {
+        if (cancelled) return;
+        setInbox({ id: next.id, secret: next.secret, url: toUrl(next.path) });
+        setInboxPath(next.path);
+        setSubs((all) => [
+          ...all,
+          ...saved.filter((s) => !all.some((a) => a.key === s.key)),
+        ]);
+        setRestored(true);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(`inbox: ${e.message}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [storageKey, setError]);
+
+  // Persist the inbox and its webhook subscriptions for the next page load.
+  useEffect(() => {
+    if (!inbox || !inboxPath || !restored) return;
+    writeStoredInbox(storageKey, {
+      id: inbox.id,
+      secret: inbox.secret,
+      path: inboxPath,
+      subs: subs
+        .filter((s) => s.mode === "webhook")
+        .map((s) => ({ ...s, polled: [], error: undefined })),
+    });
+  }, [storageKey, inbox, inboxPath, restored, subs]);
 
   // Fetch the inbox only while a webhook subscription exists and the page is
   // visible.
