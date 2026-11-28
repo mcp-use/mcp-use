@@ -312,11 +312,23 @@ mcp-use client my-server events unsubscribe message.created channel_id=c1 --url 
 `events` sits next to `tools`, `resources` and `prompts` under `mcp-use client <name>`.
 `subscribe` generates and prints a `whsec_` secret unless you pass `--secret`.
 
+<Frame caption="Subscribe a local receiver, create a note, see the delivery, then unsubscribe.">
+  <img src="/images/events/cli-subscribe.gif" alt="mcp-use client subscribing a webhook to note.created, receiving a delivery, and unsubscribing" />
+</Frame>
+
+<Frame caption="Poll from a cursor: only the inbox note is returned.">
+  <img src="/images/events/cli-poll.gif" alt="mcp-use client polling note.created with a cursor" />
+</Frame>
+
 ## Inspector
 
 The Inspector's **Events** tab lists the server's events and subscribes with
 the Inspector's built-in webhook inbox as the callback. Each delivery shows its
 `webhook-id`, signature check and body. Under `mcp-use dev --tunnel` the inbox
 callback path is the only Inspector path reachable through the tunnel.
+
+<Frame caption="Subscribe from the Events tab, call create_note from Tools, inspect the delivery, then unsubscribe.">
+  <img src="/images/events/inspector-events.gif" alt="Inspector Events tab subscribing to note.created and showing a signed delivery" />
+</Frame>
 
 See [`examples/mcp-events`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/mcp-events) for a complete server.
