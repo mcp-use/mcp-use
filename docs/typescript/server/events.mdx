@@ -298,12 +298,12 @@ function Messages() {
 ### From the CLI
 
 ```bash
-# Save the server under a name of your choice ("notes" here), then use that name
-mcp-use client connect notes http://localhost:3000/mcp
-mcp-use client notes events list
-mcp-use client notes events poll note.created folder=inbox --follow
-mcp-use client notes events subscribe note.created folder=inbox --url https://example.com/hooks/mcp
-mcp-use client notes events unsubscribe note.created folder=inbox --url https://example.com/hooks/mcp
+# Save the server under a name of your choice ("my-server" here), then use that name
+mcp-use client connect my-server http://localhost:3000/mcp
+mcp-use client my-server events list
+mcp-use client my-server events poll message.created channel_id=c1 --follow
+mcp-use client my-server events subscribe message.created channel_id=c1 --url https://example.com/hooks/mcp
+mcp-use client my-server events unsubscribe message.created channel_id=c1 --url https://example.com/hooks/mcp
 ```
 
 `events` sits next to `tools`, `resources` and `prompts` under `mcp-use client <name>`.
