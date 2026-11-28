@@ -314,6 +314,7 @@
                       "typescript/server/examples",
                       "typescript/server/landing-page",
                       "typescript/server/skills",
+                      "typescript/server/events",
                       {
                         "group": "Core Components",
                         "icon": "box",
@@ -374,8 +375,7 @@
                           "typescript/server/elicitation",
                           "typescript/server/sampling",
                           "typescript/server/subscriptions",
-                          "typescript/server/notifications",
-                          "typescript/server/events"
+                          "typescript/server/notifications"
                         ]
                       }
                     ]
